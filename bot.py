@@ -3,6 +3,7 @@ import asyncio
 import logging
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from config import Settings
@@ -18,6 +19,7 @@ class TuekaBot(commands.Bot):
         self.settings = settings
 
     async def setup_hook(self) -> None:
+        self.tree.on_error = self.on_app_command_error
         for extension in self.settings.extensions:
             await self.load_extension(extension)
         synced = await self.tree.sync()
@@ -25,6 +27,19 @@ class TuekaBot(commands.Bot):
 
     async def on_ready(self) -> None:
         logging.info("%s is online", self.user)
+
+    async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+        if isinstance(error, app_commands.MissingPermissions):
+            message = "このコマンドを実行する権限がありません。"
+        elif isinstance(error, app_commands.CheckFailure):
+            message = "このコマンドはここでは実行できません。"
+        else:
+            logging.exception("Application command failed", exc_info=error)
+            message = "コマンドの実行中にエラーが発生しました。"
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
 
 
 async def main() -> None:
