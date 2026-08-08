@@ -1,0 +1,13 @@
+[Unit]
+Description=Tueka Dashboard
+After=network.target
+
+[Service]
+User=tueka
+WorkingDirectory=/opt/discordBot-Tueka
+EnvironmentFile=/opt/discordBot-Tueka/.env
+ExecStart=/opt/discordBot-Tueka/.venv/bin/uvicorn dashboard.app:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

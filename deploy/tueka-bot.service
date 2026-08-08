@@ -1,0 +1,13 @@
+[Unit]
+Description=Tueka Discord Bot
+After=network.target
+
+[Service]
+User=tueka
+WorkingDirectory=/opt/discordBot-Tueka
+EnvironmentFile=/opt/discordBot-Tueka/.env
+ExecStart=/opt/discordBot-Tueka/.venv/bin/python bot.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
