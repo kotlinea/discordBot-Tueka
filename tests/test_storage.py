@@ -35,3 +35,18 @@ class GuildStorageTests(unittest.TestCase):
         self.assertEqual(self.storage.dashboard_session_token("session"), "access-token")
         self.storage.delete_dashboard_session("session")
         self.assertIsNone(self.storage.dashboard_session_token("session"))
+
+    def test_oauth_state_is_single_use(self):
+        self.storage.create_oauth_state("state")
+        self.assertTrue(self.storage.consume_oauth_state("state"))
+        self.assertFalse(self.storage.consume_oauth_state("state"))
+
+    def test_module_toggle_preserves_its_settings(self):
+        self.storage.set_module(1, "welcome", enabled=True, settings={"welcome_channel_id": 10, "default_role_id": 20})
+        self.storage.set_module(1, "welcome", enabled=False)
+        module = self.storage.get_module(1, "welcome")
+        self.assertFalse(module["enabled"])
+        self.assertEqual(module["settings"]["welcome_channel_id"], 10)
+
+    def test_new_modules_start_disabled(self):
+        self.assertFalse(self.storage.get_module(1, "moderation")["enabled"])

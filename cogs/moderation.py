@@ -23,6 +23,8 @@ class ModerationCog(commands.Cog):
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or message.guild is None:
             return
+        if not self.storage.module_enabled(message.guild.id, "moderation"):
+            return
         matches = [word for word in self.banned_words() if word in message.content.lower()]
         if not matches:
             return
@@ -38,12 +40,18 @@ class ModerationCog(commands.Cog):
     @app_commands.guild_only()
     async def set_management(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
         assert interaction.guild is not None
+        module = self.storage.get_module(interaction.guild.id, "audit_log")
+        module["settings"]["management_channel_id"] = channel.id
+        self.storage.set_module(interaction.guild.id, "audit_log", enabled=module["enabled"], settings=module["settings"])
         self.storage.set(interaction.guild.id, "management_channel_id", channel.id)
         await interaction.response.send_message(f"管理ログチャネルを `{channel.name}` に設定しました。", ephemeral=True)
 
     @app_commands.command(description="このチャネルのメッセージを削除します。")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def clear(self, interaction: discord.Interaction, confirm: str | None = None) -> None:
+        if interaction.guild and not self.storage.module_enabled(interaction.guild.id, "moderation"):
+            await interaction.response.send_message("この機能は管理者により無効です。", ephemeral=True)
+            return
         if confirm != "confirm" or not isinstance(interaction.channel, discord.TextChannel):
             await interaction.response.send_message("確認には `/clear confirm` を使用してください。", ephemeral=True)
             return

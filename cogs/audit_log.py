@@ -12,7 +12,10 @@ class AuditLogCog(commands.Cog):
         self.storage = GuildStorage(bot.settings.database_path)
 
     async def _channel(self, guild: discord.Guild) -> discord.TextChannel | None:
-        channel_id = self.storage.get(guild.id, "management_channel_id")
+        module = self.storage.get_module(guild.id, "audit_log")
+        if not module["enabled"]:
+            return None
+        channel_id = module["settings"].get("management_channel_id")
         channel = guild.get_channel(channel_id) if channel_id else None
         return channel if isinstance(channel, discord.TextChannel) else None
 

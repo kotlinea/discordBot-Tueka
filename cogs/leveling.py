@@ -30,6 +30,8 @@ class LevelingCog(commands.Cog):
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or message.guild is None:
             return
+        if not self.storage.module_enabled(message.guild.id, "leveling"):
+            return
         key = (message.guild.id, message.author.id)
         now = time.monotonic()
         if now - self.last_xp_time.get(key, 0) < 60:
@@ -49,6 +51,9 @@ class LevelingCog(commands.Cog):
     @app_commands.guild_only()
     async def rank(self, interaction: discord.Interaction) -> None:
         assert interaction.guild is not None
+        if not self.storage.module_enabled(interaction.guild.id, "leveling"):
+            await interaction.response.send_message("この機能は管理者により無効です。", ephemeral=True)
+            return
         xp = self.storage.get_user(interaction.guild.id, interaction.user.id)["xp"]
         level, progress = calculate_level(xp)
         await interaction.response.send_message(f"📊 {interaction.user.mention} のレベル: **Lv {level}**\n現在のXP: {progress} / {required_xp(level)}")
@@ -57,6 +62,9 @@ class LevelingCog(commands.Cog):
     @app_commands.guild_only()
     async def leaderboard(self, interaction: discord.Interaction) -> None:
         assert interaction.guild is not None
+        if not self.storage.module_enabled(interaction.guild.id, "leveling"):
+            await interaction.response.send_message("この機能は管理者により無効です。", ephemeral=True)
+            return
         ranked = self.storage.leaderboard(interaction.guild.id)
         if not ranked:
             await interaction.response.send_message("まだXPデータがありません。")

@@ -57,6 +57,17 @@ class GuildStorage:
                     access_token TEXT NOT NULL,
                     expires_at INTEGER NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS oauth_states (
+                    state TEXT PRIMARY KEY,
+                    expires_at INTEGER NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS guild_modules (
+                    guild_id INTEGER NOT NULL,
+                    module_id TEXT NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+                    settings_json TEXT NOT NULL DEFAULT '{}',
+                    PRIMARY KEY (guild_id, module_id)
+                );
             """)
 
     def get_settings(self, guild_id: int) -> dict[str, int | None]:
@@ -81,6 +92,25 @@ class GuildStorage:
                      default_role_id = excluded.default_role_id""",
                 (guild_id, current["management_channel_id"], current["welcome_channel_id"], current["default_role_id"]),
             )
+
+    def get_module(self, guild_id: int, module_id: str) -> dict[str, Any]:
+        with self._connection() as connection:
+            row = connection.execute("SELECT enabled, settings_json FROM guild_modules WHERE guild_id = ? AND module_id = ?", (guild_id, module_id)).fetchone()
+        if row:
+            return {"enabled": bool(row["enabled"]), "settings": json.loads(row["settings_json"])}
+        legacy = self.get_settings(guild_id)
+        defaults = {"welcome": {key: legacy[key] for key in ("welcome_channel_id", "default_role_id")}, "audit_log": {"management_channel_id": legacy["management_channel_id"]}}.get(module_id, {})
+        return {"enabled": False, "settings": defaults}
+
+    def set_module(self, guild_id: int, module_id: str, *, enabled: bool, settings: dict[str, Any] | None = None) -> None:
+        current = self.get_module(guild_id, module_id)
+        values = current["settings"] if settings is None else settings
+        with self._connection() as connection:
+            connection.execute("""INSERT INTO guild_modules (guild_id, module_id, enabled, settings_json) VALUES (?, ?, ?, ?)
+                ON CONFLICT(guild_id, module_id) DO UPDATE SET enabled = excluded.enabled, settings_json = excluded.settings_json""", (guild_id, module_id, int(enabled), json.dumps(values)))
+
+    def module_enabled(self, guild_id: int, module_id: str) -> bool:
+        return self.get_module(guild_id, module_id)["enabled"]
 
     # Compatibility helpers for small existing consumers.
     def get(self, guild_id: int, key: str, default: Any = None) -> Any:
@@ -127,6 +157,17 @@ class GuildStorage:
     def delete_dashboard_session(self, session_id: str) -> None:
         with self._connection() as connection:
             connection.execute("DELETE FROM dashboard_sessions WHERE session_id = ?", (session_id,))
+
+    def create_oauth_state(self, state: str, expires_in: int = 600) -> None:
+        now = int(time.time())
+        with self._connection() as connection:
+            connection.execute("DELETE FROM oauth_states WHERE expires_at <= ?", (now,))
+            connection.execute("INSERT INTO oauth_states (state, expires_at) VALUES (?, ?)", (state, now + expires_in))
+
+    def consume_oauth_state(self, state: str) -> bool:
+        with self._connection() as connection:
+            cursor = connection.execute("DELETE FROM oauth_states WHERE state = ? AND expires_at > ?", (state, int(time.time())))
+        return cursor.rowcount == 1
 
     def migrate_json(self, data_dir: Path) -> int:
         if self.migrated():

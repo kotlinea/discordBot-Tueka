@@ -27,6 +27,18 @@ class DiscordAPI:
             response.raise_for_status()
             return response.json()
 
+    async def current_user(self, access_token: str) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(f"{API_BASE}/users/@me", headers={"Authorization": f"Bearer {access_token}"})
+            response.raise_for_status()
+            return response.json()
+
+    async def bot_user(self) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(f"{API_BASE}/users/@me", headers={"Authorization": f"Bot {self.bot_token}"})
+            response.raise_for_status()
+            return response.json()
+
     async def bot_guild_ids(self) -> set[int]:
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(f"{API_BASE}/users/@me/guilds", headers={"Authorization": f"Bot {self.bot_token}"})

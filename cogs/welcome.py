@@ -11,11 +11,14 @@ class WelcomeCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
-        channel_id = self.storage.get(member.guild.id, "welcome_channel_id")
+        module = self.storage.get_module(member.guild.id, "welcome")
+        if not module["enabled"]:
+            return
+        channel_id = module["settings"].get("welcome_channel_id")
         channel = member.guild.get_channel(channel_id) if channel_id else None
         if isinstance(channel, discord.abc.Messageable):
             await channel.send(f"{member.mention}さん、**{member.guild.name}**へようこそ! 🎉")
-        role_id = self.storage.get(member.guild.id, "default_role_id")
+        role_id = module["settings"].get("default_role_id")
         role = member.guild.get_role(role_id) if role_id else None
         if role:
             try:
@@ -25,7 +28,10 @@ class WelcomeCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member) -> None:
-        channel_id = self.storage.get(member.guild.id, "welcome_channel_id")
+        module = self.storage.get_module(member.guild.id, "welcome")
+        if not module["enabled"]:
+            return
+        channel_id = module["settings"].get("welcome_channel_id")
         channel = member.guild.get_channel(channel_id) if channel_id else None
         if isinstance(channel, discord.abc.Messageable):
             await channel.send(f"Goodbye {member.name}! We'll miss you! 😢")
@@ -33,6 +39,9 @@ class WelcomeCog(commands.Cog):
     @app_commands.command(description="ウェルカムメッセージを送信します。")
     @app_commands.guild_only()
     async def welcome(self, interaction: discord.Interaction, member: discord.Member | None = None) -> None:
+        if interaction.guild and not self.storage.module_enabled(interaction.guild.id, "welcome"):
+            await interaction.response.send_message("この機能は管理者により無効です。", ephemeral=True)
+            return
         member = member or interaction.user
         await interaction.response.send_message(f"{member.mention}さん、ようこそ! 🎉")
 

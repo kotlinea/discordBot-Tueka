@@ -36,7 +36,7 @@ class GeneralCog(commands.Cog):
             await interaction.response.send_message("計算式が無効です。数値と + - * / % ** ( ) のみ使用できます。", ephemeral=True)
 
     @app_commands.command(description="指定された乱数を振ります。")
-    async def roll(self, interaction: discord.Interaction, sides: float = 6) -> None:
+    async def roll(self, interaction: discord.Interaction, sides: float = 6.0) -> None:
         if sides <= 0:
             await interaction.response.send_message("正の数を指定してください。", ephemeral=True)
         elif sides.is_integer():
