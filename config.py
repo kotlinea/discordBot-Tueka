@@ -20,6 +20,7 @@ class Settings:
     discord_token: str
     gemini_api_key: str | None
     gemini_model: str
+    google_safe_browsing_api_key: str | None
     data_dir: Path
     database_path: Path
     banned_words_file: Path
@@ -29,6 +30,10 @@ class Settings:
         "cogs.ai",
         "cogs.leveling",
         "cogs.moderation",
+        "cogs.safety",
+        "cogs.community",
+        "cogs.engagement",
+        "cogs.trust",
         "cogs.audit_log",
         "cogs.welcome",
     )
@@ -42,6 +47,7 @@ class Settings:
             discord_token=token,
             gemini_api_key=os.getenv("GEMINI_API_KEY"),
             gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            google_safe_browsing_api_key=os.getenv("GOOGLE_SAFE_BROWSING_API_KEY"),
             data_dir=BASE_DIR / os.getenv("DATA_DIR", "data"),
             database_path=BASE_DIR / os.getenv("DATABASE_PATH", "data/tueka.sqlite3"),
             banned_words_file=BASE_DIR / os.getenv("BANNED_WORDS_FILE", "banned_words.csv"),

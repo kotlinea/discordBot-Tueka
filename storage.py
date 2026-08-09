@@ -68,7 +68,18 @@ class GuildStorage:
                     settings_json TEXT NOT NULL DEFAULT '{}',
                     PRIMARY KEY (guild_id, module_id)
                 );
+                CREATE TABLE IF NOT EXISTS moderation_cases (id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, user_id INTEGER NOT NULL, moderator_id INTEGER, action TEXT NOT NULL, reason TEXT, expires_at INTEGER, dm_sent INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS safe_browsing_cache (url_hash TEXT PRIMARY KEY, unsafe INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS reaction_role_panels (message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, role_ids_json TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS temporary_voice_channels (channel_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, owner_id INTEGER NOT NULL, created_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS support_tickets (channel_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, opener_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at INTEGER NOT NULL, closed_at INTEGER, closed_by INTEGER, transcript_json TEXT);
+                CREATE TABLE IF NOT EXISTS polls (message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, channel_id INTEGER NOT NULL, creator_id INTEGER NOT NULL, question TEXT NOT NULL, options_json TEXT NOT NULL, image_url TEXT, closes_at INTEGER, status TEXT NOT NULL DEFAULT 'open', created_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS poll_votes (message_id INTEGER NOT NULL, user_id INTEGER NOT NULL, option_index INTEGER NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (message_id,user_id), FOREIGN KEY(message_id) REFERENCES polls(message_id) ON DELETE CASCADE);
+                CREATE TABLE IF NOT EXISTS trust_events (id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, user_id INTEGER NOT NULL, category TEXT NOT NULL, weight INTEGER NOT NULL, reason TEXT, created_at INTEGER NOT NULL);
             """)
+            poll_columns = {row["name"] for row in connection.execute("PRAGMA table_info(polls)").fetchall()}
+            if poll_columns and "image_url" not in poll_columns:
+                connection.execute("ALTER TABLE polls ADD COLUMN image_url TEXT")
 
     def get_settings(self, guild_id: int) -> dict[str, int | None]:
         with self._connection() as connection:
@@ -99,7 +110,7 @@ class GuildStorage:
         if row:
             return {"enabled": bool(row["enabled"]), "settings": json.loads(row["settings_json"])}
         legacy = self.get_settings(guild_id)
-        defaults = {"welcome": {key: legacy[key] for key in ("welcome_channel_id", "default_role_id")}, "audit_log": {"management_channel_id": legacy["management_channel_id"]}}.get(module_id, {})
+        defaults = {"welcome": {"welcome_channel_id": legacy["welcome_channel_id"]}, "autorole": {"default_role_id": legacy["default_role_id"]}, "audit_log": {"management_channel_id": legacy["management_channel_id"]}}.get(module_id, {})
         return {"enabled": False, "settings": defaults}
 
     def set_module(self, guild_id: int, module_id: str, *, enabled: bool, settings: dict[str, Any] | None = None) -> None:
@@ -111,6 +122,122 @@ class GuildStorage:
 
     def module_enabled(self, guild_id: int, module_id: str) -> bool:
         return self.get_module(guild_id, module_id)["enabled"]
+
+    def enabled_module_guild_ids(self, module_id: str) -> list[int]:
+        with self._connection() as connection:
+            rows = connection.execute("SELECT guild_id FROM guild_modules WHERE module_id=? AND enabled=1", (module_id,)).fetchall()
+        return [row["guild_id"] for row in rows]
+
+    def add_case(self, guild_id: int, user_id: int, action: str, reason: str | None, moderator_id: int | None = None, expires_at: int | None = None, dm_sent: bool = False) -> None:
+        weights = {"warn": -10, "timeout": -20, "kick": -30, "ban": -40, "spam": -15, "anti_spam": -15, "chat_filter": -10, "phishing": -20}
+        now = int(time.time())
+        with self._connection() as c:
+            c.execute("INSERT INTO moderation_cases (guild_id,user_id,moderator_id,action,reason,expires_at,dm_sent,created_at) VALUES (?,?,?,?,?,?,?,?)", (guild_id,user_id,moderator_id,action,reason,expires_at,int(dm_sent),now))
+            trust_enabled = c.execute("SELECT enabled FROM guild_modules WHERE guild_id=? AND module_id='trust_score'", (guild_id,)).fetchone()
+            if action in weights and trust_enabled and trust_enabled["enabled"]:
+                c.execute("INSERT INTO trust_events (guild_id,user_id,category,weight,reason,created_at) VALUES (?,?,?,?,?,?)", (guild_id, user_id, action, weights[action], reason, now))
+
+    def trust_score(self, guild_id: int, user_id: int, retention_days: int = 90) -> dict[str, Any]:
+        cutoff = int(time.time()) - max(1, retention_days) * 86400
+        with self._connection() as c:
+            rows = c.execute("SELECT category,weight,reason,created_at FROM trust_events WHERE guild_id=? AND user_id=? AND created_at>=? ORDER BY created_at DESC", (guild_id, user_id, cutoff)).fetchall()
+        events = [dict(row) for row in rows]
+        return {"score": max(0, min(100, 100 + sum(event["weight"] for event in events))), "events": events}
+
+    def clear_trust_events(self, guild_id: int, user_id: int) -> None:
+        with self._connection() as c:
+            c.execute("DELETE FROM trust_events WHERE guild_id=? AND user_id=?", (guild_id, user_id))
+
+    def purge_trust_events(self, guild_id: int, retention_days: int) -> int:
+        cutoff = int(time.time()) - max(1, retention_days) * 86400
+        with self._connection() as c:
+            cursor = c.execute("DELETE FROM trust_events WHERE guild_id=? AND created_at<?", (guild_id, cutoff))
+        return cursor.rowcount
+
+    def recent_cases(self, guild_id: int, user_id: int, limit: int = 50) -> list[dict[str, Any]]:
+        with self._connection() as c:
+            rows = c.execute("SELECT * FROM moderation_cases WHERE guild_id=? AND user_id=? ORDER BY id DESC LIMIT ?", (guild_id, user_id, limit)).fetchall()
+        return [dict(row) for row in rows]
+
+    def cached_url_result(self, url_hash: str) -> bool | None:
+        with self._connection() as c: row=c.execute("SELECT unsafe FROM safe_browsing_cache WHERE url_hash=? AND expires_at>?",(url_hash,int(time.time()))).fetchone()
+        return bool(row["unsafe"]) if row else None
+
+    def cache_url_result(self, url_hash: str, unsafe: bool, ttl: int = 3600) -> None:
+        with self._connection() as c: c.execute("INSERT OR REPLACE INTO safe_browsing_cache VALUES (?,?,?)",(url_hash,int(unsafe),int(time.time())+ttl))
+
+    def save_reaction_role_panel(self, message_id: int, guild_id: int, role_ids: list[int]) -> None:
+        if not 1 <= len(role_ids) <= 25 or len(set(role_ids)) != len(role_ids):
+            raise ValueError("Reaction role panels require 1 to 25 unique roles")
+        with self._connection() as c:
+            c.execute("INSERT OR REPLACE INTO reaction_role_panels (message_id,guild_id,role_ids_json) VALUES (?,?,?)", (message_id, guild_id, json.dumps(role_ids)))
+
+    def reaction_role_panel(self, message_id: int) -> dict[str, Any] | None:
+        with self._connection() as c:
+            row = c.execute("SELECT guild_id, role_ids_json FROM reaction_role_panels WHERE message_id=?", (message_id,)).fetchone()
+        return {"guild_id": row["guild_id"], "role_ids": json.loads(row["role_ids_json"])} if row else None
+
+    def add_temporary_voice_channel(self, channel_id: int, guild_id: int, owner_id: int) -> None:
+        with self._connection() as c:
+            c.execute("INSERT OR REPLACE INTO temporary_voice_channels (channel_id,guild_id,owner_id,created_at) VALUES (?,?,?,?)", (channel_id, guild_id, owner_id, int(time.time())))
+
+    def temporary_voice_channel(self, channel_id: int) -> dict[str, int] | None:
+        with self._connection() as c:
+            row = c.execute("SELECT guild_id,owner_id FROM temporary_voice_channels WHERE channel_id=?", (channel_id,)).fetchone()
+        return {"guild_id": row["guild_id"], "owner_id": row["owner_id"]} if row else None
+
+    def remove_temporary_voice_channel(self, channel_id: int) -> None:
+        with self._connection() as c:
+            c.execute("DELETE FROM temporary_voice_channels WHERE channel_id=?", (channel_id,))
+
+    def create_ticket(self, channel_id: int, guild_id: int, opener_id: int) -> None:
+        with self._connection() as c:
+            c.execute("INSERT INTO support_tickets (channel_id,guild_id,opener_id,status,created_at) VALUES (?,?,?,'open',?)", (channel_id, guild_id, opener_id, int(time.time())))
+
+    def ticket(self, channel_id: int) -> dict[str, Any] | None:
+        with self._connection() as c:
+            row = c.execute("SELECT * FROM support_tickets WHERE channel_id=?", (channel_id,)).fetchone()
+        return dict(row) if row else None
+
+    def close_ticket(self, channel_id: int, closed_by: int, transcript: list[dict[str, Any]]) -> None:
+        with self._connection() as c:
+            c.execute("UPDATE support_tickets SET status='closed',closed_at=?,closed_by=?,transcript_json=? WHERE channel_id=? AND status='open'", (int(time.time()), closed_by, json.dumps(transcript, ensure_ascii=False), channel_id))
+
+    def create_poll(self, message_id: int, guild_id: int, channel_id: int, creator_id: int, question: str, options: list[str], image_url: str | None, closes_at: int | None) -> None:
+        if not 2 <= len(options) <= 10:
+            raise ValueError("Polls require 2 to 10 options")
+        with self._connection() as c:
+            c.execute("INSERT INTO polls (message_id,guild_id,channel_id,creator_id,question,options_json,image_url,closes_at,created_at) VALUES (?,?,?,?,?,?,?,?,?)", (message_id, guild_id, channel_id, creator_id, question, json.dumps(options, ensure_ascii=False), image_url, closes_at, int(time.time())))
+
+    def poll(self, message_id: int) -> dict[str, Any] | None:
+        with self._connection() as c:
+            row = c.execute("SELECT * FROM polls WHERE message_id=?", (message_id,)).fetchone()
+        if not row:
+            return None
+        data = dict(row)
+        data["options"] = json.loads(data.pop("options_json"))
+        return data
+
+    def cast_poll_vote(self, message_id: int, user_id: int, option_index: int) -> list[int] | None:
+        with self._connection() as c:
+            poll = c.execute("SELECT options_json,closes_at,status FROM polls WHERE message_id=?", (message_id,)).fetchone()
+            if not poll or poll["status"] != "open" or (poll["closes_at"] and poll["closes_at"] <= int(time.time())):
+                return None
+            if not 0 <= option_index < len(json.loads(poll["options_json"])):
+                return None
+            c.execute("INSERT INTO poll_votes (message_id,user_id,option_index,created_at) VALUES (?,?,?,?) ON CONFLICT(message_id,user_id) DO UPDATE SET option_index=excluded.option_index,created_at=excluded.created_at", (message_id, user_id, option_index, int(time.time())))
+            rows = c.execute("SELECT option_index,COUNT(*) AS votes FROM poll_votes WHERE message_id=? GROUP BY option_index", (message_id,)).fetchall()
+        counts = [0] * len(json.loads(poll["options_json"]))
+        for row in rows:
+            counts[row["option_index"]] = row["votes"]
+        return counts
+
+    def close_expired_polls(self) -> list[dict[str, Any]]:
+        now = int(time.time())
+        with self._connection() as c:
+            rows = c.execute("SELECT * FROM polls WHERE status='open' AND closes_at IS NOT NULL AND closes_at<=?", (now,)).fetchall()
+            c.execute("UPDATE polls SET status='closed' WHERE status='open' AND closes_at IS NOT NULL AND closes_at<=?", (now,))
+        return [dict(row) for row in rows]
 
     # Compatibility helpers for small existing consumers.
     def get(self, guild_id: int, key: str, default: Any = None) -> Any:

@@ -18,7 +18,8 @@ class WelcomeCog(commands.Cog):
         channel = member.guild.get_channel(channel_id) if channel_id else None
         if isinstance(channel, discord.abc.Messageable):
             await channel.send(f"{member.mention}さん、**{member.guild.name}**へようこそ! 🎉")
-        role_id = module["settings"].get("default_role_id")
+        autorole = self.storage.get_module(member.guild.id, "autorole")
+        role_id = autorole["settings"].get("default_role_id") if autorole["enabled"] else None
         role = member.guild.get_role(role_id) if role_id else None
         if role:
             try:

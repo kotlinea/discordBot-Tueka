@@ -28,7 +28,11 @@ class ModerationCog(commands.Cog):
         matches = [word for word in self.banned_words() if word in message.content.lower()]
         if not matches:
             return
-        warn_count = self.storage.add_warning(message.guild.id, message.author.id)
+        safety = self.bot.get_cog("SafetyCog")
+        if safety is not None and hasattr(safety, "_warn"):
+            warn_count = await safety._warn(message.guild, message.author, f"禁止語: {', '.join(matches[:3])}", None)
+        else:
+            warn_count = self.storage.add_warning(message.guild.id, message.author.id)
         try:
             await message.delete()
             await message.channel.send(f"⚠️ {message.author.mention} さん、不適切な発言が検出されました。\n警告数: {warn_count}")
