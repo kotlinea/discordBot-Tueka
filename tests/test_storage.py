@@ -21,6 +21,21 @@ class GuildStorageTests(unittest.TestCase):
         self.assertEqual(self.storage.get_settings(1)["welcome_channel_id"], 11)
         self.assertEqual(self.storage.get_user(1, 99), {"xp": 25, "warn": 0})
 
+    def test_voice_xp_is_independent_from_text_xp_and_ranked(self):
+        self.storage.add_xp(1, 99, 25)
+        self.storage.add_voice_xp(1, 99, 10)
+        self.storage.add_voice_xp(1, 100, 20)
+        self.assertEqual(self.storage.get_user(1, 99)["xp"], 25)
+        self.assertEqual(self.storage.get_voice_user(1, 99)["xp"], 10)
+        self.assertEqual(self.storage.voice_leaderboard(1), [{"user_id": 100, "xp": 20}, {"user_id": 99, "xp": 10}])
+
+    def test_leveling_uses_legacy_management_channel_as_candidate(self):
+        self.storage.update_settings(1, management_channel_id=77)
+        leveling = self.storage.get_module(1, "leveling")
+        self.assertFalse(leveling["enabled"])
+        self.assertEqual(leveling["settings"]["text_notification_channel_id"], 77)
+        self.assertFalse(leveling["settings"]["voice_enabled"])
+
     def test_json_migration_is_one_time_and_preserves_data(self):
         data_dir = self.root / "data"
         data_dir.mkdir()
@@ -54,6 +69,14 @@ class GuildStorageTests(unittest.TestCase):
     def test_legacy_role_setting_maps_to_autorole(self):
         self.storage.update_settings(1, default_role_id=20)
         self.assertEqual(self.storage.get_module(1, "autorole")["settings"]["default_role_id"], 20)
+
+    def test_legacy_welcome_channel_becomes_disabled_welcome_candidate(self):
+        self.storage.update_settings(1, welcome_channel_id=20)
+        welcome = self.storage.get_module(1, "welcome")
+        self.assertFalse(welcome["enabled"])
+        self.assertEqual(welcome["settings"]["welcome_channel_id"], 20)
+        self.assertFalse(welcome["settings"]["welcome_enabled"])
+        self.assertFalse(welcome["settings"]["leave_enabled"])
 
     def test_moderation_case_keeps_audit_details(self):
         self.storage.add_case(1, 2, "timeout", "reason", moderator_id=3, expires_at=100, dm_sent=True)

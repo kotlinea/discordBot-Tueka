@@ -1,7 +1,15 @@
+"""Configurable welcome and leave messages; default roles stay in autorole."""
+import re
+
 import discord
 from discord import app_commands
 from discord.ext import commands
+
 from storage import GuildStorage
+
+
+TOKEN_RE = re.compile(r"\{([^{}]+)\}")
+VARIABLE_HELP = "{user}, {username}, {displayname}, {server}, {membercount}"
 
 
 class WelcomeCog(commands.Cog):
@@ -9,15 +17,43 @@ class WelcomeCog(commands.Cog):
         self.bot = bot
         self.storage = GuildStorage(bot.settings.database_path)
 
+    @staticmethod
+    def render_content(template: str, member: discord.Member) -> str:
+        values = {
+            "user": member.mention,
+            "username": discord.utils.escape_markdown(member.name),
+            "displayname": discord.utils.escape_markdown(member.display_name),
+            "server": discord.utils.escape_markdown(member.guild.name),
+            "membercount": str(member.guild.member_count or len(member.guild.members)),
+        }
+
+        def replace(match: re.Match[str]) -> str:
+            name = match.group(1)
+            return values[name] if name in values else f"\\{{{name}\\}}"
+
+        return TOKEN_RE.sub(replace, template)
+
+    async def _send_configured_message(self, member: discord.Member, event: str) -> None:
+        module = self.storage.get_module(member.guild.id, "welcome")
+        settings = module["settings"]
+        if not module["enabled"] or not settings.get(f"{event}_enabled"):
+            return
+        channel_id = settings.get(f"{event}_channel_id")
+        content = str(settings.get(f"{event}_content") or "")
+        channel = member.guild.get_channel(int(channel_id)) if channel_id else None
+        if not content or not isinstance(channel, discord.TextChannel):
+            return
+        rendered = self.render_content(content, member)
+        mentions = discord.AllowedMentions(everyone=False, roles=False, users=[member], replied_user=False)
+        if settings.get(f"{event}_format") == "embed":
+            title, color = ("Welcome", discord.Color.green()) if event == "welcome" else ("Goodbye", discord.Color.orange())
+            await channel.send(embed=discord.Embed(title=title, description=rendered[:4096], color=color), allowed_mentions=mentions)
+        else:
+            await channel.send(rendered[:2000], allowed_mentions=mentions)
+
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
-        module = self.storage.get_module(member.guild.id, "welcome")
-        if not module["enabled"]:
-            return
-        channel_id = module["settings"].get("welcome_channel_id")
-        channel = member.guild.get_channel(channel_id) if channel_id else None
-        if isinstance(channel, discord.abc.Messageable):
-            await channel.send(f"{member.mention}さん、**{member.guild.name}**へようこそ! 🎉")
+        await self._send_configured_message(member, "welcome")
         autorole = self.storage.get_module(member.guild.id, "autorole")
         role_id = autorole["settings"].get("default_role_id") if autorole["enabled"] else None
         role = member.guild.get_role(role_id) if role_id else None
@@ -29,13 +65,7 @@ class WelcomeCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member) -> None:
-        module = self.storage.get_module(member.guild.id, "welcome")
-        if not module["enabled"]:
-            return
-        channel_id = module["settings"].get("welcome_channel_id")
-        channel = member.guild.get_channel(channel_id) if channel_id else None
-        if isinstance(channel, discord.abc.Messageable):
-            await channel.send(f"Goodbye {member.name}! We'll miss you! 😢")
+        await self._send_configured_message(member, "leave")
 
     @app_commands.command(description="ウェルカムメッセージを送信します。")
     @app_commands.guild_only()

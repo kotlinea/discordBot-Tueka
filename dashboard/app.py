@@ -13,7 +13,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from config import Settings
 from dashboard.discord_api import DiscordAPI, ADMINISTRATOR, PERMISSION_BITS
-from feature_registry import FEATURES, get_feature
+from feature_registry import FEATURES, get_feature, japanese_copy
 from storage import GuildStorage
 
 
@@ -142,7 +142,8 @@ async def servers(request: Request):
 def feature_view(guild_id: int, feature, bot_permissions: int | None = None):
     module = storage.get_module(guild_id, feature.id)
     missing = [] if bot_permissions is None or bot_permissions & ADMINISTRATOR else [permission for permission in feature.required_bot_permissions if not bot_permissions & PERMISSION_BITS[permission]]
-    return {"definition": feature, "enabled": module["enabled"], "settings": module["settings"], "missing_permissions": missing}
+    title, description = japanese_copy(feature.id)
+    return {"definition": feature, "enabled": module["enabled"], "settings": module["settings"], "missing_permissions": missing, "title": title, "description": description}
 
 
 @app.get("/servers/{guild_id}", response_class=HTMLResponse)
@@ -208,6 +209,7 @@ async def save_module_settings(request: Request, guild_id: int, module_id: str):
     try:
         management = optional_id(str(form.get("management_channel_id", "")))
         welcome = optional_id(str(form.get("welcome_channel_id", "")))
+        leave = optional_id(str(form.get("leave_channel_id", "")))
         role = optional_id(str(form.get("default_role_id", "")))
         reaction_channel = optional_id(str(form.get("reaction_role_channel_id", "")))
         reaction_roles = [int(value) for value in form.getlist("reaction_role_ids") if value]
@@ -218,18 +220,40 @@ async def save_module_settings(request: Request, guild_id: int, module_id: str):
         ticket_category = optional_id(str(form.get("ticket_category_id", "")))
         ticket_staff_role = optional_id(str(form.get("ticket_staff_role_id", "")))
         ticket_log_channel = optional_id(str(form.get("ticket_log_channel_id", "")))
+        text_notification_channel = optional_id(str(form.get("text_notification_channel_id", "")))
+        voice_notification_channel = optional_id(str(form.get("voice_notification_channel_id", "")))
     except ValueError:
         return RedirectResponse(f"{target}?error=invalid-selection", status_code=303)
-    if len(reaction_roles) > 25 or len(set(reaction_roles)) != len(reaction_roles) or (management is not None and channel_types.get(management) != 0) or (welcome is not None and channel_types.get(welcome) != 0) or (role is not None and role not in role_ids) or (reaction_channel is not None and channel_types.get(reaction_channel) != 0) or any(value not in role_ids for value in reaction_roles) or (stats_channel is not None and channel_types.get(stats_channel) != 2) or (temp_trigger is not None and channel_types.get(temp_trigger) != 2) or (temp_category is not None and channel_types.get(temp_category) != 4) or (ticket_panel_channel is not None and channel_types.get(ticket_panel_channel) != 0) or (ticket_category is not None and channel_types.get(ticket_category) != 4) or (ticket_staff_role is not None and ticket_staff_role not in role_ids) or (ticket_log_channel is not None and channel_types.get(ticket_log_channel) != 0):
+    if len(reaction_roles) > 25 or len(set(reaction_roles)) != len(reaction_roles) or (management is not None and channel_types.get(management) != 0) or (welcome is not None and channel_types.get(welcome) != 0) or (leave is not None and channel_types.get(leave) != 0) or (role is not None and role not in role_ids) or (reaction_channel is not None and channel_types.get(reaction_channel) != 0) or any(value not in role_ids for value in reaction_roles) or (stats_channel is not None and channel_types.get(stats_channel) != 2) or (temp_trigger is not None and channel_types.get(temp_trigger) != 2) or (temp_category is not None and channel_types.get(temp_category) != 4) or (ticket_panel_channel is not None and channel_types.get(ticket_panel_channel) != 0) or (ticket_category is not None and channel_types.get(ticket_category) != 4) or (ticket_staff_role is not None and ticket_staff_role not in role_ids) or (ticket_log_channel is not None and channel_types.get(ticket_log_channel) != 0) or (text_notification_channel is not None and channel_types.get(text_notification_channel) != 0) or (voice_notification_channel is not None and channel_types.get(voice_notification_channel) != 0):
         return RedirectResponse(f"{target}?error=invalid-selection", status_code=303)
     def bounded_int(name: str, default: int, low: int, high: int) -> int:
         try:
             return max(low, min(int(str(form.get(name, default))), high))
         except ValueError:
             raise ValueError(name)
+    def parse_rewards(prefix: str) -> list[dict[str, int]]:
+        levels, roles_for_levels = form.getlist(f"{prefix}_reward_level"), form.getlist(f"{prefix}_reward_role_id")
+        if len(levels) != len(roles_for_levels) or len(levels) > 25:
+            raise ValueError(prefix)
+        rewards = []
+        for level, reward_role_id in zip(levels, roles_for_levels):
+            parsed_level, parsed_role = int(level), int(reward_role_id)
+            if not 1 <= parsed_level <= 100000 or parsed_role not in role_ids:
+                raise ValueError(prefix)
+            rewards.append({"level": parsed_level, "role_id": parsed_role})
+        if len({reward["level"] for reward in rewards}) != len(rewards):
+            raise ValueError(prefix)
+        return sorted(rewards, key=lambda reward: reward["level"])
     try:
         values = {
             "management_channel_id": management, "welcome_channel_id": welcome, "default_role_id": role,
+            "welcome_enabled": form.get("welcome_enabled") == "on",
+            "welcome_format": str(form.get("welcome_format", "text")),
+            "welcome_content": str(form.get("welcome_content", ""))[:4096],
+            "leave_enabled": form.get("leave_enabled") == "on",
+            "leave_channel_id": leave,
+            "leave_format": str(form.get("leave_format", "text")),
+            "leave_content": str(form.get("leave_content", ""))[:4096],
             "escalation_enabled": form.get("escalation_enabled") == "on",
             "escalation_threshold": bounded_int("escalation_threshold", 3, 1, 100),
             "escalation_action": str(form.get("escalation_action", "timeout")),
@@ -262,11 +286,43 @@ async def save_module_settings(request: Request, guild_id: int, module_id: str):
             "ticket_panel_description": str(form.get("ticket_panel_description", ""))[:4000],
             "trust_retention_days": bounded_int("trust_retention_days", 90, 1, 3650),
             "trust_flag_threshold": bounded_int("trust_flag_threshold", 60, 0, 100),
+            "text_notification_channel_id": text_notification_channel,
+            "text_role_rewards": parse_rewards("text"),
+            "voice_enabled": form.get("voice_enabled") == "on",
+            "voice_notification_channel_id": voice_notification_channel,
+            "voice_role_rewards": parse_rewards("voice"),
+            "voice_xp_per_minute": bounded_int("voice_xp_per_minute", 5, 1, 100),
+            "voice_allow_solo": form.get("voice_allow_solo") == "on",
+            "voice_allow_muted": form.get("voice_allow_muted") == "on",
         }
     except ValueError:
         return RedirectResponse(f"{target}?error=invalid-selection", status_code=303)
     if values["escalation_action"] not in {"timeout", "kick", "ban"}:
         return RedirectResponse(f"{target}?error=invalid-selection", status_code=303)
+    if values["welcome_format"] not in {"text", "embed"} or values["leave_format"] not in {"text", "embed"}:
+        return RedirectResponse(f"{target}?error=invalid-selection", status_code=303)
+    if module_id == "welcome":
+        enabled = values["welcome_enabled"] or values["leave_enabled"]
+        invalid_welcome = values["welcome_enabled"] and (welcome is None or not values["welcome_content"].strip() or (values["welcome_format"] == "text" and len(values["welcome_content"]) > 2000))
+        invalid_leave = values["leave_enabled"] and (leave is None or not values["leave_content"].strip() or (values["leave_format"] == "text" and len(values["leave_content"]) > 2000))
+        if invalid_welcome or invalid_leave:
+            draft_key = f"{guild_id}:{module_id}"
+            drafts = request.session.get("module_drafts", {})
+            drafts[draft_key] = {"enabled": enabled, "settings": {field: values[field] for field in feature.fields}}
+            request.session["module_drafts"] = drafts
+            return RedirectResponse(f"{target}?error=setup-required", status_code=303)
+    if module_id == "leveling" and values["voice_enabled"] and voice_notification_channel is None:
+        draft_key = f"{guild_id}:{module_id}"
+        drafts = request.session.get("module_drafts", {})
+        drafts[draft_key] = {"enabled": enabled, "settings": {field: values[field] for field in feature.fields}}
+        request.session["module_drafts"] = drafts
+        return RedirectResponse(f"{target}?error=setup-required", status_code=303)
+    if module_id == "leveling" and (values["text_role_rewards"] or values["voice_role_rewards"]) and not (bot_permissions & ADMINISTRATOR or bot_permissions & PERMISSION_BITS["manage_roles"]):
+        draft_key = f"{guild_id}:{module_id}"
+        drafts = request.session.get("module_drafts", {})
+        drafts[draft_key] = {"enabled": enabled, "settings": {field: values[field] for field in feature.fields}}
+        request.session["module_drafts"] = drafts
+        return RedirectResponse(f"{target}?error=missing-permissions", status_code=303)
     draft_key = f"{guild_id}:{module_id}"
     drafts = request.session.get("module_drafts", {})
     drafts[draft_key] = {"enabled": enabled, "settings": {field: values[field] for field in feature.fields}}

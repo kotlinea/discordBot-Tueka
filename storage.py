@@ -48,6 +48,12 @@ class GuildStorage:
                     warn INTEGER NOT NULL DEFAULT 0 CHECK (warn >= 0),
                     PRIMARY KEY (guild_id, user_id)
                 );
+                CREATE TABLE IF NOT EXISTS guild_voice_users (
+                    guild_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    xp INTEGER NOT NULL DEFAULT 0 CHECK (xp >= 0),
+                    PRIMARY KEY (guild_id, user_id)
+                );
                 CREATE TABLE IF NOT EXISTS app_metadata (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
@@ -108,10 +114,52 @@ class GuildStorage:
         with self._connection() as connection:
             row = connection.execute("SELECT enabled, settings_json FROM guild_modules WHERE guild_id = ? AND module_id = ?", (guild_id, module_id)).fetchone()
         if row:
-            return {"enabled": bool(row["enabled"]), "settings": json.loads(row["settings_json"])}
+            settings = json.loads(row["settings_json"])
+            if module_id == "welcome":
+                settings = self._welcome_settings(settings)
+            elif module_id == "leveling":
+                settings = self._leveling_settings(settings, self.get_settings(guild_id))
+            return {"enabled": bool(row["enabled"]), "settings": settings}
         legacy = self.get_settings(guild_id)
-        defaults = {"welcome": {"welcome_channel_id": legacy["welcome_channel_id"]}, "autorole": {"default_role_id": legacy["default_role_id"]}, "audit_log": {"management_channel_id": legacy["management_channel_id"]}}.get(module_id, {})
+        defaults = {"welcome": self._welcome_settings({"welcome_channel_id": legacy["welcome_channel_id"]}), "leveling": self._leveling_settings({}, legacy), "autorole": {"default_role_id": legacy["default_role_id"]}, "audit_log": {"management_channel_id": legacy["management_channel_id"]}}.get(module_id, {})
         return {"enabled": False, "settings": defaults}
+
+    @staticmethod
+    def _welcome_settings(settings: dict[str, Any]) -> dict[str, Any]:
+        """Normalize legacy welcome settings without silently enabling messages."""
+        defaults = {
+            "welcome_enabled": False,
+            "welcome_channel_id": None,
+            "welcome_format": "text",
+            "welcome_content": "",
+            "leave_enabled": False,
+            "leave_channel_id": None,
+            "leave_format": "text",
+            "leave_content": "",
+        }
+        defaults.update(settings)
+        # Old releases only had a channel. It remains a selectable candidate;
+        # no old message text means the new feature stays disabled.
+        if defaults["welcome_format"] not in {"text", "embed"}:
+            defaults["welcome_format"] = "text"
+        if defaults["leave_format"] not in {"text", "embed"}:
+            defaults["leave_format"] = "text"
+        return defaults
+
+    @staticmethod
+    def _leveling_settings(settings: dict[str, Any], legacy: dict[str, int | None]) -> dict[str, Any]:
+        defaults: dict[str, Any] = {
+            "text_notification_channel_id": legacy["management_channel_id"],
+            "text_role_rewards": [],
+            "voice_enabled": False,
+            "voice_notification_channel_id": None,
+            "voice_role_rewards": [],
+            "voice_xp_per_minute": 5,
+            "voice_allow_solo": False,
+            "voice_allow_muted": False,
+        }
+        defaults.update(settings)
+        return defaults
 
     def set_module(self, guild_id: int, module_id: str, *, enabled: bool, settings: dict[str, Any] | None = None) -> None:
         current = self.get_module(guild_id, module_id)
@@ -255,6 +303,21 @@ class GuildStorage:
         with self._connection() as connection:
             connection.execute("INSERT INTO guild_users (guild_id, user_id, xp) VALUES (?, ?, ?) ON CONFLICT(guild_id, user_id) DO UPDATE SET xp = xp + excluded.xp", (guild_id, user_id, amount))
         return self.get_user(guild_id, user_id)
+
+    def get_voice_user(self, guild_id: int, user_id: int) -> dict[str, int]:
+        with self._connection() as connection:
+            row = connection.execute("SELECT xp FROM guild_voice_users WHERE guild_id=? AND user_id=?", (guild_id, user_id)).fetchone()
+        return {"xp": row["xp"]} if row else {"xp": 0}
+
+    def add_voice_xp(self, guild_id: int, user_id: int, amount: int) -> dict[str, int]:
+        with self._connection() as connection:
+            connection.execute("INSERT INTO guild_voice_users (guild_id,user_id,xp) VALUES (?,?,?) ON CONFLICT(guild_id,user_id) DO UPDATE SET xp=xp+excluded.xp", (guild_id, user_id, amount))
+        return self.get_voice_user(guild_id, user_id)
+
+    def voice_leaderboard(self, guild_id: int, limit: int = 5) -> list[dict[str, int]]:
+        with self._connection() as connection:
+            rows = connection.execute("SELECT user_id,xp FROM guild_voice_users WHERE guild_id=? ORDER BY xp DESC,user_id ASC LIMIT ?", (guild_id, limit)).fetchall()
+        return [{"user_id": row["user_id"], "xp": row["xp"]} for row in rows]
 
     def add_warning(self, guild_id: int, user_id: int) -> int:
         with self._connection() as connection:

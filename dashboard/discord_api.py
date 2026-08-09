@@ -50,7 +50,7 @@ class DiscordAPI:
     async def guild_resources(self, guild_id: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
         headers = {"Authorization": f"Bot {self.bot_token}"}
         async with httpx.AsyncClient(timeout=10) as client:
-            channels, roles, bot_member = await client.get(f"{API_BASE}/guilds/{guild_id}/channels", headers=headers), await client.get(f"{API_BASE}/guilds/{guild_id}/roles", headers=headers), await client.get(f"{API_BASE}/guilds/{guild_id}/members/@me", headers=headers)
+            channels, roles, bot_member = await client.get(f"{API_BASE}/guilds/{guild_id}/channels", headers=headers), await client.get(f"{API_BASE}/guilds/{guild_id}/roles", headers=headers), await client.get(f"{API_BASE}/guilds/{guild_id}/members/{self.client_id}", headers=headers)
             channels.raise_for_status()
             roles.raise_for_status()
             bot_member.raise_for_status()

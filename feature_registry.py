@@ -15,9 +15,9 @@ class Feature:
 
 
 FEATURES = (
-    Feature("welcome", "community", "feature.welcome", "feature.welcome.description", "users", ("welcome_channel_id",), ("welcome_channel_id",), ("send_messages",)),
+    Feature("welcome", "community", "feature.welcome", "feature.welcome.description", "users", ("welcome_enabled", "welcome_channel_id", "welcome_format", "welcome_content", "leave_enabled", "leave_channel_id", "leave_format", "leave_content"), (), ("send_messages",)),
     Feature("autorole", "community", "field.default_role", "settings.enable.description", "shield", ("default_role_id",), ("default_role_id",), ("manage_roles",)),
-    Feature("leveling", "community", "feature.leveling", "feature.leveling.description", "chart", ()),
+    Feature("leveling", "community", "feature.leveling", "feature.leveling.description", "chart", ("text_notification_channel_id", "text_role_rewards", "voice_enabled", "voice_notification_channel_id", "voice_role_rewards", "voice_xp_per_minute", "voice_allow_solo", "voice_allow_muted"), ("text_notification_channel_id",), ("send_messages",)),
     Feature("audit_log", "moderation", "feature.audit_log", "feature.audit_log.description", "clipboard", ("management_channel_id",), ("management_channel_id",), ("send_messages",)),
     Feature("moderation", "moderation", "feature.moderation", "feature.moderation.description", "shield", ("escalation_enabled", "escalation_threshold", "escalation_action", "escalation_timeout_minutes", "dm_notify"), (), ("moderate_members", "kick_members", "ban_members")),
     Feature("chat_filter", "moderation", "feature.chat_filter", "feature.chat_filter.description", "shield", ("filter_keywords", "filter_regex", "filter_action", "safe_browsing_enabled"), (), ("manage_messages",)),
@@ -32,9 +32,32 @@ FEATURES = (
 )
 FEATURE_BY_ID = {feature.id: feature for feature in FEATURES}
 
+# Server-rendered fallbacks.  They keep the dashboard legible if JavaScript is
+# blocked, cached incorrectly, or finishes loading after the first paint.
+JAPANESE_COPY = {
+    "welcome": ("入退室", "歓迎・退出メッセージを管理します。"),
+    "autorole": ("初期ロール", "参加したメンバーへ初期ロールを付与します。"),
+    "leveling": ("レベリング", "メッセージでXPを獲得するシステムです。"),
+    "audit_log": ("管理ログ", "サーバー内の操作を記録します。"),
+    "moderation": ("モデレーション", "警告と制裁の設定を管理します。"),
+    "chat_filter": ("チャットフィルター", "キーワード、正規表現、危険なURLを検出します。"),
+    "anti_spam": ("スパム対策", "連投、メンション、重複メッセージを検出します。"),
+    "reaction_roles": ("リアクションロール", "ボタンでメンバーがロールを選択できます。"),
+    "live_stats": ("ライブ統計チャンネル", "メンバー数などをボイスチャンネル名に自動表示します。"),
+    "temporary_voice": ("一時的な音声チャンネル", "トリガー参加時に専用VCを作成し、空になると削除します。"),
+    "tickets": ("サポートチケット", "プライベートな会員サポートと議事録を管理します。"),
+    "advanced_polls": ("拡張投票", "最大10択、期限、画像付きのボタン投票を作成します。"),
+    "minigames": ("ミニゲーム", "コミュニティ向けの軽量ゲームを提供します。"),
+    "trust_score": ("信頼度スコア", "違反履歴を管理者だけに可視化します。"),
+}
+
 
 def get_feature(feature_id: str) -> Feature:
     try:
         return FEATURE_BY_ID[feature_id]
     except KeyError as exc:
         raise ValueError("Unknown feature") from exc
+
+
+def japanese_copy(feature_id: str) -> tuple[str, str]:
+    return JAPANESE_COPY[feature_id]

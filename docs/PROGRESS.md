@@ -2,6 +2,8 @@
 
 最終更新: 2026-08-09
 
+実VPSでのみ実施できる確認は [DEPLOYMENT_TODO.md](DEPLOYMENT_TODO.md) に分離している。
+
 ## ダッシュボード（実装済み）
 
 - Discord OAuth2ログイン（`identify guilds`）、署名付きCookie、サーバー側の期限付きセッション、SQLiteでの短時間・一回限りOAuth state検証を追加。
@@ -47,7 +49,7 @@
 | --- | --- | --- |
 | 基本 | help, ping, echo, 安全な四則演算, roll, userinfo, serverinfo | `cogs/general.py` |
 | AI | `/gemini` によるGeminiへの質問（APIキー設定時） | `cogs/ai.py` |
-| レベル | 60秒ごとのXP加算、`/rank`、`/leaderboard`、レベルアップ通知 | `cogs/leveling.py` |
+| レベル | テキスト／VC別XP、通知チャンネル、累積ロール報酬、`/rank`・`/leaderboard`・`/vcrank`・`/vcleaderboard` | `cogs/leveling.py` |
 | モデレーション | 禁止語CSVの検知・削除・警告、管理ログ設定、確認付き削除 | `cogs/moderation.py` |
 | 監査ログ | メッセージ送信・編集・削除の管理チャネル通知 | `cogs/audit_log.py` |
 | 入退室 | 歓迎/退出メッセージ、初期ロール付与 | `cogs/welcome.py` |
