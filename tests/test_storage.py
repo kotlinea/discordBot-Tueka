@@ -86,6 +86,22 @@ class GuildStorageTests(unittest.TestCase):
         self.assertFalse(audit_log["settings"]["log_member"])
         self.assertFalse(self.storage.get_module(2, "audit_log")["settings"]["log_message"])
 
+    def test_social_subscription_limit_and_event_deduplication(self):
+        for index in range(10):
+            self.storage.save_social_subscription(1, "youtube", f"UC{index}", f"Channel {index}", 100, None, "{account}", ["video"])
+        with self.assertRaises(ValueError):
+            self.storage.save_social_subscription(1, "youtube", "UC-over", "Over", 100, None, "", ["video"])
+        self.assertTrue(self.storage.enqueue_social_event("youtube", "video:1", "UC0", {"type": "video"}))
+        self.assertFalse(self.storage.enqueue_social_event("youtube", "video:1", "UC0", {"type": "video"}))
+        self.assertEqual(len(self.storage.matching_social_subscriptions("youtube", "UC0", "video")), 1)
+
+    def test_social_oauth_state_is_single_use_and_bound_to_provider(self):
+        self.storage.create_social_oauth_state("social-state", 123, "tiktok")
+        self.assertIsNone(self.storage.consume_social_oauth_state("social-state", "instagram"))
+        self.storage.create_social_oauth_state("social-state", 123, "tiktok")
+        self.assertEqual(self.storage.consume_social_oauth_state("social-state", "tiktok"), 123)
+        self.assertIsNone(self.storage.consume_social_oauth_state("social-state", "tiktok"))
+
     def test_moderation_case_keeps_audit_details(self):
         self.storage.add_case(1, 2, "timeout", "reason", moderator_id=3, expires_at=100, dm_sent=True)
         case = self.storage.recent_cases(1, 2)[0]

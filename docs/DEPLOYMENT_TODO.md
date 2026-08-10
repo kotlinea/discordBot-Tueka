@@ -8,6 +8,8 @@
 - [ ] `DISCORD_REDIRECT_URI` を公開HTTPS URL（例: `https://bot.example.com/oauth/callback`）に設定し、Developer PortalのOAuth2 Redirectsにも**完全一致**で登録する。
 - [ ] Developer Portalで Server Members Intent と Message Content Intent を有効化する。
 - [ ] 必要に応じて `GOOGLE_SAFE_BROWSING_API_KEY` を設定し、Google Safe Browsing APIの利用条件を運用前に確認する。
+- [ ] ソーシャル通知を使う場合は、必要な `YOUTUBE_API_KEY`、`TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET`、`X_BEARER_TOKEN` を設定する。TikTok／Instagramも使う場合は各OAuth設定と `SOCIAL_TOKEN_ENCRYPTION_KEY` を設定する。
+- [ ] `DASHBOARD_BASE_URL` は公開HTTPSの正規URLにし、YouTube WebSub callback は `https://<domain>/webhooks/youtube`、TikTok／Instagram Redirect URI は各 callback URL としてプロバイダ側へ完全一致で登録する。
 
 ## VPS・HTTPS
 

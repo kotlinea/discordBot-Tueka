@@ -2,13 +2,16 @@
 import os
 import secrets
 import time
+import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlencode
 from asyncio import gather
 
+import httpx
+
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -19,6 +22,7 @@ from dashboard.icon_registry import get_icon
 from dashboard.timing import add as add_timing, begin as begin_timing, end as end_timing
 from feature_registry import FEATURES, get_feature, japanese_copy
 from storage import GuildStorage
+from social_crypto import SocialTokenCipher
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -32,6 +36,7 @@ if not all((client_id, client_secret, redirect_uri, session_secret)):
 
 storage = GuildStorage(settings.database_path)
 api = DiscordAPI(settings.discord_token, client_id, client_secret, redirect_uri)
+social_cipher = SocialTokenCipher(settings.social_token_encryption_key)
 
 
 @asynccontextmanager
@@ -95,6 +100,34 @@ def avatar_url(user: dict) -> str:
 def guild_icon_url(guild: dict) -> str | None:
     icon = guild.get("icon")
     return f"https://cdn.discordapp.com/icons/{guild['id']}/{icon}.png?size=128" if icon else None
+
+
+def social_provider_available(provider: str) -> bool:
+    return {
+        "youtube": bool(settings.youtube_api_key),
+        "twitch": bool(settings.twitch_client_id and settings.twitch_client_secret),
+        "tiktok": bool(settings.tiktok_client_key and settings.tiktok_client_secret and settings.tiktok_redirect_uri and social_cipher.available),
+        "x": bool(settings.x_bearer_token),
+        "instagram": bool(settings.instagram_app_id and settings.instagram_app_secret and settings.instagram_redirect_uri and social_cipher.available),
+    }.get(provider, False)
+
+
+async def subscribe_youtube_websub(channel_id: str) -> bool:
+    """Register a public channel at the official WebSub hub.
+
+    A new subscription only receives notifications published after this point;
+    it never backfills existing videos into Discord.
+    """
+    if not settings.dashboard_base_url:
+        return False
+    callback = f"{settings.dashboard_base_url.rstrip('/')}/webhooks/youtube"
+    data = {"hub.mode": "subscribe", "hub.topic": f"https://www.youtube.com/xml/feeds/videos.xml?channel_id={channel_id}", "hub.callback": callback, "hub.verify": "async"}
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post("https://pubsubhubbub.appspot.com/subscribe", data=data)
+            return response.status_code in {202, 204}
+    except httpx.HTTPError:
+        return False
 
 
 async def page_identity(token: str) -> dict:
@@ -183,7 +216,7 @@ async def guild_home(request: Request, guild_id: int):
     token = await authorized(request, guild_id)
     _, _, bot_permissions = await api.guild_resources(guild_id)
     cards = [feature_view(guild_id, feature, bot_permissions) for feature in FEATURES]
-    categories = {"community": [card for card in cards if card["definition"].category == "community"], "moderation": [card for card in cards if card["definition"].category == "moderation"]}
+    categories = {category: [card for card in cards if card["definition"].category == category] for category in ("community", "moderation", "social")}
     return render_page(request, "guild_home.html", {"guild_id": guild_id, "categories": categories, "csrf_token": request.session["csrf_token"], **(await page_identity(token))})
 
 
@@ -210,12 +243,136 @@ async def module_settings(request: Request, guild_id: int, module_id: str):
     elif draft_key in drafts:
         drafts.pop(draft_key)
         request.session["module_drafts"] = drafts
-    return render_page(request, "module_settings.html", {"guild_id": guild_id, "module": module, "channels": channels, "roles": roles, "csrf_token": request.session["csrf_token"], **(await page_identity(token))})
+    subscriptions = storage.social_subscriptions(guild_id) if module_id == "social_updates" else []
+    connections = {item["provider"] for item in storage.social_connections(guild_id)} if module_id == "social_updates" else set()
+    provider_available = {provider: social_provider_available(provider) for provider in ("youtube", "twitch", "tiktok", "x", "instagram")}
+    return render_page(request, "module_settings.html", {"guild_id": guild_id, "module": module, "channels": channels, "roles": roles, "subscriptions": subscriptions, "social_connections": connections, "provider_available": provider_available, "csrf_token": request.session["csrf_token"], **(await page_identity(token))})
+
+
+@app.post("/servers/{guild_id}/social/subscriptions")
+async def save_social_subscription(request: Request, guild_id: int):
+    target = f"/servers/{guild_id}/modules/social_updates"
+    form = await request.form()
+    if not secrets.compare_digest(str(form.get("csrf_token", "")), request.session.get("csrf_token", "")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    await authorized(request, guild_id, live=True)
+    channels, roles, _ = await api.guild_resources(guild_id, use_cache=False)
+    channel_ids = {int(item["id"]) for item in channels if int(item["type"]) == 0}
+    role_ids = {int(item["id"]) for item in roles}
+    provider = str(form.get("provider", ""))
+    account_id, account_name = str(form.get("account_id", "")).strip()[:160], str(form.get("account_name", "")).strip()[:160]
+    template = str(form.get("template", ""))[:1000]
+    events = [str(value) for value in form.getlist("events") if value]
+    try:
+        channel_id = int(str(form.get("channel_id", "")))
+        role_raw = str(form.get("role_id", ""))
+        role_id = int(role_raw) if role_raw else None
+    except ValueError:
+        return RedirectResponse(f"{target}?error=invalid-selection", status_code=303)
+    allowed_events = {"youtube": {"video", "live_start"}, "twitch": {"live"}, "tiktok": {"post"}, "x": {"post"}, "instagram": {"post", "reel"}}
+    oauth_providers = {"tiktok", "instagram"}
+    if provider not in allowed_events or not social_provider_available(provider) or not account_id or not account_name or channel_id not in channel_ids or (role_id is not None and role_id not in role_ids) or not events or not set(events).issubset(allowed_events[provider]) or (provider in oauth_providers and not storage.social_connection(guild_id, provider, account_id)):
+        return RedirectResponse(f"{target}?error=invalid-selection", status_code=303)
+    if provider == "youtube" and not await subscribe_youtube_websub(account_id):
+        return RedirectResponse(f"{target}?error=social-provider-unavailable", status_code=303)
+    try:
+        storage.save_social_subscription(guild_id, provider, account_id, account_name, channel_id, role_id, template, events)
+    except ValueError:
+        return RedirectResponse(f"{target}?error=social-limit", status_code=303)
+    storage.set_module(guild_id, "social_updates", enabled=True)
+    return RedirectResponse(f"{target}?saved=1", status_code=303)
+
+
+@app.post("/servers/{guild_id}/social/subscriptions/{subscription_id}/delete")
+async def delete_social_subscription(request: Request, guild_id: int, subscription_id: int):
+    target = f"/servers/{guild_id}/modules/social_updates"
+    form = await request.form()
+    if not secrets.compare_digest(str(form.get("csrf_token", "")), request.session.get("csrf_token", "")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    await authorized(request, guild_id, live=True)
+    storage.delete_social_subscription(guild_id, subscription_id)
+    storage.set_module(guild_id, "social_updates", enabled=bool(storage.social_subscriptions(guild_id)))
+    return RedirectResponse(f"{target}?saved=1", status_code=303)
+
+
+@app.post("/servers/{guild_id}/social/connect/{provider}")
+async def begin_social_connection(request: Request, guild_id: int, provider: str):
+    form = await request.form()
+    target = f"/servers/{guild_id}/modules/social_updates"
+    if not secrets.compare_digest(str(form.get("csrf_token", "")), request.session.get("csrf_token", "")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    await authorized(request, guild_id, live=True)
+    if not social_cipher.available:
+        return RedirectResponse(f"{target}?error=social-token-key", status_code=303)
+    state = secrets.token_urlsafe(32)
+    if provider == "tiktok" and settings.tiktok_client_key and settings.tiktok_redirect_uri:
+        storage.create_social_oauth_state(state, guild_id, provider)
+        params = urlencode({"client_key": settings.tiktok_client_key, "response_type": "code", "scope": "user.info.basic,video.list", "redirect_uri": settings.tiktok_redirect_uri, "state": state})
+        return RedirectResponse(f"https://www.tiktok.com/v2/auth/authorize/?{params}", status_code=303)
+    if provider == "instagram" and settings.instagram_app_id and settings.instagram_redirect_uri:
+        storage.create_social_oauth_state(state, guild_id, provider)
+        params = urlencode({"client_id": settings.instagram_app_id, "redirect_uri": settings.instagram_redirect_uri, "response_type": "code", "scope": "instagram_business_basic", "state": state})
+        return RedirectResponse(f"https://www.instagram.com/oauth/authorize?{params}", status_code=303)
+    return RedirectResponse(f"{target}?error=social-provider-unavailable", status_code=303)
+
+
+@app.get("/social/oauth/{provider}/callback")
+async def social_oauth_callback(provider: str, code: str | None = None, state: str | None = None, error: str | None = None):
+    if not state or error:
+        raise HTTPException(status_code=400, detail="ソーシャルOAuth認証が拒否されました")
+    guild_id = storage.consume_social_oauth_state(state, provider)
+    if guild_id is None or not code:
+        raise HTTPException(status_code=400, detail="ソーシャルOAuth state が無効です")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            if provider == "tiktok" and settings.tiktok_client_key and settings.tiktok_client_secret and settings.tiktok_redirect_uri:
+                response = await client.post("https://open.tiktokapis.com/v2/oauth/token/", data={"client_key": settings.tiktok_client_key, "client_secret": settings.tiktok_client_secret, "code": code, "grant_type": "authorization_code", "redirect_uri": settings.tiktok_redirect_uri})
+                payload = response.raise_for_status().json()
+                token = payload.get("access_token")
+                account_id = payload.get("open_id")
+                account_name = payload.get("scope", "TikTok account")
+            elif provider == "instagram" and settings.instagram_app_id and settings.instagram_app_secret and settings.instagram_redirect_uri:
+                response = await client.post("https://api.instagram.com/oauth/access_token", data={"client_id": settings.instagram_app_id, "client_secret": settings.instagram_app_secret, "grant_type": "authorization_code", "redirect_uri": settings.instagram_redirect_uri, "code": code})
+                payload = response.raise_for_status().json()
+                token = payload.get("access_token")
+                account_id = str(payload.get("user_id", ""))
+                account_name = "Instagram Professional account"
+            else:
+                raise ValueError("Provider credentials are not configured")
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="ソーシャルOAuthトークンの取得に失敗しました") from exc
+    if not token or not account_id:
+        raise HTTPException(status_code=502, detail="ソーシャルOAuthの応答が不完全です")
+    storage.save_social_connection(guild_id, provider, str(account_id), str(account_name), social_cipher.encrypt(str(token)), social_cipher.encrypt(str(payload["refresh_token"])) if payload.get("refresh_token") else None, int(time.time()) + int(payload.get("expires_in", 0)) if payload.get("expires_in") else None)
+    return RedirectResponse(f"/servers/{guild_id}/modules/social_updates?saved=connected", status_code=303)
 
 
 @app.get("/favicon.ico")
 async def favicon():
     return RedirectResponse(avatar_url(await api.bot_user()), status_code=307)
+
+
+@app.get("/webhooks/youtube")
+async def youtube_webhook_verify(request: Request):
+    """WebSub lease validation; the public callback URL is configured at YouTube."""
+    return PlainTextResponse(request.query_params.get("hub.challenge", ""))
+
+
+@app.post("/webhooks/youtube")
+async def youtube_webhook(request: Request):
+    body = await request.body()
+    try:
+        root = ET.fromstring(body)
+        namespaces = {"yt": "http://www.youtube.com/xml/schemas/2015", "atom": "http://www.w3.org/2005/Atom"}
+        video_id = root.findtext(".//yt:videoId", namespaces=namespaces)
+        account_id = root.findtext(".//yt:channelId", namespaces=namespaces)
+        title = root.findtext(".//atom:title", namespaces=namespaces) or "YouTube video"
+    except ET.ParseError:
+        raise HTTPException(status_code=400, detail="Invalid YouTube webhook payload")
+    if not video_id or not account_id:
+        raise HTTPException(status_code=400, detail="YouTube event is incomplete")
+    storage.enqueue_social_event("youtube", f"youtube:video:{video_id}", account_id, {"account": account_id, "title": title, "url": f"https://www.youtube.com/watch?v={video_id}", "platform": "YouTube", "type": "video"})
+    return PlainTextResponse("ok")
 
 
 def optional_id(value: str) -> int | None:

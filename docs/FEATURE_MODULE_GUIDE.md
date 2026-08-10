@@ -117,6 +117,19 @@ channel_id = module["settings"].get("reply_channel_id")
 
 OAuthトークン、Botトークン、APIキー、セッション秘密鍵をモジュール設定やHTML・ログへ書き込んではいけません。
 
+## 外部サービス通知を追加・運用する場合
+
+`social_updates` は、設定そのものと外部イベントを分離しています。購読設定は `social_subscriptions`、OAuthトークンは暗号化済みの `social_connections`、受信イベントと配送の重複防止は `social_events` / `social_deliveries` に保存します。新しいサービスを追加する際は、必ず次を一組で実装してください。
+
+1. `feature_registry.py` のカテゴリ・翻訳・SVGを追加する（既存のソーシャルカテゴリにカードを増やす場合も同様）。
+2. `storage.py` の許可プロバイダ、最大件数、イベント種別、一意な外部イベントキーを定義する。
+3. ダッシュボードでCSRF・Discord Administrator認可・ギルド内チャンネル／安全なロール検証を通して保存する。通知ロール以外は `AllowedMentions` で必ず抑止する。
+4. OAuthが必要なサービスは `social_oauth_states` の一回限りstateを使い、トークンは `SocialTokenCipher` を通してから保存する。暗号鍵は `SOCIAL_TOKEN_ENCRYPTION_KEY` のみで管理し、失効・再連携の導線を用意する。
+5. 初回同期では最新カーソルだけを保存し、過去投稿を配送しない。配送は `event_key` と購読IDの一意制約で冪等にする。失敗はバックオフ付きで再試行し、外部APIのレート制限を守る。
+6. 各サービスの公式利用規約・Webhook署名検証・データ保持要件を確認する。非公式スクレイピングは追加しない。
+
+YouTubeは公開HTTPSの `/webhooks/youtube` をWebSub callbackとして設定します。TikTok LIVEとInstagram Storiesは公式APIの対象外なので、画面上でも利用可能に見せないでください。X APIは読取費用を運用者が確認してから有効化します。
+
 ## 保存データの変更
 
 通常の機能設定は `settings_json` を使用し、SQLiteの列追加は不要です。検索・集計・一意制約が必要な値だけ、専用テーブルを `GuildStorage.initialize()` に追加します。

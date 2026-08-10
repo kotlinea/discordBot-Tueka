@@ -31,6 +31,7 @@ FEATURES = (
     Feature("advanced_polls", "community", "feature.advanced_polls", "feature.advanced_polls.description", "chart-bar", ()),
     Feature("minigames", "community", "feature.minigames", "feature.minigames.description", "gamepad", ()),
     Feature("trust_score", "moderation", "feature.trust_score", "feature.trust_score.description", "shield-check", ("trust_retention_days", "trust_flag_threshold")),
+    Feature("social_updates", "social", "feature.social_updates", "feature.social_updates.description", "bell-ring", (), (), ("send_messages",)),
 )
 FEATURE_BY_ID = {feature.id: feature for feature in FEATURES}
 
@@ -54,6 +55,7 @@ JAPANESE_COPY = {
     "advanced_polls": ("拡張投票", "最大10択、期限、画像付きのボタン投票を作成します。"),
     "minigames": ("ミニゲーム", "コミュニティ向けの軽量ゲームを提供します。"),
     "trust_score": ("信頼度スコア", "違反履歴を管理者だけに可視化します。"),
+    "social_updates": ("ソーシャルメディア更新通知", "各サービスの投稿・配信を通知します。"),
 }
 
 

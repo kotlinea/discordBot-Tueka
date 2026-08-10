@@ -82,6 +82,12 @@ class GuildStorage:
                 CREATE TABLE IF NOT EXISTS polls (message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, channel_id INTEGER NOT NULL, creator_id INTEGER NOT NULL, question TEXT NOT NULL, options_json TEXT NOT NULL, image_url TEXT, closes_at INTEGER, status TEXT NOT NULL DEFAULT 'open', created_at INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS poll_votes (message_id INTEGER NOT NULL, user_id INTEGER NOT NULL, option_index INTEGER NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (message_id,user_id), FOREIGN KEY(message_id) REFERENCES polls(message_id) ON DELETE CASCADE);
                 CREATE TABLE IF NOT EXISTS trust_events (id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, user_id INTEGER NOT NULL, category TEXT NOT NULL, weight INTEGER NOT NULL, reason TEXT, created_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS social_subscriptions (id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, provider TEXT NOT NULL, account_id TEXT NOT NULL, account_name TEXT NOT NULL, channel_id INTEGER NOT NULL, role_id INTEGER, template TEXT NOT NULL DEFAULT '', events_json TEXT NOT NULL DEFAULT '[]', enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(guild_id, provider, account_id));
+                CREATE TABLE IF NOT EXISTS social_connections (id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, provider TEXT NOT NULL, account_id TEXT NOT NULL, account_name TEXT NOT NULL, access_token_encrypted TEXT NOT NULL, refresh_token_encrypted TEXT, expires_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(guild_id, provider, account_id));
+                CREATE TABLE IF NOT EXISTS social_oauth_states (state TEXT PRIMARY KEY, guild_id INTEGER NOT NULL, provider TEXT NOT NULL, expires_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS social_events (id INTEGER PRIMARY KEY, provider TEXT NOT NULL, event_key TEXT NOT NULL UNIQUE, account_id TEXT NOT NULL, payload_json TEXT NOT NULL, received_at INTEGER NOT NULL, processed_at INTEGER);
+                CREATE TABLE IF NOT EXISTS social_deliveries (id INTEGER PRIMARY KEY, subscription_id INTEGER NOT NULL, event_key TEXT NOT NULL, discord_channel_id INTEGER NOT NULL, discord_message_id INTEGER, state TEXT NOT NULL DEFAULT 'sent', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(subscription_id, event_key));
+                CREATE TABLE IF NOT EXISTS social_live_messages (subscription_id INTEGER NOT NULL, provider TEXT NOT NULL, account_id TEXT NOT NULL, discord_channel_id INTEGER NOT NULL, discord_message_id INTEGER NOT NULL, PRIMARY KEY(subscription_id, provider, account_id));
             """)
             poll_columns = {row["name"] for row in connection.execute("PRAGMA table_info(polls)").fetchall()}
             if poll_columns and "image_url" not in poll_columns:
@@ -190,6 +196,114 @@ class GuildStorage:
 
     def module_enabled(self, guild_id: int, module_id: str) -> bool:
         return self.get_module(guild_id, module_id)["enabled"]
+
+    def social_subscriptions(self, guild_id: int, provider: str | None = None) -> list[dict[str, Any]]:
+        query, params = "SELECT * FROM social_subscriptions WHERE guild_id=?", [guild_id]
+        if provider:
+            query += " AND provider=?"
+            params.append(provider)
+        query += " ORDER BY provider, account_name"
+        with self._connection() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [{**dict(row), "events": json.loads(row["events_json"])} for row in rows]
+
+    def social_subscription(self, subscription_id: int) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute("SELECT * FROM social_subscriptions WHERE id=?", (subscription_id,)).fetchone()
+        return {**dict(row), "events": json.loads(row["events_json"])} if row else None
+
+    def matching_social_subscriptions(self, provider: str, account_id: str, event_type: str) -> list[dict[str, Any]]:
+        with self._connection() as connection:
+            rows = connection.execute("SELECT * FROM social_subscriptions WHERE provider=? AND account_id=? AND enabled=1", (provider, account_id)).fetchall()
+        return [{**dict(row), "events": json.loads(row["events_json"])} for row in rows if event_type in json.loads(row["events_json"])]
+
+    def save_social_subscription(self, guild_id: int, provider: str, account_id: str, account_name: str, channel_id: int, role_id: int | None, template: str, events: list[str], enabled: bool = True, subscription_id: int | None = None) -> int:
+        if provider not in {"youtube", "twitch", "tiktok", "x", "instagram"} or len(events) == 0 or len(template) > 1000:
+            raise ValueError("Invalid social subscription")
+        now = int(time.time())
+        with self._connection() as connection:
+            if subscription_id is None:
+                count = connection.execute("SELECT COUNT(*) FROM social_subscriptions WHERE guild_id=? AND provider=?", (guild_id, provider)).fetchone()[0]
+                if count >= 10:
+                    raise ValueError("Provider account limit reached")
+                cursor = connection.execute("INSERT INTO social_subscriptions(guild_id,provider,account_id,account_name,channel_id,role_id,template,events_json,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)", (guild_id, provider, account_id, account_name, channel_id, role_id, template, json.dumps(events), int(enabled), now, now))
+                return int(cursor.lastrowid)
+            connection.execute("UPDATE social_subscriptions SET provider=?,account_id=?,account_name=?,channel_id=?,role_id=?,template=?,events_json=?,enabled=?,updated_at=? WHERE id=? AND guild_id=?", (provider, account_id, account_name, channel_id, role_id, template, json.dumps(events), int(enabled), now, subscription_id, guild_id))
+            return subscription_id
+
+    def delete_social_subscription(self, guild_id: int, subscription_id: int) -> None:
+        with self._connection() as connection:
+            connection.execute("DELETE FROM social_subscriptions WHERE guild_id=? AND id=?", (guild_id, subscription_id))
+
+    def social_connection(self, guild_id: int, provider: str, account_id: str) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute("SELECT * FROM social_connections WHERE guild_id=? AND provider=? AND account_id=?", (guild_id, provider, account_id)).fetchone()
+        return dict(row) if row else None
+
+    def social_connections(self, guild_id: int, provider: str | None = None) -> list[dict[str, Any]]:
+        query, params = "SELECT * FROM social_connections WHERE guild_id=?", [guild_id]
+        if provider:
+            query += " AND provider=?"
+            params.append(provider)
+        with self._connection() as connection:
+            rows = connection.execute(query + " ORDER BY provider, account_name", params).fetchall()
+        return [dict(row) for row in rows]
+
+    def save_social_connection(self, guild_id: int, provider: str, account_id: str, account_name: str, access_token_encrypted: str, refresh_token_encrypted: str | None, expires_at: int | None) -> None:
+        now = int(time.time())
+        with self._connection() as connection:
+            connection.execute("INSERT INTO social_connections(guild_id,provider,account_id,account_name,access_token_encrypted,refresh_token_encrypted,expires_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(guild_id,provider,account_id) DO UPDATE SET account_name=excluded.account_name,access_token_encrypted=excluded.access_token_encrypted,refresh_token_encrypted=excluded.refresh_token_encrypted,expires_at=excluded.expires_at,updated_at=excluded.updated_at", (guild_id, provider, account_id, account_name, access_token_encrypted, refresh_token_encrypted, expires_at, now, now))
+
+    def create_social_oauth_state(self, state: str, guild_id: int, provider: str, *, ttl_seconds: int = 600) -> None:
+        if provider not in {"tiktok", "instagram"}:
+            raise ValueError("Unsupported social OAuth provider")
+        with self._connection() as connection:
+            connection.execute("DELETE FROM social_oauth_states WHERE expires_at < ?", (int(time.time()),))
+            connection.execute("INSERT INTO social_oauth_states(state,guild_id,provider,expires_at) VALUES(?,?,?,?)", (state, guild_id, provider, int(time.time()) + ttl_seconds))
+
+    def consume_social_oauth_state(self, state: str, provider: str) -> int | None:
+        now = int(time.time())
+        with self._connection() as connection:
+            row = connection.execute("SELECT guild_id FROM social_oauth_states WHERE state=? AND provider=? AND expires_at>=?", (state, provider, now)).fetchone()
+            connection.execute("DELETE FROM social_oauth_states WHERE state=?", (state,))
+        return int(row["guild_id"]) if row else None
+
+    def enqueue_social_event(self, provider: str, event_key: str, account_id: str, payload: dict[str, Any]) -> bool:
+        with self._connection() as connection:
+            cursor = connection.execute("INSERT OR IGNORE INTO social_events(provider,event_key,account_id,payload_json,received_at) VALUES(?,?,?,?,?)", (provider, event_key, account_id, json.dumps(payload), int(time.time())))
+        return cursor.rowcount == 1
+
+    def pending_social_events(self) -> list[dict[str, Any]]:
+        with self._connection() as connection:
+            rows = connection.execute("SELECT * FROM social_events WHERE processed_at IS NULL ORDER BY id LIMIT 100").fetchall()
+        return [{**dict(row), "payload": json.loads(row["payload_json"])} for row in rows]
+
+    def mark_social_event_processed(self, event_id: int) -> None:
+        with self._connection() as connection:
+            connection.execute("UPDATE social_events SET processed_at=? WHERE id=?", (int(time.time()), event_id))
+
+    def record_social_delivery(self, subscription_id: int, event_key: str, channel_id: int, message_id: int | None, state: str = "sent") -> bool:
+        now = int(time.time())
+        with self._connection() as connection:
+            cursor = connection.execute("INSERT OR IGNORE INTO social_deliveries(subscription_id,event_key,discord_channel_id,discord_message_id,state,created_at,updated_at) VALUES(?,?,?,?,?,?,?)", (subscription_id, event_key, channel_id, message_id, state, now, now))
+        return cursor.rowcount == 1
+
+    def update_social_delivery(self, subscription_id: int, event_key: str, message_id: int, state: str = "sent") -> None:
+        with self._connection() as connection:
+            connection.execute("UPDATE social_deliveries SET discord_message_id=?,state=?,updated_at=? WHERE subscription_id=? AND event_key=?", (message_id, state, int(time.time()), subscription_id, event_key))
+
+    def set_social_live_message(self, subscription_id: int, provider: str, account_id: str, channel_id: int, message_id: int) -> None:
+        with self._connection() as connection:
+            connection.execute("INSERT INTO social_live_messages(subscription_id,provider,account_id,discord_channel_id,discord_message_id) VALUES(?,?,?,?,?) ON CONFLICT(subscription_id,provider,account_id) DO UPDATE SET discord_channel_id=excluded.discord_channel_id,discord_message_id=excluded.discord_message_id", (subscription_id, provider, account_id, channel_id, message_id))
+
+    def social_live_message(self, subscription_id: int, provider: str, account_id: str) -> dict[str, int] | None:
+        with self._connection() as connection:
+            row = connection.execute("SELECT discord_channel_id,discord_message_id FROM social_live_messages WHERE subscription_id=? AND provider=? AND account_id=?", (subscription_id, provider, account_id)).fetchone()
+        return dict(row) if row else None
+
+    def clear_social_live_message(self, subscription_id: int, provider: str, account_id: str) -> None:
+        with self._connection() as connection:
+            connection.execute("DELETE FROM social_live_messages WHERE subscription_id=? AND provider=? AND account_id=?", (subscription_id, provider, account_id))
 
     def enabled_module_guild_ids(self, module_id: str) -> list[int]:
         with self._connection() as connection:

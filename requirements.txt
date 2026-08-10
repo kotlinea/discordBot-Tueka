@@ -10,6 +10,6 @@ itsdangerous>=2.2,<3
 python-multipart>=0.0.9,<1
 uvicorn[standard]>=0.30,<1
 PyNaCl
+cryptography>=43,<46
 davey
-
 protobuf
