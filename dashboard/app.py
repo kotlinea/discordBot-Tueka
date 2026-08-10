@@ -1,6 +1,8 @@
 """FastAPI dashboard entry point. Run with: uvicorn dashboard.app:app"""
 import os
 import secrets
+import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlencode
 from asyncio import gather
@@ -13,6 +15,8 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from config import Settings
 from dashboard.discord_api import DiscordAPI, ADMINISTRATOR, PERMISSION_BITS
+from dashboard.icon_registry import get_icon
+from dashboard.timing import add as add_timing, begin as begin_timing, end as end_timing
 from feature_registry import FEATURES, get_feature, japanese_copy
 from storage import GuildStorage
 
@@ -28,10 +32,41 @@ if not all((client_id, client_secret, redirect_uri, session_secret)):
 
 storage = GuildStorage(settings.database_path)
 api = DiscordAPI(settings.discord_token, client_id, client_secret, redirect_uri)
-app = FastAPI(title="Tueka Dashboard")
+
+
+@asynccontextmanager
+async def dashboard_lifespan(_: FastAPI):
+    await api.start()
+    try:
+        yield
+    finally:
+        await api.close()
+
+
+app = FastAPI(title="Tueka Dashboard", lifespan=dashboard_lifespan)
 app.add_middleware(SessionMiddleware, secret_key=session_secret, https_only=os.getenv("DASHBOARD_HTTPS_ONLY", "true").lower() == "true", same_site="lax")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+
+
+@app.middleware("http")
+async def server_timing(request: Request, call_next):
+    started, token = time.perf_counter(), begin_timing()
+    try:
+        response = await call_next(request)
+    finally:
+        metrics = end_timing(token)
+    total = (time.perf_counter() - started) * 1000
+    response.headers["Server-Timing"] = f"app;dur={total:.1f}, discord;dur={metrics['discord_ms']:.1f}, template;dur={metrics['template_ms']:.1f}"
+    return response
+
+
+def render_page(request: Request, name: str, context: dict, status_code: int = 200):
+    started = time.perf_counter()
+    try:
+        return templates.TemplateResponse(request, name, context, status_code=status_code)
+    finally:
+        add_timing("template_ms", (time.perf_counter() - started) * 1000)
 
 
 def session_token(request: Request) -> str:
@@ -42,9 +77,9 @@ def session_token(request: Request) -> str:
     return token
 
 
-async def authorized(request: Request, guild_id: int) -> str:
+async def authorized(request: Request, guild_id: int, *, live: bool = False) -> str:
     token = session_token(request)
-    if not await api.can_manage(token, guild_id):
+    if not await api.can_manage(token, guild_id, use_cache=not live):
         raise HTTPException(status_code=403, detail="このサーバーを管理する権限がありません")
     return token
 
@@ -70,7 +105,7 @@ async def page_identity(token: str) -> dict:
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     bot_user = await api.bot_user()
-    return templates.TemplateResponse(request, "landing.html", {"bot": {"name": bot_user["username"], "avatar_url": avatar_url(bot_user)}, "authenticated": bool(session_token_or_none(request))})
+    return render_page(request, "landing.html", {"bot": {"name": bot_user["username"], "avatar_url": avatar_url(bot_user)}, "authenticated": bool(session_token_or_none(request))})
 
 
 def session_token_or_none(request: Request) -> str | None:
@@ -112,11 +147,6 @@ async def logout(request: Request):
     return RedirectResponse("/", status_code=303)
 
 
-@app.get("/api/identity")
-async def identity(request: Request):
-    return await page_identity(session_token(request))
-
-
 @app.exception_handler(404)
 async def not_found(request: Request, exc):
     try:
@@ -124,7 +154,7 @@ async def not_found(request: Request, exc):
         bot = {"name": bot_user["username"], "avatar_url": avatar_url(bot_user)}
     except Exception:
         bot = {"name": "Tueka", "avatar_url": "https://cdn.discordapp.com/embed/avatars/0.png"}
-    return templates.TemplateResponse(request, "404.html", {"bot": bot}, status_code=404)
+    return render_page(request, "404.html", {"bot": bot}, status_code=404)
 
 
 @app.get("/servers", response_class=HTMLResponse)
@@ -136,14 +166,16 @@ async def servers(request: Request):
         raise HTTPException(status_code=401, detail="Discordセッションの再認証が必要です") from exc
     for guild in guilds:
         guild["icon_url"] = guild_icon_url(guild)
-    return templates.TemplateResponse(request, "servers.html", {"guilds": guilds, **identity})
+    return render_page(request, "servers.html", {"guilds": guilds, **identity})
 
 
 def feature_view(guild_id: int, feature, bot_permissions: int | None = None):
     module = storage.get_module(guild_id, feature.id)
     missing = [] if bot_permissions is None or bot_permissions & ADMINISTRATOR else [permission for permission in feature.required_bot_permissions if not bot_permissions & PERMISSION_BITS[permission]]
+    if feature.id == "audit_log" and module["settings"].get("log_member") and bot_permissions is not None and not bot_permissions & ADMINISTRATOR and not bot_permissions & PERMISSION_BITS["view_audit_log"]:
+        missing.append("view_audit_log")
     title, description = japanese_copy(feature.id)
-    return {"definition": feature, "enabled": module["enabled"], "settings": module["settings"], "missing_permissions": missing, "title": title, "description": description}
+    return {"definition": feature, "icon": get_icon(feature.icon), "enabled": module["enabled"], "settings": module["settings"], "missing_permissions": missing, "title": title, "description": description}
 
 
 @app.get("/servers/{guild_id}", response_class=HTMLResponse)
@@ -152,7 +184,7 @@ async def guild_home(request: Request, guild_id: int):
     _, _, bot_permissions = await api.guild_resources(guild_id)
     cards = [feature_view(guild_id, feature, bot_permissions) for feature in FEATURES]
     categories = {"community": [card for card in cards if card["definition"].category == "community"], "moderation": [card for card in cards if card["definition"].category == "moderation"]}
-    return templates.TemplateResponse(request, "guild_home.html", {"guild_id": guild_id, "categories": categories, "csrf_token": request.session["csrf_token"], **(await page_identity(token))})
+    return render_page(request, "guild_home.html", {"guild_id": guild_id, "categories": categories, "csrf_token": request.session["csrf_token"], **(await page_identity(token))})
 
 
 @app.get("/servers/{guild_id}/settings")
@@ -178,7 +210,7 @@ async def module_settings(request: Request, guild_id: int, module_id: str):
     elif draft_key in drafts:
         drafts.pop(draft_key)
         request.session["module_drafts"] = drafts
-    return templates.TemplateResponse(request, "module_settings.html", {"guild_id": guild_id, "module": module, "channels": channels, "roles": roles, "csrf_token": request.session["csrf_token"], **(await page_identity(token))})
+    return render_page(request, "module_settings.html", {"guild_id": guild_id, "module": module, "channels": channels, "roles": roles, "csrf_token": request.session["csrf_token"], **(await page_identity(token))})
 
 
 @app.get("/favicon.ico")
@@ -198,12 +230,12 @@ async def save_module_settings(request: Request, guild_id: int, module_id: str):
     enabled = form.get("enabled") == "on"
     if not secrets.compare_digest(csrf_token, request.session.get("csrf_token", "")):
         return RedirectResponse(f"{target}?error=csrf", status_code=303)
-    await authorized(request, guild_id)
+    await authorized(request, guild_id, live=True)
     try:
         feature = get_feature(module_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="機能が見つかりません")
-    channels, roles, bot_permissions = await api.guild_resources(guild_id)
+    channels, roles, bot_permissions = await api.guild_resources(guild_id, use_cache=False)
     channel_ids, role_ids = {int(item["id"]) for item in channels}, {int(item["id"]) for item in roles}
     channel_types = {int(item["id"]): int(item["type"]) for item in channels}
     try:
@@ -247,6 +279,12 @@ async def save_module_settings(request: Request, guild_id: int, module_id: str):
     try:
         values = {
             "management_channel_id": management, "welcome_channel_id": welcome, "default_role_id": role,
+            "log_message": form.get("log_message") == "on",
+            "log_voice": form.get("log_voice") == "on",
+            "log_channel": form.get("log_channel") == "on",
+            "log_member": form.get("log_member") == "on",
+            "log_role": form.get("log_role") == "on",
+            "log_server": form.get("log_server") == "on",
             "welcome_enabled": form.get("welcome_enabled") == "on",
             "welcome_format": str(form.get("welcome_format", "text")),
             "welcome_content": str(form.get("welcome_content", ""))[:4096],
@@ -311,6 +349,18 @@ async def save_module_settings(request: Request, guild_id: int, module_id: str):
             drafts[draft_key] = {"enabled": enabled, "settings": {field: values[field] for field in feature.fields}}
             request.session["module_drafts"] = drafts
             return RedirectResponse(f"{target}?error=setup-required", status_code=303)
+    if module_id == "audit_log":
+        enabled = any(values[key] for key in ("log_message", "log_voice", "log_channel", "log_member", "log_role", "log_server"))
+        draft_key = f"{guild_id}:{module_id}"
+        drafts = request.session.get("module_drafts", {})
+        if enabled and management is None:
+            drafts[draft_key] = {"enabled": enabled, "settings": {field: values[field] for field in feature.fields}}
+            request.session["module_drafts"] = drafts
+            return RedirectResponse(f"{target}?error=setup-required", status_code=303)
+        if values["log_member"] and not (bot_permissions & ADMINISTRATOR or bot_permissions & PERMISSION_BITS["view_audit_log"]):
+            drafts[draft_key] = {"enabled": enabled, "settings": {field: values[field] for field in feature.fields}}
+            request.session["module_drafts"] = drafts
+            return RedirectResponse(f"{target}?error=missing-permissions", status_code=303)
     if module_id == "leveling" and values["voice_enabled"] and voice_notification_channel is None:
         draft_key = f"{guild_id}:{module_id}"
         drafts = request.session.get("module_drafts", {})
@@ -337,6 +387,7 @@ async def save_module_settings(request: Request, guild_id: int, module_id: str):
     for field in feature.fields:
         module["settings"][field] = values[field]
     storage.set_module(guild_id, module_id, enabled=enabled, settings=module["settings"])
+    api.invalidate_guild_resources(guild_id)
     if module_id == "reaction_roles" and form.get("publish_reaction_panel") == "on":
         if not enabled:
             request.session["module_drafts"] = drafts

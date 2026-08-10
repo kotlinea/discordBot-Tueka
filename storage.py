@@ -117,11 +117,13 @@ class GuildStorage:
             settings = json.loads(row["settings_json"])
             if module_id == "welcome":
                 settings = self._welcome_settings(settings)
+            elif module_id == "audit_log":
+                settings = self._audit_log_settings(settings, preserve_legacy_message=True)
             elif module_id == "leveling":
                 settings = self._leveling_settings(settings, self.get_settings(guild_id))
             return {"enabled": bool(row["enabled"]), "settings": settings}
         legacy = self.get_settings(guild_id)
-        defaults = {"welcome": self._welcome_settings({"welcome_channel_id": legacy["welcome_channel_id"]}), "leveling": self._leveling_settings({}, legacy), "autorole": {"default_role_id": legacy["default_role_id"]}, "audit_log": {"management_channel_id": legacy["management_channel_id"]}}.get(module_id, {})
+        defaults = {"welcome": self._welcome_settings({"welcome_channel_id": legacy["welcome_channel_id"]}), "leveling": self._leveling_settings({}, legacy), "autorole": {"default_role_id": legacy["default_role_id"]}, "audit_log": self._audit_log_settings({"management_channel_id": legacy["management_channel_id"]})}.get(module_id, {})
         return {"enabled": False, "settings": defaults}
 
     @staticmethod
@@ -144,6 +146,24 @@ class GuildStorage:
             defaults["welcome_format"] = "text"
         if defaults["leave_format"] not in {"text", "embed"}:
             defaults["leave_format"] = "text"
+        return defaults
+
+    @staticmethod
+    def _audit_log_settings(settings: dict[str, Any], *, preserve_legacy_message: bool = False) -> dict[str, Any]:
+        """Normalize category toggles while preserving the old message-only log."""
+        defaults: dict[str, Any] = {
+            "management_channel_id": None,
+            "log_message": False,
+            "log_voice": False,
+            "log_channel": False,
+            "log_member": False,
+            "log_role": False,
+            "log_server": False,
+        }
+        defaults.update(settings)
+        category_keys = ("log_message", "log_voice", "log_channel", "log_member", "log_role", "log_server")
+        if preserve_legacy_message and defaults["management_channel_id"] and not any(key in settings for key in category_keys):
+            defaults["log_message"] = True
         return defaults
 
     @staticmethod

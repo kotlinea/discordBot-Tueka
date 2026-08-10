@@ -24,12 +24,21 @@ Feature(
     "community",                 # "community" または "moderation"
     "feature.auto_reply",        # 翻訳キー
     "feature.auto_reply.description",
-    "chat",                      # ダッシュボードで使うSVGアイコン種別
+    "message-circle",            # dashboard/icon_registry.py のSVGアイコンID
     ("reply_channel_id", "text"),  # ダッシュボード設定のフィールド名
 )
 ```
 
-現在のテンプレートが描画できるアイコンは `users`、`chart`、`clipboard`、`shield` です。新しいアイコン名を使う場合は `dashboard/templates/guild_home.html` のSVG分岐を追加してください。
+### アイコンをレジストリへ追加
+
+機能カードのアイコンは `dashboard/icon_registry.py` だけで管理します。テンプレートへ条件分岐や任意SVGを追加してはいけません。
+
+1. [All SVG Icons のUIアイコン集](https://allsvgicons.com/collections/ui-icons/) を候補探索の起点にし、既存の **Lucideアウトライン** と同じ24px線画を選ぶ。
+2. 採用するアイコンのライセンスを確認する。現在のレジストリはLucide（ISC）のSVGパスをローカルに保持しており、外部サイトのSVGをホットリンクしない。
+3. `ICONS` に、意味のあるkebab-case ID・英語の簡潔なラベル・固定の`<path>`／`<rect>`断片を追加する。`<script>`、イベント属性、外部参照、style属性は追加しない。
+4. `Feature.icon` にそのIDを指定する。起動時とテストで未登録IDは失敗する。
+
+カードには常に機能見出しがあるため、カード内アイコンは装飾として支援技術から隠します。将来アイコン単独のボタンを作る場合は、レジストリのラベルまたは目的を示す`aria-label`を必ず付けてください。
 
 カテゴリを増やす場合は、`dashboard/app.py` のカテゴリ集約、テンプレート、`dashboard/static/dashboard.js` の日英翻訳を同時に追加します。
 
@@ -76,6 +85,8 @@ channel_id = module["settings"].get("reply_channel_id")
 有効化の失敗ではSQLiteを書き換えず、`module_drafts` セッションに入力値を保存して同じ画面へ戻します。この挙動を壊さないでください。設定変更は保存ボタンを押すまでBotへ反映してはいけません。
 
 `fields` が空の機能は、設定なしで有効化できます。必須ではない設定項目がある場合は、`fields` と検証を分けるようレジストリのモデルを拡張してください。すべての `fields` を必須扱いにしないことが重要です。
+
+カテゴリ別の有効状態を持つ機能では、カテゴリを `settings_json` の真偽値として保存し、Cogは**対象カテゴリが無効なら外部API呼び出しや送信前に停止**します。カテゴリのいずれかが有効な場合だけモジュール全体を有効にし、カテゴリごとに必要なBot権限が異なる場合は保存時に個別検証してください。
 
 ### 4. 翻訳とUIを追加
 

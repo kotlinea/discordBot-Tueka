@@ -19,7 +19,7 @@ MAX_EXPRESSION_NODES = 50
 MAX_POWER_EXPONENT = 12
 MAX_ROLL_SIDES = 1_000_000
 _OPERATORS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv, ast.Mod: operator.mod, ast.Pow: operator.pow, ast.USub: operator.neg, ast.UAdd: operator.pos}
-_CATEGORY_NAMES = {"GeneralCog": "基本", "AICog": "AI", "LevelingCog": "レベリング", "ModerationCog": "モデレーション", "AuditLogCog": "管理ログ", "WelcomeCog": "入退室"}
+_CATEGORY_NAMES = {"GeneralCog": "基本", "AICog": "AI", "LevelingCog": "レベリング", "ModerationCog": "モデレーション", "AuditLogCog": "サーバーログ", "WelcomeCog": "入退室"}
 _COG_MODULES = {"AICog": None, "LevelingCog": "leveling", "ModerationCog": "moderation", "AuditLogCog": "audit_log", "WelcomeCog": "welcome"}
 
 

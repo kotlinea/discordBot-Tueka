@@ -39,7 +39,7 @@ class ModerationCog(commands.Cog):
         except discord.Forbidden:
             pass
 
-    @app_commands.command(description="管理ログチャネルを設定します。")
+    @app_commands.command(description="サーバーログチャネルを設定します。")
     @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.guild_only()
     async def set_management(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
@@ -48,7 +48,7 @@ class ModerationCog(commands.Cog):
         module["settings"]["management_channel_id"] = channel.id
         self.storage.set_module(interaction.guild.id, "audit_log", enabled=module["enabled"], settings=module["settings"])
         self.storage.set(interaction.guild.id, "management_channel_id", channel.id)
-        await interaction.response.send_message(f"管理ログチャネルを `{channel.name}` に設定しました。", ephemeral=True)
+        await interaction.response.send_message(f"サーバーログチャネルを `{channel.name}` に設定しました。", ephemeral=True)
 
     @app_commands.command(description="このチャネルのメッセージを削除します。")
     @app_commands.checks.has_permissions(manage_messages=True)

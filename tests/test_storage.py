@@ -78,6 +78,14 @@ class GuildStorageTests(unittest.TestCase):
         self.assertFalse(welcome["settings"]["welcome_enabled"])
         self.assertFalse(welcome["settings"]["leave_enabled"])
 
+    def test_legacy_audit_log_keeps_message_category_and_new_categories_are_off(self):
+        self.storage.set_module(1, "audit_log", enabled=True, settings={"management_channel_id": 20})
+        audit_log = self.storage.get_module(1, "audit_log")
+        self.assertTrue(audit_log["settings"]["log_message"])
+        self.assertFalse(audit_log["settings"]["log_voice"])
+        self.assertFalse(audit_log["settings"]["log_member"])
+        self.assertFalse(self.storage.get_module(2, "audit_log")["settings"]["log_message"])
+
     def test_moderation_case_keeps_audit_details(self):
         self.storage.add_case(1, 2, "timeout", "reason", moderator_id=3, expires_at=100, dm_sent=True)
         case = self.storage.recent_cases(1, 2)[0]
