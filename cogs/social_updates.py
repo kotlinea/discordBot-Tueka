@@ -7,6 +7,9 @@ from discord.ext import commands, tasks
 from storage import GuildStorage
 
 
+MODULE_FOR_PROVIDER = {"youtube": "youtube_updates", "twitch": "twitch_updates", "tiktok": "tiktok_updates", "x": "x_updates", "instagram": "instagram_updates"}
+
+
 class SocialUpdatesCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -27,7 +30,7 @@ class SocialUpdatesCog(commands.Cog):
         matching_type = "live" if event_type == "live_end" else event_type
         retry_needed = False
         for subscription in self.storage.matching_social_subscriptions(event["provider"], event["account_id"], matching_type):
-            if not self.storage.module_enabled(subscription["guild_id"], "social_updates"):
+            if not self.storage.module_enabled(subscription["guild_id"], MODULE_FOR_PROVIDER[event["provider"]]):
                 continue
             guild = self.bot.get_guild(subscription["guild_id"])
             channel = guild.get_channel(subscription["channel_id"]) if guild else None

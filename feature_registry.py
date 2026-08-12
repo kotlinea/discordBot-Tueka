@@ -31,7 +31,11 @@ FEATURES = (
     Feature("advanced_polls", "community", "feature.advanced_polls", "feature.advanced_polls.description", "chart-bar", ()),
     Feature("minigames", "community", "feature.minigames", "feature.minigames.description", "gamepad", ()),
     Feature("trust_score", "moderation", "feature.trust_score", "feature.trust_score.description", "shield-check", ("trust_retention_days", "trust_flag_threshold")),
-    Feature("social_updates", "social", "feature.social_updates", "feature.social_updates.description", "bell-ring", (), (), ("send_messages",)),
+    Feature("youtube_updates", "social", "feature.youtube_updates", "feature.youtube_updates.description", "youtube", (), (), ("send_messages",)),
+    Feature("twitch_updates", "social", "feature.twitch_updates", "feature.twitch_updates.description", "twitch", (), (), ("send_messages",)),
+    Feature("tiktok_updates", "social", "feature.tiktok_updates", "feature.tiktok_updates.description", "tiktok", (), (), ("send_messages",)),
+    Feature("x_updates", "social", "feature.x_updates", "feature.x_updates.description", "x-twitter", (), (), ("send_messages",)),
+    Feature("instagram_updates", "social", "feature.instagram_updates", "feature.instagram_updates.description", "instagram", (), (), ("send_messages",)),
 )
 FEATURE_BY_ID = {feature.id: feature for feature in FEATURES}
 
@@ -55,7 +59,11 @@ JAPANESE_COPY = {
     "advanced_polls": ("拡張投票", "最大10択、期限、画像付きのボタン投票を作成します。"),
     "minigames": ("ミニゲーム", "コミュニティ向けの軽量ゲームを提供します。"),
     "trust_score": ("信頼度スコア", "違反履歴を管理者だけに可視化します。"),
-    "social_updates": ("ソーシャルメディア更新通知", "各サービスの投稿・配信を通知します。"),
+    "youtube_updates": ("YouTube通知", "新規動画・ライブ開始を通知します。"),
+    "twitch_updates": ("Twitch通知", "配信開始・終了を通知します。"),
+    "tiktok_updates": ("TikTok通知", "本人連携済みアカウントの新規投稿を通知します。"),
+    "x_updates": ("X通知", "新規ポストを通知します。"),
+    "instagram_updates": ("Instagram通知", "本人連携済みProfessionalアカウントの投稿・Reelsを通知します。"),
 }
 
 

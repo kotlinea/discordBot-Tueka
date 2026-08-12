@@ -89,6 +89,11 @@ class GuildStorage:
                 CREATE TABLE IF NOT EXISTS social_deliveries (id INTEGER PRIMARY KEY, subscription_id INTEGER NOT NULL, event_key TEXT NOT NULL, discord_channel_id INTEGER NOT NULL, discord_message_id INTEGER, state TEXT NOT NULL DEFAULT 'sent', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(subscription_id, event_key));
                 CREATE TABLE IF NOT EXISTS social_live_messages (subscription_id INTEGER NOT NULL, provider TEXT NOT NULL, account_id TEXT NOT NULL, discord_channel_id INTEGER NOT NULL, discord_message_id INTEGER NOT NULL, PRIMARY KEY(subscription_id, provider, account_id));
             """)
+            # Split the original all-in-one social card without dropping any
+            # existing subscription or its enabled state.
+            for row in connection.execute("SELECT DISTINCT guild_id, provider FROM social_subscriptions").fetchall():
+                module_id = f"{row['provider']}_updates"
+                connection.execute("INSERT OR IGNORE INTO guild_modules(guild_id,module_id,enabled,settings_json) VALUES(?,?,1,'{}')", (row["guild_id"], module_id))
             poll_columns = {row["name"] for row in connection.execute("PRAGMA table_info(polls)").fetchall()}
             if poll_columns and "image_url" not in poll_columns:
                 connection.execute("ALTER TABLE polls ADD COLUMN image_url TEXT")

@@ -112,6 +112,9 @@ def social_provider_available(provider: str) -> bool:
     }.get(provider, False)
 
 
+SOCIAL_MODULE_PROVIDERS = {"youtube_updates": "youtube", "twitch_updates": "twitch", "tiktok_updates": "tiktok", "x_updates": "x", "instagram_updates": "instagram"}
+
+
 async def subscribe_youtube_websub(channel_id: str) -> bool:
     """Register a public channel at the official WebSub hub.
 
@@ -243,15 +246,19 @@ async def module_settings(request: Request, guild_id: int, module_id: str):
     elif draft_key in drafts:
         drafts.pop(draft_key)
         request.session["module_drafts"] = drafts
-    subscriptions = storage.social_subscriptions(guild_id) if module_id == "social_updates" else []
-    connections = {item["provider"] for item in storage.social_connections(guild_id)} if module_id == "social_updates" else set()
+    social_provider = SOCIAL_MODULE_PROVIDERS.get(module_id)
+    subscriptions = storage.social_subscriptions(guild_id, social_provider) if social_provider else []
+    connections = {item["provider"] for item in storage.social_connections(guild_id)} if social_provider else set()
     provider_available = {provider: social_provider_available(provider) for provider in ("youtube", "twitch", "tiktok", "x", "instagram")}
-    return render_page(request, "module_settings.html", {"guild_id": guild_id, "module": module, "channels": channels, "roles": roles, "subscriptions": subscriptions, "social_connections": connections, "provider_available": provider_available, "csrf_token": request.session["csrf_token"], **(await page_identity(token))})
+    template_name = "social_module_settings.html" if social_provider else "module_settings.html"
+    return render_page(request, template_name, {"guild_id": guild_id, "module": module, "social_provider": social_provider, "channels": channels, "roles": roles, "subscriptions": subscriptions, "social_connections": connections, "provider_available": provider_available, "csrf_token": request.session["csrf_token"], **(await page_identity(token))})
 
 
 @app.post("/servers/{guild_id}/social/subscriptions")
 async def save_social_subscription(request: Request, guild_id: int):
-    target = f"/servers/{guild_id}/modules/social_updates"
+    module_id = request.query_params.get("module_id", "")
+    provider_for_module = SOCIAL_MODULE_PROVIDERS.get(module_id)
+    target = f"/servers/{guild_id}/modules/{module_id}" if provider_for_module else f"/servers/{guild_id}"
     form = await request.form()
     if not secrets.compare_digest(str(form.get("csrf_token", "")), request.session.get("csrf_token", "")):
         return RedirectResponse(f"{target}?error=csrf", status_code=303)
@@ -271,7 +278,7 @@ async def save_social_subscription(request: Request, guild_id: int):
         return RedirectResponse(f"{target}?error=invalid-selection", status_code=303)
     allowed_events = {"youtube": {"video", "live_start"}, "twitch": {"live"}, "tiktok": {"post"}, "x": {"post"}, "instagram": {"post", "reel"}}
     oauth_providers = {"tiktok", "instagram"}
-    if provider not in allowed_events or not social_provider_available(provider) or not account_id or not account_name or channel_id not in channel_ids or (role_id is not None and role_id not in role_ids) or not events or not set(events).issubset(allowed_events[provider]) or (provider in oauth_providers and not storage.social_connection(guild_id, provider, account_id)):
+    if provider != provider_for_module or provider not in allowed_events or not social_provider_available(provider) or not account_id or not account_name or channel_id not in channel_ids or (role_id is not None and role_id not in role_ids) or not events or not set(events).issubset(allowed_events[provider]) or (provider in oauth_providers and not storage.social_connection(guild_id, provider, account_id)):
         return RedirectResponse(f"{target}?error=invalid-selection", status_code=303)
     if provider == "youtube" and not await subscribe_youtube_websub(account_id):
         return RedirectResponse(f"{target}?error=social-provider-unavailable", status_code=303)
@@ -279,26 +286,31 @@ async def save_social_subscription(request: Request, guild_id: int):
         storage.save_social_subscription(guild_id, provider, account_id, account_name, channel_id, role_id, template, events)
     except ValueError:
         return RedirectResponse(f"{target}?error=social-limit", status_code=303)
-    storage.set_module(guild_id, "social_updates", enabled=True)
+    storage.set_module(guild_id, module_id, enabled=True)
     return RedirectResponse(f"{target}?saved=1", status_code=303)
 
 
 @app.post("/servers/{guild_id}/social/subscriptions/{subscription_id}/delete")
 async def delete_social_subscription(request: Request, guild_id: int, subscription_id: int):
-    target = f"/servers/{guild_id}/modules/social_updates"
+    module_id = request.query_params.get("module_id", "")
+    provider_for_module = SOCIAL_MODULE_PROVIDERS.get(module_id)
+    target = f"/servers/{guild_id}/modules/{module_id}" if provider_for_module else f"/servers/{guild_id}"
     form = await request.form()
     if not secrets.compare_digest(str(form.get("csrf_token", "")), request.session.get("csrf_token", "")):
         return RedirectResponse(f"{target}?error=csrf", status_code=303)
     await authorized(request, guild_id, live=True)
+    subscription = storage.social_subscription(subscription_id)
+    if not provider_for_module or not subscription or subscription["guild_id"] != guild_id or subscription["provider"] != provider_for_module:
+        return RedirectResponse(f"{target}?error=invalid-selection", status_code=303)
     storage.delete_social_subscription(guild_id, subscription_id)
-    storage.set_module(guild_id, "social_updates", enabled=bool(storage.social_subscriptions(guild_id)))
+    storage.set_module(guild_id, module_id, enabled=bool(storage.social_subscriptions(guild_id, provider_for_module)))
     return RedirectResponse(f"{target}?saved=1", status_code=303)
 
 
 @app.post("/servers/{guild_id}/social/connect/{provider}")
 async def begin_social_connection(request: Request, guild_id: int, provider: str):
     form = await request.form()
-    target = f"/servers/{guild_id}/modules/social_updates"
+    target = f"/servers/{guild_id}/modules/{provider}_updates" if provider in {"tiktok", "instagram"} else f"/servers/{guild_id}"
     if not secrets.compare_digest(str(form.get("csrf_token", "")), request.session.get("csrf_token", "")):
         return RedirectResponse(f"{target}?error=csrf", status_code=303)
     await authorized(request, guild_id, live=True)
@@ -344,7 +356,7 @@ async def social_oauth_callback(provider: str, code: str | None = None, state: s
     if not token or not account_id:
         raise HTTPException(status_code=502, detail="ソーシャルOAuthの応答が不完全です")
     storage.save_social_connection(guild_id, provider, str(account_id), str(account_name), social_cipher.encrypt(str(token)), social_cipher.encrypt(str(payload["refresh_token"])) if payload.get("refresh_token") else None, int(time.time()) + int(payload.get("expires_in", 0)) if payload.get("expires_in") else None)
-    return RedirectResponse(f"/servers/{guild_id}/modules/social_updates?saved=connected", status_code=303)
+    return RedirectResponse(f"/servers/{guild_id}/modules/{provider}_updates?saved=connected", status_code=303)
 
 
 @app.get("/favicon.ico")
