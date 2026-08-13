@@ -88,6 +88,185 @@ class GuildStorage:
                 CREATE TABLE IF NOT EXISTS social_events (id INTEGER PRIMARY KEY, provider TEXT NOT NULL, event_key TEXT NOT NULL UNIQUE, account_id TEXT NOT NULL, payload_json TEXT NOT NULL, received_at INTEGER NOT NULL, processed_at INTEGER);
                 CREATE TABLE IF NOT EXISTS social_deliveries (id INTEGER PRIMARY KEY, subscription_id INTEGER NOT NULL, event_key TEXT NOT NULL, discord_channel_id INTEGER NOT NULL, discord_message_id INTEGER, state TEXT NOT NULL DEFAULT 'sent', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(subscription_id, event_key));
                 CREATE TABLE IF NOT EXISTS social_live_messages (subscription_id INTEGER NOT NULL, provider TEXT NOT NULL, account_id TEXT NOT NULL, discord_channel_id INTEGER NOT NULL, discord_message_id INTEGER NOT NULL, PRIMARY KEY(subscription_id, provider, account_id));
+                CREATE TABLE IF NOT EXISTS automod_rules (
+                    id INTEGER PRIMARY KEY,
+                    guild_id INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)),
+                    mode TEXT NOT NULL DEFAULT 'enforce' CHECK(mode IN ('monitor','enforce')),
+                    priority INTEGER NOT NULL DEFAULT 100,
+                    stop_on_match INTEGER NOT NULL DEFAULT 0 CHECK(stop_on_match IN (0,1)),
+                    trigger_type TEXT NOT NULL,
+                    trigger_config_json TEXT NOT NULL DEFAULT '{}',
+                    conditions_json TEXT NOT NULL DEFAULT '{}',
+                    exemptions_json TEXT NOT NULL DEFAULT '{}',
+                    actions_json TEXT NOT NULL DEFAULT '[]',
+                    revision INTEGER NOT NULL DEFAULT 1,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_automod_rules_guild ON automod_rules(guild_id, enabled, priority, id);
+                CREATE TABLE IF NOT EXISTS automod_events (
+                    id INTEGER PRIMARY KEY,
+                    guild_id INTEGER NOT NULL,
+                    rule_id INTEGER,
+                    user_id INTEGER NOT NULL,
+                    channel_id INTEGER NOT NULL,
+                    message_id INTEGER,
+                    trigger_type TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    evidence_text TEXT,
+                    attachments_json TEXT NOT NULL DEFAULT '[]',
+                    action_results_json TEXT NOT NULL DEFAULT '[]',
+                    mode TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    evidence_expires_at INTEGER,
+                    FOREIGN KEY(rule_id) REFERENCES automod_rules(id) ON DELETE SET NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_automod_events_guild_created ON automod_events(guild_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_automod_events_expiry ON automod_events(evidence_expires_at);
+                DELETE FROM automod_events WHERE message_id IS NOT NULL AND rule_id IS NOT NULL AND id NOT IN (
+                    SELECT MIN(id) FROM automod_events WHERE message_id IS NOT NULL AND rule_id IS NOT NULL
+                    GROUP BY guild_id, message_id, rule_id
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_automod_events_message_rule ON automod_events(guild_id, message_id, rule_id)
+                    WHERE message_id IS NOT NULL AND rule_id IS NOT NULL;
+                CREATE TABLE IF NOT EXISTS moderation_points (
+                    id INTEGER PRIMARY KEY,
+                    guild_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    points INTEGER NOT NULL CHECK(points > 0),
+                    reason TEXT,
+                    rule_id INTEGER,
+                    automod_event_id INTEGER,
+                    created_at INTEGER NOT NULL,
+                    expires_at INTEGER,
+                    revoked_at INTEGER,
+                    FOREIGN KEY(rule_id) REFERENCES automod_rules(id) ON DELETE SET NULL,
+                    FOREIGN KEY(automod_event_id) REFERENCES automod_events(id) ON DELETE SET NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_moderation_points_active ON moderation_points(guild_id, user_id, expires_at, revoked_at);
+                CREATE TABLE IF NOT EXISTS scheduled_moderation_actions (
+                    id INTEGER PRIMARY KEY,
+                    guild_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    action TEXT NOT NULL,
+                    due_at INTEGER NOT NULL,
+                    reason TEXT,
+                    case_id INTEGER,
+                    completed_at INTEGER,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    last_error TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_scheduled_moderation_due ON scheduled_moderation_actions(completed_at, due_at);
+                CREATE TABLE IF NOT EXISTS automod_migrations (guild_id INTEGER PRIMARY KEY, version INTEGER NOT NULL, migrated_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS moderation_rules (
+                    id INTEGER PRIMARY KEY,
+                    guild_id INTEGER NOT NULL,
+                    family TEXT NOT NULL CHECK(family IN ('automod','anti_spam','anti_raid','infraction')),
+                    event_type TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)),
+                    mode TEXT NOT NULL DEFAULT 'enforce' CHECK(mode IN ('monitor','enforce')),
+                    priority INTEGER NOT NULL DEFAULT 100,
+                    stop_on_match INTEGER NOT NULL DEFAULT 0 CHECK(stop_on_match IN (0,1)),
+                    trigger_type TEXT NOT NULL,
+                    trigger_config_json TEXT NOT NULL DEFAULT '{}',
+                    conditions_json TEXT NOT NULL DEFAULT '{}',
+                    exemptions_json TEXT NOT NULL DEFAULT '{}',
+                    actions_json TEXT NOT NULL DEFAULT '[]',
+                    revision INTEGER NOT NULL DEFAULT 1,
+                    legacy_rule_id INTEGER UNIQUE,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_moderation_rules_guild ON moderation_rules(guild_id,family,enabled,priority,id);
+                CREATE TABLE IF NOT EXISTS moderation_events (
+                    id INTEGER PRIMARY KEY,
+                    guild_id INTEGER NOT NULL,
+                    rule_id INTEGER,
+                    family TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    actor_id INTEGER,
+                    actor_kind TEXT NOT NULL DEFAULT 'human',
+                    target_user_id INTEGER,
+                    channel_id INTEGER,
+                    target_id INTEGER,
+                    reason TEXT NOT NULL,
+                    evidence_text TEXT,
+                    evidence_json TEXT NOT NULL DEFAULT '{}',
+                    mode TEXT NOT NULL DEFAULT 'enforce',
+                    case_id INTEGER,
+                    created_at INTEGER NOT NULL,
+                    evidence_expires_at INTEGER,
+                    dedupe_key TEXT,
+                    UNIQUE(guild_id,dedupe_key),
+                    FOREIGN KEY(rule_id) REFERENCES moderation_rules(id) ON DELETE SET NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_moderation_events_guild_created ON moderation_events(guild_id,created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_moderation_events_target ON moderation_events(guild_id,target_user_id,created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_moderation_events_expiry ON moderation_events(evidence_expires_at);
+                CREATE TABLE IF NOT EXISTS moderation_action_results (
+                    id INTEGER PRIMARY KEY,
+                    event_id INTEGER NOT NULL,
+                    sequence INTEGER NOT NULL,
+                    action_type TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    case_id INTEGER,
+                    detail_json TEXT NOT NULL DEFAULT '{}',
+                    created_at INTEGER NOT NULL,
+                    UNIQUE(event_id,sequence),
+                    FOREIGN KEY(event_id) REFERENCES moderation_events(id) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS moderation_lockdowns (
+                    id INTEGER PRIMARY KEY,
+                    guild_id INTEGER NOT NULL,
+                    source_event_id INTEGER,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    reason TEXT,
+                    started_by INTEGER,
+                    started_at INTEGER NOT NULL,
+                    unlock_at INTEGER,
+                    completed_at INTEGER,
+                    last_error TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_moderation_lockdowns_active ON moderation_lockdowns(guild_id,status,unlock_at);
+                CREATE TABLE IF NOT EXISTS moderation_lockdown_snapshots (
+                    lockdown_id INTEGER NOT NULL,
+                    channel_id INTEGER NOT NULL,
+                    role_id INTEGER NOT NULL,
+                    before_json TEXT NOT NULL,
+                    applied_json TEXT NOT NULL,
+                    restore_status TEXT NOT NULL DEFAULT 'pending',
+                    PRIMARY KEY(lockdown_id,channel_id,role_id),
+                    FOREIGN KEY(lockdown_id) REFERENCES moderation_lockdowns(id) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS moderation_raid_state (
+                    guild_id INTEGER PRIMARY KEY,
+                    active INTEGER NOT NULL DEFAULT 0,
+                    started_at INTEGER,
+                    last_signal_at INTEGER,
+                    source_rule_id INTEGER,
+                    lockdown_id INTEGER
+                );
+                CREATE TABLE IF NOT EXISTS moderation_migrations (guild_id INTEGER PRIMARY KEY,version INTEGER NOT NULL,migrated_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS moderation_action_requests (
+                    id INTEGER PRIMARY KEY,
+                    guild_id INTEGER NOT NULL,
+                    moderator_id INTEGER NOT NULL,
+                    target_user_id INTEGER,
+                    channel_id INTEGER,
+                    action TEXT NOT NULL,
+                    reason TEXT,
+                    options_json TEXT NOT NULL DEFAULT '{}',
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    created_at INTEGER NOT NULL,
+                    completed_at INTEGER,
+                    result_json TEXT,
+                    dedupe_key TEXT NOT NULL UNIQUE
+                );
+                CREATE INDEX IF NOT EXISTS idx_moderation_action_requests_pending ON moderation_action_requests(status,created_at);
             """)
             # Split the original all-in-one social card without dropping any
             # existing subscription or its enabled state.
@@ -97,6 +276,22 @@ class GuildStorage:
             poll_columns = {row["name"] for row in connection.execute("PRAGMA table_info(polls)").fetchall()}
             if poll_columns and "image_url" not in poll_columns:
                 connection.execute("ALTER TABLE polls ADD COLUMN image_url TEXT")
+            case_columns = {row["name"] for row in connection.execute("PRAGMA table_info(moderation_cases)").fetchall()}
+            for name, definition in {
+                "automod_event_id": "INTEGER",
+                "moderation_event_id": "INTEGER",
+                "rule_id": "INTEGER",
+                "moderation_rule_id": "INTEGER",
+                "source": "TEXT NOT NULL DEFAULT 'manual'",
+                "points": "INTEGER NOT NULL DEFAULT 0",
+                "revoked_at": "INTEGER",
+            }.items():
+                if name not in case_columns:
+                    connection.execute(f"ALTER TABLE moderation_cases ADD COLUMN {name} {definition}")
+            point_columns = {row["name"] for row in connection.execute("PRAGMA table_info(moderation_points)").fetchall()}
+            for name in ("moderation_rule_id", "moderation_event_id"):
+                if name not in point_columns:
+                    connection.execute(f"ALTER TABLE moderation_points ADD COLUMN {name} INTEGER")
 
     def get_settings(self, guild_id: int) -> dict[str, int | None]:
         with self._connection() as connection:
@@ -132,9 +327,15 @@ class GuildStorage:
                 settings = self._audit_log_settings(settings, preserve_legacy_message=True)
             elif module_id == "leveling":
                 settings = self._leveling_settings(settings, self.get_settings(guild_id))
+            elif module_id == "automod":
+                settings = self._automod_settings(settings)
+            elif module_id == "moderation":
+                settings = self._moderation_settings(settings)
+            elif module_id in {"anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"}:
+                settings = self._moderation_submodule_settings(module_id, settings)
             return {"enabled": bool(row["enabled"]), "settings": settings}
         legacy = self.get_settings(guild_id)
-        defaults = {"welcome": self._welcome_settings({"welcome_channel_id": legacy["welcome_channel_id"]}), "leveling": self._leveling_settings({}, legacy), "autorole": {"default_role_id": legacy["default_role_id"]}, "audit_log": self._audit_log_settings({"management_channel_id": legacy["management_channel_id"]})}.get(module_id, {})
+        defaults = {"welcome": self._welcome_settings({"welcome_channel_id": legacy["welcome_channel_id"]}), "leveling": self._leveling_settings({}, legacy), "autorole": {"default_role_id": legacy["default_role_id"]}, "audit_log": self._audit_log_settings({"management_channel_id": legacy["management_channel_id"]}), "automod": self._automod_settings({}), "moderation": self._moderation_settings({})}.get(module_id, self._moderation_submodule_settings(module_id, {}) if module_id in {"anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"} else {})
         return {"enabled": False, "settings": defaults}
 
     @staticmethod
@@ -192,6 +393,55 @@ class GuildStorage:
         defaults.update(settings)
         return defaults
 
+    @staticmethod
+    def _automod_settings(settings: dict[str, Any]) -> dict[str, Any]:
+        defaults: dict[str, Any] = {
+            "log_channel_id": None,
+            "immune_role_ids": [],
+            "immune_user_ids": [],
+            "immune_channel_ids": [],
+            "evidence_excluded_channel_ids": [],
+            "evidence_retention_days": 30,
+            "point_thresholds": [],
+            "rules_revision": 0,
+        }
+        defaults.update(settings)
+        for key in ("immune_role_ids", "immune_user_ids", "immune_channel_ids", "evidence_excluded_channel_ids"):
+            defaults[key] = list(dict.fromkeys(int(value) for value in defaults.get(key, []) if str(value).isdigit()))[:100]
+        defaults["evidence_retention_days"] = max(1, min(int(defaults.get("evidence_retention_days", 30)), 365))
+        return defaults
+
+    @staticmethod
+    def _moderation_settings(settings: dict[str, Any]) -> dict[str, Any]:
+        defaults: dict[str, Any] = {
+            "default_log_channel_id": None, "immune_role_ids": [], "immune_user_ids": [],
+            "immune_channel_ids": [], "evidence_excluded_channel_ids": [], "evidence_retention_days": 30,
+            "exclude_bots": True, "exclude_webhooks": True, "rules_revision": 0,
+            "escalation_enabled": False, "escalation_threshold": 3, "escalation_action": "timeout",
+            "escalation_timeout_minutes": 60, "dm_notify": False,
+        }
+        defaults.update(settings)
+        for key in ("immune_role_ids", "immune_user_ids", "immune_channel_ids", "evidence_excluded_channel_ids"):
+            defaults[key] = list(dict.fromkeys(int(value) for value in defaults.get(key, []) if str(value).isdigit()))[:100]
+        defaults["evidence_retention_days"] = max(1, min(int(defaults.get("evidence_retention_days", 30)), 365))
+        return defaults
+
+    @staticmethod
+    def _moderation_submodule_settings(module_id: str, settings: dict[str, Any]) -> dict[str, Any]:
+        defaults: dict[str, Any] = {
+            "log_channel_id": None, "immune_role_ids": [], "immune_user_ids": [], "immune_channel_ids": [],
+        }
+        if module_id == "infractions":
+            defaults["point_thresholds"] = []
+        elif module_id == "anti_raid":
+            defaults.update({"default_lockdown_minutes": 30, "notify_channel_id": None})
+        elif module_id == "moderation_logs":
+            defaults.update({f"log_{name}": True for name in ("message_delete", "message_edit", "warning", "timeout", "kick", "ban", "unban", "join", "leave", "automod", "anti_spam", "anti_raid", "admin")})
+        defaults.update(settings)
+        for key in ("immune_role_ids", "immune_user_ids", "immune_channel_ids"):
+            defaults[key] = list(dict.fromkeys(int(value) for value in defaults.get(key, []) if str(value).isdigit()))[:100]
+        return defaults
+
     def set_module(self, guild_id: int, module_id: str, *, enabled: bool, settings: dict[str, Any] | None = None) -> None:
         current = self.get_module(guild_id, module_id)
         values = current["settings"] if settings is None else settings
@@ -201,6 +451,462 @@ class GuildStorage:
 
     def module_enabled(self, guild_id: int, module_id: str) -> bool:
         return self.get_module(guild_id, module_id)["enabled"]
+
+    @staticmethod
+    def _automod_rule(row: sqlite3.Row) -> dict[str, Any]:
+        value = dict(row)
+        for column, key in (("trigger_config_json", "trigger_config"), ("conditions_json", "conditions"), ("exemptions_json", "exemptions"), ("actions_json", "actions")):
+            value[key] = json.loads(value.pop(column))
+        value["enabled"] = bool(value["enabled"])
+        value["stop_on_match"] = bool(value["stop_on_match"])
+        return value
+
+    def automod_rules(self, guild_id: int, *, enabled_only: bool = False) -> list[dict[str, Any]]:
+        query = "SELECT * FROM automod_rules WHERE guild_id=?"
+        if enabled_only:
+            query += " AND enabled=1"
+        query += " ORDER BY priority ASC, id ASC"
+        with self._connection() as connection:
+            rows = connection.execute(query, (guild_id,)).fetchall()
+        return [self._automod_rule(row) for row in rows]
+
+    def automod_rule(self, guild_id: int, rule_id: int) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute("SELECT * FROM automod_rules WHERE guild_id=? AND id=?", (guild_id, rule_id)).fetchone()
+        return self._automod_rule(row) if row else None
+
+    def save_automod_rule(self, guild_id: int, rule: dict[str, Any], rule_id: int | None = None) -> dict[str, Any]:
+        now = int(time.time())
+        values = (
+            str(rule["name"])[:100], int(bool(rule.get("enabled", True))), rule.get("mode", "enforce"),
+            int(rule.get("priority", 100)), int(bool(rule.get("stop_on_match", False))), rule["trigger_type"],
+            json.dumps(rule.get("trigger_config", {}), ensure_ascii=False), json.dumps(rule.get("conditions", {})),
+            json.dumps(rule.get("exemptions", {})), json.dumps(rule.get("actions", []), ensure_ascii=False), now,
+        )
+        with self._connection() as connection:
+            if rule_id is None:
+                count = connection.execute("SELECT COUNT(*) AS count FROM automod_rules WHERE guild_id=?", (guild_id,)).fetchone()["count"]
+                if count >= 100:
+                    raise ValueError("A server can have at most 100 AutoMod rules")
+                cursor = connection.execute("""INSERT INTO automod_rules
+                    (guild_id,name,enabled,mode,priority,stop_on_match,trigger_type,trigger_config_json,conditions_json,exemptions_json,actions_json,created_at,updated_at)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""", (guild_id, *values[:-1], now, now))
+                rule_id = int(cursor.lastrowid)
+            else:
+                cursor = connection.execute("""UPDATE automod_rules SET name=?,enabled=?,mode=?,priority=?,stop_on_match=?,trigger_type=?,
+                    trigger_config_json=?,conditions_json=?,exemptions_json=?,actions_json=?,revision=revision+1,updated_at=? WHERE guild_id=? AND id=?""",
+                    (*values, guild_id, rule_id))
+                if cursor.rowcount != 1:
+                    raise ValueError("AutoMod rule not found")
+            row = connection.execute("SELECT * FROM automod_rules WHERE guild_id=? AND id=?", (guild_id, rule_id)).fetchone()
+            module = connection.execute("SELECT enabled,settings_json FROM guild_modules WHERE guild_id=? AND module_id='automod'", (guild_id,)).fetchone()
+            settings = self._automod_settings(json.loads(module["settings_json"]) if module else {})
+            settings["rules_revision"] = int(settings.get("rules_revision", 0)) + 1
+            connection.execute("""INSERT INTO guild_modules(guild_id,module_id,enabled,settings_json) VALUES(?, 'automod', ?, ?)
+                ON CONFLICT(guild_id,module_id) DO UPDATE SET settings_json=excluded.settings_json""",
+                (guild_id, int(module["enabled"]) if module else 0, json.dumps(settings)))
+        return self._automod_rule(row)
+
+    def delete_automod_rule(self, guild_id: int, rule_id: int) -> bool:
+        with self._connection() as connection:
+            cursor = connection.execute("DELETE FROM automod_rules WHERE guild_id=? AND id=?", (guild_id, rule_id))
+            if cursor.rowcount:
+                module = connection.execute("SELECT settings_json FROM guild_modules WHERE guild_id=? AND module_id='automod'", (guild_id,)).fetchone()
+                settings = self._automod_settings(json.loads(module["settings_json"]) if module else {})
+                settings["rules_revision"] = int(settings.get("rules_revision", 0)) + 1
+                connection.execute("UPDATE guild_modules SET settings_json=? WHERE guild_id=? AND module_id='automod'", (json.dumps(settings), guild_id))
+        return bool(cursor.rowcount)
+
+    @staticmethod
+    def _moderation_rule(row: sqlite3.Row) -> dict[str, Any]:
+        value = dict(row)
+        for column, key in (("trigger_config_json", "trigger_config"), ("conditions_json", "conditions"), ("exemptions_json", "exemptions"), ("actions_json", "actions")):
+            value[key] = json.loads(value.pop(column))
+        value["enabled"] = bool(value["enabled"])
+        value["stop_on_match"] = bool(value["stop_on_match"])
+        return value
+
+    def moderation_rules(self, guild_id: int, *, family: str | None = None, enabled_only: bool = False) -> list[dict[str, Any]]:
+        query, params = "SELECT * FROM moderation_rules WHERE guild_id=?", [guild_id]
+        if family:
+            query, params = query + " AND family=?", [guild_id, family]
+        if enabled_only:
+            query += " AND enabled=1"
+        query += " ORDER BY priority,id"
+        with self._connection() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [self._moderation_rule(row) for row in rows]
+
+    def moderation_rule(self, guild_id: int, rule_id: int) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute("SELECT * FROM moderation_rules WHERE guild_id=? AND id=?", (guild_id, rule_id)).fetchone()
+        return self._moderation_rule(row) if row else None
+
+    def save_moderation_rule(self, guild_id: int, rule: dict[str, Any], rule_id: int | None = None) -> dict[str, Any]:
+        now = int(time.time())
+        values = (rule["family"], rule["event_type"], str(rule["name"])[:100], int(bool(rule.get("enabled", True))),
+            rule.get("mode", "enforce"), int(rule.get("priority", 100)), int(bool(rule.get("stop_on_match"))), rule["trigger_type"],
+            json.dumps(rule.get("trigger_config", {}), ensure_ascii=False), json.dumps(rule.get("conditions", {})),
+            json.dumps(rule.get("exemptions", {})), json.dumps(rule.get("actions", []), ensure_ascii=False))
+        with self._connection() as connection:
+            if rule_id is None:
+                count = connection.execute("SELECT COUNT(*) AS count FROM moderation_rules WHERE guild_id=?", (guild_id,)).fetchone()["count"]
+                if count >= 200:
+                    raise ValueError("A server can have at most 200 Moderation rules")
+                cursor = connection.execute("""INSERT INTO moderation_rules
+                    (guild_id,family,event_type,name,enabled,mode,priority,stop_on_match,trigger_type,trigger_config_json,conditions_json,exemptions_json,actions_json,created_at,updated_at)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (guild_id, *values, now, now))
+                rule_id = int(cursor.lastrowid)
+            else:
+                cursor = connection.execute("""UPDATE moderation_rules SET family=?,event_type=?,name=?,enabled=?,mode=?,priority=?,stop_on_match=?,trigger_type=?,
+                    trigger_config_json=?,conditions_json=?,exemptions_json=?,actions_json=?,revision=revision+1,updated_at=? WHERE guild_id=? AND id=?""",
+                    (*values, now, guild_id, rule_id))
+                if cursor.rowcount != 1:
+                    raise ValueError("Moderation rule not found")
+            row = connection.execute("SELECT * FROM moderation_rules WHERE guild_id=? AND id=?", (guild_id, rule_id)).fetchone()
+            core = connection.execute("SELECT enabled,settings_json FROM guild_modules WHERE guild_id=? AND module_id='moderation'", (guild_id,)).fetchone()
+            settings = self._moderation_settings(json.loads(core["settings_json"]) if core else {})
+            settings["rules_revision"] = int(settings.get("rules_revision", 0)) + 1
+            connection.execute("""INSERT INTO guild_modules(guild_id,module_id,enabled,settings_json) VALUES(?,'moderation',?,?)
+                ON CONFLICT(guild_id,module_id) DO UPDATE SET settings_json=excluded.settings_json""",
+                (guild_id, int(core["enabled"]) if core else 0, json.dumps(settings)))
+        return self._moderation_rule(row)
+
+    def delete_moderation_rule(self, guild_id: int, rule_id: int) -> bool:
+        with self._connection() as connection:
+            cursor = connection.execute("DELETE FROM moderation_rules WHERE guild_id=? AND id=?", (guild_id, rule_id))
+            if cursor.rowcount:
+                row = connection.execute("SELECT settings_json FROM guild_modules WHERE guild_id=? AND module_id='moderation'", (guild_id,)).fetchone()
+                settings = self._moderation_settings(json.loads(row["settings_json"]) if row else {})
+                settings["rules_revision"] = int(settings.get("rules_revision", 0)) + 1
+                connection.execute("UPDATE guild_modules SET settings_json=? WHERE guild_id=? AND module_id='moderation'", (json.dumps(settings), guild_id))
+        return bool(cursor.rowcount)
+
+    def create_moderation_event(self, guild_id: int, *, family: str, event_type: str, source: str, reason: str,
+            rule_id: int | None = None, actor_id: int | None = None, actor_kind: str = "human", target_user_id: int | None = None,
+            channel_id: int | None = None, target_id: int | None = None, evidence_text: str | None = None,
+            evidence: dict[str, Any] | None = None, mode: str = "enforce", retention_days: int = 30,
+            dedupe_key: str | None = None) -> int | None:
+        now = int(time.time())
+        has_evidence = bool(evidence_text or evidence)
+        expires = now + max(1, min(retention_days, 365)) * 86400 if has_evidence else None
+        with self._connection() as connection:
+            cursor = connection.execute("""INSERT OR IGNORE INTO moderation_events
+                (guild_id,rule_id,family,event_type,source,actor_id,actor_kind,target_user_id,channel_id,target_id,reason,evidence_text,evidence_json,mode,created_at,evidence_expires_at,dedupe_key)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (guild_id,rule_id,family,event_type,source,actor_id,actor_kind,target_user_id,
+                channel_id,target_id,reason,evidence_text[:1000] if evidence_text else None,json.dumps(evidence or {},ensure_ascii=False),mode,now,expires,dedupe_key))
+        return int(cursor.lastrowid) if cursor.rowcount else None
+
+    def finish_moderation_event(self, event_id: int, results: list[dict[str, Any]]) -> None:
+        now = int(time.time())
+        with self._connection() as connection:
+            for sequence, result in enumerate(results):
+                detail = {key: value for key, value in result.items() if key not in {"type", "status", "case_id"}}
+                connection.execute("""INSERT OR REPLACE INTO moderation_action_results
+                    (event_id,sequence,action_type,status,case_id,detail_json,created_at) VALUES(?,?,?,?,?,?,?)""",
+                    (event_id,sequence,str(result.get("type","unknown")),str(result.get("status","unknown")),result.get("case_id"),json.dumps(detail,ensure_ascii=False),now))
+            case_id = next((int(item["case_id"]) for item in results if item.get("case_id")), None)
+            if case_id:
+                connection.execute("UPDATE moderation_events SET case_id=? WHERE id=?", (case_id,event_id))
+
+    def recent_moderation_events(self, guild_id: int, *, family: str | None = None, user_id: int | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        query, params = "SELECT * FROM moderation_events WHERE guild_id=?", [guild_id]
+        if family:
+            query, params = query + " AND family=?", [*params, family]
+        if user_id:
+            query, params = query + " AND target_user_id=?", [*params, user_id]
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(max(1, min(limit, 200)))
+        with self._connection() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [{**dict(row), "evidence": json.loads(row["evidence_json"])} for row in rows]
+
+    def moderation_summary(self, guild_id: int) -> dict[str, Any]:
+        now = int(time.time())
+        with self._connection() as connection:
+            rules = {row["family"]: row["count"] for row in connection.execute("SELECT family,COUNT(*) count FROM moderation_rules WHERE guild_id=? AND enabled=1 GROUP BY family", (guild_id,)).fetchall()}
+            events = connection.execute("SELECT COUNT(*) count FROM moderation_events WHERE guild_id=? AND created_at>?", (guild_id, now - 86400)).fetchone()["count"]
+            lockdowns = connection.execute("SELECT COUNT(*) count FROM moderation_lockdowns WHERE guild_id=? AND status='active'", (guild_id,)).fetchone()["count"]
+            sanctioned = connection.execute("SELECT COUNT(DISTINCT user_id) count FROM moderation_points WHERE guild_id=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)", (guild_id,now)).fetchone()["count"]
+        return {"rules": rules, "events_24h": int(events), "active_lockdowns": int(lockdowns), "sanctioned_users": int(sanctioned)}
+
+    def start_lockdown(self, guild_id: int, *, reason: str | None, started_by: int | None,
+            unlock_at: int | None, source_event_id: int | None = None) -> int:
+        with self._connection() as connection:
+            existing = connection.execute("SELECT id FROM moderation_lockdowns WHERE guild_id=? AND status='active'", (guild_id,)).fetchone()
+            if existing:
+                return int(existing["id"])
+            cursor = connection.execute("""INSERT INTO moderation_lockdowns
+                (guild_id,source_event_id,reason,started_by,started_at,unlock_at) VALUES(?,?,?,?,?,?)""",
+                (guild_id,source_event_id,reason,started_by,int(time.time()),unlock_at))
+        return int(cursor.lastrowid)
+
+    def save_lockdown_snapshot(self, lockdown_id: int, channel_id: int, role_id: int, before: dict[str, Any], applied: dict[str, Any]) -> None:
+        with self._connection() as connection:
+            connection.execute("""INSERT OR IGNORE INTO moderation_lockdown_snapshots
+                (lockdown_id,channel_id,role_id,before_json,applied_json) VALUES(?,?,?,?,?)""",
+                (lockdown_id,channel_id,role_id,json.dumps(before),json.dumps(applied)))
+
+    def active_lockdown(self, guild_id: int) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute("SELECT * FROM moderation_lockdowns WHERE guild_id=? AND status='active' ORDER BY id DESC LIMIT 1", (guild_id,)).fetchone()
+        return dict(row) if row else None
+
+    def due_lockdowns(self, now: int | None = None) -> list[dict[str, Any]]:
+        with self._connection() as connection:
+            rows = connection.execute("SELECT * FROM moderation_lockdowns WHERE status='active' AND unlock_at IS NOT NULL AND unlock_at<=?", (int(time.time()) if now is None else now,)).fetchall()
+        return [dict(row) for row in rows]
+
+    def lockdown_snapshots(self, lockdown_id: int) -> list[dict[str, Any]]:
+        with self._connection() as connection:
+            rows = connection.execute("SELECT * FROM moderation_lockdown_snapshots WHERE lockdown_id=? ORDER BY channel_id", (lockdown_id,)).fetchall()
+        return [{**dict(row), "before": json.loads(row["before_json"]), "applied": json.loads(row["applied_json"])} for row in rows]
+
+    def finish_lockdown(self, lockdown_id: int, *, error: str | None = None) -> None:
+        with self._connection() as connection:
+            connection.execute("UPDATE moderation_lockdowns SET status=?,completed_at=?,last_error=? WHERE id=?",
+                ("failed" if error else "completed", int(time.time()), error[:500] if error else None, lockdown_id))
+
+    def set_raid_state(self, guild_id: int, active: bool, *, source_rule_id: int | None = None, lockdown_id: int | None = None) -> None:
+        now = int(time.time())
+        with self._connection() as connection:
+            connection.execute("""INSERT INTO moderation_raid_state(guild_id,active,started_at,last_signal_at,source_rule_id,lockdown_id)
+                VALUES(?,?,?,?,?,?) ON CONFLICT(guild_id) DO UPDATE SET active=excluded.active,
+                started_at=CASE WHEN excluded.active=1 AND moderation_raid_state.active=0 THEN excluded.started_at ELSE moderation_raid_state.started_at END,
+                last_signal_at=excluded.last_signal_at,source_rule_id=excluded.source_rule_id,lockdown_id=excluded.lockdown_id""",
+                (guild_id,int(active),now if active else None,now,source_rule_id,lockdown_id))
+
+    def stale_raid_states(self, quiet_before: int) -> list[dict[str, Any]]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT * FROM moderation_raid_state WHERE active=1 AND last_signal_at<=? ORDER BY last_signal_at",
+                (quiet_before,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def migrate_moderation_v2(self) -> int:
+        """Copy legacy AutoMod rows into the generic Moderation model once per guild."""
+        now, migrated = int(time.time()), 0
+        rate_triggers = {"message_rate", "duplicate", "mention_rate", "link_rate", "attachment_rate"}
+        with self._connection() as connection:
+            guilds = connection.execute("""SELECT DISTINCT guild_id FROM guild_modules
+                UNION SELECT DISTINCT guild_id FROM automod_rules UNION SELECT DISTINCT guild_id FROM automod_events""").fetchall()
+            for guild_row in guilds:
+                guild_id = int(guild_row["guild_id"])
+                first_migration = connection.execute("SELECT 1 FROM moderation_migrations WHERE guild_id=?", (guild_id,)).fetchone() is None
+                legacy_core = connection.execute("SELECT enabled,settings_json FROM guild_modules WHERE guild_id=? AND module_id='moderation'", (guild_id,)).fetchone()
+                legacy_auto = connection.execute("SELECT enabled,settings_json FROM guild_modules WHERE guild_id=? AND module_id='automod'", (guild_id,)).fetchone()
+                core_settings = self._moderation_settings(json.loads(legacy_core["settings_json"]) if legacy_core else {})
+                auto_settings = self._automod_settings(json.loads(legacy_auto["settings_json"]) if legacy_auto else {})
+                for source, target in (("log_channel_id", "default_log_channel_id"), ("evidence_retention_days", "evidence_retention_days"), ("rules_revision", "rules_revision")):
+                    if auto_settings.get(source) is not None:
+                        core_settings[target] = auto_settings[source]
+                for key in ("immune_role_ids", "immune_user_ids", "immune_channel_ids", "evidence_excluded_channel_ids"):
+                    core_settings[key] = auto_settings.get(key, core_settings.get(key, []))
+                enabled = bool((legacy_core and legacy_core["enabled"]) or (legacy_auto and legacy_auto["enabled"]))
+                connection.execute("""INSERT INTO guild_modules(guild_id,module_id,enabled,settings_json) VALUES(?,'moderation',?,?)
+                    ON CONFLICT(guild_id,module_id) DO UPDATE SET enabled=excluded.enabled,settings_json=excluded.settings_json""",
+                    (guild_id,int(enabled),json.dumps(core_settings)))
+                infraction_settings = self._moderation_submodule_settings("infractions", {"point_thresholds": auto_settings.get("point_thresholds", [])})
+                legacy_trigger_types = {row["trigger_type"] for row in connection.execute("SELECT trigger_type FROM automod_rules WHERE guild_id=?", (guild_id,)).fetchall()}
+                for module_id in ("automod", "anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"):
+                    module_enabled = {
+                        "automod": enabled and bool(legacy_trigger_types - rate_triggers),
+                        "anti_spam": enabled and bool(legacy_trigger_types & rate_triggers),
+                        "anti_raid": False,
+                        "infractions": bool(infraction_settings.get("point_thresholds")) or bool(legacy_core and legacy_core["enabled"]),
+                        "moderation_actions": enabled,
+                        "moderation_logs": enabled,
+                    }[module_id]
+                    settings = infraction_settings if module_id == "infractions" else self._moderation_submodule_settings(module_id, {})
+                    connection.execute("INSERT OR IGNORE INTO guild_modules(guild_id,module_id,enabled,settings_json) VALUES(?,?,?,?)", (guild_id,module_id,int(module_enabled),json.dumps(settings)))
+                for row in connection.execute("SELECT * FROM automod_rules WHERE guild_id=?", (guild_id,)).fetchall():
+                    family = "anti_spam" if row["trigger_type"] in rate_triggers else "automod"
+                    connection.execute("""INSERT OR IGNORE INTO moderation_rules
+                        (guild_id,family,event_type,name,enabled,mode,priority,stop_on_match,trigger_type,trigger_config_json,conditions_json,exemptions_json,actions_json,revision,legacy_rule_id,created_at,updated_at)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (guild_id,family,"message_create",row["name"],row["enabled"],row["mode"],row["priority"],row["stop_on_match"],
+                        row["trigger_type"],row["trigger_config_json"],row["conditions_json"],row["exemptions_json"],row["actions_json"],row["revision"],row["id"],row["created_at"],row["updated_at"]))
+                for row in connection.execute("SELECT * FROM automod_events WHERE guild_id=?", (guild_id,)).fetchall():
+                    rule = connection.execute("SELECT id,family FROM moderation_rules WHERE legacy_rule_id=?", (row["rule_id"],)).fetchone() if row["rule_id"] else None
+                    connection.execute("""INSERT OR IGNORE INTO moderation_events
+                        (id,guild_id,rule_id,family,event_type,source,actor_id,actor_kind,target_user_id,channel_id,target_id,reason,evidence_text,evidence_json,mode,created_at,evidence_expires_at,dedupe_key)
+                        VALUES(?,?,?,?,?,'legacy_automod',?,'human',?,?,?,?,?,?,?,?,?,?)""",
+                        (row["id"],guild_id,rule["id"] if rule else None,rule["family"] if rule else "automod","message_create",row["user_id"],row["user_id"],row["channel_id"],row["message_id"],row["reason"],row["evidence_text"],json.dumps({"attachments": json.loads(row["attachments_json"])}),row["mode"],row["created_at"],row["evidence_expires_at"],f"legacy:{row['id']}"))
+                connection.execute("""UPDATE moderation_cases SET moderation_event_id=automod_event_id,
+                    moderation_rule_id=(SELECT id FROM moderation_rules WHERE legacy_rule_id=moderation_cases.rule_id)
+                    WHERE guild_id=? AND (moderation_event_id IS NULL OR moderation_rule_id IS NULL)""", (guild_id,))
+                connection.execute("""UPDATE moderation_points SET moderation_event_id=automod_event_id,
+                    moderation_rule_id=(SELECT id FROM moderation_rules WHERE legacy_rule_id=moderation_points.rule_id)
+                    WHERE guild_id=? AND (moderation_event_id IS NULL OR moderation_rule_id IS NULL)""", (guild_id,))
+                connection.execute("""INSERT INTO moderation_migrations(guild_id,version,migrated_at) VALUES(?,2,?)
+                    ON CONFLICT(guild_id) DO UPDATE SET version=MAX(version,excluded.version)""", (guild_id,now))
+                migrated += int(first_migration)
+        return migrated
+
+    def moderation_v2_migrated(self, guild_id: int) -> bool:
+        with self._connection() as connection:
+            return connection.execute("SELECT 1 FROM moderation_migrations WHERE guild_id=? AND version>=2", (guild_id,)).fetchone() is not None
+
+    def enqueue_moderation_action(self, guild_id: int, moderator_id: int, action: str, *, target_user_id: int | None = None,
+            channel_id: int | None = None, reason: str | None = None, options: dict[str, Any] | None = None, dedupe_key: str) -> int | None:
+        with self._connection() as connection:
+            cursor = connection.execute("""INSERT OR IGNORE INTO moderation_action_requests
+                (guild_id,moderator_id,target_user_id,channel_id,action,reason,options_json,created_at,dedupe_key)
+                VALUES(?,?,?,?,?,?,?,?,?)""", (guild_id,moderator_id,target_user_id,channel_id,action,reason,json.dumps(options or {}),int(time.time()),dedupe_key))
+        return int(cursor.lastrowid) if cursor.rowcount else None
+
+    def pending_moderation_actions(self, limit: int = 50) -> list[dict[str, Any]]:
+        with self._connection() as connection:
+            rows = connection.execute("SELECT * FROM moderation_action_requests WHERE status='pending' ORDER BY id LIMIT ?", (max(1,min(limit,100)),)).fetchall()
+        return [{**dict(row), "options": json.loads(row["options_json"])} for row in rows]
+
+    def complete_moderation_request(self, request_id: int, *, result: dict[str, Any], failed: bool = False) -> None:
+        with self._connection() as connection:
+            connection.execute("UPDATE moderation_action_requests SET status=?,completed_at=?,result_json=? WHERE id=? AND status='pending'",
+                ("failed" if failed else "completed",int(time.time()),json.dumps(result,ensure_ascii=False),request_id))
+
+    def create_automod_event(self, guild_id: int, rule_id: int | None, user_id: int, channel_id: int, message_id: int | None,
+                             trigger_type: str, reason: str, evidence_text: str | None, attachments: list[dict[str, Any]], mode: str,
+                             retention_days: int = 30) -> int | None:
+        now = int(time.time())
+        expires = now + max(1, min(retention_days, 365)) * 86400 if evidence_text or attachments else None
+        with self._connection() as connection:
+            cursor = connection.execute("""INSERT OR IGNORE INTO automod_events
+                (guild_id,rule_id,user_id,channel_id,message_id,trigger_type,reason,evidence_text,attachments_json,mode,created_at,evidence_expires_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""", (guild_id,rule_id,user_id,channel_id,message_id,trigger_type,reason,evidence_text,
+                json.dumps(attachments, ensure_ascii=False),mode,now,expires))
+        return int(cursor.lastrowid) if cursor.rowcount else None
+
+    def finish_automod_event(self, event_id: int, action_results: list[dict[str, Any]]) -> None:
+        with self._connection() as connection:
+            connection.execute("UPDATE automod_events SET action_results_json=? WHERE id=?", (json.dumps(action_results, ensure_ascii=False), event_id))
+
+    def active_points(self, guild_id: int, user_id: int, now: int | None = None) -> int:
+        current = int(time.time()) if now is None else now
+        with self._connection() as connection:
+            row = connection.execute("""SELECT COALESCE(SUM(points),0) AS total FROM moderation_points
+                WHERE guild_id=? AND user_id=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)""", (guild_id,user_id,current)).fetchone()
+        return int(row["total"])
+
+    def add_points(self, guild_id: int, user_id: int, points: int, reason: str | None, *, rule_id: int | None = None,
+                   automod_event_id: int | None = None, moderation_rule_id: int | None = None,
+                   moderation_event_id: int | None = None, expires_at: int | None = None) -> tuple[int, int, int]:
+        if not 1 <= points <= 1000:
+            raise ValueError("Points must be between 1 and 1000")
+        now = int(time.time())
+        with self._connection() as connection:
+            before = connection.execute("""SELECT COALESCE(SUM(points),0) AS total FROM moderation_points
+                WHERE guild_id=? AND user_id=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)""", (guild_id,user_id,now)).fetchone()["total"]
+            cursor = connection.execute("""INSERT INTO moderation_points
+                (guild_id,user_id,points,reason,rule_id,automod_event_id,moderation_rule_id,moderation_event_id,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                (guild_id,user_id,points,reason,rule_id,automod_event_id,moderation_rule_id,moderation_event_id,now,expires_at))
+            connection.execute("""INSERT INTO guild_users(guild_id,user_id,warn) VALUES(?,?,1)
+                ON CONFLICT(guild_id,user_id) DO UPDATE SET warn=warn+1""", (guild_id,user_id))
+        return int(cursor.lastrowid), int(before), int(before) + points
+
+    def revoke_points(self, guild_id: int, user_id: int) -> int:
+        with self._connection() as connection:
+            cursor = connection.execute("UPDATE moderation_points SET revoked_at=? WHERE guild_id=? AND user_id=? AND revoked_at IS NULL", (int(time.time()),guild_id,user_id))
+        return cursor.rowcount
+
+    def clear_warnings(self, guild_id: int, user_id: int) -> int:
+        with self._connection() as connection:
+            cursor = connection.execute("UPDATE moderation_points SET revoked_at=? WHERE guild_id=? AND user_id=? AND revoked_at IS NULL", (int(time.time()),guild_id,user_id))
+            connection.execute("UPDATE guild_users SET warn=0 WHERE guild_id=? AND user_id=?", (guild_id,user_id))
+        return cursor.rowcount
+
+    def schedule_moderation_action(self, guild_id: int, user_id: int, action: str, due_at: int, reason: str | None, case_id: int | None) -> int:
+        with self._connection() as connection:
+            cursor = connection.execute("INSERT INTO scheduled_moderation_actions(guild_id,user_id,action,due_at,reason,case_id) VALUES(?,?,?,?,?,?)", (guild_id,user_id,action,due_at,reason,case_id))
+        return int(cursor.lastrowid)
+
+    def due_moderation_actions(self, now: int | None = None, limit: int = 100) -> list[dict[str, Any]]:
+        current = int(time.time()) if now is None else now
+        with self._connection() as connection:
+            rows = connection.execute("SELECT * FROM scheduled_moderation_actions WHERE completed_at IS NULL AND due_at<=? ORDER BY due_at LIMIT ?", (current,max(1,min(limit,500)))).fetchall()
+        return [dict(row) for row in rows]
+
+    def complete_moderation_action(self, action_id: int, error: str | None = None) -> None:
+        with self._connection() as connection:
+            if error:
+                connection.execute("UPDATE scheduled_moderation_actions SET attempts=attempts+1,last_error=? WHERE id=?", (error[:500],action_id))
+            else:
+                connection.execute("UPDATE scheduled_moderation_actions SET attempts=attempts+1,completed_at=?,last_error=NULL WHERE id=?", (int(time.time()),action_id))
+
+    def purge_automod_evidence(self, now: int | None = None) -> int:
+        current = int(time.time()) if now is None else now
+        with self._connection() as connection:
+            cursor = connection.execute("UPDATE automod_events SET evidence_text=NULL,attachments_json='[]',evidence_expires_at=NULL WHERE evidence_expires_at IS NOT NULL AND evidence_expires_at<=?", (current,))
+        return cursor.rowcount
+
+    def purge_moderation_evidence(self, now: int | None = None) -> int:
+        with self._connection() as connection:
+            cursor = connection.execute("UPDATE moderation_events SET evidence_text=NULL,evidence_json='{}',evidence_expires_at=NULL WHERE evidence_expires_at IS NOT NULL AND evidence_expires_at<=?", (int(time.time()) if now is None else now,))
+        return cursor.rowcount
+
+    def migrate_legacy_automod(self, banned_words: list[str] | None = None) -> int:
+        """Convert the three legacy safety modules once, without deleting rollback data."""
+        words = list(dict.fromkeys(word.strip().lower() for word in (banned_words or []) if word.strip()))[:1000]
+        now, migrated = int(time.time()), 0
+        with self._connection() as connection:
+            guild_rows = connection.execute("""SELECT DISTINCT guild_id FROM guild_modules
+                WHERE module_id IN ('moderation','chat_filter','anti_spam') ORDER BY guild_id""").fetchall()
+            for guild_row in guild_rows:
+                guild_id = int(guild_row["guild_id"])
+                if connection.execute("SELECT 1 FROM automod_migrations WHERE guild_id=?", (guild_id,)).fetchone():
+                    continue
+                modules: dict[str, tuple[bool, dict[str, Any]]] = {}
+                for row in connection.execute("""SELECT module_id,enabled,settings_json FROM guild_modules
+                    WHERE guild_id=? AND module_id IN ('moderation','chat_filter','anti_spam')""", (guild_id,)).fetchall():
+                    modules[row["module_id"]] = (bool(row["enabled"]), json.loads(row["settings_json"] or "{}"))
+                rules: list[dict[str, Any]] = []
+                moderation_enabled, moderation = modules.get("moderation", (False, {}))
+                if moderation_enabled and words:
+                    rules.append({"name": "移行済み禁止語", "trigger_type": "keyword", "trigger_config": {"keywords": words, "allow_list": [], "match": "contains"},
+                                  "actions": [{"type": "delete"}, {"type": "points", "points": 1, "expires_days": 0}]})
+                filter_enabled, chat_filter = modules.get("chat_filter", (False, {}))
+                filter_actions = [{"type": "delete"}]
+                if chat_filter.get("filter_action") == "delete_warn":
+                    filter_actions.append({"type": "points", "points": 1, "expires_days": 0})
+                keywords = [item.strip() for item in str(chat_filter.get("filter_keywords", "")).splitlines() if item.strip()]
+                patterns = [item.strip() for item in str(chat_filter.get("filter_regex", "")).splitlines() if item.strip()]
+                if filter_enabled and keywords:
+                    rules.append({"name": "移行済みキーワードフィルター", "trigger_type": "keyword", "trigger_config": {"keywords": keywords[:1000], "allow_list": [], "match": "contains"}, "actions": filter_actions})
+                if filter_enabled and patterns:
+                    rules.append({"name": "移行済み正規表現フィルター", "trigger_type": "regex", "trigger_config": {"patterns": patterns[:20]}, "actions": filter_actions})
+                if filter_enabled and chat_filter.get("safe_browsing_enabled"):
+                    rules.append({"name": "移行済み危険URL検査", "trigger_type": "safe_browsing", "trigger_config": {}, "actions": filter_actions})
+                spam_enabled, spam = modules.get("anti_spam", (False, {}))
+                if spam_enabled:
+                    window = max(1, min(int(spam.get("spam_window_seconds", 10)), 300))
+                    spam_actions: list[dict[str, Any]] = [{"type": "delete"}, {"type": "points", "points": 1, "expires_days": 0}]
+                    if spam.get("spam_action") == "timeout":
+                        spam_actions.append({"type": "timeout", "duration_minutes": max(1, min(int(spam.get("spam_timeout_minutes", 10)), 40320))})
+                    rules.extend([
+                        {"name": "移行済み連投検知", "trigger_type": "message_rate", "trigger_config": {"limit": max(2, min(int(spam.get("spam_message_limit", 6)), 50)), "window_seconds": window}, "actions": spam_actions, "stop_on_match": True},
+                        {"name": "移行済みメンションスパム", "trigger_type": "mention_rate", "trigger_config": {"limit": max(1, min(int(spam.get("spam_mention_limit", 10)), 100)), "window_seconds": window}, "actions": spam_actions, "stop_on_match": True},
+                        {"name": "移行済み重複メッセージ", "trigger_type": "duplicate", "trigger_config": {"limit": max(2, min(int(spam.get("spam_duplicate_limit", 3)), 20)), "window_seconds": window}, "actions": spam_actions, "stop_on_match": True},
+                    ])
+                enabled = any(item[0] for item in modules.values())
+                automod_settings = self._automod_settings({})
+                if moderation.get("escalation_enabled"):
+                    threshold_action: dict[str, Any] = {"type": moderation.get("escalation_action", "timeout")}
+                    if threshold_action["type"] == "timeout":
+                        threshold_action["duration_minutes"] = max(1, min(int(moderation.get("escalation_timeout_minutes", 60)), 40320))
+                    automod_settings["point_thresholds"] = [{"points": max(1, min(int(moderation.get("escalation_threshold", 3)), 1000)), "action": threshold_action}]
+                connection.execute("""INSERT INTO guild_modules(guild_id,module_id,enabled,settings_json) VALUES(?,'automod',?,?)
+                    ON CONFLICT(guild_id,module_id) DO NOTHING""", (guild_id,int(enabled),json.dumps(automod_settings)))
+                for priority, rule in enumerate(rules, 10):
+                    connection.execute("""INSERT INTO automod_rules
+                        (guild_id,name,enabled,mode,priority,stop_on_match,trigger_type,trigger_config_json,conditions_json,exemptions_json,actions_json,created_at,updated_at)
+                        VALUES(?,?,1,'enforce',?,?,?,?,?,'{}',?, ?, ?)""",
+                        (guild_id,rule["name"],priority,int(bool(rule.get("stop_on_match", False))),rule["trigger_type"],json.dumps(rule.get("trigger_config", {}),ensure_ascii=False),json.dumps(rule.get("conditions", {})),json.dumps(rule.get("actions", []),ensure_ascii=False),now,now))
+                for user in connection.execute("SELECT user_id,warn FROM guild_users WHERE guild_id=? AND warn>0", (guild_id,)).fetchall():
+                    connection.execute("""INSERT INTO moderation_points(guild_id,user_id,points,reason,created_at)
+                        VALUES(?,?,?,?,?)""", (guild_id,int(user["user_id"]),int(user["warn"]),"旧警告数から移行",now))
+                connection.execute("INSERT INTO automod_migrations(guild_id,version,migrated_at) VALUES(?,1,?)", (guild_id,now))
+                migrated += 1
+        return migrated
 
     def social_subscriptions(self, guild_id: int, provider: str | None = None) -> list[dict[str, Any]]:
         query, params = "SELECT * FROM social_subscriptions WHERE guild_id=?", [guild_id]
@@ -315,14 +1021,20 @@ class GuildStorage:
             rows = connection.execute("SELECT guild_id FROM guild_modules WHERE module_id=? AND enabled=1", (module_id,)).fetchall()
         return [row["guild_id"] for row in rows]
 
-    def add_case(self, guild_id: int, user_id: int, action: str, reason: str | None, moderator_id: int | None = None, expires_at: int | None = None, dm_sent: bool = False) -> None:
+    def add_case(self, guild_id: int, user_id: int, action: str, reason: str | None, moderator_id: int | None = None,
+                 expires_at: int | None = None, dm_sent: bool = False, *, automod_event_id: int | None = None,
+                 rule_id: int | None = None, moderation_event_id: int | None = None,
+                 moderation_rule_id: int | None = None, source: str = "manual", points: int = 0) -> int:
         weights = {"warn": -10, "timeout": -20, "kick": -30, "ban": -40, "spam": -15, "anti_spam": -15, "chat_filter": -10, "phishing": -20}
         now = int(time.time())
         with self._connection() as c:
-            c.execute("INSERT INTO moderation_cases (guild_id,user_id,moderator_id,action,reason,expires_at,dm_sent,created_at) VALUES (?,?,?,?,?,?,?,?)", (guild_id,user_id,moderator_id,action,reason,expires_at,int(dm_sent),now))
+            cursor = c.execute("""INSERT INTO moderation_cases
+                (guild_id,user_id,moderator_id,action,reason,expires_at,dm_sent,created_at,automod_event_id,rule_id,moderation_event_id,moderation_rule_id,source,points)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (guild_id,user_id,moderator_id,action,reason,expires_at,int(dm_sent),now,automod_event_id,rule_id,moderation_event_id,moderation_rule_id,source,points))
             trust_enabled = c.execute("SELECT enabled FROM guild_modules WHERE guild_id=? AND module_id='trust_score'", (guild_id,)).fetchone()
             if action in weights and trust_enabled and trust_enabled["enabled"]:
                 c.execute("INSERT INTO trust_events (guild_id,user_id,category,weight,reason,created_at) VALUES (?,?,?,?,?,?)", (guild_id, user_id, action, weights[action], reason, now))
+        return int(cursor.lastrowid)
 
     def trust_score(self, guild_id: int, user_id: int, retention_days: int = 90) -> dict[str, Any]:
         cutoff = int(time.time()) - max(1, retention_days) * 86400

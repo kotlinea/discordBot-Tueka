@@ -12,8 +12,8 @@ The dashboard is deliberately bound to `127.0.0.1`; only Nginx exposes it over H
 
 Grant only the features you enable. The dashboard prevents activation when the Bot's guild-role permissions are missing, but channel overwrites can still restrict it.
 
-- Moderation: Manage Messages, Moderate Members, Kick Members, Ban Members.
-- Chat filter / anti-spam: Manage Messages.
+- Moderation: Manage Messages, Moderate Members, Kick Members, Ban Members. Channel Lock/Lockdown also needs Manage Channels; audit-log actor correlation needs View Audit Log.
+- AutoMod / Anti-Spam: Manage Messages for message/reaction removal. Anti-Raid and reaction-rate detection also require the Server Members Intent and reaction events enabled in the Bot.
 - Welcome, audit log, tickets, reaction-role panels, polls: View Channel, Send Messages, Embed Links, Read Message History.
 - Reaction roles / default role: Manage Roles, with the Bot's role above roles it grants.
 - Live statistics / temporary VC / tickets: Manage Channels; temporary VC also needs Move Members.

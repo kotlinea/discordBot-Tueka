@@ -19,8 +19,7 @@ class ModerationCog(commands.Cog):
         with path.open(encoding="utf-8") as file:
             return [word.strip().lower() for row in csv.reader(file) for word in row if word.strip()]
 
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message) -> None:
+    async def _legacy_on_message_disabled(self, message: discord.Message) -> None:
         if message.author.bot or message.guild is None:
             return
         if not self.storage.module_enabled(message.guild.id, "moderation"):

@@ -13,6 +13,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from storage import GuildStorage
+from automod.service import ModerationService
 
 
 MAX_TIMEOUT = 28 * 24 * 60
@@ -23,6 +24,7 @@ LOGGER = logging.getLogger(__name__)
 class SafetyCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot, self.storage = bot, GuildStorage(bot.settings.database_path)
+        self.moderation = ModerationService(bot, self.storage)
         self.recent: dict[tuple[int, int], deque[tuple[float, str, int]]] = defaultdict(deque)
 
     async def _enabled(self, interaction: discord.Interaction, module_id: str) -> bool:
@@ -52,54 +54,13 @@ class SafetyCog(commands.Cog):
 
     @staticmethod
     def _manageable(actor: discord.Member, target: discord.Member, action: str) -> str | None:
-        if target.id == actor.id:
-            return "自分自身にはこの処置を実行できません。"
-        if target.id == target.guild.owner_id:
-            return "サーバー所有者にはこの処置を実行できません。"
-        me = target.guild.me
-        if me is None or target.top_role >= me.top_role:
-            return "Botより同等以上のロールを持つメンバーには実行できません。"
-        if target.top_role >= actor.top_role and actor.id != target.guild.owner_id:
-            return "自分より同等以上のロールを持つメンバーには実行できません。"
-        permission = {"timeout": "moderate_members", "kick": "kick_members", "ban": "ban_members"}[action]
-        if not getattr(me.guild_permissions, permission):
-            return "Botに必要なDiscord権限がありません。"
-        return None
+        return ModerationService.manageable(actor, target, action)
 
     async def _apply_case(self, guild: discord.Guild, member: discord.Member, action: str, reason: str | None, moderator_id: int | None, minutes: int = 0, notify: bool = True) -> None:
-        if action == "timeout":
-            if not 1 <= minutes <= MAX_TIMEOUT:
-                raise ValueError("タイムアウトは1分から28日以内です。")
-            await member.timeout(timedelta(minutes=minutes), reason=reason)
-        elif action == "kick":
-            await member.kick(reason=reason)
-        elif action == "ban":
-            await member.ban(reason=reason)
-        dm_sent = await self._dm(member, f"{guild.name}で {action} が実行されました。理由: {reason or 'なし'}") if notify else False
-        expires_at = int(time.time()) + minutes * 60 if action == "timeout" else None
-        self.storage.add_case(guild.id, member.id, action, reason, moderator_id, expires_at, dm_sent)
-        await self._audit(guild, f"`{action}`: {member} ({member.id}) / 理由: {reason or 'なし'} / DM: {'送信済み' if dm_sent else '未送信'}")
+        await self.moderation.apply_case(guild, member, action, reason, moderator_id, minutes, notify)
 
     async def _warn(self, guild: discord.Guild, member: discord.Member, reason: str | None, moderator_id: int | None) -> int:
-        count = self.storage.add_warning(guild.id, member.id)
-        module = self.storage.get_module(guild.id, "moderation")["settings"]
-        notify = bool(module.get("dm_notify"))
-        dm_sent = await self._dm(member, f"{guild.name}で警告を受けました。理由: {reason or 'なし'}") if notify else False
-        self.storage.add_case(guild.id, member.id, "warn", reason, moderator_id, None, dm_sent)
-        await self._audit(guild, f"`warn` ({count}): {member} ({member.id}) / 理由: {reason or 'なし'}")
-        if not module.get("escalation_enabled") or count < int(module.get("escalation_threshold", 3)):
-            return count
-        action = module.get("escalation_action", "timeout")
-        minutes = int(module.get("escalation_timeout_minutes", 60))
-        error = self._manageable(guild.me, member, action) if guild.me else "Bot情報を取得できません。"
-        if error:
-            await self._audit(guild, f"自動エスカレーションを実行できません: {error}")
-            return count
-        try:
-            await self._apply_case(guild, member, action, f"警告数が {count} 回に到達", None, minutes, notify)
-        except discord.HTTPException:
-            LOGGER.warning("Automatic moderation escalation failed", exc_info=True)
-        return count
+        return await self.moderation.warn(guild, member, reason, moderator_id)
 
     @app_commands.command(description="メンバーに警告を与えます。")
     @app_commands.checks.has_permissions(moderate_members=True)
@@ -213,8 +174,7 @@ class SafetyCog(commands.Cog):
         if issue_warning and isinstance(message.author, discord.Member) and self.storage.module_enabled(message.guild.id, "moderation"):
             await self._warn(message.guild, message.author, reason, None)
 
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
+    async def _legacy_on_message_disabled(self, message: discord.Message):
         if message.author.bot or message.guild is None:
             return
         guild_id = message.guild.id

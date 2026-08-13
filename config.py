@@ -43,6 +43,8 @@ class Settings:
         "cogs.leveling",
         "cogs.moderation",
         "cogs.safety",
+        "cogs.automod",
+        "cogs.moderation_commands",
         "cogs.community",
         "cogs.engagement",
         "cogs.trust",

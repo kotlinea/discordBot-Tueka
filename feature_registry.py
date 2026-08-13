@@ -14,23 +14,28 @@ class Feature:
     fields: tuple[str, ...] = ()
     required_fields: tuple[str, ...] = ()
     required_bot_permissions: tuple[str, ...] = ()
+    parent: str | None = None
 
 
 FEATURES = (
     Feature("welcome", "community", "feature.welcome", "feature.welcome.description", "door-open", ("welcome_enabled", "welcome_channel_id", "welcome_format", "welcome_content", "leave_enabled", "leave_channel_id", "leave_format", "leave_content"), (), ("send_messages",)),
     Feature("autorole", "community", "field.default_role", "settings.enable.description", "badge-check", ("default_role_id",), ("default_role_id",), ("manage_roles",)),
     Feature("leveling", "community", "feature.leveling", "feature.leveling.description", "trophy", ("text_notification_channel_id", "text_role_rewards", "voice_enabled", "voice_notification_channel_id", "voice_role_rewards", "voice_xp_per_minute", "voice_allow_solo", "voice_allow_muted"), ("text_notification_channel_id",), ("send_messages",)),
-    Feature("audit_log", "moderation", "feature.audit_log", "feature.audit_log.description", "scroll-text", ("management_channel_id", "log_message", "log_voice", "log_channel", "log_member", "log_role", "log_server"), (), ("send_messages",)),
-    Feature("moderation", "moderation", "feature.moderation", "feature.moderation.description", "shield-alert", ("escalation_enabled", "escalation_threshold", "escalation_action", "escalation_timeout_minutes", "dm_notify"), (), ("moderate_members", "kick_members", "ban_members")),
-    Feature("chat_filter", "moderation", "feature.chat_filter", "feature.chat_filter.description", "funnel", ("filter_keywords", "filter_regex", "filter_action", "safe_browsing_enabled"), (), ("manage_messages",)),
-    Feature("anti_spam", "moderation", "feature.anti_spam", "feature.anti_spam.description", "shield-ban", ("spam_window_seconds", "spam_message_limit", "spam_mention_limit", "spam_duplicate_limit", "spam_action", "spam_timeout_minutes"), (), ("manage_messages",)),
+    Feature("moderation", "moderation", "feature.moderation", "feature.moderation.description", "shield-alert", ("default_log_channel_id", "immune_role_ids", "immune_user_ids", "immune_channel_ids", "evidence_excluded_channel_ids", "evidence_retention_days", "exclude_bots", "exclude_webhooks"), (), ("manage_messages", "send_messages")),
+    Feature("automod", "moderation", "feature.automod", "feature.automod.description", "shield-ban", ("log_channel_id", "immune_role_ids", "immune_user_ids", "immune_channel_ids"), (), ("manage_messages", "send_messages"), "moderation"),
+    Feature("anti_spam", "moderation", "feature.anti_spam", "feature.anti_spam.description", "shield-ban", ("log_channel_id", "immune_role_ids", "immune_user_ids", "immune_channel_ids"), (), ("manage_messages", "moderate_members"), "moderation"),
+    Feature("anti_raid", "moderation", "feature.anti_raid", "feature.anti_raid.description", "shield-alert", ("log_channel_id", "notify_channel_id", "default_lockdown_minutes", "immune_role_ids", "immune_user_ids", "immune_channel_ids"), (), ("manage_channels", "moderate_members", "kick_members", "ban_members"), "moderation"),
+    Feature("infractions", "moderation", "feature.infractions", "feature.infractions.description", "shield-check", ("point_thresholds", "log_channel_id"), (), ("moderate_members", "kick_members", "ban_members"), "moderation"),
+    Feature("moderation_actions", "moderation", "feature.moderation_actions", "feature.moderation_actions.description", "hand", (), (), ("manage_messages", "manage_channels", "moderate_members", "kick_members", "ban_members"), "moderation"),
+    Feature("moderation_logs", "moderation", "feature.moderation_logs", "feature.moderation_logs.description", "scroll-text", ("log_channel_id",), (), ("send_messages", "view_audit_log"), "moderation"),
+    Feature("audit_log", "moderation", "feature.audit_log", "feature.audit_log.description", "scroll-text", ("management_channel_id", "log_message", "log_voice", "log_channel", "log_member", "log_role", "log_server"), (), ("send_messages",), "moderation"),
     Feature("reaction_roles", "community", "feature.reaction_roles", "feature.reaction_roles.description", "hand", ("reaction_role_channel_id", "reaction_role_ids", "reaction_role_title", "reaction_role_description"), ("reaction_role_channel_id", "reaction_role_ids"), ("manage_roles", "send_messages")),
     Feature("live_stats", "community", "feature.live_stats", "feature.live_stats.description", "chart-line", ("stats_channel_id", "stats_template"), ("stats_channel_id",), ("manage_channels",)),
     Feature("temporary_voice", "community", "feature.temporary_voice", "feature.temporary_voice.description", "microphone", ("temp_voice_trigger_id", "temp_voice_category_id", "temp_voice_name"), ("temp_voice_trigger_id",), ("manage_channels", "move_members")),
     Feature("tickets", "community", "feature.tickets", "feature.tickets.description", "ticket", ("ticket_panel_channel_id", "ticket_category_id", "ticket_staff_role_id", "ticket_log_channel_id", "ticket_panel_title", "ticket_panel_description"), ("ticket_panel_channel_id", "ticket_category_id", "ticket_staff_role_id"), ("manage_channels", "send_messages")),
     Feature("advanced_polls", "community", "feature.advanced_polls", "feature.advanced_polls.description", "chart-bar", ()),
     Feature("minigames", "community", "feature.minigames", "feature.minigames.description", "gamepad", ()),
-    Feature("trust_score", "moderation", "feature.trust_score", "feature.trust_score.description", "shield-check", ("trust_retention_days", "trust_flag_threshold")),
+    Feature("trust_score", "moderation", "feature.trust_score", "feature.trust_score.description", "shield-check", ("trust_retention_days", "trust_flag_threshold"), (), (), "moderation"),
     Feature("youtube_updates", "social", "feature.youtube_updates", "feature.youtube_updates.description", "youtube", (), (), ("send_messages",)),
     Feature("twitch_updates", "social", "feature.twitch_updates", "feature.twitch_updates.description", "twitch", (), (), ("send_messages",)),
     Feature("tiktok_updates", "social", "feature.tiktok_updates", "feature.tiktok_updates.description", "tiktok", (), (), ("send_messages",)),
@@ -50,8 +55,12 @@ JAPANESE_COPY = {
     "leveling": ("レベリング", "メッセージでXPを獲得するシステムです。"),
     "audit_log": ("サーバーログ", "サーバー内のイベントをカテゴリ別に記録します。"),
     "moderation": ("モデレーション", "警告と制裁の設定を管理します。"),
-    "chat_filter": ("チャットフィルター", "キーワード、正規表現、危険なURLを検出します。"),
-    "anti_spam": ("スパム対策", "連投、メンション、重複メッセージを検出します。"),
+    "automod": ("AutoMod", "柔軟なルール、例外、複数アクションでサーバーを保護します。"),
+    "anti_spam": ("Anti-Spam", "連投、重複、メンション、リアクションスパムを検知します。"),
+    "anti_raid": ("Anti-Raid", "参加・退出の急増を検知し、制裁やLockdownを実行します。"),
+    "infractions": ("Warnings / Infractions", "警告ポイント、違反履歴、段階的制裁を管理します。"),
+    "moderation_actions": ("Moderation Actions", "手動処置とLockdownの状態を管理します。"),
+    "moderation_logs": ("Moderation Logs", "検知、制裁、管理操作を一元的に記録します。"),
     "reaction_roles": ("リアクションロール", "ボタンでメンバーがロールを選択できます。"),
     "live_stats": ("ライブ統計チャンネル", "メンバー数などをボイスチャンネル名に自動表示します。"),
     "temporary_voice": ("一時的な音声チャンネル", "トリガー参加時に専用VCを作成し、空になると削除します。"),

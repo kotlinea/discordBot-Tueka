@@ -1,17 +1,19 @@
 """FastAPI dashboard entry point. Run with: uvicorn dashboard.app:app"""
 import os
+import json
 import secrets
 import time
 import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from pathlib import Path
-from urllib.parse import urlencode
+from typing import Any
+from urllib.parse import quote_plus, urlencode
 from asyncio import gather
 
 import httpx
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -23,6 +25,7 @@ from dashboard.timing import add as add_timing, begin as begin_timing, end as en
 from feature_registry import FEATURES, get_feature, japanese_copy
 from storage import GuildStorage
 from social_crypto import SocialTokenCipher
+from automod import ACTION_TYPES, TRIGGER_TYPES, AutoModEngine, MessageContext, default_rule, validate_rule
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -113,6 +116,12 @@ def social_provider_available(provider: str) -> bool:
 
 
 SOCIAL_MODULE_PROVIDERS = {"youtube_updates": "youtube", "twitch_updates": "twitch", "tiktok_updates": "tiktok", "x_updates": "x", "instagram_updates": "instagram"}
+MODERATION_SECTIONS = ("automod", "anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs")
+FAMILY_TRIGGERS = {
+    "automod": ("keyword", "regex", "safe_browsing", "phishing_link", "discord_invite", "domain", "caps", "emoji_sticker_rate", "media_only", "honeypot"),
+    "anti_spam": ("message_rate", "duplicate", "mention_rate", "link_rate", "attachment_rate", "reaction_rate", "reaction_burst"),
+    "anti_raid": ("join_rate", "leave_rate", "new_account_ratio", "new_member_activity"),
+}
 
 
 async def subscribe_youtube_websub(channel_id: str) -> bool:
@@ -135,7 +144,7 @@ async def subscribe_youtube_websub(channel_id: str) -> bool:
 
 async def page_identity(token: str) -> dict:
     user, bot_user = await gather(api.current_user(token), api.bot_user())
-    return {"current_user": {"name": user.get("global_name") or user["username"], "avatar_url": avatar_url(user)}, "bot": {"name": bot_user["username"], "avatar_url": avatar_url(bot_user)}}
+    return {"current_user": {"id": int(user["id"]), "name": user.get("global_name") or user["username"], "avatar_url": avatar_url(user)}, "bot": {"name": bot_user["username"], "avatar_url": avatar_url(bot_user)}}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -218,7 +227,7 @@ def feature_view(guild_id: int, feature, bot_permissions: int | None = None):
 async def guild_home(request: Request, guild_id: int):
     token = await authorized(request, guild_id)
     _, _, bot_permissions = await api.guild_resources(guild_id)
-    cards = [feature_view(guild_id, feature, bot_permissions) for feature in FEATURES]
+    cards = [feature_view(guild_id, feature, bot_permissions) for feature in FEATURES if feature.parent is None]
     categories = {category: [card for card in cards if card["definition"].category == category] for category in ("community", "moderation", "social")}
     return render_page(request, "guild_home.html", {"guild_id": guild_id, "categories": categories, "csrf_token": request.session["csrf_token"], **(await page_identity(token))})
 
@@ -228,8 +237,56 @@ async def legacy_guild_settings(guild_id: int):
     return RedirectResponse(f"/servers/{guild_id}", status_code=303)
 
 
+@app.get("/servers/{guild_id}/moderation", response_class=HTMLResponse)
+async def moderation_hub(request: Request, guild_id: int):
+    token = await authorized(request, guild_id)
+    channels, roles, bot_permissions = await api.guild_resources(guild_id)
+    core = feature_view(guild_id, get_feature("moderation"), bot_permissions)
+    sections = [feature_view(guild_id, get_feature(item), bot_permissions) for item in MODERATION_SECTIONS]
+    return render_page(request, "moderation_hub.html", {"guild_id": guild_id, "module": core, "sections": sections,
+        "summary": storage.moderation_summary(guild_id), "events": storage.recent_moderation_events(guild_id, limit=10),
+        "lockdown": storage.active_lockdown(guild_id), "channels": channels, "roles": roles,
+        "csrf_token": request.session["csrf_token"], **(await page_identity(token))})
+
+
+@app.get("/servers/{guild_id}/moderation/{section}", response_class=HTMLResponse)
+async def moderation_section(request: Request, guild_id: int, section: str):
+    if section not in MODERATION_SECTIONS:
+        raise HTTPException(status_code=404, detail="Moderation機能が見つかりません")
+    token = await authorized(request, guild_id)
+    channels, roles, bot_permissions = await api.guild_resources(guild_id)
+    module = feature_view(guild_id, get_feature(section), bot_permissions)
+    family = section if section in FAMILY_TRIGGERS else None
+    rules = storage.moderation_rules(guild_id, family=family) if family else []
+    selected = None
+    rule_id = request.query_params.get("rule_id")
+    if family and rule_id and rule_id.isdigit():
+        selected = storage.moderation_rule(guild_id, int(rule_id))
+        if selected and selected["family"] != family:
+            selected = None
+    if family and selected is None:
+        selected = default_rule(FAMILY_TRIGGERS[family][0])
+        selected["family"] = family
+    preview = request.session.pop(f"moderation_preview:{guild_id}:{section}", None)
+    user_id = int(request.query_params["user_id"]) if section == "infractions" and request.query_params.get("user_id", "").isdigit() else None
+    return render_page(request, "moderation_section.html", {"guild_id": guild_id, "section": section, "module": module,
+        "rules": rules, "selected_rule": selected, "trigger_types": FAMILY_TRIGGERS.get(family, ()), "channels": channels,
+        "roles": roles, "events": storage.recent_moderation_events(guild_id, family=family, user_id=user_id, limit=50),
+        "cases": storage.recent_cases(guild_id, user_id, 50) if user_id else [], "active_points": storage.active_points(guild_id, user_id) if user_id else 0,
+        "selected_user_id": user_id, "lockdown": storage.active_lockdown(guild_id),
+        "preview": preview,
+        "csrf_token": request.session["csrf_token"], **(await page_identity(token))})
+
+
 @app.get("/servers/{guild_id}/modules/{module_id}", response_class=HTMLResponse)
 async def module_settings(request: Request, guild_id: int, module_id: str):
+    if module_id in {"chat_filter", "automod", "anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"}:
+        target = "automod" if module_id == "chat_filter" else module_id
+        return RedirectResponse(f"/servers/{guild_id}/moderation/{target}", status_code=303)
+    if module_id == "audit_log":
+        return RedirectResponse(f"/servers/{guild_id}/moderation/moderation_logs", status_code=303)
+    if module_id == "moderation":
+        return RedirectResponse(f"/servers/{guild_id}/moderation", status_code=303)
     token = await authorized(request, guild_id)
     try:
         feature = get_feature(module_id)
@@ -237,6 +294,18 @@ async def module_settings(request: Request, guild_id: int, module_id: str):
         raise HTTPException(status_code=404, detail="機能が見つかりません") from exc
     channels, roles, bot_permissions = await api.guild_resources(guild_id)
     module = feature_view(guild_id, feature, bot_permissions)
+    if module_id == "automod":
+        rule_id = request.query_params.get("rule_id")
+        selected_rule = storage.automod_rule(guild_id, int(rule_id)) if rule_id and rule_id.isdigit() else None
+        selected_rule = selected_rule or default_rule()
+        preview_key = f"automod_preview:{guild_id}"
+        preview = request.session.pop(preview_key, None)
+        return render_page(request, "automod.html", {
+            "guild_id": guild_id, "module": module, "channels": channels, "roles": roles,
+            "rules": storage.automod_rules(guild_id), "selected_rule": selected_rule,
+            "trigger_types": sorted(TRIGGER_TYPES), "action_types": sorted(ACTION_TYPES),
+            "preview": preview, "csrf_token": request.session["csrf_token"], **(await page_identity(token)),
+        })
     draft_key = f"{guild_id}:{module_id}"
     drafts = request.session.get("module_drafts", {})
     draft = drafts.get(draft_key) if request.query_params.get("error") else None
@@ -252,6 +321,490 @@ async def module_settings(request: Request, guild_id: int, module_id: str):
     provider_available = {provider: social_provider_available(provider) for provider in ("youtube", "twitch", "tiktok", "x", "instagram")}
     template_name = "social_module_settings.html" if social_provider else "module_settings.html"
     return render_page(request, template_name, {"guild_id": guild_id, "module": module, "social_provider": social_provider, "channels": channels, "roles": roles, "subscriptions": subscriptions, "social_connections": connections, "provider_available": provider_available, "csrf_token": request.session["csrf_token"], **(await page_identity(token))})
+
+
+def _csrf_ok(request: Request, value: object) -> bool:
+    return secrets.compare_digest(str(value or ""), request.session.get("csrf_token", ""))
+
+
+def _form_ids(values: list[object], allowed: set[int], limit: int = 100) -> list[int]:
+    try:
+        parsed = list(dict.fromkeys(int(value) for value in values if str(value)))
+    except ValueError as exc:
+        raise ValueError("invalid resource") from exc
+    if len(parsed) > limit or any(value not in allowed for value in parsed):
+        raise ValueError("invalid resource")
+    return parsed
+
+
+def _json_object(value: object, fallback: object) -> object:
+    text = str(value or "").strip()
+    result = json.loads(text) if text else fallback
+    if not isinstance(result, type(fallback)):
+        raise ValueError("invalid JSON shape")
+    return result
+
+
+def _lines(value: object, limit: int, item_limit: int = 253) -> list[str]:
+    return list(dict.fromkeys(item.strip()[:item_limit] for item in str(value or "").splitlines() if item.strip()))[:limit]
+
+
+def _typed_moderation_rule(form: Any, family: str, allowed_channels: set[int], allowed_roles: set[int]) -> dict:
+    trigger = str(form.get("trigger_type", ""))
+    if trigger not in FAMILY_TRIGGERS.get(family, ()):
+        raise ValueError("invalid family trigger")
+    raw = default_rule(trigger)
+    config: dict[str, Any] = {}
+    if trigger == "keyword":
+        config = {"keywords": _lines(form.get("keywords"), 1000, 60), "allow_list": _lines(form.get("allow_list"), 100, 60), "match": str(form.get("keyword_match", "wildcard"))}
+    elif trigger == "regex":
+        config = {"patterns": _lines(form.get("patterns"), 20, 260)}
+    elif trigger == "domain":
+        config = {"domains": _lines(form.get("domains"), 500), "mode": str(form.get("domain_mode", "blacklist"))}
+    elif trigger in {"message_rate", "duplicate", "mention_rate", "link_rate", "attachment_rate", "reaction_rate", "reaction_burst", "join_rate", "leave_rate", "new_account_ratio", "emoji_sticker_rate"}:
+        config = {"limit": form.get("limit", 3), "window_seconds": form.get("window_seconds", 10)}
+        if trigger == "duplicate":
+            config["similarity_percent"] = form.get("similarity_percent", 100)
+        elif trigger == "new_account_ratio":
+            config.update({"account_age_days": form.get("account_age_days", 7), "percentage": form.get("percentage", 70)})
+        elif trigger == "emoji_sticker_rate":
+            config["per_message_limit"] = form.get("per_message_limit", 12)
+    elif trigger == "caps":
+        config = {"percentage": form.get("percentage", 70), "minimum_letters": form.get("minimum_letters", 6)}
+    elif trigger == "new_member_activity":
+        config = {"join_age_minutes": form.get("join_age_minutes", 10)}
+    elif trigger == "media_only":
+        config = {"allow_links": form.get("allow_links") == "on"}
+    elif trigger == "honeypot":
+        config = {"channel_ids": _form_ids(form.getlist("honeypot_channel_ids"), allowed_channels, 20)}
+    raw.update({"name": str(form.get("name", "")), "enabled": form.get("enabled") == "on", "mode": str(form.get("mode", "monitor")),
+        "priority": form.get("priority", 100), "stop_on_match": form.get("stop_on_match") == "on", "family": family,
+        "trigger_config": config, "conditions": {
+            "channel_ids": _form_ids(form.getlist("condition_channel_ids"), allowed_channels),
+            "category_ids": _form_ids(form.getlist("condition_category_ids"), allowed_channels),
+            "required_role_ids": _form_ids(form.getlist("required_role_ids"), allowed_roles),
+            "excluded_role_ids": _form_ids(form.getlist("excluded_role_ids"), allowed_roles),
+            "minimum_account_age_days": form.get("minimum_account_age_days", 0), "minimum_join_age_days": form.get("minimum_join_age_days", 0),
+            "user_ids": [int(item) for item in _lines(form.get("condition_user_ids"), 100) if item.isdigit()],
+            "actor_kinds": form.getlist("actor_kinds"), "bot_ids": [int(item) for item in _lines(form.get("bot_ids"), 100) if item.isdigit()],
+            "webhook_ids": [int(item) for item in _lines(form.get("webhook_ids"), 100) if item.isdigit()],
+        }, "exemptions": {
+            "channel_ids": _form_ids(form.getlist("exempt_channel_ids"), allowed_channels),
+            "category_ids": _form_ids(form.getlist("exempt_category_ids"), allowed_channels),
+            "role_ids": _form_ids(form.getlist("exempt_role_ids"), allowed_roles),
+            "user_ids": [int(item) for item in _lines(form.get("exempt_user_ids"), 100) if item.isdigit()],
+            "bot_ids": [int(item) for item in _lines(form.get("exempt_bot_ids"), 100) if item.isdigit()],
+            "webhook_ids": [int(item) for item in _lines(form.get("exempt_webhook_ids"), 100) if item.isdigit()],
+        }})
+    actions: list[dict[str, Any]] = []
+    for action_type in form.getlist("actions"):
+        action: dict[str, Any] = {"type": str(action_type)}
+        if action_type == "points":
+            action.update({"points": form.get("points", 1), "expires_days": form.get("expires_days", 30)})
+        elif action_type in {"timeout", "tempban"}:
+            action["duration_minutes"] = form.get("duration_minutes", 10)
+        elif action_type == "notify":
+            action.update({"channel_id": form.get("notify_channel_id"), "message": str(form.get("notify_message", "ルール違反を検知しました。"))})
+        elif action_type == "dm":
+            action["message"] = str(form.get("dm_message", "ルール違反を検知しました: {reason}"))
+        elif action_type == "purge":
+            action["count"] = form.get("purge_count", 10)
+        elif action_type == "lockdown":
+            action.update({"duration_minutes": form.get("lockdown_minutes", 30), "channel_ids": _form_ids(form.getlist("lockdown_channel_ids"), allowed_channels)})
+        actions.append(action)
+    raw["actions"] = actions
+    return validate_rule(raw)
+
+
+@app.post("/servers/{guild_id}/moderation/settings")
+async def save_moderation_core(request: Request, guild_id: int):
+    form = await request.form()
+    target = f"/servers/{guild_id}/moderation"
+    if not _csrf_ok(request, form.get("csrf_token")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    await authorized(request, guild_id, live=True)
+    channels, roles, _ = await api.guild_resources(guild_id, use_cache=False)
+    channel_ids, role_ids = {int(item["id"]) for item in channels}, {int(item["id"]) for item in roles}
+    try:
+        settings = storage.get_module(guild_id, "moderation")["settings"]
+        log_id = int(form["default_log_channel_id"]) if form.get("default_log_channel_id") else None
+        if log_id and log_id not in {int(item["id"]) for item in channels if int(item["type"]) == 0}:
+            raise ValueError("invalid log channel")
+        settings.update({"default_log_channel_id": log_id, "immune_role_ids": _form_ids(form.getlist("immune_role_ids"), role_ids),
+            "immune_channel_ids": _form_ids(form.getlist("immune_channel_ids"), channel_ids),
+            "evidence_excluded_channel_ids": _form_ids(form.getlist("evidence_excluded_channel_ids"), channel_ids),
+            "immune_user_ids": [int(item) for item in _lines(form.get("immune_user_ids"), 100) if item.isdigit()],
+            "evidence_retention_days": max(1,min(int(form.get("evidence_retention_days",30)),365)),
+            "exclude_bots": form.get("exclude_bots") == "on", "exclude_webhooks": form.get("exclude_webhooks") == "on"})
+    except (TypeError, ValueError):
+        return RedirectResponse(f"{target}?error=invalid", status_code=303)
+    storage.set_module(guild_id, "moderation", enabled=form.get("enabled") == "on", settings=settings)
+    return RedirectResponse(f"{target}?saved=1", status_code=303)
+
+
+@app.post("/servers/{guild_id}/moderation/{section}/settings")
+async def save_moderation_section_settings(request: Request, guild_id: int, section: str):
+    if section not in MODERATION_SECTIONS:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    target = f"/servers/{guild_id}/moderation/{section}"
+    if not _csrf_ok(request, form.get("csrf_token")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    await authorized(request, guild_id, live=True)
+    channels, roles, _ = await api.guild_resources(guild_id, use_cache=False)
+    channel_ids, role_ids = {int(item["id"]) for item in channels}, {int(item["id"]) for item in roles}
+    settings = storage.get_module(guild_id, section)["settings"]
+    try:
+        if "immune_role_ids" in settings:
+            settings.update({"immune_role_ids": _form_ids(form.getlist("immune_role_ids"), role_ids), "immune_channel_ids": _form_ids(form.getlist("immune_channel_ids"), channel_ids),
+                "immune_user_ids": [int(item) for item in _lines(form.get("immune_user_ids"),100) if item.isdigit()]})
+        if section == "anti_raid":
+            settings["default_lockdown_minutes"] = max(1,min(int(form.get("default_lockdown_minutes",30)),1440))
+        if section == "infractions":
+            thresholds = []
+            for points, action, duration in zip(form.getlist("threshold_points"),form.getlist("threshold_action"),form.getlist("threshold_duration")):
+                item = {"points": max(1,min(int(points),1000)), "action": {"type": str(action)}}
+                if action in {"timeout","tempban"}:
+                    item["action"]["duration_minutes"] = max(1,min(int(duration or 10),525600 if action == "tempban" else 40320))
+                thresholds.append(item)
+            settings["point_thresholds"] = sorted(thresholds,key=lambda item:item["points"])
+        if section == "moderation_logs":
+            log_id = int(form["log_channel_id"]) if form.get("log_channel_id") else None
+            if log_id and log_id not in {int(item["id"]) for item in channels if int(item["type"]) == 0}:
+                raise ValueError("invalid log channel")
+            settings["log_channel_id"] = log_id
+            for name in ("message_delete","message_edit","warning","timeout","kick","ban","unban","join","leave","automod","anti_spam","anti_raid","admin"):
+                settings[f"log_{name}"] = form.get(f"log_{name}") == "on"
+    except (TypeError, ValueError):
+        return RedirectResponse(f"{target}?error=invalid", status_code=303)
+    storage.set_module(guild_id, section, enabled=form.get("enabled") == "on", settings=settings)
+    return RedirectResponse(f"{target}?saved=1", status_code=303)
+
+
+@app.post("/servers/{guild_id}/moderation/{family}/rules")
+async def save_moderation_rule_v2(request: Request, guild_id: int, family: str):
+    if family not in FAMILY_TRIGGERS:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    target = f"/servers/{guild_id}/moderation/{family}"
+    if not _csrf_ok(request, form.get("csrf_token")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    await authorized(request, guild_id, live=True)
+    channels, roles, bot_permissions = await api.guild_resources(guild_id, use_cache=False)
+    try:
+        channel_ids, text_ids = {int(item["id"]) for item in channels}, {int(item["id"]) for item in channels if int(item["type"]) == 0}
+        rule = _typed_moderation_rule(form, family, channel_ids, {int(item["id"]) for item in roles})
+        _rule_resource_permissions(rule, channel_ids, text_ids, {int(item["id"]) for item in roles}, bot_permissions)
+        rule_id = int(form["rule_id"]) if form.get("rule_id") else None
+        storage.save_moderation_rule(guild_id, rule, rule_id)
+    except (KeyError,TypeError,ValueError,PermissionError):
+        return RedirectResponse(f"{target}?error=invalid-rule", status_code=303)
+    return RedirectResponse(f"{target}?saved=rule", status_code=303)
+
+
+@app.get("/servers/{guild_id}/moderation/{family}/rules/{rule_id}.json")
+async def moderation_rule_json(request: Request, guild_id: int, family: str, rule_id: int):
+    if family not in FAMILY_TRIGGERS:
+        raise HTTPException(status_code=404)
+    await authorized(request, guild_id)
+    rule = storage.moderation_rule(guild_id, rule_id)
+    if not rule or rule["family"] != family:
+        raise HTTPException(status_code=404)
+    return JSONResponse(rule)
+
+
+@app.post("/servers/{guild_id}/moderation/{family}/rules/{rule_id}/delete")
+async def delete_moderation_rule_v2(request: Request, guild_id: int, family: str, rule_id: int):
+    form = await request.form()
+    target = f"/servers/{guild_id}/moderation/{family}"
+    if not _csrf_ok(request, form.get("csrf_token")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    await authorized(request, guild_id, live=True)
+    rule = storage.moderation_rule(guild_id, rule_id)
+    if not rule or rule["family"] != family:
+        raise HTTPException(status_code=404)
+    storage.delete_moderation_rule(guild_id, rule_id)
+    return RedirectResponse(f"{target}?saved=deleted", status_code=303)
+
+
+@app.post("/servers/{guild_id}/moderation/{family}/rules/{rule_id}/duplicate")
+async def duplicate_moderation_rule_v2(request: Request, guild_id: int, family: str, rule_id: int):
+    if family not in FAMILY_TRIGGERS:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    target = f"/servers/{guild_id}/moderation/{family}"
+    if not _csrf_ok(request, form.get("csrf_token")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    await authorized(request, guild_id, live=True)
+    rule = storage.moderation_rule(guild_id, rule_id)
+    if not rule or rule["family"] != family:
+        raise HTTPException(status_code=404)
+    copy = {key: value for key, value in rule.items() if key not in {"id", "guild_id", "revision", "created_at", "updated_at", "legacy_rule_id"}}
+    copy["name"] = f"{rule['name']} (コピー)"[:100]
+    copy["enabled"] = False
+    storage.save_moderation_rule(guild_id, validate_rule(copy))
+    return RedirectResponse(f"{target}?saved=duplicated", status_code=303)
+
+
+@app.post("/servers/{guild_id}/moderation/{family}/preview")
+async def preview_moderation_rule(request: Request, guild_id: int, family: str):
+    if family not in FAMILY_TRIGGERS:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    target = f"/servers/{guild_id}/moderation/{family}"
+    if not _csrf_ok(request, form.get("csrf_token")):
+        return RedirectResponse(f"{target}?error=csrf",status_code=303)
+    await authorized(request,guild_id)
+    channels,roles,_ = await api.guild_resources(guild_id)
+    try:
+        rule = _typed_moderation_rule(form,family,{int(item["id"]) for item in channels},{int(item["id"]) for item in roles})
+        context = MessageContext(guild_id,1,int(form.get("preview_channel_id") or 1),content=str(form.get("preview_content", ""))[:4000],
+            mention_count=max(0,min(int(form.get("preview_mentions",0)),100)),attachment_count=max(0,min(int(form.get("preview_attachments",0)),20)),
+            sticker_count=max(0,min(int(form.get("preview_stickers",0)),100)),event_type=rule["event_type"])
+        engine = AutoModEngine()
+        matches = []
+        repeats = int(rule["trigger_config"].get("limit",1)) if rule["trigger_type"] in {"message_rate","duplicate","mention_rate","link_rate","attachment_rate","reaction_rate","reaction_burst","join_rate","leave_rate","new_account_ratio","emoji_sticker_rate"} else 1
+        for _ in range(max(1,min(repeats,100))):
+            matches = await engine.evaluate(context,[{**rule,"id":1}])
+        result = {"matched":bool(matches),"reason":matches[0].reason if matches else "一致しませんでした"}
+    except (TypeError,ValueError):
+        result = {"matched":False,"reason":"ルールまたはテスト入力が無効です"}
+    request.session[f"moderation_preview:{guild_id}:{family}"] = result
+    return RedirectResponse(f"{target}?preview={'matched' if result['matched'] else 'clear'}&preview_reason={quote_plus(result['reason'])}",status_code=303)
+
+
+@app.post("/servers/{guild_id}/moderation/actions")
+async def request_moderation_action(request: Request, guild_id: int):
+    form = await request.form()
+    target = f"/servers/{guild_id}/moderation/moderation_actions"
+    if not _csrf_ok(request, form.get("csrf_token")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    token = await authorized(request, guild_id, live=True)
+    user = await api.current_user(token, use_cache=False)
+    if not storage.module_enabled(guild_id, "moderation"):
+        return RedirectResponse(f"{target}?error=moderation-disabled", status_code=303)
+    action = str(form.get("action", ""))
+    if action not in {"warn","timeout","untimeout","kick","ban","unban","softban","purge","lock","unlock","lockdown","unlockdown"} or form.get("confirm") != "confirm":
+        return RedirectResponse(f"{target}?error=confirmation", status_code=303)
+    try:
+        target_id = int(form["target_user_id"]) if form.get("target_user_id") else None
+        channel_id = int(form["channel_id"]) if form.get("channel_id") else None
+        duration = max(1,min(int(form.get("duration_minutes",10)),525600))
+        count = max(1,min(int(form.get("count",10)),100))
+        reason = str(form.get("reason", "")).strip()[:500]
+        channels, _, bot_permissions = await api.guild_resources(guild_id, use_cache=False)
+        guild_channel_ids = {int(item["id"]) for item in channels}
+        text_channel_ids = {int(item["id"]) for item in channels if int(item["type"]) in {0, 5, 15}}
+        target_actions = {"warn", "timeout", "untimeout", "kick", "ban", "unban", "softban"}
+        channel_actions = {"purge", "lock", "unlock"}
+        required_permissions = {
+            "timeout": "moderate_members", "untimeout": "moderate_members", "kick": "kick_members",
+            "ban": "ban_members", "unban": "ban_members", "softban": "ban_members",
+            "purge": "manage_messages", "lock": "manage_channels", "unlock": "manage_channels",
+            "lockdown": "manage_channels", "unlockdown": "manage_channels",
+        }
+        if action in target_actions and (target_id is None or target_id <= 0):
+            raise ValueError("target user is required")
+        if action in channel_actions and (channel_id is None or channel_id not in text_channel_ids):
+            raise ValueError("a channel from this server is required")
+        if channel_id is not None and channel_id not in guild_channel_ids:
+            raise ValueError("channel belongs to another server")
+        if not reason:
+            raise ValueError("reason is required")
+        permission = required_permissions.get(action)
+        if permission and not (bot_permissions & PERMISSION_BITS[permission]):
+            raise PermissionError(f"missing {permission}")
+    except (TypeError, ValueError, PermissionError):
+        return RedirectResponse(f"{target}?error=invalid", status_code=303)
+    nonce = secrets.token_urlsafe(16)
+    storage.enqueue_moderation_action(guild_id,int(user["id"]),action,target_user_id=target_id,channel_id=channel_id,
+        reason=reason,options={"duration_minutes":duration,"count":count},dedupe_key=f"dashboard:{guild_id}:{nonce}")
+    return RedirectResponse(f"{target}?saved=queued", status_code=303)
+
+
+@app.post("/servers/{guild_id}/moderation/infractions/adjust")
+async def adjust_infraction(request: Request, guild_id: int):
+    form = await request.form()
+    target = f"/servers/{guild_id}/moderation/infractions"
+    if not _csrf_ok(request, form.get("csrf_token")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    token = await authorized(request, guild_id, live=True)
+    user = await api.current_user(token, use_cache=False)
+    try:
+        user_id = int(form["target_user_id"])
+        operation = str(form.get("operation", ""))
+        reason = str(form.get("reason", ""))[:500]
+        if user_id <= 0 or operation not in {"add", "revoke", "note"} or not reason:
+            raise ValueError("invalid infraction operation")
+        if operation == "add":
+            points = max(1,min(int(form.get("points",1)),1000))
+            expires_days = max(0,min(int(form.get("expires_days",30)),3650))
+            storage.enqueue_moderation_action(guild_id,int(user["id"]),"points",target_user_id=user_id,reason=reason,
+                options={"points":points,"expires_days":expires_days},dedupe_key=f"infraction:{guild_id}:{secrets.token_urlsafe(16)}")
+        elif operation == "revoke":
+            revoked = storage.clear_warnings(guild_id,user_id)
+            storage.add_case(guild_id,user_id,"revoke_points",f"{reason} ({revoked}件)",int(user["id"]),source="manual")
+        else:
+            storage.add_case(guild_id,user_id,"note",reason,int(user["id"]),source="manual")
+    except (KeyError,TypeError,ValueError):
+        return RedirectResponse(f"{target}?error=invalid",status_code=303)
+    return RedirectResponse(f"{target}?user_id={user_id}&saved=1",status_code=303)
+
+
+def _rule_resource_permissions(rule: dict, channel_ids: set[int], text_channel_ids: set[int], role_ids: set[int], bot_permissions: int) -> None:
+    channel_values = set(rule["conditions"].get("channel_ids", [])) | set(rule["conditions"].get("category_ids", [])) | set(rule["exemptions"].get("channel_ids", []))
+    channel_values |= set(rule["trigger_config"].get("channel_ids", []))
+    role_values = set(rule["conditions"].get("required_role_ids", [])) | set(rule["conditions"].get("excluded_role_ids", [])) | set(rule["exemptions"].get("role_ids", []))
+    for action in rule["actions"]:
+        if action.get("channel_id"):
+            channel_values.add(int(action["channel_id"]))
+            if int(action["channel_id"]) not in text_channel_ids:
+                raise ValueError("Notification target must be a text channel")
+    if channel_values - channel_ids or role_values - role_ids:
+        raise ValueError("Rule contains a resource from another server")
+    required = set()
+    for action in rule["actions"]:
+        required |= {"delete": {"manage_messages"}, "purge": {"manage_messages"}, "remove_reaction": {"manage_messages"},
+                     "notify": {"send_messages"}, "log": {"send_messages"}, "timeout": {"moderate_members"}, "untimeout": {"moderate_members"},
+                     "kick": {"kick_members"}, "ban": {"ban_members"}, "unban": {"ban_members"}, "tempban": {"ban_members"},
+                     "softban": {"ban_members"}, "lock": {"manage_channels"}, "unlock": {"manage_channels"},
+                     "lockdown": {"manage_channels"}, "unlockdown": {"manage_channels"}}.get(action["type"], set())
+    if not bot_permissions & ADMINISTRATOR and any(not bot_permissions & PERMISSION_BITS[item] for item in required):
+        raise PermissionError("Bot is missing an action permission")
+
+
+@app.post("/servers/{guild_id}/automod/settings")
+async def save_automod_settings(request: Request, guild_id: int):
+    target = f"/servers/{guild_id}/modules/automod"
+    form = await request.form()
+    if not _csrf_ok(request, form.get("csrf_token")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    await authorized(request, guild_id, live=True)
+    channels, roles, bot_permissions = await api.guild_resources(guild_id, use_cache=False)
+    channel_ids, text_channel_ids = {int(item["id"]) for item in channels}, {int(item["id"]) for item in channels if int(item["type"]) == 0}
+    role_ids = {int(item["id"]) for item in roles}
+    try:
+        log_channel = int(form["log_channel_id"]) if form.get("log_channel_id") else None
+        if log_channel is not None and log_channel not in text_channel_ids:
+            raise ValueError("invalid log channel")
+        user_text = str(form.get("immune_user_ids", "")).replace(",", "\n")
+        immune_users = list(dict.fromkeys(int(value.strip()) for value in user_text.splitlines() if value.strip()))
+        if len(immune_users) > 100 or any(value <= 0 for value in immune_users):
+            raise ValueError("invalid immune user")
+        retention = max(1, min(int(form.get("evidence_retention_days", 30)), 365))
+        thresholds = _json_object(form.get("point_thresholds"), [])
+        normalized_thresholds = []
+        for item in thresholds[:20]:
+            points, action = int(item["points"]), dict(item["action"])
+            if not 1 <= points <= 1000 or action.get("type") not in {"timeout", "kick", "ban", "tempban"}:
+                raise ValueError("invalid threshold")
+            if action["type"] in {"timeout", "tempban"}:
+                action["duration_minutes"] = max(1, min(int(action.get("duration_minutes", 60)), 525600 if action["type"] == "tempban" else 40320))
+            normalized_thresholds.append({"points": points, "action": action})
+        normalized_thresholds.sort(key=lambda item: item["points"])
+        threshold_permissions = {"timeout": "moderate_members", "kick": "kick_members", "ban": "ban_members", "tempban": "ban_members"}
+        if not bot_permissions & ADMINISTRATOR and any(not bot_permissions & PERMISSION_BITS[threshold_permissions[item["action"]["type"]]] for item in normalized_thresholds):
+            raise PermissionError("missing threshold permission")
+        values = {
+            "log_channel_id": log_channel,
+            "immune_role_ids": _form_ids(form.getlist("immune_role_ids"), role_ids),
+            "immune_user_ids": immune_users,
+            "immune_channel_ids": _form_ids(form.getlist("immune_channel_ids"), channel_ids),
+            "evidence_excluded_channel_ids": _form_ids(form.getlist("evidence_excluded_channel_ids"), channel_ids),
+            "evidence_retention_days": retention,
+            "point_thresholds": normalized_thresholds,
+        }
+        if not bot_permissions & ADMINISTRATOR and not bot_permissions & PERMISSION_BITS["manage_messages"]:
+            raise PermissionError("missing permission")
+    except (KeyError, TypeError, ValueError, PermissionError, json.JSONDecodeError):
+        return RedirectResponse(f"{target}?error=invalid-selection", status_code=303)
+    current = storage.get_module(guild_id, "automod")
+    current["settings"].update(values)
+    storage.set_module(guild_id, "automod", enabled=form.get("enabled") == "on", settings=current["settings"])
+    return RedirectResponse(f"{target}?saved=1", status_code=303)
+
+
+def _rule_from_form(form: Any) -> dict:
+    return validate_rule({
+        "name": str(form.get("name", "")), "enabled": form.get("enabled") == "on", "mode": str(form.get("mode", "monitor")),
+        "priority": form.get("priority", 100), "stop_on_match": form.get("stop_on_match") == "on",
+        "trigger_type": str(form.get("trigger_type", "")),
+        "trigger_config": _json_object(form.get("trigger_config"), {}),
+        "conditions": _json_object(form.get("conditions"), {}),
+        "exemptions": _json_object(form.get("exemptions"), {}),
+        "actions": _json_object(form.get("actions"), []),
+    })
+
+
+@app.post("/servers/{guild_id}/automod/rules")
+async def save_automod_rule(request: Request, guild_id: int):
+    target = f"/servers/{guild_id}/modules/automod"
+    form = await request.form()
+    if not _csrf_ok(request, form.get("csrf_token")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    await authorized(request, guild_id, live=True)
+    channels, roles, bot_permissions = await api.guild_resources(guild_id, use_cache=False)
+    try:
+        rule = _rule_from_form(form)
+        _rule_resource_permissions(rule, {int(item["id"]) for item in channels},
+            {int(item["id"]) for item in channels if int(item["type"]) == 0},
+            {int(item["id"]) for item in roles}, bot_permissions)
+        rule_id = int(form["rule_id"]) if form.get("rule_id") else None
+        storage.save_automod_rule(guild_id, rule, rule_id)
+    except (KeyError, TypeError, ValueError, PermissionError, json.JSONDecodeError):
+        return RedirectResponse(f"{target}?error=invalid-rule", status_code=303)
+    return RedirectResponse(f"{target}?saved=rule", status_code=303)
+
+
+@app.post("/servers/{guild_id}/automod/rules/{rule_id}/duplicate")
+async def duplicate_automod_rule(request: Request, guild_id: int, rule_id: int):
+    form = await request.form()
+    target = f"/servers/{guild_id}/modules/automod"
+    if not _csrf_ok(request, form.get("csrf_token")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    await authorized(request, guild_id, live=True)
+    rule = storage.automod_rule(guild_id, rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="ルールが見つかりません")
+    rule["name"] = f"{rule['name']} のコピー"[:100]
+    storage.save_automod_rule(guild_id, validate_rule(rule))
+    return RedirectResponse(f"{target}?saved=rule", status_code=303)
+
+
+@app.post("/servers/{guild_id}/automod/rules/{rule_id}/delete")
+async def delete_automod_rule(request: Request, guild_id: int, rule_id: int):
+    form = await request.form()
+    target = f"/servers/{guild_id}/modules/automod"
+    if not _csrf_ok(request, form.get("csrf_token")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    await authorized(request, guild_id, live=True)
+    if not storage.delete_automod_rule(guild_id, rule_id):
+        raise HTTPException(status_code=404, detail="ルールが見つかりません")
+    return RedirectResponse(f"{target}?saved=deleted", status_code=303)
+
+
+@app.post("/servers/{guild_id}/automod/preview")
+async def preview_automod_rule(request: Request, guild_id: int):
+    form = await request.form()
+    target = f"/servers/{guild_id}/modules/automod"
+    if not _csrf_ok(request, form.get("csrf_token")):
+        return RedirectResponse(f"{target}?error=csrf", status_code=303)
+    await authorized(request, guild_id)
+    try:
+        rule = _rule_from_form(form)
+        engine = AutoModEngine()
+        context = MessageContext(guild_id=guild_id, user_id=1, channel_id=int(form.get("preview_channel_id") or 1),
+            content=str(form.get("preview_content", ""))[:4000], mention_count=max(0, min(int(form.get("preview_mentions", 0)), 100)),
+            attachment_count=max(0, min(int(form.get("preview_attachments", 0)), 20)))
+        matches = []
+        repeats = int(rule.get("trigger_config", {}).get("limit", 1)) if rule["trigger_type"] in {"message_rate", "duplicate", "mention_rate", "link_rate", "attachment_rate"} else 1
+        for _ in range(repeats):
+            matches = await engine.evaluate(context, [{**rule, "id": 1}])
+        result = {"matched": bool(matches), "reason": matches[0].reason if matches else "一致しませんでした", "actions": rule["actions"]}
+    except (TypeError, ValueError, json.JSONDecodeError):
+        result = {"matched": False, "reason": "ルールまたはテスト入力が無効です", "actions": []}
+    request.session[f"automod_preview:{guild_id}"] = result
+    return RedirectResponse(target, status_code=303)
 
 
 @app.post("/servers/{guild_id}/social/subscriptions")
@@ -393,6 +946,8 @@ def optional_id(value: str) -> int | None:
 
 @app.post("/servers/{guild_id}/modules/{module_id}")
 async def save_module_settings(request: Request, guild_id: int, module_id: str):
+    if module_id in {"chat_filter", "anti_spam"}:
+        return RedirectResponse(f"/servers/{guild_id}/modules/automod", status_code=303)
     target = f"/servers/{guild_id}/modules/{module_id}"
     form = await request.form()
     csrf_token = str(form.get("csrf_token", ""))

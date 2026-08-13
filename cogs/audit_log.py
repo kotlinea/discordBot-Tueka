@@ -22,7 +22,26 @@ class AuditLogCog(commands.Cog):
         text = discord.utils.escape_markdown(str(value or "(なし)"))
         return text[: limit - 1] + "…" if len(text) > limit else text
 
-    def _channel(self, guild: discord.Guild, category: str) -> discord.TextChannel | None:
+    @staticmethod
+    def _event_key(title: str) -> str | None:
+        for token, event in (
+            ("メッセージ編集", "message_edit"), ("メッセージ削除", "message_delete"),
+            ("Timeout", "timeout"), ("Kick", "kick"), ("BAN解除", "unban"),
+            ("BAN", "ban"), ("参加", "join"), ("退会", "leave"),
+        ):
+            if token in title:
+                return event
+        if any(token in title for token in ("更新", "作成", "ロール", "チャンネル", "サーバー", "ボイス")):
+            return "admin"
+        return None
+
+    def _channel(self, guild: discord.Guild, category: str, event: str | None = None) -> discord.TextChannel | None:
+        modern = self.storage.get_module(guild.id, "moderation_logs")
+        if modern["enabled"] and event and modern["settings"].get(f"log_{event}"):
+            channel_id = modern["settings"].get("log_channel_id") or self.storage.get_module(guild.id, "moderation")["settings"].get("default_log_channel_id")
+            channel = guild.get_channel(int(channel_id)) if channel_id else None
+            if isinstance(channel, discord.TextChannel):
+                return channel
         module = self.storage.get_module(guild.id, "audit_log")
         if not module["enabled"] or not module["settings"].get(f"log_{category}"):
             return None
@@ -31,7 +50,8 @@ class AuditLogCog(commands.Cog):
         return channel if isinstance(channel, discord.TextChannel) else None
 
     async def _send(self, guild: discord.Guild, category: str, title: str, color: discord.Color, description: str | None = None, fields: list[tuple[str, Any]] | None = None) -> None:
-        channel = self._channel(guild, category)
+        event = self._event_key(title)
+        channel = self._channel(guild, category, event)
         if channel is None:
             return
         embed = discord.Embed(title=title, description=self._short(description) if description else None, color=color, timestamp=datetime.now(timezone.utc))
@@ -41,6 +61,11 @@ class AuditLogCog(commands.Cog):
             await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
         except (discord.Forbidden, discord.HTTPException):
             return
+        modern = self.storage.get_module(guild.id, "moderation_logs")
+        if event and modern["enabled"] and modern["settings"].get(f"log_{event}"):
+            family = "anti_raid" if any(token in title for token in ("参加","退会")) else "infraction"
+            self.storage.create_moderation_event(guild.id,family=family,event_type="infraction_change",source="discord_audit",
+                reason=title,channel_id=channel.id,evidence={"description":description,"fields":fields or []},mode="enforce")
 
     def _claim_action(self, guild_id: int, action: str, user_id: int) -> bool:
         now = time.monotonic()
@@ -150,7 +175,7 @@ class AuditLogCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member) -> None:
-        if self._channel(member.guild, "member") is None:
+        if all(self._channel(member.guild, "member", event) is None for event in ("ban", "kick", "leave")):
             return
         ban = await self._recent_audit(member.guild, discord.AuditLogAction.ban, member.id)
         if ban and self._claim_action(member.guild.id, "ban", member.id):
@@ -164,7 +189,7 @@ class AuditLogCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild: discord.Guild, user: discord.User) -> None:
-        if self._channel(guild, "member") is None:
+        if self._channel(guild, "member", "ban") is None:
             return
         if not self._claim_action(guild.id, "ban", user.id):
             return
@@ -173,7 +198,7 @@ class AuditLogCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_unban(self, guild: discord.Guild, user: discord.User) -> None:
-        if self._channel(guild, "member") is None:
+        if self._channel(guild, "member", "unban") is None:
             return
         entry = await self._recent_audit(guild, discord.AuditLogAction.unban, user.id)
         await self._send(guild, "member", "✅ BAN解除", discord.Color.green(), fields=[("対象", str(user)), ("実行者", getattr(getattr(entry, "user", None), "mention", "不明")), ("理由", getattr(entry, "reason", None) or "(なし)")])
