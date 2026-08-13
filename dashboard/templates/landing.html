@@ -1,1 +1,51 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="{{ bot.avatar_url }}"><link rel="stylesheet" href="/static/dashboard.css"><script defer src="/static/dashboard.js"></script><title>Tueka</title></head><body><main class="shell"><header class="topbar"><div style="display:flex;align-items:center;gap:10px"><img src="{{ bot.avatar_url }}" alt="{{ bot.name }}" width="38" height="38" decoding="async" style="width:38px;height:38px;border-radius:50%"><strong>Tueka</strong></div><a class="primary" href="{% if authenticated %}/servers{% else %}/login{% endif %}" data-i18n="{% if authenticated %}landing.servers{% else %}landing.login{% endif %}">{% if authenticated %}サーバー一覧へ{% else %}Discordでログイン{% endif %}</a></header><section class="hero"><p class="eyebrow">TUEKA DISCORD BOT</p><h1 data-i18n="landing.title">あなたのコミュニティを、もっと心地よく。</h1><p data-i18n="landing.description">入退室、レベリング、モデレーション、管理ログを一つのダッシュボードで管理できます。</p><div class="form-actions"><a class="primary" href="{% if authenticated %}/servers{% else %}/login{% endif %}" data-i18n="{% if authenticated %}landing.servers{% else %}landing.login{% endif %}">{% if authenticated %}サーバー一覧へ{% else %}Discordでログイン{% endif %}</a><a class="secondary" href="https://discord.com" data-i18n="landing.discord">Discordを開く</a></div></section></main></body></html>
+<!doctype html>
+<html lang="ja" data-appearance="precision" data-color-scheme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="description" content="Tueka — Discordサーバーの保護、運用、コミュニティ機能を一か所で管理します。">
+  <title>{{ bot.name }} — Discord operations workbench</title>
+  {% if frontend_css %}<link rel="stylesheet" href="{{ frontend_css }}">{% endif %}
+  <link rel="stylesheet" href="/static/landing-v2.css">
+</head>
+<body>
+  <header class="site-head">
+    <a class="brand" href="/" aria-label="{{ bot.name }} home"><span>T</span><strong>{{ bot.name }}</strong></a>
+    <nav aria-label="Primary">
+      <a href="#capabilities">機能</a>
+      <a href="#operations">運用設計</a>
+      <a class="head-action" href="{{ '/servers' if authenticated else '/login' }}">{{ 'ダッシュボード' if authenticated else 'Discordでログイン' }}</a>
+    </nav>
+  </header>
+  <main>
+    <section class="intro">
+      <div class="intro-copy">
+        <p class="signal">Discord operations workbench</p>
+        <h1>守る、判断する、記録する。</h1>
+        <p class="lede">AutoMod、Anti-Spam、Anti-Raid、警告、手動処置、監査ログを、サーバーごとの運用フローとして管理します。</p>
+        <div class="intro-actions"><a class="primary" href="{{ '/servers' if authenticated else '/login' }}">{{ '管理を続ける' if authenticated else 'Discordで開始' }}</a><a class="secondary" href="#capabilities">構成を確認</a></div>
+      </div>
+      <div class="operations-board" id="operations" aria-label="Moderation workflow">
+        <div class="board-head"><span>Event pipeline</span><code>LIVE</code></div>
+        <ol>
+          <li><span>01</span><div><strong>Trigger</strong><p>メッセージ、リアクション、参加・退出を検知</p></div></li>
+          <li><span>02</span><div><strong>Conditions / Exemptions</strong><p>チャンネル、ロール、ユーザー、Botを共通評価</p></div></li>
+          <li><span>03</span><div><strong>Actions</strong><p>削除、警告、Timeout、通知、Lockdownを順序実行</p></div></li>
+          <li><span>04</span><div><strong>Case / Log</strong><p>検知理由と処置結果をケースへ関連付け</p></div></li>
+        </ol>
+      </div>
+    </section>
+    <section class="capabilities" id="capabilities">
+      <header><h2>目的から設定へ到達する。</h2><p>個別機能を探し回らず、運用上の仕事ごとに設定と履歴をまとめます。</p></header>
+      <div class="capability-list">
+        <article><span>Protection</span><h3>自動検知</h3><p>キーワード、URL、スパム、Raidを型付きルールで構成します。</p></article>
+        <article><span>Response</span><h3>モデレーション処置</h3><p>手動処置と自動Actionが同じ権限確認、ケース、ログを使用します。</p></article>
+        <article><span>Evidence</span><h3>履歴と監査</h3><p>検知、Warning、Timeout、Ban、管理操作を時系列で追跡します。</p></article>
+        <article><span>Community</span><h3>サーバー運営</h3><p>歓迎、ロール、レベル、チケット、通知を同じ管理画面で扱います。</p></article>
+      </div>
+    </section>
+    <section class="closing"><div><h2>サーバーの状態から始める。</h2><p>ログイン後、管理可能なDiscordサーバーだけを表示します。</p></div><a class="primary" href="{{ '/servers' if authenticated else '/login' }}">{{ 'ダッシュボードを開く' if authenticated else 'Discordでログイン' }}</a></section>
+  </main>
+  <footer><strong>{{ bot.name }}</strong><span>Discord administration, made explicit.</span></footer>
+</body>
+</html>

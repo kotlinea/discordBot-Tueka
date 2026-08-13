@@ -63,6 +63,15 @@ class GuildStorage:
                     access_token TEXT NOT NULL,
                     expires_at INTEGER NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS dashboard_preferences (
+                    user_id INTEGER PRIMARY KEY,
+                    locale TEXT NOT NULL DEFAULT 'ja' CHECK(locale IN ('ja','en')),
+                    appearance TEXT NOT NULL DEFAULT 'precision' CHECK(appearance IN ('precision','community','atmosphere')),
+                    color_scheme TEXT NOT NULL DEFAULT 'system' CHECK(color_scheme IN ('system','light','dark')),
+                    navigation_collapsed INTEGER NOT NULL DEFAULT 0 CHECK(navigation_collapsed IN (0,1)),
+                    revision INTEGER NOT NULL DEFAULT 1,
+                    updated_at INTEGER NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS oauth_states (
                     state TEXT PRIMARY KEY,
                     expires_at INTEGER NOT NULL
@@ -292,6 +301,9 @@ class GuildStorage:
             for name in ("moderation_rule_id", "moderation_event_id"):
                 if name not in point_columns:
                     connection.execute(f"ALTER TABLE moderation_points ADD COLUMN {name} INTEGER")
+            module_columns = {row["name"] for row in connection.execute("PRAGMA table_info(guild_modules)").fetchall()}
+            if "revision" not in module_columns:
+                connection.execute("ALTER TABLE guild_modules ADD COLUMN revision INTEGER NOT NULL DEFAULT 1")
 
     def get_settings(self, guild_id: int) -> dict[str, int | None]:
         with self._connection() as connection:
@@ -318,7 +330,7 @@ class GuildStorage:
 
     def get_module(self, guild_id: int, module_id: str) -> dict[str, Any]:
         with self._connection() as connection:
-            row = connection.execute("SELECT enabled, settings_json FROM guild_modules WHERE guild_id = ? AND module_id = ?", (guild_id, module_id)).fetchone()
+            row = connection.execute("SELECT enabled, settings_json, revision FROM guild_modules WHERE guild_id = ? AND module_id = ?", (guild_id, module_id)).fetchone()
         if row:
             settings = json.loads(row["settings_json"])
             if module_id == "welcome":
@@ -333,10 +345,10 @@ class GuildStorage:
                 settings = self._moderation_settings(settings)
             elif module_id in {"anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"}:
                 settings = self._moderation_submodule_settings(module_id, settings)
-            return {"enabled": bool(row["enabled"]), "settings": settings}
+            return {"enabled": bool(row["enabled"]), "settings": settings, "revision": int(row["revision"])}
         legacy = self.get_settings(guild_id)
         defaults = {"welcome": self._welcome_settings({"welcome_channel_id": legacy["welcome_channel_id"]}), "leveling": self._leveling_settings({}, legacy), "autorole": {"default_role_id": legacy["default_role_id"]}, "audit_log": self._audit_log_settings({"management_channel_id": legacy["management_channel_id"]}), "automod": self._automod_settings({}), "moderation": self._moderation_settings({})}.get(module_id, self._moderation_submodule_settings(module_id, {}) if module_id in {"anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"} else {})
-        return {"enabled": False, "settings": defaults}
+        return {"enabled": False, "settings": defaults, "revision": 0}
 
     @staticmethod
     def _welcome_settings(settings: dict[str, Any]) -> dict[str, Any]:
@@ -442,12 +454,18 @@ class GuildStorage:
             defaults[key] = list(dict.fromkeys(int(value) for value in defaults.get(key, []) if str(value).isdigit()))[:100]
         return defaults
 
-    def set_module(self, guild_id: int, module_id: str, *, enabled: bool, settings: dict[str, Any] | None = None) -> None:
+    def set_module(self, guild_id: int, module_id: str, *, enabled: bool, settings: dict[str, Any] | None = None,
+                   expected_revision: int | None = None) -> dict[str, Any]:
         current = self.get_module(guild_id, module_id)
+        if expected_revision is not None and current["revision"] != expected_revision:
+            raise RuntimeError("revision_conflict")
         values = current["settings"] if settings is None else settings
         with self._connection() as connection:
-            connection.execute("""INSERT INTO guild_modules (guild_id, module_id, enabled, settings_json) VALUES (?, ?, ?, ?)
-                ON CONFLICT(guild_id, module_id) DO UPDATE SET enabled = excluded.enabled, settings_json = excluded.settings_json""", (guild_id, module_id, int(enabled), json.dumps(values)))
+            connection.execute("""INSERT INTO guild_modules (guild_id, module_id, enabled, settings_json, revision) VALUES (?, ?, ?, ?, 1)
+                ON CONFLICT(guild_id, module_id) DO UPDATE SET enabled = excluded.enabled,
+                settings_json = excluded.settings_json, revision = guild_modules.revision + 1""",
+                (guild_id, module_id, int(enabled), json.dumps(values)))
+        return self.get_module(guild_id, module_id)
 
     def module_enabled(self, guild_id: int, module_id: str) -> bool:
         return self.get_module(guild_id, module_id)["enabled"]
@@ -1198,6 +1216,36 @@ class GuildStorage:
     def delete_dashboard_session(self, session_id: str) -> None:
         with self._connection() as connection:
             connection.execute("DELETE FROM dashboard_sessions WHERE session_id = ?", (session_id,))
+
+    def dashboard_preferences(self, user_id: int) -> dict[str, Any]:
+        with self._connection() as connection:
+            row = connection.execute("SELECT * FROM dashboard_preferences WHERE user_id=?", (user_id,)).fetchone()
+        if not row:
+            return {"locale": "ja", "appearance": "precision", "color_scheme": "system",
+                    "navigation_collapsed": False, "revision": 0}
+        value = dict(row)
+        value.pop("user_id", None)
+        value.pop("updated_at", None)
+        value["navigation_collapsed"] = bool(value["navigation_collapsed"])
+        return value
+
+    def set_dashboard_preferences(self, user_id: int, *, locale: str, appearance: str, color_scheme: str,
+                                  navigation_collapsed: bool, expected_revision: int | None = None) -> dict[str, Any]:
+        if locale not in {"ja", "en"} or appearance not in {"precision", "community", "atmosphere"} \
+                or color_scheme not in {"system", "light", "dark"}:
+            raise ValueError("invalid_preferences")
+        current = self.dashboard_preferences(user_id)
+        if expected_revision is not None and current["revision"] != expected_revision:
+            raise RuntimeError("revision_conflict")
+        with self._connection() as connection:
+            connection.execute("""INSERT INTO dashboard_preferences
+                (user_id,locale,appearance,color_scheme,navigation_collapsed,revision,updated_at)
+                VALUES(?,?,?,?,?,1,?) ON CONFLICT(user_id) DO UPDATE SET locale=excluded.locale,
+                appearance=excluded.appearance,color_scheme=excluded.color_scheme,
+                navigation_collapsed=excluded.navigation_collapsed,revision=dashboard_preferences.revision+1,
+                updated_at=excluded.updated_at""",
+                (user_id, locale, appearance, color_scheme, int(navigation_collapsed), int(time.time())))
+        return self.dashboard_preferences(user_id)
 
     def create_oauth_state(self, state: str, expires_in: int = 600) -> None:
         now = int(time.time())

@@ -13,7 +13,7 @@ from asyncio import gather
 import httpx
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -26,6 +26,7 @@ from feature_registry import FEATURES, get_feature, japanese_copy
 from storage import GuildStorage
 from social_crypto import SocialTokenCipher
 from automod import ACTION_TYPES, TRIGGER_TYPES, AutoModEngine, MessageContext, default_rule, validate_rule
+from dashboard.api_v1 import create_api_router
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -54,14 +55,53 @@ async def dashboard_lifespan(_: FastAPI):
 app = FastAPI(title="Tueka Dashboard", lifespan=dashboard_lifespan)
 app.add_middleware(SessionMiddleware, secret_key=session_secret, https_only=os.getenv("DASHBOARD_HTTPS_ONLY", "true").lower() == "true", same_site="lax")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
+app.mount("/ui", StaticFiles(directory=FRONTEND_DIST, check_dir=False), name="dashboard-v2")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+app.include_router(create_api_router(storage, api))
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_response(request: Request, exc: HTTPException):
+    if request.url.path.startswith("/api/v1"):
+        detail = exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "status": exc.status_code,
+                "code": str(detail.get("code", "request_failed")),
+                "detail": str(detail.get("message", "リクエストを処理できませんでした。")),
+                "errors": detail.get("errors", []),
+            },
+            headers=exc.headers,
+        )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers)
+
+
+@app.get("/tokens.css", include_in_schema=False)
+async def design_tokens():
+    return FileResponse(BASE_DIR.parent / "tokens.css", media_type="text/css")
+
+
+def dashboard_v2_enabled(path: str) -> bool:
+    if os.getenv("DASHBOARD_UI_V2", "false").lower() != "true" or not path.startswith("/servers"):
+        return False
+    allowlist = {value.strip() for value in os.getenv("DASHBOARD_UI_V2_GUILDS", "").split(",") if value.strip()}
+    parts = path.strip("/").split("/")
+    return not allowlist or len(parts) == 1 or (len(parts) > 1 and parts[1] in allowlist)
 
 
 @app.middleware("http")
 async def server_timing(request: Request, call_next):
     started, token = time.perf_counter(), begin_timing()
     try:
-        response = await call_next(request)
+        if request.method == "GET" and dashboard_v2_enabled(request.url.path) and (FRONTEND_DIST / "index.html").exists():
+            # Authentication remains authoritative in /api/v1/session.  This
+            # middleware intentionally does not read request.session because
+            # SessionMiddleware may be inside the timing middleware stack.
+            response = FileResponse(FRONTEND_DIST / "index.html")
+        else:
+            response = await call_next(request)
     finally:
         metrics = end_timing(token)
     total = (time.perf_counter() - started) * 1000
@@ -103,6 +143,17 @@ def avatar_url(user: dict) -> str:
 def guild_icon_url(guild: dict) -> str | None:
     icon = guild.get("icon")
     return f"https://cdn.discordapp.com/icons/{guild['id']}/{icon}.png?size=128" if icon else None
+
+
+def frontend_css_url() -> str | None:
+    manifest_path = FRONTEND_DIST / ".vite" / "manifest.json"
+    if not manifest_path.exists():
+        return None
+    try:
+        css = json.loads(manifest_path.read_text(encoding="utf-8")).get("index.html", {}).get("css", [])
+        return f"/ui/{css[0]}" if css else None
+    except (OSError, ValueError):
+        return None
 
 
 def social_provider_available(provider: str) -> bool:
@@ -150,7 +201,7 @@ async def page_identity(token: str) -> dict:
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     bot_user = await api.bot_user()
-    return render_page(request, "landing.html", {"bot": {"name": bot_user["username"], "avatar_url": avatar_url(bot_user)}, "authenticated": bool(session_token_or_none(request))})
+    return render_page(request, "landing.html", {"bot": {"name": bot_user["username"], "avatar_url": avatar_url(bot_user)}, "authenticated": bool(session_token_or_none(request)), "frontend_css": frontend_css_url()})
 
 
 def session_token_or_none(request: Request) -> str | None:
@@ -199,7 +250,7 @@ async def not_found(request: Request, exc):
         bot = {"name": bot_user["username"], "avatar_url": avatar_url(bot_user)}
     except Exception:
         bot = {"name": "Tueka", "avatar_url": "https://cdn.discordapp.com/embed/avatars/0.png"}
-    return render_page(request, "404.html", {"bot": bot}, status_code=404)
+    return render_page(request, "404.html", {"bot": bot, "frontend_css": frontend_css_url()}, status_code=404)
 
 
 @app.get("/servers", response_class=HTMLResponse)

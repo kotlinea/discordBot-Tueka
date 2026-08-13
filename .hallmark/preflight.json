@@ -1,0 +1,9 @@
+{
+  "date": "2026-08-14",
+  "framework": "FastAPI + Jinja + vanilla CSS/JS; React/Vite migration requested",
+  "font_stack": "Inter declared but not loaded",
+  "palette": "raw hex variables with undefined moderation aliases",
+  "motion": "motion-cut",
+  "spacing": "no shared scale"
+}
+

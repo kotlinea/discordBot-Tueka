@@ -2,6 +2,13 @@
 .venv/
 __pycache__/
 *.py[cod]
+dashboard/frontend/node_modules/
+dashboard/frontend/dist/
+dashboard/frontend/test-results/
+dashboard/frontend/playwright-report/
+dashboard/frontend/*.tsbuildinfo
+dashboard/frontend/vite.config.js
+dashboard/frontend/vite.config.d.ts
 data/
 welcome.png
 rank.png
