@@ -45,8 +45,14 @@ def create_api_router(storage: Any, discord: Any) -> APIRouter:
     async def session(request: Request) -> dict[str, Any]:
         access = token(request)
         user = await discord.current_user(access)
+        avatar_hash = user.get("avatar")
+        avatar_url = (
+            f"https://cdn.discordapp.com/avatars/{user['id']}/{avatar_hash}.webp?size=128"
+            if avatar_hash else
+            f"https://cdn.discordapp.com/embed/avatars/{(int(user['id']) >> 22) % 6}.png"
+        )
         return {
-            "user": {"id": str(user["id"]), "name": user.get("global_name") or user["username"], "avatar": user.get("avatar")},
+            "user": {"id": str(user["id"]), "name": user.get("global_name") or user["username"], "avatar_url": avatar_url},
             "csrf_token": request.session.get("csrf_token", ""),
             "preferences": storage.dashboard_preferences(int(user["id"])),
         }
