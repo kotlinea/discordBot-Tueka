@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from storage import GuildStorage
+from template_defaults import TEMPLATE_DEFAULTS
 
 
 class GuildStorageTests(unittest.TestCase):
@@ -65,6 +66,20 @@ class GuildStorageTests(unittest.TestCase):
 
     def test_new_modules_start_disabled(self):
         self.assertFalse(self.storage.get_module(1, "moderation")["enabled"])
+
+    def test_template_fields_have_defaults_and_blank_values_are_normalized(self):
+        welcome = self.storage.get_module(1, "welcome")["settings"]
+        self.assertEqual(welcome["welcome_content"], TEMPLATE_DEFAULTS["welcome_content"])
+        self.assertEqual(welcome["leave_content"], TEMPLATE_DEFAULTS["leave_content"])
+        self.assertEqual(self.storage.get_module(1, "live_stats")["settings"]["stats_template"], TEMPLATE_DEFAULTS["stats_template"])
+        self.assertEqual(self.storage.get_module(1, "temporary_voice")["settings"]["temp_voice_name"], TEMPLATE_DEFAULTS["temp_voice_name"])
+
+        self.storage.set_module(1, "welcome", enabled=False, settings={"welcome_content": " ", "leave_content": ""})
+        self.storage.set_module(1, "live_stats", enabled=False, settings={"stats_template": ""})
+        self.storage.set_module(1, "temporary_voice", enabled=False, settings={"temp_voice_name": ""})
+        self.assertEqual(self.storage.get_module(1, "welcome")["settings"]["welcome_content"], TEMPLATE_DEFAULTS["welcome_content"])
+        self.assertEqual(self.storage.get_module(1, "live_stats")["settings"]["stats_template"], TEMPLATE_DEFAULTS["stats_template"])
+        self.assertEqual(self.storage.get_module(1, "temporary_voice")["settings"]["temp_voice_name"], TEMPLATE_DEFAULTS["temp_voice_name"])
 
     def test_legacy_role_setting_maps_to_autorole(self):
         self.storage.update_settings(1, default_role_id=20)

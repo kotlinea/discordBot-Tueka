@@ -8,6 +8,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from storage import GuildStorage
+from template_defaults import STATS_TEMPLATE_DEFAULT, TEMP_VOICE_NAME_DEFAULT
 
 
 LOGGER = logging.getLogger(__name__)
@@ -36,11 +37,11 @@ class CommunityCog(commands.Cog):
             return
         members = guild.member_count or len(guild.members)
         bots = sum(member.bot for member in guild.members)
-        template = str(settings.get("stats_template") or "Members: {members} | Bots: {bots} | Roles: {roles}")[:90]
+        template = str(settings.get("stats_template") or STATS_TEMPLATE_DEFAULT)[:90]
         try:
             name = template.format(members=members, bots=bots, humans=members - bots, roles=len(guild.roles))
         except (KeyError, ValueError):
-            name = f"Members: {members} | Bots: {bots}"
+            name = STATS_TEMPLATE_DEFAULT.format(members=members, bots=bots, humans=members - bots, roles=len(guild.roles))
         if channel.name != name:
             try:
                 await channel.edit(name=name[:100], reason="Live statistics update")
@@ -94,7 +95,7 @@ class CommunityCog(commands.Cog):
         category = guild.get_channel(int(category_id)) if category_id else None
         if category is not None and not isinstance(category, discord.CategoryChannel):
             category = None
-        name = str(settings.get("temp_voice_name") or "{member}'s room").replace("{member}", member.display_name)[:100]
+        name = str(settings.get("temp_voice_name") or TEMP_VOICE_NAME_DEFAULT).replace("{member}", member.display_name)[:100]
         try:
             channel = await guild.create_voice_channel(name=name, category=category, reason="Temporary voice channel")
             self.storage.add_temporary_voice_channel(channel.id, guild.id, member.id)

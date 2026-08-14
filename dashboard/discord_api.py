@@ -112,7 +112,9 @@ class DiscordAPI:
             return cached
         user_guilds, bot_guilds = await asyncio.gather(self.user_guilds(access_token), self.bot_guild_ids(use_cache=use_cache))
         value = [guild for guild in user_guilds if int(guild["id"]) in bot_guilds and int(guild.get("permissions", "0")) & ADMINISTRATOR]
-        return self._cache_for("manageable", access_token, value, 30) if use_cache else value
+        # A live write authorization still refreshes the cache for the immediate
+        # GET that follows it. Live writes never read this cache.
+        return self._cache_for("manageable", access_token, value, 30)
 
     async def can_manage(self, access_token: str, guild_id: int, *, use_cache: bool = True) -> bool:
         return any(int(guild["id"]) == guild_id for guild in await self.manageable_guilds(access_token, use_cache=use_cache))

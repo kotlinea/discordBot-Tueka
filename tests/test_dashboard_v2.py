@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from dashboard.api_v1 import _normalize_resource_ids, _serialize_resource_ids, _serialize_rule_resource_ids
 from storage import GuildStorage
 
 
@@ -35,7 +36,18 @@ class DashboardV2StorageTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "revision_conflict"):
             self.storage.set_module(1, "welcome", enabled=False, expected_revision=0)
 
+    def test_discord_snowflakes_round_trip_as_json_safe_strings(self):
+        trigger_id = "123456789012345678"
+        role_ids = ["123456789012345679", "123456789012345680"]
+        normalized = _normalize_resource_ids({"temp_voice_trigger_id": trigger_id, "reaction_role_ids": role_ids})
+        self.assertEqual(normalized["temp_voice_trigger_id"], int(trigger_id))
+        self.assertEqual(normalized["reaction_role_ids"], [int(item) for item in role_ids])
+        self.assertEqual(_serialize_resource_ids(normalized), {"temp_voice_trigger_id": trigger_id, "reaction_role_ids": role_ids})
+        rule = _serialize_rule_resource_ids({"conditions": {"channel_ids": [int(trigger_id)]}, "exemptions": {"role_ids": [int(role_ids[0])]}, "trigger_config": {}, "actions": [{"type": "notify", "channel_id": int(trigger_id)}]})
+        self.assertEqual(rule["conditions"]["channel_ids"], [trigger_id])
+        self.assertEqual(rule["exemptions"]["role_ids"], [role_ids[0]])
+        self.assertEqual(rule["actions"][0]["channel_id"], trigger_id)
+
 
 if __name__ == "__main__":
     unittest.main()
-

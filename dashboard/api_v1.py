@@ -20,6 +20,52 @@ MODERATION_SECTIONS = ("automod", "anti_spam", "anti_raid", "infractions", "mode
 ALLOWED_ACTIONS = {"warn", "timeout", "untimeout", "kick", "ban", "unban", "softban", "purge", "lock", "unlock", "lockdown", "unlockdown"}
 
 
+def _resource_kind(key: str) -> tuple[str, bool] | None:
+    if key == "temp_voice_trigger_id" or key.endswith(("channel_id", "category_id")):
+        return ("channel", False)
+    if key.endswith(("channel_ids", "category_ids")):
+        return ("channel", True)
+    if key.endswith("role_id"):
+        return ("role", False)
+    if key.endswith("role_ids"):
+        return ("role", True)
+    return None
+
+
+def _serialize_resource_ids(settings: dict[str, Any]) -> dict[str, Any]:
+    serialized = dict(settings)
+    for key, value in settings.items():
+        kind = _resource_kind(key)
+        if kind is None:
+            continue
+        if kind[1]:
+            serialized[key] = [str(item) for item in value] if value else []
+        else:
+            serialized[key] = str(value) if value not in (None, "") else None
+    return serialized
+
+
+def _normalize_resource_ids(settings: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(settings)
+    for key, value in settings.items():
+        kind = _resource_kind(key)
+        if kind is None:
+            continue
+        if kind[1]:
+            normalized[key] = [int(item) for item in value] if value else []
+        else:
+            normalized[key] = int(value) if value not in (None, "") else None
+    return normalized
+
+
+def _serialize_rule_resource_ids(rule: dict[str, Any]) -> dict[str, Any]:
+    serialized = dict(rule)
+    for section in ("trigger_config", "conditions", "exemptions"):
+        serialized[section] = _serialize_resource_ids(dict(rule.get(section) or {}))
+    serialized["actions"] = [_serialize_resource_ids(dict(action)) for action in rule.get("actions", [])]
+    return serialized
+
+
 def create_api_router(storage: Any, discord: Any) -> APIRouter:
     router = APIRouter(prefix="/api/v1")
 
@@ -91,7 +137,7 @@ def create_api_router(storage: Any, discord: Any) -> APIRouter:
             "id": feature.id, "category": feature.category, "parent": feature.parent,
             "title": title, "description": description, "fields": list(feature.fields),
             "required_fields": list(feature.required_fields), "required_bot_permissions": list(feature.required_bot_permissions),
-            "enabled": module["enabled"], "settings": module["settings"], "revision": module["revision"],
+            "enabled": module["enabled"], "settings": _serialize_resource_ids(module["settings"]), "revision": module["revision"],
             "missing_permissions": missing,
         }
 
@@ -129,13 +175,12 @@ def create_api_router(storage: Any, discord: Any) -> APIRouter:
         for key, value in settings.items():
             if value in (None, "", []):
                 continue
-            if key.endswith("channel_id") and int(value) not in channels:
-                raise ValueError(key)
-            if key.endswith("channel_ids") and any(int(item) not in channels for item in value):
-                raise ValueError(key)
-            if key.endswith("role_id") and int(value) not in roles:
-                raise ValueError(key)
-            if key.endswith("role_ids") and any(int(item) not in roles for item in value):
+            kind = _resource_kind(key)
+            if kind is None:
+                continue
+            resource_ids, multiple = (channels if kind[0] == "channel" else roles), kind[1]
+            values = value if multiple else [value]
+            if not isinstance(values, list) or any(int(item) not in resource_ids for item in values):
                 raise ValueError(key)
 
     @router.put("/guilds/{guild_id}/modules/{module_id}")
@@ -150,8 +195,9 @@ def create_api_router(storage: Any, discord: Any) -> APIRouter:
             if not isinstance(values, dict):
                 raise ValueError("settings")
             validate_resource_ids(values, {int(item["id"]) for item in channels}, {int(item["id"]) for item in roles})
-            return storage.set_module(guild_id, module_id, enabled=bool(body.get("enabled")), settings=values,
-                                      expected_revision=int(body["revision"]) if body.get("revision") is not None else None)
+            saved = storage.set_module(guild_id, module_id, enabled=bool(body.get("enabled")), settings=_normalize_resource_ids(values),
+                                       expected_revision=int(body["revision"]) if body.get("revision") is not None else None)
+            return {**saved, "settings": _serialize_resource_ids(saved["settings"])}
         except RuntimeError as exc:
             raise HTTPException(409, detail={"code": "revision_conflict", "message": "別の管理者が設定を更新しました。再読み込みしてください。"}) from exc
         except (TypeError, ValueError) as exc:
@@ -162,7 +208,7 @@ def create_api_router(storage: Any, discord: Any) -> APIRouter:
         if family not in FAMILY_TRIGGERS:
             raise HTTPException(404, detail={"code": "family_not_found", "message": "ルール種別が見つかりません。"})
         await manage(request, guild_id)
-        return {"items": storage.moderation_rules(guild_id, family=family), "trigger_types": FAMILY_TRIGGERS[family]}
+        return {"items": [_serialize_rule_resource_ids(item) for item in storage.moderation_rules(guild_id, family=family)], "trigger_types": FAMILY_TRIGGERS[family]}
 
     @router.get("/guilds/{guild_id}/moderation/{family}/rules/{rule_id}")
     async def rule(request: Request, guild_id: int, family: str, rule_id: int) -> dict[str, Any]:
@@ -170,7 +216,7 @@ def create_api_router(storage: Any, discord: Any) -> APIRouter:
         value = storage.moderation_rule(guild_id, rule_id)
         if not value or value["family"] != family:
             raise HTTPException(404, detail={"code": "rule_not_found", "message": "ルールが見つかりません。"})
-        return value
+        return _serialize_rule_resource_ids(value)
 
     def normalized_rule(body: dict[str, Any], family: str) -> dict[str, Any]:
         trigger = str(body.get("trigger_type", ""))
@@ -194,7 +240,7 @@ def create_api_router(storage: Any, discord: Any) -> APIRouter:
         csrf(request)
         await manage(request, guild_id, live=True)
         try:
-            return storage.save_moderation_rule(guild_id, normalized_rule(await request.json(), family))
+            return _serialize_rule_resource_ids(storage.save_moderation_rule(guild_id, normalized_rule(await request.json(), family)))
         except (TypeError, ValueError) as exc:
             raise HTTPException(422, detail={"code": "rule_invalid", "message": str(exc) or "ルールを確認してください。"}) from exc
 
@@ -208,7 +254,7 @@ def create_api_router(storage: Any, discord: Any) -> APIRouter:
         if body.get("revision") is not None and int(body["revision"]) != int(current["revision"]):
             raise HTTPException(409, detail={"code": "revision_conflict", "message": "別の管理者がルールを更新しました。再読み込みしてください。"})
         try:
-            return storage.save_moderation_rule(guild_id, normalized_rule(body, family), rule_id)
+            return _serialize_rule_resource_ids(storage.save_moderation_rule(guild_id, normalized_rule(body, family), rule_id))
         except (TypeError, ValueError) as exc:
             raise HTTPException(422, detail={"code": "rule_invalid", "message": str(exc) or "ルールを確認してください。"}) from exc
 
@@ -232,7 +278,7 @@ def create_api_router(storage: Any, discord: Any) -> APIRouter:
             raise HTTPException(404, detail={"code": "rule_not_found", "message": "ルールが見つかりません。"})
         copy = {key: value for key, value in current.items() if key not in {"id", "guild_id", "revision", "created_at", "updated_at", "legacy_rule_id"}}
         copy.update({"name": f"{current['name']} (コピー)"[:100], "enabled": False})
-        return storage.save_moderation_rule(guild_id, validate_rule(copy))
+        return _serialize_rule_resource_ids(storage.save_moderation_rule(guild_id, validate_rule(copy)))
 
     @router.post("/guilds/{guild_id}/moderation/{family}/preview")
     async def preview(request: Request, guild_id: int, family: str) -> dict[str, Any]:

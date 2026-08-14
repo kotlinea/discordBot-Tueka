@@ -6,6 +6,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from template_defaults import TEMPLATE_DEFAULTS
+
 
 class GuildStorage:
     def __init__(self, database_path: Path) -> None:
@@ -335,6 +337,8 @@ class GuildStorage:
             settings = json.loads(row["settings_json"])
             if module_id == "welcome":
                 settings = self._welcome_settings(settings)
+            elif module_id in {"live_stats", "temporary_voice"}:
+                settings = self._template_module_settings(module_id, settings)
             elif module_id == "audit_log":
                 settings = self._audit_log_settings(settings, preserve_legacy_message=True)
             elif module_id == "leveling":
@@ -347,7 +351,7 @@ class GuildStorage:
                 settings = self._moderation_submodule_settings(module_id, settings)
             return {"enabled": bool(row["enabled"]), "settings": settings, "revision": int(row["revision"])}
         legacy = self.get_settings(guild_id)
-        defaults = {"welcome": self._welcome_settings({"welcome_channel_id": legacy["welcome_channel_id"]}), "leveling": self._leveling_settings({}, legacy), "autorole": {"default_role_id": legacy["default_role_id"]}, "audit_log": self._audit_log_settings({"management_channel_id": legacy["management_channel_id"]}), "automod": self._automod_settings({}), "moderation": self._moderation_settings({})}.get(module_id, self._moderation_submodule_settings(module_id, {}) if module_id in {"anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"} else {})
+        defaults = {"welcome": self._welcome_settings({"welcome_channel_id": legacy["welcome_channel_id"]}), "leveling": self._leveling_settings({}, legacy), "autorole": {"default_role_id": legacy["default_role_id"]}, "audit_log": self._audit_log_settings({"management_channel_id": legacy["management_channel_id"]}), "automod": self._automod_settings({}), "moderation": self._moderation_settings({}), "live_stats": self._template_module_settings("live_stats", {}), "temporary_voice": self._template_module_settings("temporary_voice", {})}.get(module_id, self._moderation_submodule_settings(module_id, {}) if module_id in {"anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"} else {})
         return {"enabled": False, "settings": defaults, "revision": 0}
 
     @staticmethod
@@ -357,19 +361,34 @@ class GuildStorage:
             "welcome_enabled": False,
             "welcome_channel_id": None,
             "welcome_format": "text",
-            "welcome_content": "",
+            "welcome_content": TEMPLATE_DEFAULTS["welcome_content"],
             "leave_enabled": False,
             "leave_channel_id": None,
             "leave_format": "text",
-            "leave_content": "",
+            "leave_content": TEMPLATE_DEFAULTS["leave_content"],
         }
         defaults.update(settings)
+        for field in ("welcome_content", "leave_content"):
+            if not str(defaults.get(field) or "").strip():
+                defaults[field] = TEMPLATE_DEFAULTS[field]
         # Old releases only had a channel. It remains a selectable candidate;
         # no old message text means the new feature stays disabled.
         if defaults["welcome_format"] not in {"text", "embed"}:
             defaults["welcome_format"] = "text"
         if defaults["leave_format"] not in {"text", "embed"}:
             defaults["leave_format"] = "text"
+        return defaults
+
+    @staticmethod
+    def _template_module_settings(module_id: str, settings: dict[str, Any]) -> dict[str, Any]:
+        defaults = {
+            "live_stats": {"stats_channel_id": None, "stats_template": TEMPLATE_DEFAULTS["stats_template"]},
+            "temporary_voice": {"temp_voice_trigger_id": None, "temp_voice_category_id": None, "temp_voice_name": TEMPLATE_DEFAULTS["temp_voice_name"]},
+        }[module_id]
+        defaults.update(settings)
+        field = "stats_template" if module_id == "live_stats" else "temp_voice_name"
+        if not str(defaults.get(field) or "").strip():
+            defaults[field] = TEMPLATE_DEFAULTS[field]
         return defaults
 
     @staticmethod

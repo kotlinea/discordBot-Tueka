@@ -25,6 +25,7 @@ from dashboard.timing import add as add_timing, begin as begin_timing, end as en
 from feature_registry import FEATURES, get_feature, japanese_copy
 from storage import GuildStorage
 from social_crypto import SocialTokenCipher
+from template_defaults import LEAVE_CONTENT_DEFAULT, STATS_TEMPLATE_DEFAULT, TEMP_VOICE_NAME_DEFAULT, WELCOME_CONTENT_DEFAULT
 from automod import ACTION_TYPES, TRIGGER_TYPES, AutoModEngine, MessageContext, default_rule, validate_rule
 from dashboard.api_v1 import create_api_router
 
@@ -1062,11 +1063,11 @@ async def save_module_settings(request: Request, guild_id: int, module_id: str):
             "log_server": form.get("log_server") == "on",
             "welcome_enabled": form.get("welcome_enabled") == "on",
             "welcome_format": str(form.get("welcome_format", "text")),
-            "welcome_content": str(form.get("welcome_content", ""))[:4096],
+            "welcome_content": str(form.get("welcome_content") or WELCOME_CONTENT_DEFAULT)[:4096],
             "leave_enabled": form.get("leave_enabled") == "on",
             "leave_channel_id": leave,
             "leave_format": str(form.get("leave_format", "text")),
-            "leave_content": str(form.get("leave_content", ""))[:4096],
+            "leave_content": str(form.get("leave_content") or LEAVE_CONTENT_DEFAULT)[:4096],
             "escalation_enabled": form.get("escalation_enabled") == "on",
             "escalation_threshold": bounded_int("escalation_threshold", 3, 1, 100),
             "escalation_action": str(form.get("escalation_action", "timeout")),
@@ -1087,10 +1088,10 @@ async def save_module_settings(request: Request, guild_id: int, module_id: str):
             "reaction_role_title": str(form.get("reaction_role_title", ""))[:256],
             "reaction_role_description": str(form.get("reaction_role_description", ""))[:4000],
             "stats_channel_id": stats_channel,
-            "stats_template": str(form.get("stats_template", "Members: {members} | Bots: {bots} | Roles: {roles}"))[:90],
+            "stats_template": str(form.get("stats_template") or STATS_TEMPLATE_DEFAULT)[:90],
             "temp_voice_trigger_id": temp_trigger,
             "temp_voice_category_id": temp_category,
-            "temp_voice_name": str(form.get("temp_voice_name", "{member}'s room"))[:100],
+            "temp_voice_name": str(form.get("temp_voice_name") or TEMP_VOICE_NAME_DEFAULT)[:100],
             "ticket_panel_channel_id": ticket_panel_channel,
             "ticket_category_id": ticket_category,
             "ticket_staff_role_id": ticket_staff_role,

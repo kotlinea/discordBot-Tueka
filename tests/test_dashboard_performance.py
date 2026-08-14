@@ -53,6 +53,13 @@ class DashboardPerformanceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await api.can_manage("user-token", 10, use_cache=False))
         self.assertEqual(len(client.calls), 4)
 
+    async def test_live_authorization_refreshes_follow_up_get_cache(self):
+        client = FakeDiscordClient()
+        api = self.api_with(client)
+        self.assertTrue(await api.can_manage("user-token", 10, use_cache=False))
+        self.assertTrue(await api.can_manage("user-token", 10))
+        self.assertEqual(len(client.calls), 2)
+
     async def test_expired_or_invalidated_cache_is_refetched(self):
         client = FakeDiscordClient()
         api = self.api_with(client)
