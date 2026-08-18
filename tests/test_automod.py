@@ -15,6 +15,25 @@ def rule(trigger_type: str, config: dict, **values):
 
 
 class AutoModValidationTests(unittest.TestCase):
+    def test_scope_policy_prevents_conflicting_channel_and_role_lists(self):
+        raw = default_rule("keyword")
+        raw.update({"name": "scope", "trigger_config": {"keywords": ["bad"]}, "conditions": {"channel_policy": "only", "role_policy": "all_except", "channel_ids": [10], "required_role_ids": [20]}, "exemptions": {"channel_ids": [11], "role_ids": [21]}, "actions": [{"type": "log"}]})
+        validated = validate_rule(raw)
+        self.assertEqual(validated["conditions"]["channel_ids"], [10])
+        self.assertEqual(validated["conditions"]["required_role_ids"], [])
+        self.assertEqual(validated["exemptions"]["channel_ids"], [])
+        self.assertEqual(validated["exemptions"]["role_ids"], [21])
+        with self.assertRaises(ValueError):
+            validate_rule({**raw, "conditions": {"channel_policy": "only", "channel_ids": []}})
+
+    def test_configurable_actions_keep_their_options(self):
+        raw = default_rule("keyword")
+        raw.update({"name": "actions", "trigger_config": {"keywords": ["bad"]}, "actions": [{"type": "points", "points": 3, "expires_days": 7}, {"type": "tempban", "duration_minutes": 120}, {"type": "log", "message": "{rule}: {reason}"}]})
+        actions = validate_rule(raw)["actions"]
+        self.assertEqual(actions[0], {"type": "points", "points": 3, "expires_days": 7})
+        self.assertEqual(actions[1], {"type": "tempban", "duration_minutes": 120})
+        self.assertEqual(actions[2], {"type": "log", "message": "{rule}: {reason}"})
+
     def test_terminal_actions_are_mutually_exclusive(self):
         raw = default_rule("keyword")
         raw.update({"trigger_config": {"keywords": ["bad"]}, "actions": [{"type": "kick"}, {"type": "ban"}]})

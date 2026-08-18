@@ -579,6 +579,37 @@ class GuildStorage:
             row = connection.execute("SELECT * FROM moderation_rules WHERE guild_id=? AND id=?", (guild_id, rule_id)).fetchone()
         return self._moderation_rule(row) if row else None
 
+    def next_moderation_rule_priority(self, guild_id: int, family: str) -> int:
+        with self._connection() as connection:
+            row = connection.execute("SELECT COALESCE(MAX(priority),0) AS value FROM moderation_rules WHERE guild_id=? AND family=?", (guild_id, family)).fetchone()
+        return min(10000, int(row["value"]) + 10)
+
+    def reorder_moderation_rules(self, guild_id: int, family: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not items or len(items) > 200:
+            raise ValueError("Rule order must contain 1 to 200 rules")
+        ids = [int(item.get("id", 0)) for item in items]
+        if any(value <= 0 for value in ids) or len(ids) != len(set(ids)):
+            raise ValueError("Rule order contains invalid or duplicate IDs")
+        now = int(time.time())
+        with self._connection() as connection:
+            rows = connection.execute(f"SELECT id,revision FROM moderation_rules WHERE guild_id=? AND family=? AND id IN ({','.join('?' for _ in ids)})", (guild_id, family, *ids)).fetchall()
+            current = {int(row["id"]): int(row["revision"]) for row in rows}
+            if set(current) != set(ids):
+                raise ValueError("Rule order contains a rule from another server or family")
+            for position, item in enumerate(items, 1):
+                rule_id = int(item["id"])
+                if item.get("revision") is not None and int(item["revision"]) != current[rule_id]:
+                    raise RuntimeError("revision_conflict")
+                connection.execute("UPDATE moderation_rules SET priority=?,stop_on_match=?,revision=revision+1,updated_at=? WHERE guild_id=? AND family=? AND id=?",
+                    (position * 10, int(bool(item.get("stop_on_match"))), now, guild_id, family, rule_id))
+            core = connection.execute("SELECT enabled,settings_json FROM guild_modules WHERE guild_id=? AND module_id='moderation'", (guild_id,)).fetchone()
+            settings = self._moderation_settings(json.loads(core["settings_json"]) if core else {})
+            settings["rules_revision"] = int(settings.get("rules_revision", 0)) + 1
+            connection.execute("""INSERT INTO guild_modules(guild_id,module_id,enabled,settings_json) VALUES(?,'moderation',?,?)
+                ON CONFLICT(guild_id,module_id) DO UPDATE SET settings_json=excluded.settings_json""",
+                (guild_id, int(core["enabled"]) if core else 0, json.dumps(settings)))
+        return self.moderation_rules(guild_id, family=family)
+
     def save_moderation_rule(self, guild_id: int, rule: dict[str, Any], rule_id: int | None = None) -> dict[str, Any]:
         now = int(time.time())
         values = (rule["family"], rule["event_type"], str(rule["name"])[:100], int(bool(rule.get("enabled", True))),

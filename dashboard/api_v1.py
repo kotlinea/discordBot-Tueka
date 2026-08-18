@@ -240,9 +240,28 @@ def create_api_router(storage: Any, discord: Any) -> APIRouter:
         csrf(request)
         await manage(request, guild_id, live=True)
         try:
-            return _serialize_rule_resource_ids(storage.save_moderation_rule(guild_id, normalized_rule(await request.json(), family)))
+            value = normalized_rule(await request.json(), family)
+            value["priority"] = storage.next_moderation_rule_priority(guild_id, family)
+            return _serialize_rule_resource_ids(storage.save_moderation_rule(guild_id, value))
         except (TypeError, ValueError) as exc:
             raise HTTPException(422, detail={"code": "rule_invalid", "message": str(exc) or "ルールを確認してください。"}) from exc
+
+    @router.put("/guilds/{guild_id}/moderation/{family}/rules/order")
+    async def reorder_rules(request: Request, guild_id: int, family: str) -> dict[str, Any]:
+        csrf(request)
+        await manage(request, guild_id, live=True)
+        if family not in FAMILY_TRIGGERS:
+            raise HTTPException(404, detail={"code": "family_not_found", "message": "ルール種別が見つかりません。"})
+        try:
+            body = await request.json()
+            items = body.get("items")
+            if not isinstance(items, list):
+                raise ValueError("items")
+            return {"items": [_serialize_rule_resource_ids(item) for item in storage.reorder_moderation_rules(guild_id, family, items)]}
+        except RuntimeError as exc:
+            raise HTTPException(409, detail={"code": "revision_conflict", "message": "別の管理者がルール一覧を更新しました。再読み込みしてください。"}) from exc
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(422, detail={"code": "rule_order_invalid", "message": "ルールの順序を再読み込みして、もう一度保存してください。"}) from exc
 
     @router.put("/guilds/{guild_id}/moderation/{family}/rules/{rule_id}")
     async def update_rule(request: Request, guild_id: int, family: str, rule_id: int) -> dict[str, Any]:
@@ -254,7 +273,9 @@ def create_api_router(storage: Any, discord: Any) -> APIRouter:
         if body.get("revision") is not None and int(body["revision"]) != int(current["revision"]):
             raise HTTPException(409, detail={"code": "revision_conflict", "message": "別の管理者がルールを更新しました。再読み込みしてください。"})
         try:
-            return _serialize_rule_resource_ids(storage.save_moderation_rule(guild_id, normalized_rule(body, family), rule_id))
+            value = normalized_rule(body, family)
+            value["priority"] = current["priority"]
+            return _serialize_rule_resource_ids(storage.save_moderation_rule(guild_id, value, rule_id))
         except (TypeError, ValueError) as exc:
             raise HTTPException(422, detail={"code": "rule_invalid", "message": str(exc) or "ルールを確認してください。"}) from exc
 
@@ -277,7 +298,7 @@ def create_api_router(storage: Any, discord: Any) -> APIRouter:
         if not current or current["family"] != family:
             raise HTTPException(404, detail={"code": "rule_not_found", "message": "ルールが見つかりません。"})
         copy = {key: value for key, value in current.items() if key not in {"id", "guild_id", "revision", "created_at", "updated_at", "legacy_rule_id"}}
-        copy.update({"name": f"{current['name']} (コピー)"[:100], "enabled": False})
+        copy.update({"name": f"{current['name']} (コピー)"[:100], "enabled": False, "priority": storage.next_moderation_rule_priority(guild_id, family)})
         return _serialize_rule_resource_ids(storage.save_moderation_rule(guild_id, validate_rule(copy)))
 
     @router.post("/guilds/{guild_id}/moderation/{family}/preview")

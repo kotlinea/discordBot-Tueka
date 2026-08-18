@@ -165,10 +165,24 @@ def validate_rule(raw: dict[str, Any]) -> dict[str, Any]:
         config = {}
 
     conditions_raw, exemptions_raw = dict(raw.get("conditions") or {}), dict(raw.get("exemptions") or {})
+    channel_policy = str(conditions_raw.get("channel_policy") or ("only" if conditions_raw.get("channel_ids") else "all_except"))
+    role_policy = str(conditions_raw.get("role_policy") or ("only" if conditions_raw.get("required_role_ids") else "all_except"))
+    if channel_policy not in {"only", "all_except"} or role_policy not in {"only", "all_except"}:
+        raise ValueError("Invalid scope policy")
+    condition_channel_ids = _ids(conditions_raw.get("channel_ids"))
+    required_role_ids = _ids(conditions_raw.get("required_role_ids"))
+    exempt_channel_ids = _ids(exemptions_raw.get("channel_ids"))
+    exempt_role_ids = _ids(exemptions_raw.get("role_ids"))
+    if channel_policy == "only" and not condition_channel_ids:
+        raise ValueError("Whitelist channel policy requires at least one channel")
+    if role_policy == "only" and not required_role_ids:
+        raise ValueError("Whitelist role policy requires at least one role")
     conditions = {
-        "channel_ids": _ids(conditions_raw.get("channel_ids")),
+        "channel_policy": channel_policy,
+        "role_policy": role_policy,
+        "channel_ids": condition_channel_ids if channel_policy == "only" else [],
         "category_ids": _ids(conditions_raw.get("category_ids")),
-        "required_role_ids": _ids(conditions_raw.get("required_role_ids")),
+        "required_role_ids": required_role_ids if role_policy == "only" else [],
         "excluded_role_ids": _ids(conditions_raw.get("excluded_role_ids")),
         "minimum_account_age_days": _integer(conditions_raw.get("minimum_account_age_days", 0), 0, 0, 3650, "minimum_account_age_days"),
         "minimum_join_age_days": _integer(conditions_raw.get("minimum_join_age_days", 0), 0, 0, 3650, "minimum_join_age_days"),
@@ -177,7 +191,7 @@ def validate_rule(raw: dict[str, Any]) -> dict[str, Any]:
         "webhook_ids": _ids(conditions_raw.get("webhook_ids")),
         "actor_kinds": [item for item in dict.fromkeys(str(item) for item in conditions_raw.get("actor_kinds", [])) if item in {"human", "bot", "webhook"}],
     }
-    exemptions = {"channel_ids": _ids(exemptions_raw.get("channel_ids")), "category_ids": _ids(exemptions_raw.get("category_ids")), "role_ids": _ids(exemptions_raw.get("role_ids")), "user_ids": _ids(exemptions_raw.get("user_ids")), "bot_ids": _ids(exemptions_raw.get("bot_ids")), "webhook_ids": _ids(exemptions_raw.get("webhook_ids"))}
+    exemptions = {"channel_ids": exempt_channel_ids if channel_policy == "all_except" else [], "category_ids": _ids(exemptions_raw.get("category_ids")), "role_ids": exempt_role_ids if role_policy == "all_except" else [], "user_ids": _ids(exemptions_raw.get("user_ids")), "bot_ids": _ids(exemptions_raw.get("bot_ids")), "webhook_ids": _ids(exemptions_raw.get("webhook_ids"))}
     actions: list[dict[str, Any]] = []
     for raw_action in raw.get("actions", []):
         action = dict(raw_action)
@@ -202,6 +216,8 @@ def validate_rule(raw: dict[str, Any]) -> dict[str, Any]:
             normalized["message"] = str(action.get("message", "ルール違反を検知しました。"))[:500]
             if action_type == "notify" and action.get("channel_id"):
                 normalized["channel_id"] = _ids([action["channel_id"]], 1)[0]
+        elif action_type == "log":
+            normalized["message"] = str(action.get("message", "{rule}: {reason}"))[:1000]
         actions.append(normalized)
     if mode == "enforce" and not actions:
         raise ValueError("Enforced rules require at least one action")

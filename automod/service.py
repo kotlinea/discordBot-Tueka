@@ -169,8 +169,20 @@ class ModerationService:
             return {"type": "threshold", "status": "failed", "action": action_type, "error": str(exc)[:300]}
 
     @staticmethod
-    def _message_template(text: str, member: discord.Member, reason: str) -> str:
-        return text.replace("{user}", member.mention).replace("{username}", member.name).replace("{reason}", reason)[:2000]
+    def _message_template(text: str, member: discord.Member | None, reason: str, *, guild: discord.Guild | None = None,
+                          channel: discord.abc.GuildChannel | discord.Thread | None = None, rule: dict[str, Any] | None = None) -> str:
+        values = {
+            "user": member.mention if member else "不明",
+            "username": member.name if member else "不明",
+            "reason": reason,
+            "server": guild.name if guild else "不明",
+            "channel": getattr(channel, "mention", getattr(channel, "name", "不明")),
+            "rule": str((rule or {}).get("name") or "不明"),
+        }
+        rendered = text
+        for name, value in values.items():
+            rendered = rendered.replace(f"{{{name}}}", str(value))
+        return rendered[:2000]
 
     @staticmethod
     def _overwrite_value(value: bool | None) -> bool | None:
@@ -270,13 +282,13 @@ class ModerationService:
                         raise ValueError("通知チャンネルが見つかりません")
                     text = action.get("message", "ルール違反を検知しました。")
                     if member:
-                        text = self._message_template(text, member, reason)
+                        text = self._message_template(text, member, reason, guild=guild, channel=target, rule=rule)
                     await target.send(text[:2000], allowed_mentions=discord.AllowedMentions.none())
                     results.append({"type": action_type, "status": "success"})
                 elif action_type == "dm":
                     if member is None:
                         raise ValueError("対象メンバーが見つかりません")
-                    sent = await self.dm(member, self._message_template(action.get("message", "ルール違反を検知しました: {reason}"), member, reason))
+                    sent = await self.dm(member, self._message_template(action.get("message", "ルール違反を検知しました: {reason}"), member, reason, guild=guild, channel=context.channel, rule=rule))
                     results.append({"type": action_type, "status": "success" if sent else "failed"})
                 elif action_type in {"timeout", "untimeout", "kick", "ban", "tempban", "softban"}:
                     if member is None:
@@ -321,7 +333,10 @@ class ModerationService:
         if channel is None:
             return
         rendered = ", ".join(f"{item.get('type')}: {item.get('status')}" for item in results) or "記録のみ"
-        embed = discord.Embed(title=f"Moderation Event #{event_id}", description=reason[:4000],
+        log_action = next((action for action in rule.get("actions", []) if action.get("type") == "log"), None)
+        description = self._message_template(str((log_action or {}).get("message") or "{reason}"), context.member, reason,
+            guild=context.guild, channel=context.channel, rule=rule)
+        embed = discord.Embed(title=f"Moderation Event #{event_id}", description=description[:4000],
             color=discord.Color.gold() if rule.get("mode") == "monitor" else discord.Color.red())
         embed.add_field(name="機能 / ルール", value=f"{rule.get('family')} / {rule.get('name')} (`{rule.get('trigger_type')}`)", inline=False)
         if context.member:

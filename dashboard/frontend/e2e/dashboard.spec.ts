@@ -5,6 +5,7 @@ const session = { user: { id: '1', name: 'Moderator', avatar_url: 'https://cdn.d
 const feature = (id: string, category: string, parent: string | null = null) => ({ id, category, parent, title: id, description: `${id} settings`, fields: [], required_fields: [], required_bot_permissions: [], enabled: true, settings: {}, revision: 1, missing_permissions: [] })
 const welcome = { ...feature('welcome','community'), title: '入退室', fields: ['welcome_enabled','welcome_channel_id','welcome_format','welcome_content'], settings: { welcome_enabled: false, welcome_channel_id: null, welcome_format: 'text', welcome_content: '' } }
 const reactionRoles = { ...feature('reaction_roles','community'), title: 'リアクションロール', fields: ['reaction_role_channel_id','reaction_role_ids'], settings: { reaction_role_channel_id: null, reaction_role_ids: [] } }
+const rule = (id: number, name: string) => ({ id, guild_id: 1, family: 'automod', event_type: 'message_create', name, enabled: true, mode: 'enforce', priority: id * 10, stop_on_match: false, trigger_type: 'keyword', trigger_config: { keywords: ['bad'], allow_list: [], match: 'wildcard' }, conditions: { channel_policy: 'all_except', role_policy: 'all_except', channel_ids: [], required_role_ids: [] }, exemptions: { channel_ids: [], role_ids: [] }, actions: [{ type: 'delete' }, { type: 'log', message: '{rule}: {reason}' }], revision: 1 })
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/session', route => route.fulfill({ json: session }))
@@ -41,4 +42,37 @@ test('overview is responsive and accessible', async ({ page }) => {
   expect(overflow).toBe(false)
   const results = await new AxeBuilder({ page }).analyze()
   expect(results.violations.filter(item => ['critical','serious'].includes(item.impact || ''))).toEqual([])
+})
+
+test('rule scope uses one policy and action options open in a dialog', async ({ page }) => {
+  await page.route('**/api/v1/guilds/1/moderation/automod/rules', route => route.fulfill({ json: { items: [], trigger_types: ['keyword'] } }))
+  await page.goto('/servers/1/moderation/automod/rules/new')
+  await page.getByRole('button', { name: /適用範囲・例外/ }).click()
+  const channels = page.getByRole('heading', { name: 'チャンネル' }).locator('..').locator('..')
+  await channels.getByRole('button', { name: '選択したものだけ対象' }).click()
+  await expect(page.getByRole('button', { name: '次へ' })).toBeDisabled()
+  await channels.getByRole('button', { name: 'すべて選択' }).click()
+  await expect(page.getByRole('button', { name: '次へ' })).toBeEnabled()
+  await page.getByRole('button', { name: '次へ' }).click()
+  await page.getByRole('button', { name: '警告ポイント' }).click()
+  await page.getByRole('button', { name: '警告ポイントを設定' }).click()
+  await expect(page.getByLabel('加算ポイント')).toHaveValue('1')
+  await page.getByRole('button', { name: 'キャンセル' }).click()
+  await page.getByRole('button', { name: 'モデレーションログを設定' }).click()
+  await expect(page.getByRole('dialog')).toContainText('{reason}')
+})
+
+test('rule order and stop behavior are saved from the list', async ({ page }) => {
+  let saved: Record<string, any> | undefined
+  await page.route('**/api/v1/guilds/1/moderation/automod/rules**', async route => {
+    if (route.request().method() === 'PUT') { saved = route.request().postDataJSON(); await route.fulfill({ json: { items: [] } }); return }
+    await route.fulfill({ json: { items: [rule(1, 'first'), rule(2, 'second')], trigger_types: ['keyword'] } })
+  })
+  await page.goto('/servers/1/moderation/automod')
+  await page.getByRole('button', { name: 'firstを下へ' }).click()
+  await page.getByRole('switch').first().click()
+  await page.getByRole('region', { name: 'Unsaved changes' }).getByRole('button', { name: '変更を保存' }).click()
+  await expect.poll(() => saved).toBeTruthy()
+  expect(saved?.items.map((item: Record<string, unknown>) => item.id)).toEqual([2, 1])
+  expect(saved?.items[0].stop_on_match).toBe(true)
 })

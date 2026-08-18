@@ -37,6 +37,18 @@ class AutoModStorageTests(unittest.TestCase):
         self.assertTrue(self.storage.delete_automod_rule(1, saved["id"]))
         self.assertFalse(self.storage.delete_automod_rule(1, saved["id"]))
 
+    def test_rule_order_and_stop_flag_are_saved_together(self):
+        first = self.storage.save_moderation_rule(1, {**self.keyword_rule(), "name": "first"})
+        second = self.storage.save_moderation_rule(1, {**self.keyword_rule(), "name": "second"})
+        ordered = self.storage.reorder_moderation_rules(1, "automod", [
+            {"id": second["id"], "revision": second["revision"], "stop_on_match": True},
+            {"id": first["id"], "revision": first["revision"], "stop_on_match": False},
+        ])
+        self.assertEqual([item["id"] for item in ordered], [second["id"], first["id"]])
+        self.assertTrue(ordered[0]["stop_on_match"])
+        with self.assertRaises(RuntimeError):
+            self.storage.reorder_moderation_rules(1, "automod", [{"id": first["id"], "revision": first["revision"], "stop_on_match": False}])
+
     def test_points_expire_revoke_and_events_purge_evidence(self):
         event_id = self.storage.create_automod_event(1, None, 2, 3, 4, "keyword", "reason", "secret", [{"filename": "x.txt"}], "enforce", 1)
         self.assertIsNotNone(event_id)
