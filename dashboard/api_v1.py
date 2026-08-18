@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import secrets
+import time
+import importlib.util
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Request
@@ -9,6 +11,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from automod import AutoModEngine, MessageContext, default_rule, validate_rule
 from dashboard.discord_api import ADMINISTRATOR, PERMISSION_BITS
 from feature_registry import FEATURES, get_feature, japanese_copy
+from social_models import PROVIDERS, PROVIDER_EVENTS, TEMPLATE_VARIABLES, default_templates, normalize_account, render_template, validate_subscription
 
 
 FAMILY_TRIGGERS = {
@@ -66,7 +69,7 @@ def _serialize_rule_resource_ids(rule: dict[str, Any]) -> dict[str, Any]:
     return serialized
 
 
-def create_api_router(storage: Any, discord: Any) -> APIRouter:
+def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -> APIRouter:
     router = APIRouter(prefix="/api/v1")
 
     def token(request: Request) -> str:
@@ -160,6 +163,136 @@ def create_api_router(storage: Any, discord: Any) -> APIRouter:
     async def guild_resources(request: Request, guild_id: int) -> dict[str, Any]:
         channels, roles, permissions = await resources(request, guild_id)
         return {"channels": channels, "roles": roles, "bot_permissions": str(permissions)}
+
+    def provider_available(provider: str) -> bool:
+        if settings is None:
+            return True
+        return {
+            "youtube": True,
+            "twitch": bool(settings.twitch_client_id and settings.twitch_client_secret and settings.dashboard_base_url and settings.social_webhook_secret),
+            "x": bool(settings.x_bearer_token),
+            "tiktok": importlib.util.find_spec("yt_dlp") is not None,
+            "instagram": bool(settings.instagram_rss_url_template),
+        }[provider]
+
+    def social_payload(subscription: dict[str, Any]) -> dict[str, Any]:
+        target = storage.social_target(int(subscription["target_id"])) if subscription.get("target_id") else None
+        public_target = ({key: target.get(key) for key in ("id", "provider", "account_key", "external_id", "handle", "display_name", "avatar_url", "status", "last_error", "last_checked_at", "revision")} if target else None)
+        return {
+            **subscription,
+            "id": int(subscription["id"]), "guild_id": str(subscription["guild_id"]),
+            "channel_id": str(subscription["channel_id"]), "role_id": str(subscription["role_id"]) if subscription.get("role_id") else None,
+            "event_channels": {key: str(value) for key, value in subscription.get("event_channels", {}).items()},
+            "target": public_target,
+        }
+
+    @router.get("/guilds/{guild_id}/social")
+    async def social_summary(request: Request, guild_id: int) -> dict[str, Any]:
+        await manage(request, guild_id)
+        health = storage.social_worker_health()
+        subscriptions = storage.social_subscriptions(guild_id)
+        return {"providers": [{"id": provider, "available": provider_available(provider), "events": list(PROVIDER_EVENTS[provider]),
+            "count": sum(1 for item in subscriptions if item["provider"] == provider),
+            "limit": int(getattr(settings, "social_max_subscriptions_per_provider", 10))} for provider in PROVIDERS],
+            "worker": {**health, "online": bool(health and int(health["heartbeat_at"]) >= int(time.time()) - 30)} if health else {"online": False}}
+
+    @router.get("/guilds/{guild_id}/social/{provider}/subscriptions")
+    async def social_subscriptions(request: Request, guild_id: int, provider: str) -> dict[str, Any]:
+        if provider not in PROVIDERS:
+            raise HTTPException(404, detail={"code": "provider_not_found", "message": "通知サービスが見つかりません。"})
+        await manage(request, guild_id)
+        return {"items": [social_payload(item) for item in storage.social_subscriptions(guild_id, provider)],
+                "available": provider_available(provider), "events": list(PROVIDER_EVENTS[provider]),
+                "limit": int(getattr(settings, "social_max_subscriptions_per_provider", 10)),
+                "variables": list(TEMPLATE_VARIABLES), "defaults": default_templates(provider)}
+
+    async def checked_social_body(request: Request, guild_id: int, provider: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+        if provider not in PROVIDERS or not provider_available(provider):
+            raise HTTPException(409, detail={"code": "provider_unavailable", "message": "この通知サービスは運用設定が完了していません。"})
+        body = await request.json() if body is None else body
+        value = validate_subscription(provider, body)
+        channels, roles, permissions = await discord.guild_resources(guild_id, use_cache=False)
+        text_channels = {int(item["id"]) for item in channels if int(item["type"]) in {0, 5}}
+        role_ids = {int(item["id"]) for item in roles}
+        if value["channel_id"] not in text_channels or any(channel not in text_channels for channel in value["event_channels"].values()):
+            raise ValueError("channel")
+        if value["role_id"] is not None and value["role_id"] not in role_ids:
+            raise ValueError("role")
+        if not ((permissions & ADMINISTRATOR) or (permissions & PERMISSION_BITS["send_messages"])):
+            raise PermissionError("send_messages")
+        return value
+
+    @router.post("/guilds/{guild_id}/social/{provider}/subscriptions", status_code=201)
+    async def create_social_subscription(request: Request, guild_id: int, provider: str) -> dict[str, Any]:
+        csrf(request)
+        await manage(request, guild_id, live=True)
+        try:
+            value = await checked_social_body(request, guild_id, provider)
+            saved = storage.save_social_subscription_v2(guild_id, provider, max_count=int(getattr(settings, "social_max_subscriptions_per_provider", 10)), **value)
+            storage.set_module(guild_id, f"{provider}_updates", enabled=any(bool(item["enabled"]) for item in storage.social_subscriptions(guild_id, provider)))
+            return social_payload(saved)
+        except OverflowError as exc:
+            raise HTTPException(422, detail={"code": "social_limit", "message": "このサービスで登録できる上限に達しています。"}) from exc
+        except (TypeError, ValueError, PermissionError) as exc:
+            raise HTTPException(422, detail={"code": "social_invalid", "message": str(exc) or "対象アカウントと通知先を確認してください。"}) from exc
+
+    @router.put("/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}")
+    async def update_social_subscription(request: Request, guild_id: int, provider: str, subscription_id: int) -> dict[str, Any]:
+        csrf(request)
+        await manage(request, guild_id, live=True)
+        current = storage.social_subscription(subscription_id)
+        if not current or int(current["guild_id"]) != guild_id or current["provider"] != provider:
+            raise HTTPException(404, detail={"code": "subscription_not_found", "message": "登録が見つかりません。"})
+        try:
+            body = await request.json()
+            value = await checked_social_body(request, guild_id, provider, body)
+            if value["account_key"] != normalize_account(provider, str(current["account_id"])):
+                raise ValueError("対象アカウントは変更できません。新しい登録を作成してください。")
+            saved = storage.save_social_subscription_v2(guild_id, provider, subscription_id=subscription_id,
+                expected_revision=int(body["revision"]) if body.get("revision") is not None else None, **value)
+            storage.set_module(guild_id, f"{provider}_updates", enabled=any(bool(item["enabled"]) for item in storage.social_subscriptions(guild_id, provider)))
+            return social_payload(saved)
+        except RuntimeError as exc:
+            raise HTTPException(409, detail={"code": "revision_conflict", "message": "別の管理者がこの登録を更新しました。再読み込みしてください。"}) from exc
+        except (TypeError, ValueError, PermissionError) as exc:
+            raise HTTPException(422, detail={"code": "social_invalid", "message": str(exc) or "登録内容を確認してください。"}) from exc
+
+    @router.delete("/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}", status_code=204)
+    async def delete_social_subscription(request: Request, guild_id: int, provider: str, subscription_id: int, if_match: str | None = Header(default=None)) -> None:
+        csrf(request)
+        await manage(request, guild_id, live=True)
+        current = storage.social_subscription(subscription_id)
+        if not current or int(current["guild_id"]) != guild_id or current["provider"] != provider:
+            raise HTTPException(404, detail={"code": "subscription_not_found", "message": "登録が見つかりません。"})
+        if if_match is not None and int(if_match.strip('"')) != int(current.get("revision", 1)):
+            raise HTTPException(409, detail={"code": "revision_conflict", "message": "別の管理者がこの登録を更新しました。"})
+        storage.delete_social_subscription(guild_id, subscription_id)
+        storage.set_module(guild_id, f"{provider}_updates", enabled=any(bool(item["enabled"]) for item in storage.social_subscriptions(guild_id, provider)))
+
+    @router.post("/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}/retry")
+    async def retry_social_subscription(request: Request, guild_id: int, provider: str, subscription_id: int) -> dict[str, str]:
+        csrf(request)
+        await manage(request, guild_id, live=True)
+        current = storage.social_subscription(subscription_id)
+        if not current or int(current["guild_id"]) != guild_id or current["provider"] != provider or not current.get("target_id"):
+            raise HTTPException(404, detail={"code": "subscription_not_found", "message": "登録が見つかりません。"})
+        storage.request_social_target_retry(int(current["target_id"]))
+        return {"status": "pending"}
+
+    @router.post("/guilds/{guild_id}/social/{provider}/preview")
+    async def preview_social_template(request: Request, guild_id: int, provider: str) -> dict[str, Any]:
+        csrf(request)
+        await manage(request, guild_id)
+        try:
+            body = await request.json()
+            event = str(body.get("event") or PROVIDER_EVENTS[provider][0])
+            template = validate_subscription(provider, {"account": "preview", "channel_id": 1, "events": [event], "templates": {event: body.get("template") or {}}})["templates"][event]
+            sample = {"account": "Sample Creator", "handle": "sample", "title": "新しいコンテンツ", "text": "通知本文のプレビューです。",
+                "url": "https://example.com/content", "platform": provider.title(), "event": event, "published_at": "2026-08-18 12:00",
+                "thumbnail": "https://example.com/thumbnail.jpg", "avatar": "https://example.com/avatar.jpg", "viewer_count": "123"}
+            return {key: render_template(str(value), sample, limit={"content": 1900, "title": 256, "description": 4096, "footer": 2048}.get(key, 500)) for key, value in template.items()}
+        except (KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(422, detail={"code": "template_invalid", "message": str(exc) or "通知テンプレートを確認してください。"}) from exc
 
     @router.get("/guilds/{guild_id}/modules/{module_id}")
     async def module(request: Request, guild_id: int, module_id: str) -> dict[str, Any]:

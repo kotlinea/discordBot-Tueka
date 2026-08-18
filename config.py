@@ -32,6 +32,12 @@ class Settings:
     instagram_redirect_uri: str | None
     x_bearer_token: str | None
     social_token_encryption_key: str | None
+    social_webhook_secret: str | None
+    social_x_mode: str
+    social_max_subscriptions_per_provider: int
+    social_poll_interval_seconds: int
+    instagram_rss_url_template: str | None
+    instagram_rss_auth_token: str | None
     dashboard_base_url: str | None
     data_dir: Path
     database_path: Path
@@ -74,6 +80,12 @@ class Settings:
             instagram_redirect_uri=os.getenv("INSTAGRAM_REDIRECT_URI"),
             x_bearer_token=os.getenv("X_BEARER_TOKEN"),
             social_token_encryption_key=os.getenv("SOCIAL_TOKEN_ENCRYPTION_KEY"),
+            social_webhook_secret=os.getenv("SOCIAL_WEBHOOK_SECRET"),
+            social_x_mode=os.getenv("SOCIAL_X_MODE", "stream").lower() if os.getenv("SOCIAL_X_MODE", "stream").lower() in {"stream", "poll"} else "stream",
+            social_max_subscriptions_per_provider=max(1, min(int(os.getenv("SOCIAL_MAX_SUBSCRIPTIONS_PER_PROVIDER", "10")), 100)),
+            social_poll_interval_seconds=max(30, min(int(os.getenv("SOCIAL_POLL_INTERVAL_SECONDS", "120")), 3600)),
+            instagram_rss_url_template=os.getenv("INSTAGRAM_RSS_URL_TEMPLATE"),
+            instagram_rss_auth_token=os.getenv("INSTAGRAM_RSS_AUTH_TOKEN"),
             dashboard_base_url=os.getenv("DASHBOARD_BASE_URL"),
             data_dir=BASE_DIR / os.getenv("DATA_DIR", "data"),
             database_path=BASE_DIR / os.getenv("DATABASE_PATH", "data/tueka.sqlite3"),

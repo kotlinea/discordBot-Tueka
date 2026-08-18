@@ -130,6 +130,8 @@ OAuthトークン、Botトークン、APIキー、セッション秘密鍵をモ
 
 YouTubeは公開HTTPSの `/webhooks/youtube` をWebSub callbackとして設定します。TikTok LIVEとInstagram Storiesは公式APIの対象外なので、画面上でも利用可能に見せないでください。X APIは読取費用を運用者が確認してから有効化します。
 
+ソーシャル通知の監視は `social_worker.py`、Webhook受付はDashboard、Discord配送は`SocialUpdatesCog`へ分離されています。同じ外部アカウントは`social_targets`で共有し、ギルドごとの通知先とテンプレートだけを`social_subscriptions`へ保存します。初回確認ではカーソルだけを作成し、過去投稿をイベント化してはいけません。TikTokの公開監視とInstagram外部RSSはベストエフォートとして扱い、失敗を他プロバイダーへ伝播させないでください。
+
 ## 保存データの変更
 
 通常の機能設定は `settings_json` を使用し、SQLiteの列追加は不要です。検索・集計・一意制約が必要な値だけ、専用テーブルを `GuildStorage.initialize()` に追加します。

@@ -76,3 +76,31 @@ test('rule order and stop behavior are saved from the list', async ({ page }) =>
   expect(saved?.items.map((item: Record<string, unknown>) => item.id)).toEqual([2, 1])
   expect(saved?.items[0].stop_on_match).toBe(true)
 })
+
+test('social account registration only requires an account and Discord channel', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 })
+  const template = { content: '', title: '{title}', description: '{account}\n{url}', color: '#5865F2', url: '{url}', thumbnail_url: '{avatar}', image_url: '{thumbnail}', footer: '{platform}' }
+  let saved: Record<string, any> | undefined
+  await page.route('**/api/v1/guilds/1/social/youtube/subscriptions', async route => {
+    if (route.request().method() === 'POST') { saved = route.request().postDataJSON(); await route.fulfill({ status: 201, json: { id: 1 } }); return }
+    await route.fulfill({ json: { items: [], available: true, events: ['video','live_start','live_end'], limit: 10, variables: ['account','title','url'], defaults: { video: template, live_start: template, live_end: template } } })
+  })
+  await page.goto('/servers/1/social/youtube')
+  const breadcrumb = page.getByRole('navigation', { name: 'パンくず' })
+  await expect(breadcrumb.getByRole('link', { name: 'Servers' })).toHaveAttribute('href', '/servers')
+  await expect(breadcrumb.getByRole('link', { name: 'Maple Server' })).toHaveAttribute('href', '/servers/1')
+  await expect(breadcrumb.getByRole('link', { name: '通知・ソーシャル' })).toHaveAttribute('href', '/servers/1/social')
+  await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText('YouTube 通知・ソーシャル')
+  await page.getByRole('button', { name: 'アカウントを追加' }).first().click()
+  await page.getByLabel('アカウントID／ハンドル').fill('UCExample')
+  await page.getByLabel('既定の通知チャンネル').selectOption('123456789012345678')
+  await page.getByRole('button', { name: '通知Embedを編集' }).click()
+  await expect(page.getByRole('dialog').last()).toContainText('{account}')
+  await page.getByRole('button', { name: '閉じる' }).last().click()
+  await page.getByRole('button', { name: '変更を保存' }).click()
+  await expect.poll(() => saved).toBeTruthy()
+  expect(saved?.account).toBe('UCExample')
+  expect(saved?.channel_id).toBe('123456789012345678')
+  expect(saved?.events).toEqual(['video','live_start','live_end'])
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false)
+})

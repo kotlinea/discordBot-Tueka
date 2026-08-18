@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote_plus, urlencode
+from urllib.parse import parse_qs, quote_plus, urlencode, urlparse
 from asyncio import gather
 
 import httpx
@@ -25,6 +25,7 @@ from dashboard.timing import add as add_timing, begin as begin_timing, end as en
 from feature_registry import FEATURES, get_feature, japanese_copy
 from storage import GuildStorage
 from social_crypto import SocialTokenCipher
+from social_webhooks import verify_twitch_signature, verify_youtube_signature
 from template_defaults import LEAVE_CONTENT_DEFAULT, STATS_TEMPLATE_DEFAULT, TEMP_VOICE_NAME_DEFAULT, WELCOME_CONTENT_DEFAULT
 from automod import ACTION_TYPES, TRIGGER_TYPES, AutoModEngine, MessageContext, default_rule, validate_rule
 from dashboard.api_v1 import create_api_router
@@ -59,7 +60,7 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 app.mount("/ui", StaticFiles(directory=FRONTEND_DIST, check_dir=False), name="dashboard-v2")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
-app.include_router(create_api_router(storage, api))
+app.include_router(create_api_router(storage, api, settings))
 
 
 @app.exception_handler(HTTPException)
@@ -332,6 +333,8 @@ async def moderation_section(request: Request, guild_id: int, section: str):
 
 @app.get("/servers/{guild_id}/modules/{module_id}", response_class=HTMLResponse)
 async def module_settings(request: Request, guild_id: int, module_id: str):
+    if module_id in SOCIAL_MODULE_PROVIDERS:
+        return RedirectResponse(f"/servers/{guild_id}/social/{SOCIAL_MODULE_PROVIDERS[module_id]}", status_code=303)
     if module_id in {"chat_filter", "automod", "anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"}:
         target = "automod" if module_id == "chat_filter" else module_id
         return RedirectResponse(f"/servers/{guild_id}/moderation/{target}", status_code=303)
@@ -972,12 +975,23 @@ async def favicon():
 @app.get("/webhooks/youtube")
 async def youtube_webhook_verify(request: Request):
     """WebSub lease validation; the public callback URL is configured at YouTube."""
+    if request.query_params.get("hub.mode") == "denied":
+        topic = request.query_params.get("hub.topic", "")
+        channel_id = parse_qs(urlparse(topic).query).get("channel_id", [""])[0]
+        if channel_id:
+            storage.invalidate_social_target("youtube", channel_id, request.query_params.get("hub.reason", "WebSub subscription denied"))
     return PlainTextResponse(request.query_params.get("hub.challenge", ""))
 
 
 @app.post("/webhooks/youtube")
 async def youtube_webhook(request: Request):
     body = await request.body()
+    if len(body) > 1_000_000:
+        raise HTTPException(status_code=413, detail="Webhook payload is too large")
+    if settings.social_webhook_secret:
+        supplied = request.headers.get("x-hub-signature", "")
+        if not verify_youtube_signature(body, supplied, settings.social_webhook_secret):
+            raise HTTPException(status_code=401, detail="Invalid YouTube webhook signature")
     try:
         root = ET.fromstring(body)
         namespaces = {"yt": "http://www.youtube.com/xml/schemas/2015", "atom": "http://www.w3.org/2005/Atom"}
@@ -988,7 +1002,43 @@ async def youtube_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Invalid YouTube webhook payload")
     if not video_id or not account_id:
         raise HTTPException(status_code=400, detail="YouTube event is incomplete")
-    storage.enqueue_social_event("youtube", f"youtube:video:{video_id}", account_id, {"account": account_id, "title": title, "url": f"https://www.youtube.com/watch?v={video_id}", "platform": "YouTube", "type": "video"})
+    storage.wake_social_target("youtube", account_id)
+    return PlainTextResponse("ok")
+
+
+@app.post("/webhooks/twitch")
+async def twitch_webhook(request: Request):
+    body = await request.body()
+    if len(body) > 1_000_000 or not settings.social_webhook_secret:
+        raise HTTPException(status_code=401 if not settings.social_webhook_secret else 413, detail="Twitch webhook is not configured")
+    message_id = request.headers.get("twitch-eventsub-message-id", "")
+    timestamp = request.headers.get("twitch-eventsub-message-timestamp", "")
+    supplied = request.headers.get("twitch-eventsub-message-signature", "")
+    if not verify_twitch_signature(body, message_id, timestamp, supplied, settings.social_webhook_secret):
+        raise HTTPException(status_code=401, detail="Invalid Twitch webhook signature")
+    payload = json.loads(body)
+    message_type = request.headers.get("twitch-eventsub-message-type", "")
+    if message_type == "webhook_callback_verification":
+        return PlainTextResponse(str(payload.get("challenge", "")))
+    if message_type == "revocation":
+        condition = (payload.get("subscription") or {}).get("condition") or {}
+        account = str(condition.get("broadcaster_user_id", ""))
+        if account:
+            storage.invalidate_social_target("twitch", account, str((payload.get("subscription") or {}).get("status") or "EventSub subscription revoked"))
+        return PlainTextResponse("ok")
+    event, subscription = payload.get("event") or {}, payload.get("subscription") or {}
+    raw_type = str(subscription.get("type", ""))
+    event_type = "live_start" if raw_type == "stream.online" else "live_end" if raw_type == "stream.offline" else ""
+    account_id = str(event.get("broadcaster_user_id", ""))
+    if not event_type or not account_id:
+        raise HTTPException(status_code=400, detail="Unsupported Twitch event")
+    external_id = str(event.get("id") or message_id)
+    handle = str(event.get("broadcaster_user_login", ""))
+    storage.enqueue_social_event_v2("twitch", external_id, account_id, event_type, {
+        "account": event.get("broadcaster_user_name") or handle, "handle": handle, "title": event.get("title") or "配信を開始しました",
+        "text": "", "url": f"https://twitch.tv/{handle}", "platform": "Twitch", "event": event_type, "type": event_type,
+        "published_at": event.get("started_at", ""), "thumbnail": "", "avatar": "", "viewer_count": "",
+    })
     return PlainTextResponse("ok")
 
 
