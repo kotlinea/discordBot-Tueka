@@ -136,12 +136,24 @@ class CommunityCog(commands.Cog):
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction) -> None:
         if interaction.type is discord.InteractionType.component and (interaction.data or {}).get("custom_id") == "tueka-ticket:create" and interaction.guild:
+            if self.bot.settings.tickets_v2 and (not self.bot.settings.tickets_v2_guilds or interaction.guild.id in self.bot.settings.tickets_v2_guilds):
+                return
             await self._create_ticket(interaction)
 
     @app_commands.command(description="設定済みのサポートチケット用ボタンを投稿します。")
     @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.guild_only()
     async def publish_ticket_panel(self, interaction: discord.Interaction) -> None:
+        if interaction.guild and self.bot.settings.tickets_v2 and (not self.bot.settings.tickets_v2_guilds or interaction.guild.id in self.bot.settings.tickets_v2_guilds):
+            cog = self.bot.get_cog("TicketsCog")
+            configs = cog.repository.panel_messages(interaction.guild.id) if cog else []
+            if not configs:
+                await interaction.response.send_message("ダッシュボードのTicket > Panel Messagesで投稿内容を作成してください。", ephemeral=True)
+                return
+            with cog.repository._connection() as connection:
+                connection.execute("UPDATE ticket_panel_messages SET status='draft',lease_owner=NULL,lease_until=NULL WHERE guild_id=?", (interaction.guild.id,))
+            await interaction.response.send_message("Panel Messageの投稿・更新をキューへ追加しました。", ephemeral=True)
+            return
         if not await self._module_enabled(interaction, "tickets"):
             return
         assert interaction.guild is not None
@@ -163,6 +175,15 @@ class CommunityCog(commands.Cog):
     @app_commands.command(description="このチケットを閉じ、議事録を保存します。")
     @app_commands.guild_only()
     async def close_ticket(self, interaction: discord.Interaction) -> None:
+        if interaction.guild and self.bot.settings.tickets_v2 and (not self.bot.settings.tickets_v2_guilds or interaction.guild.id in self.bot.settings.tickets_v2_guilds):
+            cog = self.bot.get_cog("TicketsCog")
+            ticket = cog.repository.ticket_for_container(interaction.channel_id or 0) if cog else None
+            if not cog or not ticket:
+                await interaction.response.send_message("このチャンネルは開いているTicketではありません。", ephemeral=True)
+                return
+            await interaction.response.defer(ephemeral=True)
+            await cog.close_container(interaction, ticket, "解決済み")
+            return
         if not await self._module_enabled(interaction, "tickets"):
             return
         assert interaction.guild is not None and isinstance(interaction.channel, discord.TextChannel)

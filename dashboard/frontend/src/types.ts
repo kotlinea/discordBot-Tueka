@@ -3,7 +3,7 @@ export type Appearance = 'precision' | 'community' | 'atmosphere'
 export type ColorScheme = 'system' | 'light' | 'dark'
 export interface Preferences { locale: Locale; appearance: Appearance; color_scheme: ColorScheme; navigation_collapsed: boolean; revision: number }
 export interface Session { user: { id: string; name: string; avatar_url: string }; csrf_token: string; preferences: Preferences }
-export interface Guild { id: string; name: string; icon: string | null }
+export interface Guild { id: string; name: string; icon: string | null; access?: 'admin'|'ticket_staff' }
 export interface Resource { id: string; name: string; type?: number; position?: number }
 export interface Feature { id: string; category: string; parent: string | null; title: string; description: string; fields: string[]; required_fields: string[]; required_bot_permissions: string[]; enabled: boolean; settings: Record<string, unknown>; revision: number; missing_permissions: string[] }
 export interface ModerationEvent { id: number; family: string; event_type: string; source: string; target_user_id?: number; channel_id?: number; reason: string; mode: string; case_id?: number; created_at: number }
@@ -12,3 +12,9 @@ export interface SocialTemplate { content: string; title: string; description: s
 export interface SocialTarget { id: number; provider: string; account_key: string; external_id?: string; handle?: string; display_name?: string; avatar_url?: string; status: 'pending'|'active'|'degraded'|'error'; last_error?: string; last_checked_at?: number; revision: number }
 export interface SocialSubscription { id: number; provider: string; account_id: string; channel_id: string; role_id: string|null; events: string[]; event_channels: Record<string,string>; templates: Record<string,SocialTemplate>; enabled: boolean; status: string; last_error?: string; revision: number; target: SocialTarget|null }
 export interface SocialProviderSummary { id: string; available: boolean; events: string[]; count: number; limit: number }
+export interface TicketSettings { enabled:boolean; open_limit:number; language:'ja'|'en'; log_channel_id:string|null; transcript_channel_id:string|null; transcript_retention_days:number; close_dm:boolean; default_auto_close:{on_member_leave:boolean;no_user_reply_minutes:number;inactivity_minutes:number}; revision:number }
+export interface TicketItem { id:number; ticket_number:number; guild_id:string; panel_id:string; opener_id:string; mode:'channel'|'private_thread'; status:string; discord_container_id:string|null; claimed_by:string|null; form_answers?:Record<string,string>; auto_close_excluded:boolean; created_at:number; opened_at?:number; closed_at?:number; revision:number }
+export interface TicketPanel { id:number; name:string; description:string; mode:'channel'|'private_thread'; form_id:string|null; team_id:string|null; category_id:string|null; thread_parent_channel_id:string|null; staff_notification_channel_id:string|null; ticket_name_template:string; claim_mode:string; enabled:boolean; revision:number }
+export interface TicketForm { id:number; name:string; title:string; fields:Array<{key:string;label:string;placeholder:string;style:'short'|'paragraph';required:boolean;min_length:number;max_length:number}>; revision:number }
+export interface TicketTeam { id:number; name:string; role_ids:string[]; user_ids:string[]; admin_user_ids:string[]; notification_channel_id:string|null; enabled:boolean; revision:number }
+export interface TicketPanelMessage { id:number; name:string; channel_id:string; message_id:string|null; title:string; description:string; color:string; panel_ids:string[]; status:string; last_error?:string; revision:number }

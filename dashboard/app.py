@@ -86,7 +86,11 @@ async def design_tokens():
 
 
 def dashboard_v2_enabled(path: str) -> bool:
-    if os.getenv("DASHBOARD_UI_V2", "false").lower() != "true" or not path.startswith("/servers"):
+    if os.getenv("DASHBOARD_UI_V2", "false").lower() != "true":
+        return False
+    if path.startswith("/tickets/transcripts/"):
+        return settings.tickets_v2
+    if not path.startswith("/servers"):
         return False
     allowlist = {value.strip() for value in os.getenv("DASHBOARD_UI_V2_GUILDS", "").split(",") if value.strip()}
     parts = path.strip("/").split("/")
@@ -102,6 +106,10 @@ async def server_timing(request: Request, call_next):
             # middleware intentionally does not read request.session because
             # SessionMiddleware may be inside the timing middleware stack.
             response = FileResponse(FRONTEND_DIST / "index.html")
+            # The shell points at content-hashed assets and must be revalidated
+            # after every frontend build; otherwise an open dashboard can keep
+            # rendering an older route implementation.
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
         else:
             response = await call_next(request)
     finally:
@@ -333,6 +341,8 @@ async def moderation_section(request: Request, guild_id: int, section: str):
 
 @app.get("/servers/{guild_id}/modules/{module_id}", response_class=HTMLResponse)
 async def module_settings(request: Request, guild_id: int, module_id: str):
+    if module_id == "tickets" and settings.tickets_v2 and (not settings.tickets_v2_guilds or guild_id in settings.tickets_v2_guilds):
+        return RedirectResponse(f"/servers/{guild_id}/tickets", status_code=307)
     if module_id in SOCIAL_MODULE_PROVIDERS:
         return RedirectResponse(f"/servers/{guild_id}/social/{SOCIAL_MODULE_PROVIDERS[module_id]}", status_code=303)
     if module_id in {"chat_filter", "automod", "anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"}:
@@ -1048,6 +1058,8 @@ def optional_id(value: str) -> int | None:
 
 @app.post("/servers/{guild_id}/modules/{module_id}")
 async def save_module_settings(request: Request, guild_id: int, module_id: str):
+    if module_id == "tickets" and settings.tickets_v2 and (not settings.tickets_v2_guilds or guild_id in settings.tickets_v2_guilds):
+        return RedirectResponse(f"/servers/{guild_id}/tickets", status_code=303)
     if module_id in {"chat_filter", "anti_spam"}:
         return RedirectResponse(f"/servers/{guild_id}/modules/automod", status_code=303)
     target = f"/servers/{guild_id}/modules/{module_id}"

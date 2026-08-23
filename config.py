@@ -38,6 +38,15 @@ class Settings:
     social_poll_interval_seconds: int
     instagram_rss_url_template: str | None
     instagram_rss_auth_token: str | None
+    ticket_encryption_key: str | None
+    ticket_s3_endpoint_url: str | None
+    ticket_s3_region: str | None
+    ticket_s3_bucket: str | None
+    ticket_s3_access_key_id: str | None
+    ticket_s3_secret_access_key: str | None
+    ticket_s3_prefix: str
+    tickets_v2: bool
+    tickets_v2_guilds: tuple[int, ...]
     dashboard_base_url: str | None
     data_dir: Path
     database_path: Path
@@ -52,6 +61,7 @@ class Settings:
         "cogs.automod",
         "cogs.moderation_commands",
         "cogs.community",
+        "cogs.tickets",
         "cogs.engagement",
         "cogs.trust",
         "cogs.audit_log",
@@ -86,6 +96,15 @@ class Settings:
             social_poll_interval_seconds=max(30, min(int(os.getenv("SOCIAL_POLL_INTERVAL_SECONDS", "120")), 3600)),
             instagram_rss_url_template=os.getenv("INSTAGRAM_RSS_URL_TEMPLATE"),
             instagram_rss_auth_token=os.getenv("INSTAGRAM_RSS_AUTH_TOKEN"),
+            ticket_encryption_key=os.getenv("TICKET_ENCRYPTION_KEY"),
+            ticket_s3_endpoint_url=os.getenv("TICKET_S3_ENDPOINT_URL"),
+            ticket_s3_region=os.getenv("TICKET_S3_REGION"),
+            ticket_s3_bucket=os.getenv("TICKET_S3_BUCKET"),
+            ticket_s3_access_key_id=os.getenv("TICKET_S3_ACCESS_KEY_ID"),
+            ticket_s3_secret_access_key=os.getenv("TICKET_S3_SECRET_ACCESS_KEY"),
+            ticket_s3_prefix=os.getenv("TICKET_S3_PREFIX", "ticket-transcripts"),
+            tickets_v2=os.getenv("TICKETS_V2", "false").lower() == "true",
+            tickets_v2_guilds=tuple(int(value.strip()) for value in os.getenv("TICKETS_V2_GUILDS", "").split(",") if value.strip()),
             dashboard_base_url=os.getenv("DASHBOARD_BASE_URL"),
             data_dir=BASE_DIR / os.getenv("DATA_DIR", "data"),
             database_path=BASE_DIR / os.getenv("DATABASE_PATH", "data/tueka.sqlite3"),

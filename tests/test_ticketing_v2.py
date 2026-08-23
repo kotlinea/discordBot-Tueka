@@ -1,0 +1,101 @@
+import asyncio
+import json
+import sqlite3
+from contextlib import closing
+import tempfile
+import unittest
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+from cryptography.fernet import Fernet
+
+from ticketing import TicketRepository, TicketService, TranscriptStorage, validate_form, validate_panel
+from ticketing.models import support_is_open
+
+
+class TicketV2Tests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.repository = TicketRepository(self.root / "tickets.db")
+        self.storage = TranscriptStorage(self.root / "blobs", Fernet.generate_key().decode("ascii"))
+        self.service = TicketService(self.repository, self.storage)
+        self.repository.save_settings(1, {"enabled": True, "open_limit": 1})
+        self.team = self.repository.save_team(1, {"name": "Staff", "role_ids": [500]})
+        self.panel = self.repository.save_panel(1, {"name": "Support", "mode": "channel", "category_id": 100, "team_id": self.team["id"]})
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def test_form_and_panel_limits(self):
+        with self.assertRaises(ValueError):
+            validate_form({"name": "Too many", "fields": [{"label": str(index)} for index in range(6)]})
+        with self.assertRaises(ValueError):
+            validate_panel({"name": "Thread", "mode": "private_thread", "team_id": self.team["id"]})
+
+    def test_reservation_is_idempotent_and_limit_is_guild_wide(self):
+        first, _ = self.service.reserve(1, self.panel["id"], 10, "same", set())
+        duplicate, _ = self.service.reserve(1, self.panel["id"], 10, "same", set())
+        self.assertEqual(first["id"], duplicate["id"])
+        with self.assertRaises(OverflowError):
+            self.repository.reserve_ticket(1, self.panel["id"], 11, "other", {})
+        staff = self.repository.reserve_ticket(1, self.panel["id"], 11, "staff", {}, staff_exempt=True)
+        self.assertNotEqual(first["id"], staff["id"])
+
+    def test_close_encrypts_answers_and_all_messages(self):
+        form = self.repository.save_form(1, {"name": "Contact", "title": "Contact", "fields": [{"key": "reason", "label": "Reason"}]})
+        panel = self.repository.save_panel(1, {"name": "Contact", "mode": "channel", "category_id": 100, "form_id": form["id"], "team_id": self.team["id"]})
+        ticket, _ = self.service.reserve(1, panel["id"], 10, "close", set(), {"reason": "private"}, staff_exempt=True)
+        ticket = self.repository.activate_ticket(ticket["id"], 200, 100)
+        for index in range(501):
+            self.service.record_message(ticket, index + 1, 10, "member", f"message {index}", [])
+        closed, transcript = asyncio.run(self.service.close(ticket["id"], 99, "done"))
+        payload = asyncio.run(self.storage.load(transcript["backend"], transcript["object_key"], transcript["content_hash"]))
+        self.assertEqual("closed", closed["status"])
+        self.assertEqual("private", payload["form_answers"]["reason"])
+        self.assertEqual(501, len(payload["messages"]))
+
+    def test_attachment_is_encrypted_and_integrity_checked(self):
+        stored = asyncio.run(self.storage.save_attachment(1, 2, 3, b"attachment body"))
+        self.assertEqual(b"attachment body", asyncio.run(self.storage.load_attachment(stored.backend, stored.object_key, stored.content_hash)))
+        raw = (self.root / "blobs" / stored.object_key).read_bytes()
+        self.assertNotIn(b"attachment body", raw)
+
+    def test_auto_close_schedule_survives_repository_restart(self):
+        self.repository.save_settings(1, {"enabled": True, "open_limit": 2, "default_auto_close": {"no_user_reply_minutes": 1}})
+        ticket, _ = self.service.reserve(1, self.panel["id"], 10, "scheduled", set())
+        ticket = self.repository.activate_ticket(ticket["id"], 300, 100)
+        self.service.schedule_ticket(ticket)
+        reopened = TicketRepository(self.root / "tickets.db")
+        with reopened._connection() as connection:
+            row = connection.execute("SELECT kind,status FROM ticket_schedules WHERE ticket_id=?", (ticket["id"],)).fetchone()
+        self.assertEqual(("no_user_reply", "pending"), tuple(row))
+
+    def test_support_hours_reports_next_open(self):
+        panel = {"support_hours": {"timezone": "Asia/Tokyo", "weekdays": {"0": {"start": "09:00", "end": "17:00"}}}}
+        opened, next_open = support_is_open(panel, datetime(2026, 8, 24, 8, 0, tzinfo=ZoneInfo("Asia/Tokyo")))
+        self.assertFalse(opened)
+        self.assertEqual(9, next_open.hour)
+        overnight = {"support_hours": {"timezone": "Asia/Tokyo", "weekdays": {"0": {"start": "22:00", "end": "02:00"}}}}
+        opened, _ = support_is_open(overnight, datetime(2026, 8, 25, 1, 0, tzinfo=ZoneInfo("Asia/Tokyo")))
+        self.assertTrue(opened)
+
+    def test_legacy_migration_is_idempotent_and_removes_plaintext_after_verification(self):
+        path = self.root / "legacy.db"
+        with closing(sqlite3.connect(path)) as connection:
+            connection.execute("CREATE TABLE guild_modules(guild_id INTEGER,module_id TEXT,enabled INTEGER,settings_json TEXT)")
+            connection.execute("CREATE TABLE support_tickets(channel_id INTEGER PRIMARY KEY,guild_id INTEGER,opener_id INTEGER,status TEXT,created_at INTEGER,closed_at INTEGER,closed_by INTEGER,transcript_json TEXT)")
+            connection.execute("INSERT INTO guild_modules VALUES(1,'tickets',1,?)", (json.dumps({"ticket_category_id": 100}),))
+            connection.execute("INSERT INTO support_tickets VALUES(200,1,10,'closed',1,2,99,?)", (json.dumps([{"author": "member", "content": "legacy"}]),))
+            connection.commit()
+        repository = TicketRepository(path)
+        service = TicketService(repository, TranscriptStorage(self.root / "legacy-blobs", Fernet.generate_key().decode("ascii")))
+        self.assertEqual(1, asyncio.run(service.migrate_legacy_transcripts()))
+        self.assertEqual(0, asyncio.run(service.migrate_legacy_transcripts()))
+        with closing(sqlite3.connect(path)) as connection:
+            self.assertIsNone(connection.execute("SELECT transcript_json FROM support_tickets").fetchone()[0])
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -11,7 +11,13 @@ from dashboard.timing import add as add_timing
 API_BASE = "https://discord.com/api/v10"
 ADMINISTRATOR = 0x8
 MANAGEMENT_PERMISSIONS = 0x0000000000000008 | 0x0000000000000010 | 0x0000000000000020 | 0x0000000000000040 | 0x0000000000000080 | 0x0000000000000100 | 0x0000000000000400 | 0x0000000000001000 | 0x0000000000002000 | 0x0000000000004000 | 0x0000000000008000 | 0x0000000001000000 | 0x0000000020000000
-PERMISSION_BITS = {"send_messages": 0x800, "view_audit_log": 0x80, "manage_messages": 0x2000, "manage_channels": 0x10, "manage_roles": 0x10000000, "move_members": 0x1000000, "moderate_members": 0x10000000000, "kick_members": 0x2, "ban_members": 0x4}
+PERMISSION_BITS = {
+    "send_messages": 1 << 11, "view_audit_log": 1 << 7, "manage_messages": 1 << 13,
+    "manage_channels": 1 << 4, "manage_roles": 1 << 28, "move_members": 1 << 24,
+    "moderate_members": 1 << 40, "kick_members": 1 << 1, "ban_members": 1 << 2,
+    "read_message_history": 1 << 16, "embed_links": 1 << 14, "attach_files": 1 << 15,
+    "manage_threads": 1 << 34, "create_private_threads": 1 << 36, "send_messages_in_threads": 1 << 38,
+}
 
 
 class DiscordAPI:
@@ -101,6 +107,18 @@ class DiscordAPI:
         selectable_roles = [item for item in all_roles if item.get("name") != "@everyone" and not item.get("managed") and int(item.get("position", 0)) < bot_top_position and not (int(item.get("permissions", "0")) & MANAGEMENT_PERMISSIONS)]
         value = ([item for item in channels.json() if item.get("type") in {0, 2, 4}], selectable_roles, bot_permissions)
         return self._cache_for("resources", key, value, 30) if use_cache else value
+
+    async def guild_member(self, guild_id: int, user_id: int, *, use_cache: bool = True) -> dict[str, Any] | None:
+        key = f"{guild_id}:{user_id}"
+        if use_cache and (cached := self._get_cached("guild_member", key)) is not None:
+            return cached
+        try:
+            value = (await self._request("GET", f"/guilds/{guild_id}/members/{user_id}", headers={"Authorization": f"Bot {self.bot_token}"})).json()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                return None
+            raise
+        return self._cache_for("guild_member", key, value, 30) if use_cache else value
 
     async def publish_reaction_role_panel(self, channel_id: int, roles: list[dict[str, Any]], title: str, description: str) -> dict[str, Any]:
         components = [{"type": 1, "components": [{"type": 2, "style": 2, "label": role["name"][:80], "custom_id": f"tueka-rr:{role['id']}"} for role in roles[start:start + 5]]} for start in range(0, len(roles), 5)]
