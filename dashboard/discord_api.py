@@ -14,6 +14,7 @@ MANAGEMENT_PERMISSIONS = 0x0000000000000008 | 0x0000000000000010 | 0x00000000000
 PERMISSION_BITS = {
     "send_messages": 1 << 11, "view_audit_log": 1 << 7, "manage_messages": 1 << 13,
     "manage_channels": 1 << 4, "manage_roles": 1 << 28, "move_members": 1 << 24,
+    "add_reactions": 1 << 6,
     "moderate_members": 1 << 40, "kick_members": 1 << 1, "ban_members": 1 << 2,
     "read_message_history": 1 << 16, "embed_links": 1 << 14, "attach_files": 1 << 15,
     "manage_threads": 1 << 34, "create_private_threads": 1 << 36, "send_messages_in_threads": 1 << 38,
@@ -115,6 +116,14 @@ class DiscordAPI:
         value = (await self._request("GET", f"/guilds/{guild_id}/emojis", headers={"Authorization": f"Bot {self.bot_token}"})).json()
         result = [{"id": str(item["id"]), "name": str(item.get("name") or "emoji"), "animated": bool(item.get("animated"))} for item in value]
         return self._cache_for("emojis", key, result, 30) if use_cache else result
+
+    async def channel_message(self, channel_id: int, message_id: int) -> dict[str, Any] | None:
+        try:
+            return (await self._request("GET", f"/channels/{channel_id}/messages/{message_id}", headers={"Authorization": f"Bot {self.bot_token}"})).json()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                return None
+            raise
 
     async def guild_member(self, guild_id: int, user_id: int, *, use_cache: bool = True) -> dict[str, Any] | None:
         key = f"{guild_id}:{user_id}"

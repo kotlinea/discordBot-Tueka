@@ -16,6 +16,7 @@ from dashboard.discord_api import ADMINISTRATOR, PERMISSION_BITS
 from feature_registry import FEATURES, get_feature, japanese_copy
 from social_models import PROVIDERS, PROVIDER_EVENTS, TEMPLATE_VARIABLES, default_templates, normalize_account, render_template, validate_subscription
 from ticketing import TicketRepository, TicketService, TicketValidationError, TranscriptStorage, default_deployment, default_panel, validate_form, validate_panel, validate_panel_bundle, validate_settings
+from reaction_roles import ReactionRoleRepository, ReactionRoleService, ReactionRoleValidationError
 
 
 FAMILY_TRIGGERS = {
@@ -82,6 +83,8 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         "prefix": settings.ticket_s3_prefix,
     }) if settings is not None else None
     ticket_service = TicketService(ticket_repository, ticket_transcripts) if ticket_repository and ticket_transcripts else None
+    reaction_role_repository = ReactionRoleRepository(settings.database_path) if settings is not None else None
+    reaction_role_service = ReactionRoleService(reaction_role_repository, max_mappings=settings.reaction_role_max_mappings_per_message) if reaction_role_repository and settings else None
 
     def token(request: Request) -> str:
         session_id = request.session.get("session_id")
@@ -95,6 +98,20 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         if not await discord.can_manage(value, guild_id, use_cache=not live):
             raise HTTPException(403, detail={"code": "guild_forbidden", "message": "このサーバーを管理する権限がありません。"})
         return value
+
+    def reaction_roles_available() -> tuple[ReactionRoleRepository, ReactionRoleService]:
+        if not reaction_role_repository or not reaction_role_service:
+            raise HTTPException(503, detail={"code":"reaction_roles_unavailable","message":"Reaction Rolesを初期化できません。"})
+        return reaction_role_repository, reaction_role_service
+
+    def rr_payload(value: dict[str, Any]) -> dict[str, Any]:
+        result=dict(value)
+        for key in ("guild_id","channel_id","message_id","link_group_id"):
+            if key in result:result[key]=str(result[key]) if result[key] is not None else None
+        result["mappings"]=[{**item,"role_id":str(item["role_id"]),"emoji_id":str(item["emoji_id"]) if item.get("emoji_id") else None} for item in result.get("mappings",[])]
+        result["whitelist_role_ids"]=[str(item) for item in result.get("whitelist_role_ids",[])]
+        result["blacklist_role_ids"]=[str(item) for item in result.get("blacklist_role_ids",[])]
+        return result
 
     def tickets_available(guild_id: int) -> None:
         if not settings or not settings.tickets_v2 or (settings.tickets_v2_guilds and guild_id not in settings.tickets_v2_guilds) or not ticket_repository or not ticket_service:
@@ -777,6 +794,141 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         except PermissionError as exc: raise HTTPException(403, detail={"code": "feedback_forbidden", "message": "このTicketを評価できません。"}) from exc
         except (TypeError, ValueError) as exc: raise HTTPException(422, detail={"code": "feedback_invalid", "message": "評価は1～5で指定してください。"}) from exc
         except sqlite3.IntegrityError as exc: raise HTTPException(409, detail={"code": "feedback_exists", "message": "このTicketは評価済みです。"}) from exc
+
+    async def checked_reaction_role(request: Request, guild_id: int, body: dict[str, Any]) -> tuple[dict[str, Any], int]:
+        access = await manage(request, guild_id, live=True)
+        user = await discord.current_user(access, use_cache=False)
+        _, service = reaction_roles_available()
+        value = service.validate(dict(body.get("message") or body))
+        channels, roles, permissions = await discord.guild_resources(guild_id, use_cache=False)
+        channel_ids = {int(item["id"]) for item in channels if int(item.get("type", -1)) == 0}
+        role_ids = {int(item["id"]) for item in roles}
+        emojis = {int(item["id"]) for item in await discord.guild_emojis(guild_id, use_cache=False)}
+        if value["channel_id"] not in channel_ids:
+            raise ReactionRoleValidationError("channel_invalid", "このサーバーのテキストチャンネルを選択してください。", "channel_id")
+        for index, mapping in enumerate(value["mappings"]):
+            if mapping["role_id"] not in role_ids:
+                raise ReactionRoleValidationError("role_invalid", "Botが管理できるRoleを選択してください。", f"mappings.{index}.role_id")
+            if mapping["emoji_id"] is not None and mapping["emoji_id"] not in emojis:
+                raise ReactionRoleValidationError("emoji_invalid", "このサーバーで利用できるEmojiを選択してください。", f"mappings.{index}.emoji")
+        for key in ("whitelist_role_ids", "blacklist_role_ids"):
+            if any(role_id not in role_ids for role_id in value[key]):
+                raise ReactionRoleValidationError("access_role_invalid", "アクセスRoleを確認してください。", key)
+        required = ["manage_roles", "add_reactions", "read_message_history", "manage_messages"]
+        if value["source"] == "bot":
+            required.extend(("send_messages", "embed_links"))
+        missing = [name for name in required if not ((permissions & ADMINISTRATOR) or (permissions & PERMISSION_BITS[name]))]
+        if missing:
+            raise ReactionRoleValidationError("bot_permission_missing", "Bot権限が不足しています: " + ", ".join(missing), "permissions")
+        if value["source"] == "external":
+            message = await discord.channel_message(value["channel_id"], value["message_id"])
+            if not message:
+                raise ReactionRoleValidationError("message_not_found", "既存メッセージが見つかりません。", "message_id")
+        return value, int(user["id"])
+
+    def rr_error(exc: ReactionRoleValidationError) -> HTTPException:
+        return HTTPException(422, detail={"code":exc.code,"message":exc.message,"errors":[{"path":exc.path,"message":exc.message}]})
+
+    @router.get("/guilds/{guild_id}/reaction-roles")
+    async def reaction_roles_overview(request: Request, guild_id: int) -> dict[str, Any]:
+        await manage(request, guild_id)
+        repository, _ = reaction_roles_available()
+        items=repository.messages(guild_id)
+        legacy=storage.get_module(guild_id,"reaction_roles")
+        return {"settings":rr_payload(repository.settings(guild_id)),"items":[rr_payload(item) for item in items],
+            "summary":{"active":sum(1 for item in items if item["enabled"] and item["status"]=="active"),"pending":sum(1 for item in items if item["status"]=="pending"),"failed":sum(1 for item in items if item["status"]=="failed"),"scheduled":sum(1 for item in items if item.get("self_destruct_at"))},
+            "legacy":{"configured":bool(legacy["settings"].get("reaction_role_ids")),"role_ids":[str(item) for item in legacy["settings"].get("reaction_role_ids",[])],"title":legacy["settings"].get("reaction_role_title","")},
+            "recoveries":[{**item,"deleted_message_id":str(item["deleted_message_id"])} for item in repository.recoveries(guild_id)]}
+
+    @router.put("/guilds/{guild_id}/reaction-roles/settings")
+    async def save_reaction_role_settings(request: Request,guild_id:int)->dict[str,Any]:
+        csrf(request);await manage(request,guild_id,live=True);repository,_=reaction_roles_available();body=await request.json()
+        try:
+            channels,_,_=await discord.guild_resources(guild_id,use_cache=False);text_ids={int(item["id"]) for item in channels if int(item.get("type",-1))==0}
+            log_channel=int(body["log_channel_id"]) if body.get("log_channel_id") else None
+            if log_channel is not None and log_channel not in text_ids:raise ValueError("log_channel_id")
+            saved=repository.save_settings(guild_id,{**body,"log_channel_id":log_channel},int(body["revision"]) if body.get("revision") is not None else None)
+            storage.set_module(guild_id,"reaction_roles",enabled=bool(saved["enabled"]),settings=storage.get_module(guild_id,"reaction_roles")["settings"])
+            return rr_payload(saved)
+        except RuntimeError as exc:raise HTTPException(409,detail={"code":"revision_conflict","message":"別の管理者が設定を更新しました。"}) from exc
+        except (TypeError,ValueError) as exc:raise HTTPException(422,detail={"code":"settings_invalid","message":"ログ先と通知設定を確認してください。"}) from exc
+
+    @router.get("/guilds/{guild_id}/reaction-roles/events")
+    async def reaction_role_events(request:Request,guild_id:int,limit:int=100)->dict[str,Any]:
+        await manage(request,guild_id);repository,_=reaction_roles_available();return {"items":repository.events(guild_id,limit)}
+
+    @router.get("/guilds/{guild_id}/reaction-roles/link-groups")
+    async def reaction_role_link_groups(request:Request,guild_id:int)->dict[str,Any]:
+        await manage(request,guild_id);repository,_=reaction_roles_available();return {"items":repository.link_groups(guild_id)}
+
+    @router.post("/guilds/{guild_id}/reaction-roles/link-groups",status_code=201)
+    async def create_reaction_role_link_group(request:Request,guild_id:int)->dict[str,Any]:
+        csrf(request);await manage(request,guild_id,live=True);repository,_=reaction_roles_available();body=await request.json()
+        try:return repository.create_link_group(guild_id,str(body.get("name") or "Link Group"),[int(item) for item in body.get("message_ids",[])])
+        except (TypeError,ValueError) as exc:raise HTTPException(422,detail={"code":"link_invalid","message":"2件以上の互換性がある未Link設定を選択してください。"}) from exc
+
+    @router.delete("/guilds/{guild_id}/reaction-roles/link-groups/{group_id}",status_code=204)
+    async def delete_reaction_role_link_group(request:Request,guild_id:int,group_id:int)->Response:
+        csrf(request);await manage(request,guild_id,live=True);repository,_=reaction_roles_available();repository.dissolve_link_group(guild_id,group_id);return Response(status_code=204)
+
+    @router.post("/guilds/{guild_id}/reaction-roles/preview")
+    async def preview_reaction_role(request:Request,guild_id:int)->dict[str,Any]:
+        csrf(request);await manage(request,guild_id);_,service=reaction_roles_available()
+        try:return service.preview(dict((await request.json()).get("message") or {}))
+        except ReactionRoleValidationError as exc:raise rr_error(exc) from exc
+
+    @router.post("/guilds/{guild_id}/reaction-roles",status_code=201)
+    async def create_reaction_role(request:Request,guild_id:int)->dict[str,Any]:
+        csrf(request);body=await request.json();repository,service=reaction_roles_available()
+        try:
+            value,actor_id=await checked_reaction_role(request,guild_id,body);return rr_payload(repository.create_message(guild_id,value,actor_id))
+        except ReactionRoleValidationError as exc:raise rr_error(exc) from exc
+        except sqlite3.IntegrityError as exc:raise HTTPException(409,detail={"code":"message_exists","message":"このDiscordメッセージはすでに登録されています。"}) from exc
+
+    @router.get("/guilds/{guild_id}/reaction-roles/messages/{config_id}")
+    async def reaction_role_detail(request:Request,guild_id:int,config_id:int)->dict[str,Any]:
+        await manage(request,guild_id);repository,_=reaction_roles_available();value=repository.message(guild_id,config_id)
+        if not value:raise HTTPException(404,detail={"code":"reaction_role_not_found","message":"Reaction Role設定が見つかりません。"})
+        return rr_payload(value)
+
+    @router.put("/guilds/{guild_id}/reaction-roles/messages/{config_id}")
+    async def update_reaction_role(request:Request,guild_id:int,config_id:int)->dict[str,Any]:
+        csrf(request);body=await request.json();repository,_=reaction_roles_available()
+        try:
+            value,actor_id=await checked_reaction_role(request,guild_id,body);revision=int(body.get("revision",body.get("message",{}).get("revision",0)));return rr_payload(repository.update_message(guild_id,config_id,value,revision,actor_id))
+        except ReactionRoleValidationError as exc:raise rr_error(exc) from exc
+        except RuntimeError as exc:raise HTTPException(409,detail={"code":"revision_conflict","message":"別の管理者が設定を更新しました。"}) from exc
+        except KeyError as exc:raise HTTPException(404,detail={"code":"reaction_role_not_found","message":"Reaction Role設定が見つかりません。"}) from exc
+
+    @router.delete("/guilds/{guild_id}/reaction-roles/messages/{config_id}",status_code=204)
+    async def delete_reaction_role(request:Request,guild_id:int,config_id:int,if_match:str|None=Header(default=None))->Response:
+        csrf(request);access=await manage(request,guild_id,live=True);repository,_=reaction_roles_available();config=repository.message(guild_id,config_id)
+        if not config:raise HTTPException(404,detail={"code":"reaction_role_not_found","message":"Reaction Role設定が見つかりません。"})
+        if if_match is None or int(if_match)!=int(config["revision"]):raise HTTPException(409,detail={"code":"revision_conflict","message":"設定を再読み込みしてください。"})
+        actor=await discord.current_user(access,use_cache=False);repository.queue_action(guild_id,config_id,"delete",{"channel_id":config["channel_id"],"message_id":config.get("message_id"),"source":config["source"]});repository.delete_message(guild_id,config_id,recoverable=False,actor_id=int(actor["id"]));return Response(status_code=204)
+
+    @router.post("/guilds/{guild_id}/reaction-roles/messages/{config_id}/fix",status_code=202)
+    async def fix_reaction_role(request:Request,guild_id:int,config_id:int)->dict[str,Any]:
+        csrf(request);await manage(request,guild_id,live=True);repository,_=reaction_roles_available()
+        if not repository.message(guild_id,config_id):raise HTTPException(404,detail={"code":"reaction_role_not_found","message":"Reaction Role設定が見つかりません。"})
+        repository.queue_action(guild_id,config_id,"fix",{});return {"status":"queued"}
+
+    @router.post("/guilds/{guild_id}/reaction-roles/messages/{config_id}/move",status_code=202)
+    async def move_reaction_role(request:Request,guild_id:int,config_id:int)->dict[str,Any]:
+        csrf(request);await manage(request,guild_id,live=True);repository,_=reaction_roles_available();body=await request.json();config=repository.message(guild_id,config_id)
+        if not config:raise HTTPException(404,detail={"code":"reaction_role_not_found","message":"Reaction Role設定が見つかりません。"})
+        channels,_,_=await discord.guild_resources(guild_id,use_cache=False);channel_id=int(body.get("channel_id",0));message_id=int(body.get("message_id",0))
+        if channel_id not in {int(item["id"]) for item in channels if int(item.get("type",-1))==0} or not await discord.channel_message(channel_id,message_id):raise HTTPException(422,detail={"code":"move_invalid","message":"移動先メッセージを確認してください。"})
+        repository.queue_action(guild_id,config_id,"move",{"channel_id":channel_id,"message_id":message_id,"revision":config["revision"]});return {"status":"queued"}
+
+    @router.post("/guilds/{guild_id}/reaction-roles/recoveries/{deleted_message_id}/restore",status_code=201)
+    async def restore_reaction_role(request:Request,guild_id:int,deleted_message_id:int)->dict[str,Any]:
+        csrf(request);await manage(request,guild_id,live=True);repository,_=reaction_roles_available();snapshot=repository.recovery(guild_id,deleted_message_id)
+        if not snapshot:raise HTTPException(404,detail={"code":"recovery_not_found","message":"復旧データが見つかりません。"})
+        body=await request.json();snapshot.update({"source":"external","channel_id":body.get("channel_id"),"message_id":body.get("message_id"),"self_destruct_at":None,"link_group_id":None})
+        try:
+            value,actor_id=await checked_reaction_role(request,guild_id,{"message":snapshot});created=repository.create_message(guild_id,value,actor_id);repository.consume_recovery(guild_id,deleted_message_id);return rr_payload(created)
+        except ReactionRoleValidationError as exc:raise rr_error(exc) from exc
 
     @router.get("/guilds/{guild_id}/modules/{module_id}")
     async def module(request: Request, guild_id: int, module_id: str) -> dict[str, Any]:

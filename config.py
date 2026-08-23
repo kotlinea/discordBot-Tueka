@@ -47,6 +47,7 @@ class Settings:
     ticket_s3_prefix: str
     tickets_v2: bool
     tickets_v2_guilds: tuple[int, ...]
+    reaction_role_max_mappings_per_message: int
     dashboard_base_url: str | None
     data_dir: Path
     database_path: Path
@@ -58,6 +59,7 @@ class Settings:
         "cogs.leveling",
         "cogs.moderation",
         "cogs.safety",
+        "cogs.reaction_roles",
         "cogs.automod",
         "cogs.moderation_commands",
         "cogs.community",
@@ -105,6 +107,7 @@ class Settings:
             ticket_s3_prefix=os.getenv("TICKET_S3_PREFIX", "ticket-transcripts"),
             tickets_v2=os.getenv("TICKETS_V2", "false").lower() == "true",
             tickets_v2_guilds=tuple(int(value.strip()) for value in os.getenv("TICKETS_V2_GUILDS", "").split(",") if value.strip()),
+            reaction_role_max_mappings_per_message=max(1, min(int(os.getenv("REACTION_ROLE_MAX_MAPPINGS_PER_MESSAGE", "20")), 100)),
             dashboard_base_url=os.getenv("DASHBOARD_BASE_URL"),
             data_dir=BASE_DIR / os.getenv("DATA_DIR", "data"),
             database_path=BASE_DIR / os.getenv("DATABASE_PATH", "data/tueka.sqlite3"),
