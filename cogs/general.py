@@ -19,8 +19,32 @@ MAX_EXPRESSION_NODES = 50
 MAX_POWER_EXPONENT = 12
 MAX_ROLL_SIDES = 1_000_000
 _OPERATORS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv, ast.Mod: operator.mod, ast.Pow: operator.pow, ast.USub: operator.neg, ast.UAdd: operator.pos}
-_CATEGORY_NAMES = {"GeneralCog": "基本", "AICog": "AI", "LevelingCog": "レベリング", "ModerationCog": "モデレーション", "AuditLogCog": "サーバーログ", "WelcomeCog": "入退室"}
-_COG_MODULES = {"AICog": None, "LevelingCog": "leveling", "ModerationCog": "moderation", "AuditLogCog": "audit_log", "WelcomeCog": "welcome"}
+_CATEGORY_NAMES = {
+    "GeneralCog": "基本",
+    "AICog": "AI",
+    "LevelingCog": "レベリング",
+    "ModerationCog": "モデレーション",
+    "ModerationCommandsCog": "モデレーション",
+    "TicketsCog": "チケット",
+    "AuditLogCog": "サーバーログ",
+    "WelcomeCog": "入退室",
+}
+_COG_MODULES = {
+    "AICog": None,
+    "LevelingCog": "leveling",
+    "ModerationCog": "moderation",
+    "ModerationCommandsCog": "moderation",
+    "TicketsCog": "tickets",
+    "AuditLogCog": "audit_log",
+    "WelcomeCog": "welcome",
+}
+
+
+def _leaf_commands(command: app_commands.Command | app_commands.Group) -> list[app_commands.Command]:
+    """Expand command groups because Group itself has no Cog binding."""
+    if isinstance(command, app_commands.Group):
+        return [leaf for child in command.commands for leaf in _leaf_commands(child)]
+    return [command]
 
 
 class HelpView(discord.ui.View):
@@ -69,20 +93,22 @@ class GeneralCog(commands.Cog):
 
     async def _available_commands(self, interaction: discord.Interaction, include_all: bool) -> list[tuple[str, list[app_commands.Command]]]:
         categories: dict[str, list[app_commands.Command]] = {}
-        for command in self.bot.tree.get_commands():
-            cog_name = type(command.binding).__name__ if command.binding else "GeneralCog"
-            if not include_all:
-                module_id = _COG_MODULES.get(cog_name)
-                if module_id and interaction.guild and not self.storage.module_enabled(interaction.guild.id, module_id):
-                    continue
-                if cog_name == "AICog" and not getattr(command.binding, "client", None):
-                    continue
-                try:
-                    if not await command._check_can_run(interaction):
+        for top_level_command in self.bot.tree.get_commands():
+            for command in _leaf_commands(top_level_command):
+                binding = getattr(command, "binding", None)
+                cog_name = type(binding).__name__ if binding else "GeneralCog"
+                if not include_all:
+                    module_id = _COG_MODULES.get(cog_name)
+                    if module_id and interaction.guild and not self.storage.module_enabled(interaction.guild.id, module_id):
                         continue
-                except app_commands.AppCommandError:
-                    continue
-            categories.setdefault(_CATEGORY_NAMES.get(cog_name, "その他"), []).append(command)
+                    if cog_name == "AICog" and not getattr(binding, "client", None):
+                        continue
+                    try:
+                        if not await command._check_can_run(interaction):
+                            continue
+                    except app_commands.AppCommandError:
+                        continue
+                categories.setdefault(_CATEGORY_NAMES.get(cog_name, "その他"), []).append(command)
         return list(categories.items())
 
     @app_commands.command(name="help", description="利用できるコマンド一覧を表示します。")

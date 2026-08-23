@@ -9,13 +9,14 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
-from .models import default_panel, default_settings, validate_form, validate_panel, validate_settings
+from .models import default_panel, default_settings, validate_deployment, validate_form, validate_panel, validate_panel_bundle, validate_settings
 
 
 JSON_FIELDS = {
     "role_ids_json": "role_ids", "user_ids_json": "user_ids", "admin_user_ids_json": "admin_user_ids",
     "fields_json": "fields", "config_json": "config", "panel_ids_json": "panel_ids",
     "form_answers_json": "form_answers", "metadata_json": "metadata", "payload_json": "payload",
+    "answers_encrypted_json": "answers_encrypted",
 }
 
 
@@ -83,7 +84,7 @@ class TicketRepository:
                 CREATE TABLE IF NOT EXISTS ticket_panel_messages (
                     id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, name TEXT NOT NULL, channel_id INTEGER NOT NULL, message_id INTEGER,
                     title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', color TEXT NOT NULL DEFAULT '#5865F2',
-                    panel_ids_json TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'draft', last_error TEXT,
+                    panel_ids_json TEXT NOT NULL DEFAULT '[]', config_json TEXT NOT NULL DEFAULT '{}', status TEXT NOT NULL DEFAULT 'draft', last_error TEXT,
                     lease_owner TEXT, lease_until INTEGER, revision INTEGER NOT NULL DEFAULT 1,
                     created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(guild_id,name)
                 );
@@ -93,7 +94,7 @@ class TicketRepository:
                     interaction_id TEXT, mode TEXT NOT NULL, discord_container_id INTEGER, parent_channel_id INTEGER, status TEXT NOT NULL DEFAULT 'creating',
                     claimed_by INTEGER, close_reason TEXT, closed_by INTEGER, form_answers_json TEXT NOT NULL DEFAULT '{}',
                     auto_close_excluded INTEGER NOT NULL DEFAULT 0, last_user_message_at INTEGER, last_message_at INTEGER,
-                    notes_thread_id INTEGER, closing_at INTEGER, created_at INTEGER NOT NULL, opened_at INTEGER, closed_at INTEGER, deleted_at INTEGER, revision INTEGER NOT NULL DEFAULT 1,
+                    notes_thread_id INTEGER, closing_at INTEGER, awaiting_return_category_id INTEGER, created_at INTEGER NOT NULL, opened_at INTEGER, closed_at INTEGER, deleted_at INTEGER, revision INTEGER NOT NULL DEFAULT 1,
                     UNIQUE(guild_id,ticket_number), UNIQUE(interaction_id)
                 );
                 CREATE INDEX IF NOT EXISTS idx_tickets_v2_guild_status ON tickets_v2(guild_id,status,created_at);
@@ -139,7 +140,7 @@ class TicketRepository:
                 );
                 CREATE TABLE IF NOT EXISTS ticket_feedback (
                     ticket_id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, rating INTEGER NOT NULL, comment_encrypted TEXT,
-                    created_at INTEGER NOT NULL
+                    form_id INTEGER, answers_encrypted_json TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS ticket_transcripts (
                     id INTEGER PRIMARY KEY, ticket_id INTEGER NOT NULL, version INTEGER NOT NULL DEFAULT 1, backend TEXT NOT NULL,
@@ -167,6 +168,13 @@ class TicketRepository:
             self._add_column(connection, "tickets_v2", "closing_at", "INTEGER")
             self._add_column(connection, "ticket_panel_messages", "lease_owner", "TEXT")
             self._add_column(connection, "ticket_panel_messages", "lease_until", "INTEGER")
+            self._add_column(connection, "ticket_panel_messages", "config_json", "TEXT NOT NULL DEFAULT '{}'")
+            self._add_column(connection, "ticket_panel_messages", "previous_channel_id", "INTEGER")
+            self._add_column(connection, "ticket_panel_messages", "previous_message_id", "INTEGER")
+            self._add_column(connection, "ticket_panels", "archived_at", "INTEGER")
+            self._add_column(connection, "tickets_v2", "awaiting_return_category_id", "INTEGER")
+            self._add_column(connection, "ticket_feedback", "form_id", "INTEGER")
+            self._add_column(connection, "ticket_feedback", "answers_encrypted_json", "TEXT NOT NULL DEFAULT '{}'")
         self.migrate_legacy()
         self.recover_incomplete_closes()
 
@@ -269,7 +277,8 @@ class TicketRepository:
         return self.form(guild_id, form_id) or {}
 
     def panels(self, guild_id: int) -> list[dict[str, Any]]:
-        values = self._list("ticket_panels", guild_id)
+        with self._connection() as connection:
+            values = [self._item(row) or {} for row in connection.execute("SELECT * FROM ticket_panels WHERE guild_id=? AND archived_at IS NULL ORDER BY id", (guild_id,)).fetchall()]
         return [{**item, **dict(item.get("config") or {}), "enabled": bool(item.get("enabled"))} for item in values]
 
     def panel(self, guild_id: int, panel_id: int) -> dict[str, Any] | None:
@@ -300,17 +309,23 @@ class TicketRepository:
         return self.panel(guild_id, panel_id) or {}
 
     def panel_messages(self, guild_id: int) -> list[dict[str, Any]]:
-        return self._list("ticket_panel_messages", guild_id)
+        return [{**item, **dict(item.get("config") or {})} for item in self._list("ticket_panel_messages", guild_id)]
+
+    def panel_message(self, guild_id: int, message_config_id: int) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            item = self._item(connection.execute("SELECT * FROM ticket_panel_messages WHERE guild_id=? AND id=?", (guild_id, message_config_id)).fetchone())
+        return {**item, **dict(item.get("config") or {})} if item else None
 
     def save_panel_message(self, guild_id: int, value: dict[str, Any], message_config_id: int | None = None, expected_revision: int | None = None) -> dict[str, Any]:
         panel_ids = [int(item) for item in value.get("panel_ids", [])]
         if not panel_ids or len(panel_ids) > 25 or len(set(panel_ids)) != len(panel_ids):
             raise ValueError("panel_ids")
-        name, title, description = str(value.get("name", "")).strip(), str(value.get("title", "")).strip(), str(value.get("description", ""))
-        channel_id = int(value.get("channel_id", 0))
-        color = str(value.get("color") or "#5865F2").upper()
-        if not name or len(name) > 80 or not title or len(title) > 256 or len(description) > 4000 or channel_id <= 0 or not re.fullmatch(r"#[0-9A-F]{6}", color):
+        deployment = validate_deployment(value)
+        name, title, description = deployment["name"], deployment["title"], deployment["description"]
+        channel_id, color = int(deployment["channel_id"] or 0), deployment["color"]
+        if channel_id <= 0:
             raise ValueError("panel_message")
+        config = {key: deployment[key] for key in ("content", "image_url", "thumbnail_url")}
         now = int(time.time())
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -318,33 +333,112 @@ class TicketRepository:
             if count != len(panel_ids):
                 raise ValueError("panel_ids")
             if message_config_id is None:
-                message_config_id = int(connection.execute("INSERT INTO ticket_panel_messages(guild_id,name,channel_id,title,description,color,panel_ids_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                    (guild_id, name, channel_id, title, description, color, json.dumps(panel_ids), now, now)).lastrowid)
+                message_config_id = int(connection.execute("INSERT INTO ticket_panel_messages(guild_id,name,channel_id,title,description,color,panel_ids_json,config_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (guild_id, name, channel_id, title, description, color, json.dumps(panel_ids), json.dumps(config), now, now)).lastrowid)
             else:
                 current = connection.execute("SELECT revision FROM ticket_panel_messages WHERE guild_id=? AND id=?", (guild_id, message_config_id)).fetchone()
                 if not current:
                     raise KeyError("panel_message")
                 if expected_revision is not None and int(current["revision"]) != expected_revision:
                     raise RuntimeError("revision_conflict")
-                connection.execute("UPDATE ticket_panel_messages SET name=?,channel_id=?,title=?,description=?,color=?,panel_ids_json=?,status='draft',revision=revision+1,updated_at=? WHERE guild_id=? AND id=?",
-                    (name, channel_id, title, description, color, json.dumps(panel_ids), now, guild_id, message_config_id))
+                current_full = connection.execute("SELECT channel_id,message_id FROM ticket_panel_messages WHERE guild_id=? AND id=?", (guild_id, message_config_id)).fetchone()
+                moving = int(current_full["channel_id"]) != channel_id and current_full["message_id"] is not None
+                connection.execute("UPDATE ticket_panel_messages SET name=?,channel_id=?,title=?,description=?,color=?,panel_ids_json=?,config_json=?,previous_channel_id=?,previous_message_id=?,status='draft',revision=revision+1,updated_at=? WHERE guild_id=? AND id=?",
+                    (name, channel_id, title, description, color, json.dumps(panel_ids), json.dumps(config), current_full["channel_id"] if moving else None, current_full["message_id"] if moving else None, now, guild_id, message_config_id))
             row = connection.execute("SELECT * FROM ticket_panel_messages WHERE id=?", (message_config_id,)).fetchone()
-        return self._item(row) or {}
+        item = self._item(row) or {}
+        return {**item, **dict(item.get("config") or {})}
 
-    def mark_panel_published(self, config_id: int, message_id: int, error: str | None = None) -> None:
+    def panel_bundle(self, guild_id: int, panel_id: int) -> dict[str, Any] | None:
+        panel = self.panel(guild_id, panel_id)
+        if not panel:
+            return None
+        deployments = [item for item in self.panel_messages(guild_id) if panel_id in [int(value) for value in item.get("panel_ids", [])]]
+        return {"panel": panel, "deployment": deployments[0] if deployments else None, "deployments": deployments,
+                "welcome_embed": panel["welcome_embed"], "permissions": panel["creator_permissions"],
+                "access_rules": panel["access_rules"], "support_hours": panel["support_hours"]}
+
+    def save_panel_bundle(self, guild_id: int, value: dict[str, Any], panel_id: int | None = None) -> dict[str, Any]:
+        normalized, now = validate_panel_bundle(value), int(time.time())
+        panel, deployment = normalized["panel"], normalized["deployment"]
+        expected_panel_revision = int(value.get("panel", {}).get("revision")) if value.get("panel", {}).get("revision") else None
+        columns = {"name", "description", "mode", "form_id", "team_id", "category_id", "thread_parent_channel_id", "staff_notification_channel_id", "enabled", "revision"}
+        config = {key: val for key, val in panel.items() if key not in columns}
         with self._connection() as connection:
-            connection.execute("UPDATE ticket_panel_messages SET message_id=?,status=?,last_error=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=?",
-                               (message_id or None, "error" if error else "published", error[:500] if error else None, int(time.time()), config_id))
+            connection.execute("BEGIN IMMEDIATE")
+            for key, table in (("form_id", "ticket_forms"), ("exit_form_id", "ticket_forms"), ("team_id", "ticket_staff_teams")):
+                if panel.get(key) and not connection.execute(f"SELECT 1 FROM {table} WHERE guild_id=? AND id=?", (guild_id, panel[key])).fetchone():
+                    raise ValueError(key)
+            if panel_id is None:
+                panel_id = int(connection.execute("""INSERT INTO ticket_panels(guild_id,name,description,mode,form_id,team_id,category_id,thread_parent_channel_id,staff_notification_channel_id,config_json,enabled,created_at,updated_at)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""", (guild_id, panel["name"], panel["description"], panel["mode"], panel["form_id"], panel["team_id"], panel["category_id"], panel["thread_parent_channel_id"], panel["staff_notification_channel_id"], json.dumps(config, ensure_ascii=False), int(panel["enabled"]), now, now)).lastrowid)
+            else:
+                current = connection.execute("SELECT revision FROM ticket_panels WHERE guild_id=? AND id=? AND archived_at IS NULL", (guild_id, panel_id)).fetchone()
+                if not current:
+                    raise KeyError("panel")
+                if expected_panel_revision is not None and int(current["revision"]) != expected_panel_revision:
+                    raise RuntimeError("revision_conflict")
+                connection.execute("""UPDATE ticket_panels SET name=?,description=?,mode=?,form_id=?,team_id=?,category_id=?,thread_parent_channel_id=?,staff_notification_channel_id=?,config_json=?,enabled=?,revision=revision+1,updated_at=? WHERE guild_id=? AND id=?""",
+                    (panel["name"], panel["description"], panel["mode"], panel["form_id"], panel["team_id"], panel["category_id"], panel["thread_parent_channel_id"], panel["staff_notification_channel_id"], json.dumps(config, ensure_ascii=False), int(panel["enabled"]), now, guild_id, panel_id))
+            if deployment.get("panel_message_id"):
+                message = connection.execute("SELECT * FROM ticket_panel_messages WHERE guild_id=? AND id=?", (guild_id, deployment["panel_message_id"])).fetchone()
+                if not message:
+                    raise ValueError("panel_message_id")
+                if deployment.get("revision") is not None and int(message["revision"]) != int(deployment["revision"]):
+                    raise RuntimeError("revision_conflict")
+                panel_ids = json.loads(message["panel_ids_json"] or "[]")
+                if panel_id not in panel_ids:
+                    position = deployment.get("position")
+                    panel_ids.insert(min(max(position if position is not None else len(panel_ids), 0), len(panel_ids)), panel_id)
+                channel_id = deployment.get("channel_id") or int(message["channel_id"])
+                moving = channel_id != int(message["channel_id"]) and message["message_id"] is not None
+                message_config = {"content": deployment["content"], "image_url": deployment["image_url"], "thumbnail_url": deployment["thumbnail_url"]}
+                connection.execute("""UPDATE ticket_panel_messages SET name=?,channel_id=?,title=?,description=?,color=?,panel_ids_json=?,config_json=?,previous_channel_id=?,previous_message_id=?,status='draft',last_error=NULL,revision=revision+1,updated_at=? WHERE id=?""",
+                    (deployment["name"] or message["name"], channel_id, deployment["title"] or message["title"], deployment["description"], deployment["color"], json.dumps(panel_ids), json.dumps(message_config), message["channel_id"] if moving else None, message["message_id"] if moving else None, now, message["id"]))
+            elif deployment.get("channel_id"):
+                deployment_name = deployment["name"] or f"{panel['name']} Panel"
+                connection.execute("""INSERT INTO ticket_panel_messages(guild_id,name,channel_id,title,description,color,panel_ids_json,config_json,created_at,updated_at)
+                    VALUES(?,?,?,?,?,?,?,?,?,?)""", (guild_id, deployment_name, deployment["channel_id"], deployment["title"], deployment["description"], deployment["color"], json.dumps([panel_id]), json.dumps({"content": deployment["content"], "image_url": deployment["image_url"], "thumbnail_url": deployment["thumbnail_url"]}), now, now))
+        return self.panel_bundle(guild_id, panel_id) or {}
+
+    def detach_panel(self, guild_id: int, panel_id: int, message_config_id: int) -> bool:
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT panel_ids_json FROM ticket_panel_messages WHERE guild_id=? AND id=?", (guild_id, message_config_id)).fetchone()
+            if not row:
+                return False
+            panel_ids = [int(value) for value in json.loads(row["panel_ids_json"] or "[]") if int(value) != panel_id]
+            connection.execute("UPDATE ticket_panel_messages SET panel_ids_json=?,status=?,last_error=NULL,revision=revision+1,updated_at=? WHERE id=?",
+                               (json.dumps(panel_ids), "draft" if panel_ids else "delete", int(time.time()), message_config_id))
+        return True
+
+    def archive_panel(self, guild_id: int, panel_id: int) -> bool:
+        now = int(time.time())
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            changed = connection.execute("UPDATE ticket_panels SET enabled=0,archived_at=?,revision=revision+1,updated_at=? WHERE guild_id=? AND id=? AND archived_at IS NULL", (now, now, guild_id, panel_id)).rowcount
+            if changed:
+                rows = connection.execute("SELECT id,panel_ids_json FROM ticket_panel_messages WHERE guild_id=?", (guild_id,)).fetchall()
+                for row in rows:
+                    panel_ids = [int(value) for value in json.loads(row["panel_ids_json"] or "[]") if int(value) != panel_id]
+                    if len(panel_ids) != len(json.loads(row["panel_ids_json"] or "[]")):
+                        connection.execute("UPDATE ticket_panel_messages SET panel_ids_json=?,status=?,revision=revision+1,updated_at=? WHERE id=?", (json.dumps(panel_ids), "draft" if panel_ids else "delete", now, row["id"]))
+        return bool(changed)
+
+    def mark_panel_published(self, config_id: int, message_id: int, error: str | None = None, *, deleted: bool = False) -> None:
+        with self._connection() as connection:
+            connection.execute("UPDATE ticket_panel_messages SET message_id=?,previous_channel_id=NULL,previous_message_id=NULL,status=?,last_error=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=?",
+                               (message_id or None, "error" if error else ("detached" if deleted else "published"), error[:500] if error else None, int(time.time()), config_id))
 
     def claim_panel_messages(self, owner: str, limit: int = 5, lease_seconds: int = 60) -> list[dict[str, Any]]:
         now = int(time.time())
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            rows = connection.execute("SELECT * FROM ticket_panel_messages WHERE status='draft' AND (lease_until IS NULL OR lease_until<?) ORDER BY id LIMIT ?", (now, max(1, min(limit, 25)))).fetchall()
+            rows = connection.execute("SELECT * FROM ticket_panel_messages WHERE status IN ('draft','delete') AND (lease_until IS NULL OR lease_until<?) ORDER BY id LIMIT ?", (now, max(1, min(limit, 25)))).fetchall()
             ids = [int(row["id"]) for row in rows]
             if ids:
                 connection.execute(f"UPDATE ticket_panel_messages SET lease_owner=?,lease_until=? WHERE id IN ({','.join('?' for _ in ids)})", (owner, now + lease_seconds, *ids))
-        return [self._item(row) or {} for row in rows]
+        return [{**(self._item(row) or {}), **dict((self._item(row) or {}).get("config") or {})} for row in rows]
 
     def reserve_ticket(self, guild_id: int, panel_id: int, opener_id: int, interaction_id: str, form_answers: dict[str, str], *, staff_exempt: bool = False) -> dict[str, Any]:
         now, settings = int(time.time()), self.settings(guild_id)
@@ -353,13 +447,23 @@ class TicketRepository:
             existing = connection.execute("SELECT * FROM tickets_v2 WHERE interaction_id=?", (interaction_id,)).fetchone()
             if existing:
                 return self._item(existing) or {}
-            if not staff_exempt:
-                count = connection.execute("SELECT COUNT(*) FROM tickets_v2 WHERE guild_id=? AND status IN ('creating','open','closing')", (guild_id,)).fetchone()[0]
-                if count >= settings["open_limit"]:
-                    raise OverflowError("ticket_limit")
-            panel = connection.execute("SELECT mode FROM ticket_panels WHERE guild_id=? AND id=? AND enabled=1", (guild_id, panel_id)).fetchone()
+            panel = connection.execute("SELECT * FROM ticket_panels WHERE guild_id=? AND id=? AND enabled=1 AND archived_at IS NULL", (guild_id, panel_id)).fetchone()
             if not panel:
                 raise KeyError("panel")
+            panel_item = self._item(panel) or {}
+            panel_config = {**default_panel(), **dict(panel_item.get("config") or {})}
+            if not staff_exempt:
+                count = connection.execute("SELECT COUNT(*) FROM tickets_v2 WHERE guild_id=? AND status IN ('creating','open','awaiting_user','closing')", (guild_id,)).fetchone()[0]
+                if count >= settings["open_limit"]:
+                    raise OverflowError("ticket_limit")
+                user_count = connection.execute("SELECT COUNT(*) FROM tickets_v2 WHERE guild_id=? AND panel_id=? AND opener_id=? AND status IN ('creating','open','awaiting_user','closing')", (guild_id, panel_id, opener_id)).fetchone()[0]
+                if user_count >= int(panel_config.get("per_user_open_limit", 1)):
+                    raise OverflowError("user_ticket_limit")
+                cooldown = int(panel_config.get("open_cooldown_seconds", 0))
+                if cooldown:
+                    last_opened = connection.execute("SELECT MAX(opened_at) FROM tickets_v2 WHERE guild_id=? AND panel_id=? AND opener_id=? AND opened_at IS NOT NULL", (guild_id, panel_id, opener_id)).fetchone()[0]
+                    if last_opened and int(last_opened) + cooldown > now:
+                        raise OverflowError(f"ticket_cooldown:{int(last_opened) + cooldown - now}")
             counter = connection.execute("SELECT next_number FROM ticket_counters WHERE guild_id=?", (guild_id,)).fetchone()
             number = int(counter["next_number"]) if counter else 1
             connection.execute("INSERT INTO ticket_counters(guild_id,next_number) VALUES(?,?) ON CONFLICT(guild_id) DO UPDATE SET next_number=excluded.next_number", (guild_id, number + 1))
@@ -406,11 +510,25 @@ class TicketRepository:
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             current = connection.execute("SELECT mode,status,revision FROM tickets_v2 WHERE id=?", (ticket_id,)).fetchone()
-            if not current or current["status"] != "open" or current["mode"] != "channel":
+            if not current or current["status"] not in {"open", "awaiting_user"} or current["mode"] != "channel":
                 raise ValueError("claim_unavailable")
             if expected_revision is not None and int(current["revision"]) != expected_revision:
                 raise RuntimeError("revision_conflict")
             connection.execute("UPDATE tickets_v2 SET claimed_by=?,revision=revision+1 WHERE id=?", (actor_id, ticket_id))
+        return self.ticket(ticket_id) or {}
+
+    def set_awaiting_user(self, ticket_id: int, return_category_id: int) -> dict[str, Any]:
+        with self._connection() as connection:
+            changed = connection.execute("UPDATE tickets_v2 SET status='awaiting_user',awaiting_return_category_id=?,revision=revision+1 WHERE id=? AND status='open'", (return_category_id, ticket_id)).rowcount
+            if not changed:
+                raise RuntimeError("ticket_not_open")
+        return self.ticket(ticket_id) or {}
+
+    def resume_awaiting_user(self, ticket_id: int) -> dict[str, Any]:
+        with self._connection() as connection:
+            changed = connection.execute("UPDATE tickets_v2 SET status='open',awaiting_return_category_id=NULL,revision=revision+1 WHERE id=? AND status='awaiting_user'", (ticket_id,)).rowcount
+            if not changed:
+                raise RuntimeError("ticket_not_awaiting")
         return self.ticket(ticket_id) or {}
 
     def set_notes_thread(self, ticket_id: int, thread_id: int) -> None:
@@ -420,7 +538,7 @@ class TicketRepository:
     def begin_close(self, ticket_id: int, actor_id: int, reason: str) -> dict[str, Any]:
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            result = connection.execute("UPDATE tickets_v2 SET status='closing',closing_at=?,closed_by=?,close_reason=?,revision=revision+1 WHERE id=? AND status='open'", (int(time.time()), actor_id, reason[:1000], ticket_id))
+            result = connection.execute("UPDATE tickets_v2 SET status='closing',closing_at=?,closed_by=?,close_reason=?,revision=revision+1 WHERE id=? AND status IN ('open','awaiting_user')", (int(time.time()), actor_id, reason[:1000], ticket_id))
             if result.rowcount != 1:
                 raise RuntimeError("ticket_not_open")
         return self.ticket(ticket_id) or {}
@@ -702,15 +820,16 @@ class TicketRepository:
             row = connection.execute("SELECT tr.*,t.guild_id,t.opener_id,t.panel_id FROM ticket_transcripts tr JOIN tickets_v2 t ON t.id=tr.ticket_id WHERE tr.id=?", (transcript_id,)).fetchone()
         return self._item(row)
 
-    def save_feedback(self, ticket_id: int, user_id: int, rating: int, comment_encrypted: str | None = None) -> dict[str, Any]:
+    def save_feedback(self, ticket_id: int, user_id: int, rating: int, comment_encrypted: str | None = None,
+                      form_id: int | None = None, answers_encrypted: dict[str, str] | None = None) -> dict[str, Any]:
         if rating < 1 or rating > 5:
             raise ValueError("feedback_rating")
         with self._connection() as connection:
             ticket = connection.execute("SELECT guild_id,opener_id,status FROM tickets_v2 WHERE id=?", (ticket_id,)).fetchone()
             if not ticket or int(ticket["opener_id"]) != user_id or ticket["status"] != "closed":
                 raise PermissionError("feedback_forbidden")
-            connection.execute("INSERT INTO ticket_feedback(ticket_id,user_id,rating,comment_encrypted,created_at) VALUES(?,?,?,?,?)",
-                               (ticket_id, user_id, rating, comment_encrypted, int(time.time())))
+            connection.execute("INSERT INTO ticket_feedback(ticket_id,user_id,rating,comment_encrypted,form_id,answers_encrypted_json,created_at) VALUES(?,?,?,?,?,?,?)",
+                               (ticket_id, user_id, rating, comment_encrypted, form_id, json.dumps(answers_encrypted or {}, ensure_ascii=False), int(time.time())))
             row = connection.execute("SELECT * FROM ticket_feedback WHERE ticket_id=?", (ticket_id,)).fetchone()
         return self._item(row) or {}
 
@@ -721,7 +840,7 @@ class TicketRepository:
 
     def summary(self, guild_id: int) -> dict[str, Any]:
         with self._connection() as connection:
-            open_count = connection.execute("SELECT COUNT(*) FROM tickets_v2 WHERE guild_id=? AND status IN ('creating','open','closing')", (guild_id,)).fetchone()[0]
+            open_count = connection.execute("SELECT COUNT(*) FROM tickets_v2 WHERE guild_id=? AND status IN ('creating','open','awaiting_user','closing')", (guild_id,)).fetchone()[0]
             unclaimed = connection.execute("SELECT COUNT(*) FROM tickets_v2 WHERE guild_id=? AND status='open' AND mode='channel' AND claimed_by IS NULL", (guild_id,)).fetchone()[0]
             closed_30d = connection.execute("SELECT COUNT(*) FROM tickets_v2 WHERE guild_id=? AND status='closed' AND closed_at>=?", (guild_id, int(time.time()) - 30 * 86400)).fetchone()[0]
             rating = connection.execute("SELECT AVG(f.rating) FROM ticket_feedback f JOIN tickets_v2 t ON t.id=f.ticket_id WHERE t.guild_id=?", (guild_id,)).fetchone()[0]

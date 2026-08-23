@@ -10,8 +10,8 @@ const rule = (id: number, name: string) => ({ id, guild_id: 1, family: 'automod'
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/session', route => route.fulfill({ json: session }))
   await page.route('**/api/v1/guilds', route => route.fulfill({ json: { items: [{ id: '1', name: 'Maple Server', icon: null }] } }))
-  await page.route('**/api/v1/guilds/1/overview', route => route.fulfill({ json: { guild_id: '1', features: [feature('moderation','moderation'), feature('automod','moderation','moderation'), feature('anti_spam','moderation','moderation'), feature('anti_raid','moderation','moderation'), feature('infractions','moderation','moderation'), feature('moderation_actions','moderation','moderation'), feature('moderation_logs','moderation','moderation'), welcome, reactionRoles], resources: { channels: [], roles: [], bot_permissions: '8' }, moderation: { summary: {}, events: [], lockdown: null } } }))
-  await page.route('**/api/v1/guilds/1/resources', route => route.fulfill({ json: { channels: [{ id: '123456789012345678', name: '一般', type: 0 }], roles: [{ id: '123456789012345679', name: 'メンバー' }, { id: '123456789012345680', name: '通知' }], bot_permissions: '8' } }))
+  await page.route('**/api/v1/guilds/1/overview', route => route.fulfill({ json: { guild_id: '1', features: [feature('moderation','moderation'), feature('automod','moderation','moderation'), feature('anti_spam','moderation','moderation'), feature('anti_raid','moderation','moderation'), feature('infractions','moderation','moderation'), feature('moderation_actions','moderation','moderation'), feature('moderation_logs','moderation','moderation'), feature('tickets','community'), welcome, reactionRoles], resources: { channels: [], roles: [], bot_permissions: '8' }, moderation: { summary: {}, events: [], lockdown: null } } }))
+  await page.route('**/api/v1/guilds/1/resources', route => route.fulfill({ json: { channels: [{ id: '123456789012345678', name: '一般', type: 0 }, { id: '123456789012345681', name: 'サポート', type: 4 }], roles: [{ id: '123456789012345679', name: 'メンバー' }, { id: '123456789012345680', name: '通知' }], emojis: [{ id: '123456789012345682', name: 'ticket', animated: false }], bot_permissions: '8' } }))
 })
 
 test('resource selections preserve snowflake IDs and module labels are Japanese', async ({ page }) => {
@@ -103,4 +103,38 @@ test('social account registration only requires an account and Discord channel',
   expect(saved?.channel_id).toBe('123456789012345678')
   expect(saved?.events).toEqual(['video','live_start','live_end'])
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false)
+})
+
+test('ticket panel editor keeps one draft across six responsive tabs', async ({ page }) => {
+  let saved: Record<string, any> | undefined
+  const team = { id: 7, name: 'Support', role_ids: ['123456789012345680'], user_ids: [], manager_user_ids: [], notification_channel_id: null, on_call_user_ids: [], revision: 1 }
+  await page.route('**/api/v1/guilds/1/tickets/teams', route => route.fulfill({ json: { items: [team] } }))
+  await page.route('**/api/v1/guilds/1/tickets/forms', route => route.fulfill({ json: { items: [] } }))
+  await page.route('**/api/v1/guilds/1/tickets/panel-messages', route => route.fulfill({ json: { items: [] } }))
+  await page.route('**/api/v1/guilds/1/tickets/panels/bundles', async route => {
+    saved = route.request().postDataJSON()
+    await route.fulfill({ status: 201, json: { ...saved, panel: { ...saved?.panel, id: 9, revision: 1 }, deployment: { ...saved?.deployment, id: 3, panel_ids: [9], revision: 1 }, deployments: [] } })
+  })
+  await page.route('**/api/v1/guilds/1/tickets/panels/preview', route => route.fulfill({ json: { panel_message: { title: 'サポートチケット', description: '下のボタンからお問い合わせください。', content: '' }, button: { style: 'primary', label: 'チケットを作成', emoji: '' }, welcome_message: { title: 'ようこそ', description: '受付しました', fields: [] } } }))
+  await page.goto('/servers/1/tickets/panels/new')
+  await page.getByLabel('設定名').fill('請求サポート')
+  await page.getByLabel('サポートチーム').selectOption('7')
+  await page.getByLabel('チケットカテゴリー').selectOption('123456789012345681')
+  const mobileTabs = page.locator('select').filter({ has: page.locator('option[value="panel"]') })
+  if (await mobileTabs.isVisible()) await mobileTabs.selectOption('panel')
+  else await page.getByRole('tab', { name: 'パネル' }).click()
+  await page.getByLabel('設置名').fill('問い合わせ窓口')
+  await page.getByLabel('パネルチャンネル').selectOption('123456789012345678')
+  await expect(page.getByRole('region', { name: '未保存の変更があります' })).toContainText('2タブ変更')
+  await page.getByRole('region', { name: '未保存の変更があります' }).getByRole('button', { name: 'プレビュー' }).click()
+  await expect(page.getByRole('dialog')).toContainText('サポートチケット')
+  await page.getByRole('dialog').getByRole('button').first().click()
+  await page.getByRole('region', { name: '未保存の変更があります' }).getByRole('button', { name: '保存' }).click()
+  await expect.poll(() => saved).toBeTruthy()
+  expect(saved?.panel.name).toBe('請求サポート')
+  expect(saved?.panel.category_id).toBe('123456789012345681')
+  expect(saved?.deployment.channel_id).toBe('123456789012345678')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false)
+  const results = await new AxeBuilder({ page }).analyze()
+  expect(results.violations.filter(item => ['critical','serious'].includes(item.impact || ''))).toEqual([])
 })

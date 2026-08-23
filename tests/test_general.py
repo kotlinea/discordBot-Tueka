@@ -1,6 +1,8 @@
 import unittest
 
-from cogs.general import HelpView, MAX_ROLL_SIDES, _build_embed, _safe_calculate
+from discord import app_commands
+
+from cogs.general import HelpView, MAX_ROLL_SIDES, _build_embed, _leaf_commands, _safe_calculate
 
 
 class GeneralCommandTests(unittest.TestCase):
@@ -19,6 +21,16 @@ class GeneralCommandTests(unittest.TestCase):
         view = HelpView(1, [("基本", [])])
         self.assertTrue(view.previous.disabled)
         self.assertTrue(view.next.disabled)
+
+    def test_help_expands_command_groups_to_leaf_commands(self):
+        group = app_commands.Group(name="ticket", description="Ticket commands")
+
+        @group.command(name="open", description="Open a ticket")
+        async def open_ticket(interaction):
+            pass
+
+        commands = _leaf_commands(group)
+        self.assertEqual([command.qualified_name for command in commands], ["ticket open"])
 
     def test_roll_limit_is_practical(self):
         self.assertEqual(MAX_ROLL_SIDES, 1_000_000)

@@ -108,6 +108,14 @@ class DiscordAPI:
         value = ([item for item in channels.json() if item.get("type") in {0, 2, 4}], selectable_roles, bot_permissions)
         return self._cache_for("resources", key, value, 30) if use_cache else value
 
+    async def guild_emojis(self, guild_id: int, *, use_cache: bool = True) -> list[dict[str, Any]]:
+        key = str(guild_id)
+        if use_cache and (cached := self._get_cached("emojis", key)) is not None:
+            return cached
+        value = (await self._request("GET", f"/guilds/{guild_id}/emojis", headers={"Authorization": f"Bot {self.bot_token}"})).json()
+        result = [{"id": str(item["id"]), "name": str(item.get("name") or "emoji"), "animated": bool(item.get("animated"))} for item in value]
+        return self._cache_for("emojis", key, result, 30) if use_cache else result
+
     async def guild_member(self, guild_id: int, user_id: int, *, use_cache: bool = True) -> dict[str, Any] | None:
         key = f"{guild_id}:{user_id}"
         if use_cache and (cached := self._get_cached("guild_member", key)) is not None:

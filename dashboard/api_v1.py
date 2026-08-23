@@ -15,7 +15,7 @@ from automod import AutoModEngine, MessageContext, default_rule, validate_rule
 from dashboard.discord_api import ADMINISTRATOR, PERMISSION_BITS
 from feature_registry import FEATURES, get_feature, japanese_copy
 from social_models import PROVIDERS, PROVIDER_EVENTS, TEMPLATE_VARIABLES, default_templates, normalize_account, render_template, validate_subscription
-from ticketing import TicketRepository, TicketService, TicketValidationError, TranscriptStorage, validate_form, validate_panel, validate_settings
+from ticketing import TicketRepository, TicketService, TicketValidationError, TranscriptStorage, default_deployment, default_panel, validate_form, validate_panel, validate_panel_bundle, validate_settings
 
 
 FAMILY_TRIGGERS = {
@@ -221,7 +221,8 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
     @router.get("/guilds/{guild_id}/resources")
     async def guild_resources(request: Request, guild_id: int) -> dict[str, Any]:
         channels, roles, permissions = await resources(request, guild_id)
-        return {"channels": channels, "roles": roles, "bot_permissions": str(permissions)}
+        emojis = await discord.guild_emojis(guild_id)
+        return {"channels": channels, "roles": roles, "emojis": emojis, "bot_permissions": str(permissions)}
 
     def provider_available(provider: str) -> bool:
         if settings is None:
@@ -360,7 +361,8 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         result.pop("payload_json", None)
         singular = ("guild_id", "channel_id", "message_id", "form_id", "team_id", "category_id", "thread_parent_channel_id",
                     "staff_notification_channel_id", "log_channel_id", "transcript_channel_id", "discord_container_id", "parent_channel_id",
-                    "opener_id", "claimed_by", "closed_by", "panel_id", "notification_channel_id")
+                    "opener_id", "claimed_by", "closed_by", "panel_id", "notification_channel_id", "awaiting_category_id",
+                    "exit_form_id", "panel_message_id", "previous_channel_id", "previous_message_id", "awaiting_return_category_id")
         plural = ("role_ids", "user_ids", "admin_user_ids", "required_role_ids", "mention_role_ids", "mention_user_ids", "panel_ids")
         for key in singular:
             if key in result:
@@ -377,11 +379,14 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         for key in ("log_channel_id", "transcript_channel_id", "thread_parent_channel_id", "staff_notification_channel_id", "notification_channel_id", "channel_id"):
             if value.get(key) and channel_types.get(int(value[key])) != 0:
                 raise ValueError(key)
-        if value.get("category_id") and channel_types.get(int(value["category_id"])) != 4:
-            raise ValueError("category_id")
+        for key in ("category_id", "awaiting_category_id"):
+            if value.get(key) and channel_types.get(int(value[key])) != 4:
+                raise ValueError(key)
         for key in ("role_ids", "required_role_ids", "mention_role_ids"):
             if any(int(item) not in role_ids for item in value.get(key, [])):
                 raise ValueError(key)
+        if any(int(item.get("role_id", 0)) not in role_ids for item in value.get("access_rules", [])):
+            raise ValueError("access_rules")
         required: set[str] = set()
         if value.get("category_id"):
             required.update({"manage_channels", "send_messages", "read_message_history", "manage_messages"})
@@ -393,6 +398,26 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
             missing = [name for name in required if not bot_permissions & PERMISSION_BITS[name]]
             if missing:
                 raise ValueError("bot_permissions:" + ",".join(sorted(missing)))
+
+    async def validate_ticket_bundle_resources(guild_id: int, bundle: dict[str, Any]) -> None:
+        panel, deployment = bundle["panel"], bundle["deployment"]
+        await validate_ticket_resources(guild_id, {**panel, **deployment})
+        emoji = str(panel.get("button", {}).get("emoji") or "")
+        if emoji.startswith("<"):
+            match = __import__("re").fullmatch(r"<a?:[A-Za-z0-9_]{2,32}:(\d+)>", emoji)
+            emoji_ids = {int(item["id"]) for item in await discord.guild_emojis(guild_id, use_cache=False)}
+            if not match or int(match.group(1)) not in emoji_ids:
+                raise ValueError("button_emoji")
+
+    def ticket_bundle_payload(value: dict[str, Any]) -> dict[str, Any]:
+        result = dict(value)
+        if result.get("panel"):
+            result["panel"] = ticket_ids(result["panel"])
+            result["panel"]["access_rules"] = [{**rule, "role_id": str(rule["role_id"])} for rule in result["panel"].get("access_rules", [])]
+        if result.get("deployment"):
+            result["deployment"] = ticket_ids(result["deployment"])
+        result["deployments"] = [ticket_ids(item) for item in result.get("deployments", [])]
+        return result
 
     @router.get("/guilds/{guild_id}/tickets")
     async def ticket_overview(request: Request, guild_id: int) -> dict[str, Any]:
@@ -476,6 +501,112 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
     async def ticket_panels(request: Request, guild_id: int) -> dict[str, Any]:
         tickets_available(guild_id); await ticket_actor(request, guild_id, require_manage=True)
         return {"items": [ticket_ids(item) for item in ticket_repository.panels(guild_id)]}
+
+    @router.get("/guilds/{guild_id}/tickets/panels/{panel_id}/editor")
+    async def ticket_panel_editor(request: Request, guild_id: int, panel_id: int) -> dict[str, Any]:
+        tickets_available(guild_id); await ticket_actor(request, guild_id, require_manage=True)
+        bundle = ticket_repository.panel_bundle(guild_id, panel_id)
+        if not bundle:
+            raise HTTPException(404, detail={"code": "ticket_panel_not_found", "message": "Panelが見つかりません。"})
+        return ticket_bundle_payload(bundle)
+
+    @router.post("/guilds/{guild_id}/tickets/panels/bundles", status_code=201)
+    async def create_ticket_panel_bundle(request: Request, guild_id: int) -> dict[str, Any]:
+        csrf(request); tickets_available(guild_id); actor, _ = await ticket_actor(request, guild_id, require_manage=True)
+        try:
+            body = await request.json(); value = validate_panel_bundle(body)
+            await validate_ticket_bundle_resources(guild_id, value)
+            saved = ticket_repository.save_panel_bundle(guild_id, body)
+            ticket_repository.audit(guild_id, "panel_created", actor, detail={"panel_id": saved["panel"]["id"]})
+            return ticket_bundle_payload(saved)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(422, detail={"code": "ticket_panel_invalid", "message": str(exc) or "Ticket設定を確認してください。"}) from exc
+
+    @router.put("/guilds/{guild_id}/tickets/panels/{panel_id}/bundle")
+    async def update_ticket_panel_bundle(request: Request, guild_id: int, panel_id: int) -> dict[str, Any]:
+        csrf(request); tickets_available(guild_id); actor, _ = await ticket_actor(request, guild_id, require_manage=True)
+        try:
+            body = await request.json(); value = validate_panel_bundle(body)
+            await validate_ticket_bundle_resources(guild_id, value)
+            saved = ticket_repository.save_panel_bundle(guild_id, body, panel_id)
+            for ticket in ticket_repository.tickets(guild_id, status="open", limit=200):
+                if int(ticket["panel_id"]) == panel_id:
+                    ticket_service.schedule_ticket(ticket)
+            ticket_repository.audit(guild_id, "panel_updated", actor, detail={"panel_id": panel_id})
+            return ticket_bundle_payload(saved)
+        except RuntimeError as exc:
+            raise HTTPException(409, detail={"code": "revision_conflict", "message": "Panelまたは設置メッセージが別の管理者に更新されています。"}) from exc
+        except (KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(422, detail={"code": "ticket_panel_invalid", "message": str(exc) or "Ticket設定を確認してください。"}) from exc
+
+    @router.post("/guilds/{guild_id}/tickets/panels/preview")
+    async def preview_ticket_panel(request: Request, guild_id: int) -> dict[str, Any]:
+        tickets_available(guild_id); await ticket_actor(request, guild_id, require_manage=True)
+        try:
+            value = validate_panel_bundle(await request.json())
+            sample = {"ticket_number": "42", "user": "@member", "username": "member", "user_id": "123456789", "panel": value["panel"]["name"], "team": "Support"}
+            def render(text: str) -> str:
+                for key, replacement in sample.items(): text = text.replace("{" + key + "}", replacement)
+                return text
+            welcome = value["panel"]["welcome_embed"]
+            rendered = {**welcome, "title": render(welcome["title"]), "description": render(welcome["description"]),
+                        "author": {**welcome["author"], "name": render(welcome["author"]["name"])},
+                        "footer": {**welcome["footer"], "text": render(welcome["footer"]["text"])},
+                        "fields": [{**field, "name": render(field["name"]), "value": render(field["value"])} for field in welcome["fields"]]}
+            return {"panel_message": value["deployment"], "button": value["panel"]["button"], "welcome_message": rendered}
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(422, detail={"code": "ticket_panel_preview_invalid", "message": str(exc)}) from exc
+
+    @router.post("/guilds/{guild_id}/tickets/panels/{panel_id}/duplicate", status_code=201)
+    async def duplicate_ticket_panel(request: Request, guild_id: int, panel_id: int) -> dict[str, Any]:
+        csrf(request); tickets_available(guild_id); actor, _ = await ticket_actor(request, guild_id, require_manage=True)
+        bundle = ticket_repository.panel_bundle(guild_id, panel_id)
+        if not bundle: raise HTTPException(404, detail={"code": "ticket_panel_not_found", "message": "Panelが見つかりません。"})
+        panel = {**bundle["panel"], "name": str(bundle["panel"]["name"] + " のコピー")[:80], "enabled": False}
+        panel.pop("id", None); panel.pop("revision", None); panel.pop("guild_id", None)
+        saved = ticket_repository.save_panel_bundle(guild_id, {"panel": panel, "deployment": default_deployment()})
+        ticket_repository.audit(guild_id, "panel_duplicated", actor, detail={"source_panel_id": panel_id, "panel_id": saved["panel"]["id"]})
+        return ticket_bundle_payload(saved)
+
+    @router.post("/guilds/{guild_id}/tickets/panels/{panel_id}/detach", status_code=202)
+    async def detach_ticket_panel(request: Request, guild_id: int, panel_id: int) -> dict[str, Any]:
+        csrf(request); tickets_available(guild_id); actor, _ = await ticket_actor(request, guild_id, require_manage=True); body = await request.json()
+        if not ticket_repository.detach_panel(guild_id, panel_id, int(body.get("panel_message_id", 0))):
+            raise HTTPException(404, detail={"code": "ticket_panel_message_not_found", "message": "設置済みPanelが見つかりません。"})
+        ticket_repository.audit(guild_id, "panel_detach_queued", actor, detail={"panel_id": panel_id})
+        return {"status": "queued"}
+
+    @router.delete("/guilds/{guild_id}/tickets/panels/{panel_id}", status_code=204)
+    async def archive_ticket_panel(request: Request, guild_id: int, panel_id: int) -> Response:
+        csrf(request); tickets_available(guild_id); actor, _ = await ticket_actor(request, guild_id, require_manage=True)
+        if not ticket_repository.archive_panel(guild_id, panel_id):
+            raise HTTPException(404, detail={"code": "ticket_panel_not_found", "message": "Panelが見つかりません。"})
+        ticket_repository.audit(guild_id, "panel_archived", actor, detail={"panel_id": panel_id})
+        return Response(status_code=204)
+
+    @router.get("/guilds/{guild_id}/tickets/panels/{panel_id}/export")
+    async def export_ticket_panel(request: Request, guild_id: int, panel_id: int) -> dict[str, Any]:
+        tickets_available(guild_id); await ticket_actor(request, guild_id, require_manage=True)
+        bundle = ticket_repository.panel_bundle(guild_id, panel_id)
+        if not bundle: raise HTTPException(404, detail={"code": "ticket_panel_not_found", "message": "Panelが見つかりません。"})
+        panel = dict(bundle["panel"]); [panel.pop(key, None) for key in ("id", "guild_id", "revision", "created_at", "updated_at", "archived_at")]
+        team = ticket_repository.team(guild_id, int(panel["team_id"])) if panel.get("team_id") else None
+        forms = [ticket_repository.form(guild_id, int(form_id)) for form_id in {panel.get("form_id"), panel.get("exit_form_id")} if form_id]
+        return {"schema": "tueka.ticket-panel.v1", "panel": panel, "team": team, "forms": [item for item in forms if item], "deployment": default_deployment()}
+
+    @router.post("/guilds/{guild_id}/tickets/panels/import", status_code=201)
+    async def import_ticket_panel(request: Request, guild_id: int) -> dict[str, Any]:
+        csrf(request); tickets_available(guild_id); actor, _ = await ticket_actor(request, guild_id, require_manage=True); body = await request.json()
+        if body.get("schema") != "tueka.ticket-panel.v1":
+            raise HTTPException(422, detail={"code": "ticket_import_version", "message": "対応していないExport形式です。"})
+        try:
+            value = {"panel": {**body.get("panel", {}), **body.get("mapping", {}), "enabled": False}, "deployment": default_deployment()}
+            normalized = validate_panel_bundle(value); await validate_ticket_bundle_resources(guild_id, normalized)
+            saved = ticket_repository.save_panel_bundle(guild_id, value)
+            ticket_repository.audit(guild_id, "panel_imported", actor, detail={"panel_id": saved["panel"]["id"]})
+            return ticket_bundle_payload(saved)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(422, detail={"code": "ticket_import_mapping_required", "message": str(exc), "fields": ["team_id", "category_id", "form_id", "exit_form_id"]}) from exc
 
     @router.post("/guilds/{guild_id}/tickets/panels", status_code=201)
     async def create_ticket_panel(request: Request, guild_id: int) -> dict[str, Any]:
@@ -578,7 +709,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         if not ticket or int(ticket["guild_id"]) != guild_id: raise HTTPException(404, detail={"code": "ticket_not_found", "message": "Ticketが見つかりません。"})
         await ticket_subject_access(request, guild_id, ticket, actor, administrator)
         action = str(body.get("action", ""))
-        if action not in {"claim", "unclaim", "close", "reopen", "delete", "exclude_auto_close"}: raise HTTPException(422, detail={"code": "ticket_action_invalid", "message": "操作を確認してください。"})
+        if action not in {"claim", "unclaim", "close", "reopen", "delete", "exclude_auto_close", "awaiting_user"}: raise HTTPException(422, detail={"code": "ticket_action_invalid", "message": "操作を確認してください。"})
         item = ticket_repository.queue_outbox(ticket_id, action, actor, {"reason": str(body.get("reason", ""))[:1000], "revision": body.get("revision"), "excluded": body.get("excluded", True)})
         return {"id": item["id"], "status": item["status"]}
 
@@ -597,6 +728,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         payload = await ticket_transcripts.load(transcript["backend"], transcript["object_key"], transcript["content_hash"])
         panel = ticket_repository.panel(int(transcript["guild_id"]), int(transcript["panel_id"]))
         payload["feedback_enabled"] = bool(panel and panel.get("feedback_enabled"))
+        payload["feedback_form"] = ticket_repository.form(int(transcript["guild_id"]), int(panel["exit_form_id"])) if panel and panel.get("exit_form_id") else None
         return payload
 
     @router.get("/tickets/attachments/{attachment_id}")
@@ -626,7 +758,20 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         comment = str(body.get("comment") or "").strip()
         if len(comment) > 1000: raise HTTPException(422, detail={"code": "feedback_invalid", "message": "コメントは1000文字以内で入力してください。"})
         try:
-            saved = ticket_repository.save_feedback(ticket_id, user_id, int(body.get("rating", 0)), ticket_transcripts.encrypt_text(comment) if comment else None)
+            form = ticket_repository.form(int(ticket["guild_id"]), int(panel["exit_form_id"])) if panel.get("exit_form_id") else None
+            answers = {str(key): str(value).strip() for key, value in dict(body.get("answers") or {}).items()}
+            if form:
+                permitted = {field["key"] for field in form["fields"]}
+                if set(answers) - permitted: raise ValueError("feedback_answers")
+                for field in form["fields"]:
+                    answer = answers.get(field["key"], "")
+                    if field["required"] and not answer: raise ValueError(field["key"])
+                    if answer and not int(field["min_length"]) <= len(answer) <= int(field["max_length"]): raise ValueError(field["key"])
+            elif answers:
+                raise ValueError("feedback_answers")
+            encrypted_answers = {key: ticket_transcripts.encrypt_text(value) for key, value in answers.items()}
+            saved = ticket_repository.save_feedback(ticket_id, user_id, int(body.get("rating", 0)), ticket_transcripts.encrypt_text(comment) if comment else None,
+                int(form["id"]) if form else None, encrypted_answers)
             ticket_repository.audit(int(ticket["guild_id"]), "feedback_submitted", user_id, ticket_id, {"rating": saved["rating"]})
             return {"rating": saved["rating"], "created_at": saved["created_at"]}
         except PermissionError as exc: raise HTTPException(403, detail={"code": "feedback_forbidden", "message": "このTicketを評価できません。"}) from exc

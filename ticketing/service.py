@@ -33,6 +33,11 @@ class TicketService:
         with self.repository._connection() as connection:
             if connection.execute("SELECT 1 FROM ticket_blacklist WHERE guild_id=? AND user_id=?", (guild_id, opener_id)).fetchone():
                 raise TicketValidationError("blacklisted", "チケットの作成が制限されています。")
+        access_rules = panel.get("access_rules") or []
+        denied = {int(rule["role_id"]) for rule in access_rules if not rule.get("allow", True)}
+        allowed = {int(rule["role_id"]) for rule in access_rules if rule.get("allow", True)}
+        if denied.intersection(role_ids) or (allowed and not allowed.intersection(role_ids)):
+            raise TicketValidationError("panel_forbidden", "このチケットを作成する権限がありません。")
         is_open, next_open = support_is_open(panel)
         if not is_open:
             suffix = f" 次回受付: {next_open.strftime('%Y-%m-%d %H:%M %Z')}" if next_open else ""
@@ -57,7 +62,13 @@ class TicketService:
         try:
             ticket = self.repository.reserve_ticket(guild_id, panel_id, opener_id, interaction_id, encrypted_answers, staff_exempt=staff_exempt)
         except OverflowError as exc:
-            raise TicketValidationError("ticket_limit", "同時に開けるチケット数の上限に達しています。") from exc
+            code = str(exc)
+            if code.startswith("ticket_cooldown:"):
+                seconds = code.partition(":")[2]
+                raise TicketValidationError("ticket_cooldown", f"次のチケットを作成できるまであと{seconds}秒です。") from exc
+            if code == "user_ticket_limit":
+                raise TicketValidationError("user_ticket_limit", "この種類で同時に開けるチケット数の上限に達しています。") from exc
+            raise TicketValidationError("ticket_limit", "サーバー全体の同時受付上限に達しています。") from exc
         self.repository.audit(guild_id, "ticket_reserved", opener_id, ticket["id"], {"panel_id": panel_id})
         return ticket, panel
 
@@ -95,7 +106,7 @@ class TicketService:
 
     def queue_reply(self, ticket_id: int, actor_id: int, actor_name: str, content: str, *, anonymous: bool = False, note: bool = False) -> dict[str, Any]:
         ticket = self.repository.ticket(ticket_id)
-        if not ticket or ticket["status"] != "open":
+        if not ticket or ticket["status"] not in {"open", "awaiting_user"}:
             raise TicketValidationError("ticket_closed", "開いているチケットではありません。")
         clean = content.strip()
         if not clean or len(clean) > 2000:
@@ -106,7 +117,7 @@ class TicketService:
 
     async def close(self, ticket_id: int, actor_id: int, reason: str) -> tuple[dict[str, Any], dict[str, Any]]:
         ticket = self.repository.ticket(ticket_id)
-        if not ticket or ticket["status"] != "open":
+        if not ticket or ticket["status"] not in {"open", "awaiting_user"}:
             raise TicketValidationError("ticket_closed", "開いているチケットではありません。")
         ticket = self.repository.begin_close(ticket_id, actor_id, reason)
         try:

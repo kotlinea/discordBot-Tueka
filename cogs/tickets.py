@@ -1,10 +1,12 @@
 """Ticket V2 Discord workflow."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import socket
 import sqlite3
+from datetime import datetime, timezone
 from typing import Any
 
 import discord
@@ -29,6 +31,43 @@ class TicketFormModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction) -> None:
         answers = {field["key"]: str(child.value) for field, child in zip(self.fields, self.children)}
         await self.cog.create_ticket(interaction, self.panel["id"], answers)
+
+
+class TicketCloseReasonModal(discord.ui.Modal):
+    reason = discord.ui.TextInput(label="Close理由", style=discord.TextStyle.paragraph, min_length=1, max_length=1000)
+
+    def __init__(self, cog: "TicketsCog", ticket_id: int) -> None:
+        super().__init__(title="理由を入力してClose", custom_id=f"tueka-ticket:close-reason-submit:{ticket_id}")
+        self.cog, self.ticket_id = cog, ticket_id
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        ticket = self.cog.repository.ticket(self.ticket_id)
+        if not ticket:
+            await interaction.response.send_message("Ticketが見つかりません。", ephemeral=True); return
+        await interaction.response.defer(ephemeral=True)
+        await self.cog.close_container(interaction, ticket, str(self.reason.value))
+
+
+class TicketFeedbackModal(discord.ui.Modal):
+    def __init__(self, cog: "TicketsCog", ticket_id: int, rating: int, form: dict[str, Any]) -> None:
+        super().__init__(title=str(form["title"])[:45], custom_id=f"tueka-ticket-feedback-submit:{ticket_id}:{rating}")
+        self.cog, self.ticket_id, self.rating, self.fields = cog, ticket_id, rating, form["fields"]
+        for field in self.fields:
+            self.add_item(discord.ui.TextInput(label=field["label"], custom_id=field["key"], placeholder=field["placeholder"] or None,
+                style=discord.TextStyle.paragraph if field["style"] == "paragraph" else discord.TextStyle.short,
+                required=field["required"], min_length=field["min_length"] or None, max_length=field["max_length"]))
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        answers = {field["key"]: self.cog.transcripts.encrypt_text(str(child.value)) for field, child in zip(self.fields, self.children)}
+        try:
+            ticket = self.cog.repository.ticket(self.ticket_id) or {}
+            panel = self.cog.repository.panel(int(ticket.get("guild_id", 0)), int(ticket.get("panel_id", 0))) or {}
+            self.cog.repository.save_feedback(self.ticket_id, interaction.user.id, self.rating, form_id=panel.get("exit_form_id"), answers_encrypted=answers)
+            await interaction.response.send_message("評価を送信しました。", ephemeral=True)
+        except sqlite3.IntegrityError:
+            await interaction.response.send_message("このTicketは評価済みです。", ephemeral=True)
+        except (PermissionError, ValueError):
+            await interaction.response.send_message("この評価は受け付けられません。", ephemeral=True)
 
 
 class TicketsCog(commands.Cog):
@@ -65,6 +104,40 @@ class TicketsCog(commands.Cog):
             return True
         team = self.repository.team(member.guild.id, int(panel["team_id"])) if panel and panel.get("team_id") else None
         return bool(team and (member.id in team.get("user_ids", []) or member.id in team.get("admin_user_ids", []) or any(role.id in team.get("role_ids", []) for role in member.roles)))
+
+    @staticmethod
+    def _render(value: str, ticket: dict[str, Any], panel: dict[str, Any], member: discord.Member, team: dict[str, Any] | None) -> str:
+        replacements = {"ticket_number": ticket["ticket_number"], "user": member.mention, "username": member.name,
+                        "user_id": member.id, "panel": panel["name"], "team": (team or {}).get("name", "Support")}
+        result = str(value or "")
+        for key, replacement in replacements.items():
+            result = result.replace("{" + key + "}", str(replacement))
+        return result
+
+    def _welcome_embed(self, ticket: dict[str, Any], panel: dict[str, Any], member: discord.Member, team: dict[str, Any] | None) -> discord.Embed:
+        config = panel.get("welcome_embed") or {}
+        timestamp = datetime.now(timezone.utc) if config.get("footer", {}).get("timestamp") else None
+        embed = discord.Embed(title=self._render(config.get("title", ""), ticket, panel, member, team) or None,
+            description=self._render(config.get("description", ""), ticket, panel, member, team) or None,
+            url=config.get("title_url") or None, color=int(str(config.get("color") or "#5865F2").lstrip("#"), 16), timestamp=timestamp)
+        author = config.get("author") or {}
+        if author.get("enabled") and author.get("name"):
+            embed.set_author(name=self._render(author["name"], ticket, panel, member, team), url=author.get("url") or None, icon_url=author.get("icon_url") or None)
+        footer = config.get("footer") or {}
+        if footer.get("enabled") and footer.get("text"):
+            embed.set_footer(text=self._render(footer["text"], ticket, panel, member, team), icon_url=footer.get("icon_url") or None)
+        if config.get("image_url"): embed.set_image(url=config["image_url"])
+        if config.get("thumbnail_url"): embed.set_thumbnail(url=config["thumbnail_url"])
+        for field in config.get("fields", []):
+            embed.add_field(name=self._render(field["name"], ticket, panel, member, team), value=self._render(field["value"], ticket, panel, member, team), inline=bool(field.get("inline")))
+        return embed
+
+    async def _remove_open_mentions(self, message: discord.Message, ticket: dict[str, Any]) -> None:
+        await asyncio.sleep(5)
+        try:
+            await message.edit(content=None, allowed_mentions=discord.AllowedMentions.none())
+        except discord.HTTPException as exc:
+            self.repository.audit(int(ticket["guild_id"]), "opening_mentions_remove_failed", self.bot.user.id if self.bot.user else None, int(ticket["id"]), {"error": type(exc).__name__})
 
     async def _capture_attachments(self, ticket: dict[str, Any], attachments: list[discord.Attachment]) -> list[dict[str, Any]]:
         existing = {int(item["discord_attachment_id"]): item for item in self.repository.attachments(int(ticket["id"]))}
@@ -160,7 +233,10 @@ class TicketsCog(commands.Cog):
                 overwrites: dict[Any, discord.PermissionOverwrite] = {
                     guild.default_role: discord.PermissionOverwrite(view_channel=False),
                     member: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True,
-                        attach_files=panel["creator_permissions"]["attach_files"], add_reactions=panel["creator_permissions"]["add_reactions"], send_tts_messages=panel["creator_permissions"]["send_tts_messages"]),
+                        attach_files=panel["creator_permissions"]["attach_files"], add_reactions=panel["creator_permissions"]["add_reactions"],
+                        send_tts_messages=panel["creator_permissions"]["send_tts_messages"], embed_links=panel["creator_permissions"]["embed_links"],
+                        use_external_emojis=panel["creator_permissions"]["use_external_emojis"], use_external_stickers=panel["creator_permissions"]["use_external_stickers"],
+                        send_voice_messages=panel["creator_permissions"]["send_voice_messages"]),
                     guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True, manage_messages=True, read_message_history=True),
                 }
                 for role_id in (team or {}).get("role_ids", []):
@@ -197,7 +273,11 @@ class TicketsCog(commands.Cog):
             controls.add_item(discord.ui.Button(label="参加", style=discord.ButtonStyle.secondary, custom_id=f"tueka-ticket:join:{ticket['id']}"))
         if panel.get("show_close_button"):
             controls.add_item(discord.ui.Button(label="Close", style=discord.ButtonStyle.danger, custom_id=f"tueka-ticket:close:{ticket['id']}"))
-        embed = discord.Embed(title=f"Ticket #{ticket['ticket_number']} · {panel['name']}", description=panel["description"], color=int(panel["color"].lstrip("#"), 16))
+        if panel.get("show_close_reason_button"):
+            controls.add_item(discord.ui.Button(label="理由を入力してClose", style=discord.ButtonStyle.secondary, custom_id=f"tueka-ticket:close-reason:{ticket['id']}"))
+        if panel.get("awaiting_category_id") and panel["mode"] == "channel":
+            controls.add_item(discord.ui.Button(label="回答待ち", style=discord.ButtonStyle.secondary, custom_id=f"tueka-ticket:awaiting:{ticket['id']}"))
+        embed = self._welcome_embed(ticket, panel, member, team)
         if answers:
             for key, encrypted in ticket.get("form_answers", {}).items():
                 embed.add_field(name=key[:256], value=self.transcripts.decrypt_text(encrypted)[:1024] or "-", inline=False)
@@ -205,6 +285,8 @@ class TicketsCog(commands.Cog):
         content = " ".join([member.mention] + [role.mention for role in mentions if role])
         message = await container.send(content=content, embed=embed, view=controls,
             allowed_mentions=discord.AllowedMentions(everyone=False, users=[member], roles=[role for role in mentions if role]))
+        if panel.get("remove_mentions"):
+            asyncio.create_task(self._remove_open_mentions(message, ticket))
         self.service.record_message(ticket, message.id, self.bot.user.id if self.bot.user else None, str(self.bot.user), "Ticket opened", [], kind="system", created_at=int(message.created_at.timestamp()))
         if panel["mode"] == "private_thread":
             notify = guild.get_channel(int(panel["staff_notification_channel_id"]))
@@ -250,6 +332,15 @@ class TicketsCog(commands.Cog):
                 await opener.send(f"Ticket #{ticket['ticket_number']} をCloseしました。", view=view, allowed_mentions=discord.AllowedMentions.none())
             except (discord.Forbidden, discord.HTTPException):
                 self.repository.audit(interaction.guild.id, "close_dm_failed", interaction.user.id, ticket["id"])
+        transcript_channel_id = panel.get("transcript_channel_id") or settings.get("transcript_channel_id")
+        transcript_destination = interaction.guild.get_channel(int(transcript_channel_id or 0))
+        if isinstance(transcript_destination, discord.TextChannel):
+            try:
+                base = str(self.bot.settings.dashboard_base_url or "").rstrip("/")
+                link = f"[Transcript #{transcript['id']}]({base}/tickets/transcripts/{transcript['id']})" if base else f"Transcript #{transcript['id']}"
+                await transcript_destination.send(f"Ticket #{ticket['ticket_number']} · {panel.get('name', 'Ticket')} · {link}\nClose理由: {reason[:1000]}", allowed_mentions=discord.AllowedMentions.none())
+            except discord.HTTPException as exc:
+                self.repository.audit(interaction.guild.id, "transcript_notification_failed", interaction.user.id, ticket["id"], {"error": type(exc).__name__})
         if isinstance(channel, discord.Thread):
             await channel.edit(archived=True, locked=True, reason="Ticket closed")
         elif isinstance(channel, discord.TextChannel):
@@ -264,8 +355,16 @@ class TicketsCog(commands.Cog):
             parts = custom_id.split(":")
             if len(parts) == 3 and parts[1].isdigit() and parts[2].isdigit():
                 try:
-                    self.repository.save_feedback(int(parts[1]), interaction.user.id, int(parts[2]))
-                    await interaction.response.send_message("評価を送信しました。", ephemeral=True)
+                    ticket = self.repository.ticket(int(parts[1])) or {}
+                    panel = self.repository.panel(int(ticket.get("guild_id", 0)), int(ticket.get("panel_id", 0))) or {}
+                    if not panel.get("feedback_enabled"):
+                        raise PermissionError("feedback_disabled")
+                    form = self.repository.form(int(ticket["guild_id"]), int(panel["exit_form_id"])) if panel.get("exit_form_id") else None
+                    if form and form.get("fields"):
+                        await interaction.response.send_modal(TicketFeedbackModal(self, int(parts[1]), int(parts[2]), form))
+                    else:
+                        self.repository.save_feedback(int(parts[1]), interaction.user.id, int(parts[2]))
+                        await interaction.response.send_message("評価を送信しました。", ephemeral=True)
                 except sqlite3.IntegrityError:
                     await interaction.response.send_message("このTicketは評価済みです。", ephemeral=True)
                 except (PermissionError, ValueError):
@@ -302,6 +401,8 @@ class TicketsCog(commands.Cog):
         ticket = self.repository.ticket(entity_id)
         if not ticket:
             await interaction.response.send_message("Ticketが見つかりません。", ephemeral=True); return
+        if action == "close-reason":
+            await interaction.response.send_modal(TicketCloseReasonModal(self, entity_id)); return
         await interaction.response.defer(ephemeral=True)
         if action == "join" and isinstance(interaction.user, discord.Member):
             panel = self.repository.panel(interaction.guild.id, int(ticket["panel_id"]))
@@ -319,16 +420,41 @@ class TicketsCog(commands.Cog):
             await interaction.followup.send("TicketをClaimしました。", ephemeral=True)
         elif action == "close":
             await self.close_container(interaction, ticket, "解決済み")
+        elif action == "awaiting" and isinstance(interaction.user, discord.Member):
+            panel = self.repository.panel(interaction.guild.id, int(ticket["panel_id"])) or {}
+            if not await self._staff(interaction.user, panel):
+                await interaction.followup.send("Staffだけが回答待ちへ変更できます。", ephemeral=True); return
+            channel = interaction.guild.get_channel(int(ticket.get("discord_container_id") or 0))
+            category = interaction.guild.get_channel(int(panel.get("awaiting_category_id") or 0))
+            if not isinstance(channel, discord.TextChannel) or not isinstance(category, discord.CategoryChannel):
+                await interaction.followup.send("回答待ちCategoryを確認してください。", ephemeral=True); return
+            original_category = channel.category_id or int(panel.get("category_id") or 0)
+            try:
+                await channel.edit(category=category, reason="Ticket awaiting user")
+                self.repository.set_awaiting_user(ticket["id"], original_category)
+                self.repository.audit(interaction.guild.id, "ticket_awaiting_user", interaction.user.id, ticket["id"])
+                await interaction.followup.send("Ticketを回答待ちへ変更しました。", ephemeral=True)
+            except (discord.HTTPException, RuntimeError):
+                await interaction.followup.send("回答待ちへ変更できませんでした。", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
         if not message.guild or message.author.bot or not self.enabled(message.guild.id):
             return
         ticket = self.repository.ticket_for_container(message.channel.id)
-        if ticket and ticket["status"] == "open" and self.transcripts.available:
+        if ticket and ticket["status"] in {"open", "awaiting_user"} and self.transcripts.available:
             attachments = await self._capture_attachments(ticket, message.attachments)
             self.service.record_message(ticket, message.id, message.author.id, str(message.author), message.content,
                 attachments, created_at=int(message.created_at.timestamp()))
+            if ticket["status"] == "awaiting_user" and message.author.id == int(ticket["opener_id"]) and isinstance(message.channel, discord.TextChannel):
+                category = message.guild.get_channel(int(ticket.get("awaiting_return_category_id") or 0))
+                if isinstance(category, discord.CategoryChannel):
+                    try:
+                        await message.channel.edit(category=category, reason="Ticket opener replied")
+                        self.repository.resume_awaiting_user(ticket["id"])
+                        self.repository.audit(message.guild.id, "ticket_resumed", message.author.id, ticket["id"])
+                    except (discord.HTTPException, RuntimeError) as exc:
+                        self.repository.audit(message.guild.id, "ticket_resume_failed", message.author.id, ticket["id"], {"error": type(exc).__name__})
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
@@ -605,6 +731,17 @@ class TicketsCog(commands.Cog):
                     self.service.schedule_ticket(self.repository.ticket(ticket["id"]) or ticket)
                     self.repository.complete_outbox(item["id"], self.owner)
                     continue
+                if action == "awaiting_user":
+                    panel = self.repository.panel(int(ticket["guild_id"]), int(ticket["panel_id"])) or {}
+                    category = guild.get_channel(int(panel.get("awaiting_category_id") or 0)) if guild else None
+                    if not isinstance(channel, discord.TextChannel) or not isinstance(category, discord.CategoryChannel):
+                        raise RuntimeError("Awaiting category unavailable")
+                    original_category = channel.category_id or int(panel.get("category_id") or 0)
+                    await channel.edit(category=category, reason="Ticket awaiting user")
+                    self.repository.set_awaiting_user(ticket["id"], original_category)
+                    self.repository.audit(int(ticket["guild_id"]), "ticket_awaiting_user", int(item["actor_id"]), ticket["id"])
+                    self.repository.complete_outbox(item["id"], self.owner)
+                    continue
                 if action == "delete":
                     if isinstance(channel, (discord.TextChannel, discord.Thread)):
                         await channel.delete(reason="Ticket deleted from dashboard")
@@ -651,19 +788,44 @@ class TicketsCog(commands.Cog):
             try:
                 if not isinstance(channel, discord.TextChannel):
                     raise RuntimeError("Panel channel unavailable")
+                if config.get("status") == "delete":
+                    if config.get("message_id"):
+                        try:
+                            message = await channel.fetch_message(int(config["message_id"]))
+                            await message.delete()
+                        except discord.NotFound:
+                            pass
+                    self.repository.mark_panel_published(config["id"], 0, deleted=True)
+                    continue
                 view = discord.ui.View(timeout=None)
+                styles = {"primary": discord.ButtonStyle.primary, "secondary": discord.ButtonStyle.secondary,
+                          "success": discord.ButtonStyle.success, "danger": discord.ButtonStyle.danger}
                 for panel_id in config.get("panel_ids", []):
                     panel = self.repository.panel(guild.id, int(panel_id))
                     if panel and panel.get("enabled"):
-                        view.add_item(discord.ui.Button(label=str(panel["name"])[:80], style=discord.ButtonStyle.primary, custom_id=f"tueka-ticket:open:{panel['id']}"))
+                        button = panel.get("button") or {}
+                        view.add_item(discord.ui.Button(label=str(button.get("label") or panel["name"])[:80], style=styles.get(str(button.get("style")), discord.ButtonStyle.primary),
+                            emoji=str(button.get("emoji")) or None, custom_id=f"tueka-ticket:open:{panel['id']}"))
                 if not view.children:
                     raise RuntimeError("No enabled panels")
                 embed = discord.Embed(title=str(config["title"])[:256], description=str(config.get("description") or "")[:4000], color=int(str(config.get("color") or "#5865F2").lstrip("#"), 16))
+                if config.get("image_url"): embed.set_image(url=str(config["image_url"]))
+                if config.get("thumbnail_url"): embed.set_thumbnail(url=str(config["thumbnail_url"]))
                 old = None
                 if config.get("message_id"):
                     try: old = await channel.fetch_message(int(config["message_id"]))
                     except discord.NotFound: pass
-                message = await old.edit(embed=embed, view=view) if old else await channel.send(embed=embed, view=view, allowed_mentions=discord.AllowedMentions.none())
+                message = await old.edit(content=str(config.get("content") or "") or None, embed=embed, view=view, allowed_mentions=discord.AllowedMentions.none()) if old else await channel.send(content=str(config.get("content") or "") or None, embed=embed, view=view, allowed_mentions=discord.AllowedMentions.none())
+                if config.get("previous_channel_id") and config.get("previous_message_id"):
+                    previous_channel = guild.get_channel(int(config["previous_channel_id"]))
+                    if isinstance(previous_channel, discord.TextChannel):
+                        try:
+                            previous = await previous_channel.fetch_message(int(config["previous_message_id"]))
+                            await previous.delete()
+                        except discord.NotFound:
+                            pass
+                        except discord.HTTPException as exc:
+                            self.repository.audit(guild.id, "panel_reposition_partial", self.bot.user.id if self.bot.user else None, detail={"panel_message_id": config["id"], "error": type(exc).__name__})
                 self.repository.mark_panel_published(config["id"], message.id)
             except Exception as exc:
                 self.repository.mark_panel_published(config["id"], int(config.get("message_id") or 0), str(exc))
