@@ -51,6 +51,7 @@ class ReactionRoleRepository:
                 id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, channel_id INTEGER NOT NULL, message_id INTEGER,
                 name TEXT NOT NULL, source TEXT NOT NULL CHECK(source IN ('bot','external')),
                 behavior_type TEXT NOT NULL, locked INTEGER NOT NULL DEFAULT 0 CHECK(locked IN (0,1)),
+                access_policy TEXT NOT NULL DEFAULT 'blacklist' CHECK(access_policy IN ('whitelist','blacklist')),
                 selection_limit INTEGER, temp_duration_seconds INTEGER, self_destruct_at INTEGER,
                 embed_json TEXT NOT NULL DEFAULT '{}', link_group_id INTEGER, enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)),
                 status TEXT NOT NULL DEFAULT 'pending', last_error TEXT, revision INTEGER NOT NULL DEFAULT 1,
@@ -105,6 +106,9 @@ class ReactionRoleRepository:
                 created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, PRIMARY KEY(guild_id,deleted_message_id)
             );
             """)
+            columns={row["name"] for row in c.execute("PRAGMA table_info(reaction_role_messages_v2)").fetchall()}
+            if "access_policy" not in columns:
+                c.execute("ALTER TABLE reaction_role_messages_v2 ADD COLUMN access_policy TEXT NOT NULL DEFAULT 'blacklist'")
 
     def settings(self, guild_id: int) -> dict[str, Any]:
         with self.connection() as c:
@@ -139,6 +143,8 @@ class ReactionRoleRepository:
             "emoji_name": item["emoji_name"], "animated": bool(item["animated"]), "role_id": item["role_id"], "max_members": item["max_members"], "position": item["position"]} for item in mappings]
         value["whitelist_role_ids"] = [item["role_id"] for item in access if item["policy"] == "whitelist"]
         value["blacklist_role_ids"] = [item["role_id"] for item in access if item["policy"] == "blacklist"]
+        if value["whitelist_role_ids"] and not value["blacklist_role_ids"]:
+            value["access_policy"] = "whitelist"
         return value
 
     def message(self, guild_id: int, config_id: int) -> dict[str, Any] | None:
@@ -181,8 +187,8 @@ class ReactionRoleRepository:
     def create_message(self, guild_id: int, value: dict[str, Any], actor_id: int | None = None) -> dict[str, Any]:
         now = int(time.time())
         with self.connection() as c:
-            cursor = c.execute("""INSERT INTO reaction_role_messages_v2(guild_id,channel_id,message_id,name,source,behavior_type,locked,selection_limit,temp_duration_seconds,self_destruct_at,embed_json,link_group_id,enabled,status,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (guild_id,value["channel_id"],value["message_id"],value["name"],value["source"],value["behavior_type"],int(value["locked"]),value["selection_limit"],value["temp_duration_seconds"],value["self_destruct_at"],json.dumps(value["embed"],ensure_ascii=False),value["link_group_id"],int(value["enabled"]),"active" if value["message_id"] else "pending",now,now))
+            cursor = c.execute("""INSERT INTO reaction_role_messages_v2(guild_id,channel_id,message_id,name,source,behavior_type,locked,access_policy,selection_limit,temp_duration_seconds,self_destruct_at,embed_json,link_group_id,enabled,status,created_at,updated_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (guild_id,value["channel_id"],value["message_id"],value["name"],value["source"],value["behavior_type"],int(value["locked"]),value["access_policy"],value["selection_limit"],value["temp_duration_seconds"],value["self_destruct_at"],json.dumps(value["embed"],ensure_ascii=False),value["link_group_id"],int(value["enabled"]),"active" if value["message_id"] else "pending",now,now))
             config_id = int(cursor.lastrowid); self._replace_children(c, config_id, value)
             if value["source"] == "bot": self._queue(c, guild_id, config_id, "publish", {})
             if value["self_destruct_at"]: self._schedule(c,guild_id,config_id,None,None,"self_destruct",value["self_destruct_at"])
@@ -196,8 +202,8 @@ class ReactionRoleRepository:
             if not row: raise KeyError(config_id)
             if int(row["revision"]) != expected_revision: raise RuntimeError("revision_conflict")
             if row["source"] == "external" and value["source"] != "external": raise ValueError("source_immutable")
-            c.execute("""UPDATE reaction_role_messages_v2 SET channel_id=?,message_id=?,name=?,behavior_type=?,locked=?,selection_limit=?,temp_duration_seconds=?,self_destruct_at=?,embed_json=?,link_group_id=?,enabled=?,status='pending',last_error=NULL,revision=revision+1,updated_at=? WHERE id=?""",
-                (value["channel_id"],value["message_id"],value["name"],value["behavior_type"],int(value["locked"]),value["selection_limit"],value["temp_duration_seconds"],value["self_destruct_at"],json.dumps(value["embed"],ensure_ascii=False),value["link_group_id"],int(value["enabled"]),now,config_id))
+            c.execute("""UPDATE reaction_role_messages_v2 SET channel_id=?,message_id=?,name=?,behavior_type=?,locked=?,access_policy=?,selection_limit=?,temp_duration_seconds=?,self_destruct_at=?,embed_json=?,link_group_id=?,enabled=?,status='pending',last_error=NULL,revision=revision+1,updated_at=? WHERE id=?""",
+                (value["channel_id"],value["message_id"],value["name"],value["behavior_type"],int(value["locked"]),value["access_policy"],value["selection_limit"],value["temp_duration_seconds"],value["self_destruct_at"],json.dumps(value["embed"],ensure_ascii=False),value["link_group_id"],int(value["enabled"]),now,config_id))
             self._replace_children(c, config_id, value); self._queue(c,guild_id,config_id,"sync",{})
             c.execute("DELETE FROM reaction_role_schedules WHERE message_config_id=? AND kind='self_destruct' AND state='pending'",(config_id,))
             if value["self_destruct_at"]:self._schedule(c,guild_id,config_id,None,None,"self_destruct",value["self_destruct_at"])
@@ -293,14 +299,18 @@ class ReactionRoleRepository:
     def claim_outbox(self,owner:str,limit:int=20)->list[dict[str,Any]]:
         now=int(time.time())
         with self.connection() as c:
-            rows=c.execute("SELECT * FROM reaction_role_outbox WHERE state='pending' AND next_attempt_at<=? AND (lease_until IS NULL OR lease_until<?) ORDER BY id LIMIT ?",(now,now,limit)).fetchall()
-            ids=[row["id"] for row in rows]
-            if ids: c.execute(f"UPDATE reaction_role_outbox SET lease_owner=?,lease_until=? WHERE id IN ({','.join('?' for _ in ids)})",(owner,now+30,*ids))
+            lease_until=now+30
+            c.execute("""UPDATE reaction_role_outbox SET lease_owner=?,lease_until=? WHERE id IN (
+                SELECT id FROM reaction_role_outbox WHERE state='pending' AND next_attempt_at<=?
+                AND (lease_until IS NULL OR lease_until<?) ORDER BY id LIMIT ?)""",(owner,lease_until,now,now,limit))
+            rows=c.execute("SELECT * FROM reaction_role_outbox WHERE state='pending' AND lease_owner=? AND lease_until=? ORDER BY id",(owner,lease_until)).fetchall()
         return [{**dict(row),"payload":json.loads(row["payload_json"])} for row in rows]
 
     def finish_outbox(self,item_id:int,owner:str,error:str|None=None,retry:bool=False)->None:
         with self.connection() as c:
-            if error and retry: c.execute("UPDATE reaction_role_outbox SET attempts=attempts+1,last_error=?,lease_owner=NULL,lease_until=NULL,next_attempt_at=?,state='pending' WHERE id=? AND lease_owner=?",(error[:500],int(time.time())+min(300,2**min(8,item_id)),item_id,owner))
+            row=c.execute("SELECT attempts FROM reaction_role_outbox WHERE id=? AND lease_owner=?",(item_id,owner)).fetchone()
+            attempts=int(row["attempts"])+1 if row else 1
+            if error and retry: c.execute("UPDATE reaction_role_outbox SET attempts=?,last_error=?,lease_owner=NULL,lease_until=NULL,next_attempt_at=?,state='pending' WHERE id=? AND lease_owner=?",(attempts,error[:500],int(time.time())+min(300,2**min(8,attempts)),item_id,owner))
             else: c.execute("UPDATE reaction_role_outbox SET attempts=attempts+1,last_error=?,lease_owner=NULL,lease_until=NULL,state=? WHERE id=? AND lease_owner=?",(error[:500] if error else None,"failed" if error else "done",item_id,owner))
 
     def set_discord_message(self,config_id:int,message_id:int,status:str="active",error:str|None=None)->None:

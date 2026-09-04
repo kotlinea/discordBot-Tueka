@@ -3,15 +3,17 @@ import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import discord
 from discord.ext import commands
+from cogs.reaction_roles import ReactionRolesCog
 from reaction_roles.models import ReactionRoleValidationError, normalize_emoji, validate_message
 from reaction_roles.repository import ReactionRoleRepository
 from reaction_roles.service import ReactionRoleService
 
 
-def message(*, emoji="é", role_id=20, behavior="normal", channel_id=10):
+def message(*, emoji="😀", role_id=20, behavior="normal", channel_id=10):
     return {
         "name": "Roles",
         "source": "bot",
@@ -19,6 +21,7 @@ def message(*, emoji="é", role_id=20, behavior="normal", channel_id=10):
         "message_id": None,
         "behavior_type": behavior,
         "locked": False,
+        "access_policy": "blacklist",
         "selection_limit": 1 if behavior in {"unique", "binding"} else None,
         "temp_duration_seconds": 60 if behavior == "temp" else None,
         "self_destruct_at": None,
@@ -32,11 +35,19 @@ def message(*, emoji="é", role_id=20, behavior="normal", channel_id=10):
 
 
 class ReactionRoleModelTests(unittest.TestCase):
-    def test_unicode_is_normalized_and_custom_emoji_uses_id(self):
-        self.assertEqual(normalize_emoji("e\u0301")["key"], normalize_emoji("é")["key"])
+    def test_unicode_emoji_and_custom_emoji_are_normalized(self):
+        self.assertEqual(normalize_emoji("❤️")["key"], "unicode:❤️")
+        for value in ("👍🏽", "👨‍👩‍👧‍👦", "🇯🇵", "1️⃣", "☕", "⚙️"):
+            with self.subTest(value=value):
+                self.assertEqual(normalize_emoji(value)["display"], value)
         custom = normalize_emoji("<a:party:123456789012345678>")
         self.assertEqual(custom["key"], "custom:123456789012345678")
         self.assertTrue(custom["animated"])
+
+    def test_non_emoji_unicode_and_multiple_emoji_are_rejected(self):
+        for value in ("A", "é", "😀😀", "123", "<:bad:123>"):
+            with self.subTest(value=value), self.assertRaises(ReactionRoleValidationError):
+                normalize_emoji(value)
 
     def test_duplicate_roles_and_conflicting_access_are_rejected(self):
         value = message()
@@ -45,9 +56,15 @@ class ReactionRoleModelTests(unittest.TestCase):
             validate_message(value)
         self.assertEqual(duplicate.exception.path, "mappings.1.role_id")
         value = message()
-        value.update({"whitelist_role_ids": [30], "blacklist_role_ids": [30]})
-        with self.assertRaises(ReactionRoleValidationError):
+        value.update({"whitelist_role_ids": [30], "blacklist_role_ids": [40]})
+        with self.assertRaises(ReactionRoleValidationError) as conflict:
             validate_message(value)
+        self.assertEqual(conflict.exception.code, "access_conflict")
+        value = message()
+        value.update({"access_policy": "whitelist", "blacklist_role_ids": [40]})
+        with self.assertRaises(ReactionRoleValidationError) as mismatch:
+            validate_message(value)
+        self.assertEqual(mismatch.exception.code, "access_policy_conflict")
 
     def test_type_constraints_are_typed(self):
         value = message(behavior="temp")
@@ -93,13 +110,24 @@ class ReactionRoleRepositoryTests(unittest.TestCase):
         self.assertTrue(self.service.decide(saved, mapping, event="add", user_id=99, member_role_ids=set()).allowed)
 
     def test_blacklist_precedes_whitelist_and_remove_is_always_allowed(self):
-        saved = self.service.create(1, {**message(), "whitelist_role_ids": [30], "blacklist_role_ids": [40]})
+        saved = self.service.create(1, {**message(), "access_policy": "blacklist", "blacklist_role_ids": [40]})
         mapping = saved["mappings"][0]
+        # Runtime remains defensive for legacy rows that predate the single-policy model.
+        saved["whitelist_role_ids"] = [30]
         denied = self.service.decide(saved, mapping, event="add", user_id=1, member_role_ids={30, 40})
         self.assertFalse(denied.allowed)
         removed = self.service.decide(saved, mapping, event="remove", user_id=1, member_role_ids={40})
         self.assertTrue(removed.allowed)
         self.assertEqual(removed.operation, "remove")
+
+    def test_access_policy_is_persisted_and_outbox_claim_is_exclusive(self):
+        saved = self.service.create(1, {**message(), "access_policy": "whitelist", "whitelist_role_ids": [30]})
+        self.assertEqual(saved["access_policy"], "whitelist")
+        self.assertEqual(saved["whitelist_role_ids"], [30])
+        first = self.repo.claim_outbox("worker-a")
+        second = self.repo.claim_outbox("worker-b")
+        self.assertEqual(len(first), 1)
+        self.assertEqual(second, [])
 
     def test_link_group_is_global_unique_and_rejects_incompatible_types(self):
         first = self.service.create(1, message(role_id=20))
@@ -128,6 +156,66 @@ class ReactionRoleRepositoryTests(unittest.TestCase):
 
 
 class ReactionRoleCogTests(unittest.IsolatedAsyncioTestCase):
+    async def test_custom_emoji_must_belong_to_the_current_guild(self):
+        interaction = SimpleNamespace(guild=SimpleNamespace(emojis=[SimpleNamespace(id=123456789012345678)]))
+        ReactionRolesCog._validate_guild_emojis(interaction, {"mappings": [{"emoji": "<:party:123456789012345678>"}]})
+        with self.assertRaises(ReactionRoleValidationError):
+            ReactionRolesCog._validate_guild_emojis(interaction, {"mappings": [{"emoji": "<:other:223456789012345678>"}]})
+
+    async def test_publish_retry_reuses_the_message_created_before_reaction_failure(self):
+        config = {**message(), "id": 7, "guild_id": 1, "message_id": None, "mappings": [{"emoji": "✅", "role_id": 20}]}
+        item = {"id": 8, "guild_id": 1, "message_config_id": 7, "action": "publish", "payload": {}}
+
+        class FakeMessage:
+            id = 900
+            failures = 1
+
+            async def edit(self, **_kwargs):
+                return self
+
+            async def add_reaction(self, _emoji):
+                if self.failures:
+                    self.failures -= 1
+                    raise Exception("reaction failed")
+
+        fake_message = FakeMessage()
+
+        class FakeChannel:
+            send_count = 0
+
+            async def send(self, **_kwargs):
+                self.send_count += 1
+                return fake_message
+
+            async def fetch_message(self, message_id):
+                self.assert_message_id = message_id
+                return fake_message
+
+        channel = FakeChannel()
+
+        class FakeRepository:
+            def claim_outbox(self, _owner): return [item]
+            def message(self, _guild_id, _config_id): return config
+            def set_discord_message(self, _config_id, message_id, status="active", error=None):
+                config["message_id"] = message_id
+                config["status"] = status
+            def set_delivery_status(self, _config_id, status, error=None): config["status"] = status
+            def finish_outbox(self, *_args, **_kwargs): pass
+
+        guild = SimpleNamespace(id=1, get_channel=lambda _channel_id: channel)
+        cog = object.__new__(ReactionRolesCog)
+        cog.bot = SimpleNamespace(get_guild=lambda _guild_id: guild)
+        cog.repository = FakeRepository()
+        cog.owner = "test-worker"
+
+        with patch("cogs.reaction_roles.discord.TextChannel", FakeChannel), patch("cogs.reaction_roles.discord.Thread", FakeChannel):
+            await ReactionRolesCog.process_outbox.coro(cog)
+            self.assertEqual(config["message_id"], 900)
+            self.assertEqual(channel.send_count, 1)
+            await ReactionRolesCog.process_outbox.coro(cog)
+            self.assertEqual(channel.send_count, 1)
+            self.assertEqual(config["status"], "active")
+
     async def test_command_groups_load_without_discord_connection(self):
         with tempfile.TemporaryDirectory() as directory:
             bot = commands.Bot(command_prefix="/", intents=discord.Intents.none())

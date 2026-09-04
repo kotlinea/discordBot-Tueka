@@ -98,8 +98,21 @@ class ReactionRolesCog(commands.Cog):
     def _editable(config: dict[str, Any]) -> dict[str, Any]:
         return {key: config.get(key) for key in default_message()}
 
+    @staticmethod
+    def _validate_guild_emojis(interaction: discord.Interaction, value: dict[str, Any]) -> None:
+        allowed_ids = {emoji.id for emoji in interaction.guild.emojis} if interaction.guild else set()
+        for index, mapping in enumerate(value.get("mappings", [])):
+            normalized = normalize_emoji(str(mapping.get("emoji") or ""))
+            if normalized["emoji_id"] is not None and normalized["emoji_id"] not in allowed_ids:
+                raise ReactionRoleValidationError(
+                    "emoji_invalid",
+                    "標準絵文字またはこのサーバーの絵文字を選択してください。",
+                    f"mappings.{index}.emoji",
+                )
+
     async def _save_edit(self, interaction: discord.Interaction, config: dict[str, Any], value: dict[str, Any]) -> None:
         try:
+            self._validate_guild_emojis(interaction, value)
             updated = self.service.update(interaction.guild_id, config["id"], value, config["revision"], interaction.user.id)
             await interaction.response.send_message(f"{updated['name']} を更新しました。", ephemeral=True)
         except ReactionRoleValidationError as exc:
@@ -111,6 +124,7 @@ class ReactionRolesCog(commands.Cog):
         value = default_message(); value.update({"channel_id": channel.id, "source": "external" if message_id else "bot", "message_id": int(message_id) if message_id else None})
         value["embed"]["title"] = title; value["mappings"]=[{"emoji":emoji,"role_id":role.id}]
         try:
+            self._validate_guild_emojis(interaction, value)
             created=self.service.create(interaction.guild_id,value,interaction.user.id);await interaction.response.send_message(f"Reaction Role #{created['id']} を作成しました。",ephemeral=True)
         except ReactionRoleValidationError as exc:await interaction.response.send_message(exc.message,ephemeral=True)
 
@@ -242,7 +256,7 @@ class ReactionRolesCog(commands.Cog):
         if behavior not in BEHAVIOR_TYPES:await interaction.response.send_message("Typeを確認してください。",ephemeral=True);return
         value=default_message();value.update({"channel_id":channel.id,"behavior_type":behavior});value["embed"]["title"]=title;value["mappings"]=[{"emoji":emoji,"role_id":role.id}]
         if behavior=="temp":value["temp_duration_seconds"]=3600
-        try:created=self.service.create(interaction.guild_id,value,interaction.user.id);await interaction.response.send_message(f"Reaction Role #{created['id']} を作成しました。",ephemeral=True)
+        try:self._validate_guild_emojis(interaction,value);created=self.service.create(interaction.guild_id,value,interaction.user.id);await interaction.response.send_message(f"Reaction Role #{created['id']} を作成しました。",ephemeral=True)
         except ReactionRoleValidationError as exc:await interaction.response.send_message(exc.message,ephemeral=True)
 
     @short.command(name="show")
@@ -258,7 +272,7 @@ class ReactionRolesCog(commands.Cog):
         config=self._config(interaction.guild_id,config_id);value=self._editable(config);value["mappings"]=[{"emoji":item["emoji"],"role_id":item["role_id"],"max_members":item.get("max_members")} for item in config["mappings"] if item["role_id"]!=role.id];await self._save_edit(interaction,config,value)
     async def _short_aio(self,interaction:discord.Interaction,channel:discord.TextChannel,emoji:str,role:discord.Role,behavior:str)->None:
         value=default_message();value.update({"channel_id":channel.id,"behavior_type":behavior,"selection_limit":1 if behavior in {"unique","binding"} else None});value["mappings"]=[{"emoji":emoji,"role_id":role.id}]
-        try:created=self.service.create(interaction.guild_id,value,interaction.user.id);await interaction.response.send_message(f"Reaction Role #{created['id']} を作成しました。",ephemeral=True)
+        try:self._validate_guild_emojis(interaction,value);created=self.service.create(interaction.guild_id,value,interaction.user.id);await interaction.response.send_message(f"Reaction Role #{created['id']} を作成しました。",ephemeral=True)
         except ReactionRoleValidationError as exc:await interaction.response.send_message(exc.message,ephemeral=True)
     @short.command(name="aio")
     async def short_aio(self,interaction:discord.Interaction,channel:discord.TextChannel,emoji:str,role:discord.Role)->None:await self._short_aio(interaction,channel,emoji,role,"normal")
@@ -412,7 +426,16 @@ class ReactionRolesCog(commands.Cog):
                 if config.get("message_id"):
                     try:message=await channel.fetch_message(config["message_id"])
                     except discord.NotFound:pass
-                if config["source"]=="bot":message=await message.edit(embed=embed,allowed_mentions=discord.AllowedMentions.none()) if message else await channel.send(embed=embed,allowed_mentions=discord.AllowedMentions.none())
+                if config["source"]=="bot":
+                    if message:
+                        message=await message.edit(embed=embed,allowed_mentions=discord.AllowedMentions.none())
+                    else:
+                        message=await channel.send(embed=embed,allowed_mentions=discord.AllowedMentions.none())
+                        # Persist the Discord identity before adding reactions. If a
+                        # later reaction fails, the retry repairs this message instead
+                        # of publishing a new one every time the outbox is claimed.
+                        self.repository.set_discord_message(config["id"],message.id,status="publishing")
+                        config["message_id"]=message.id
                 elif not message:raise RuntimeError("external_message_missing")
                 for mapping in config["mappings"]:
                     try:await message.add_reaction(mapping["emoji"])
