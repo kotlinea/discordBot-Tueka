@@ -47,9 +47,9 @@ class SocialWorker:
             self.failures[provider] = 0
             interval = self.settings.social_poll_interval_seconds if provider in {"tiktok", "instagram"} and result.interval_seconds >= 120 else result.interval_seconds
             jitter = random.randint(0, max(1, interval // 10))
-            self.storage.complete_social_target(target["id"], self.owner, status="active", cursor=result.cursor,
+            self.storage.complete_social_target(target["id"], self.owner, status=result.status, cursor=result.cursor,
                 next_check_at=int(time.time()) + interval + jitter, external_id=result.external_id, handle=result.handle,
-                display_name=result.display_name, avatar_url=result.avatar_url)
+                display_name=result.display_name, avatar_url=result.avatar_url, error=result.error)
         except Exception as exc:
             failures = self.failures.get(provider, 0) + 1
             self.failures[provider] = failures

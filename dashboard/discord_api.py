@@ -14,11 +14,49 @@ MANAGEMENT_PERMISSIONS = 0x0000000000000008 | 0x0000000000000010 | 0x00000000000
 PERMISSION_BITS = {
     "send_messages": 1 << 11, "view_audit_log": 1 << 7, "manage_messages": 1 << 13,
     "manage_channels": 1 << 4, "manage_roles": 1 << 28, "move_members": 1 << 24,
-    "add_reactions": 1 << 6,
+    "add_reactions": 1 << 6, "view_channel": 1 << 10,
     "moderate_members": 1 << 40, "kick_members": 1 << 1, "ban_members": 1 << 2,
     "read_message_history": 1 << 16, "embed_links": 1 << 14, "attach_files": 1 << 15,
     "manage_threads": 1 << 34, "create_private_threads": 1 << 36, "send_messages_in_threads": 1 << 38,
 }
+
+
+def effective_channel_permissions(
+    guild_id: int,
+    bot_user_id: int,
+    bot_role_ids: set[int],
+    guild_permissions: int,
+    overwrites: list[dict[str, Any]],
+) -> int:
+    """Resolve Discord channel overwrites for the dashboard's bot member."""
+    if guild_permissions & ADMINISTRATOR:
+        return (1 << 53) - 1
+
+    permissions = guild_permissions
+    everyone = next(
+        (item for item in overwrites if int(item.get("type", -1)) == 0 and int(item.get("id", 0)) == guild_id),
+        None,
+    )
+    if everyone:
+        permissions &= ~int(everyone.get("deny", "0"))
+        permissions |= int(everyone.get("allow", "0"))
+
+    role_denies = role_allows = 0
+    for item in overwrites:
+        if int(item.get("type", -1)) == 0 and int(item.get("id", 0)) in bot_role_ids:
+            role_denies |= int(item.get("deny", "0"))
+            role_allows |= int(item.get("allow", "0"))
+    permissions &= ~role_denies
+    permissions |= role_allows
+
+    member = next(
+        (item for item in overwrites if int(item.get("type", -1)) == 1 and int(item.get("id", 0)) == bot_user_id),
+        None,
+    )
+    if member:
+        permissions &= ~int(member.get("deny", "0"))
+        permissions |= int(member.get("allow", "0"))
+    return permissions
 
 
 class DiscordAPI:
@@ -106,7 +144,20 @@ class DiscordAPI:
             if int(role["id"]) in bot_role_ids or role.get("name") == "@everyone":
                 bot_permissions |= int(role.get("permissions", "0"))
         selectable_roles = [item for item in all_roles if item.get("name") != "@everyone" and not item.get("managed") and int(item.get("position", 0)) < bot_top_position and not (int(item.get("permissions", "0")) & MANAGEMENT_PERMISSIONS)]
-        value = ([item for item in channels.json() if item.get("type") in {0, 2, 4}], selectable_roles, bot_permissions)
+        visible_channels = []
+        for raw_channel in channels.json():
+            if raw_channel.get("type") not in {0, 2, 4}:
+                continue
+            channel = dict(raw_channel)
+            channel["bot_permissions"] = str(effective_channel_permissions(
+                guild_id,
+                int(self.client_id),
+                bot_role_ids,
+                bot_permissions,
+                list(channel.get("permission_overwrites") or []),
+            ))
+            visible_channels.append(channel)
+        value = (visible_channels, selectable_roles, bot_permissions)
         return self._cache_for("resources", key, value, 30) if use_cache else value
 
     async def guild_emojis(self, guild_id: int, *, use_cache: bool = True) -> list[dict[str, Any]]:

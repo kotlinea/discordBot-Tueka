@@ -1,5 +1,7 @@
 # Tickets V2 operations
 
+> 最新の正本は[サポートチケット](./features/tickets.md)です。この文書は旧リンクとの互換のため、1リリースだけ保持します。
+
 Tickets V2 is released together with Dashboard V2. Enable it only after the
 Bot, dashboard, and rebuilt frontend assets have been deployed from the same
 revision.

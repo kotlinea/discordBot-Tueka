@@ -54,11 +54,19 @@ async def dashboard_lifespan(_: FastAPI):
         await api.close()
 
 
-app = FastAPI(title="Tueka Dashboard", lifespan=dashboard_lifespan)
+app = FastAPI(
+    title="Tueka Dashboard",
+    lifespan=dashboard_lifespan,
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json",
+    redoc_url=None,
+)
 app.add_middleware(SessionMiddleware, secret_key=session_secret, https_only=os.getenv("DASHBOARD_HTTPS_ONLY", "true").lower() == "true", same_site="lax")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 app.mount("/ui", StaticFiles(directory=FRONTEND_DIST, check_dir=False), name="dashboard-v2")
+DOCS_DIST = BASE_DIR.parent / "docs" / ".vitepress" / "dist"
+app.mount("/docs", StaticFiles(directory=DOCS_DIST, html=True, check_dir=False), name="documentation")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 app.include_router(create_api_router(storage, api, settings))
 
@@ -116,6 +124,11 @@ async def server_timing(request: Request, call_next):
         metrics = end_timing(token)
     total = (time.perf_counter() - started) * 1000
     response.headers["Server-Timing"] = f"app;dur={total:.1f}, discord;dur={metrics['discord_ms']:.1f}, template;dur={metrics['template_ms']:.1f}"
+    if request.url.path.startswith("/docs/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable" if "/assets/" in request.url.path else "public, max-age=300, must-revalidate"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
 
 

@@ -1,5 +1,7 @@
 # DiscordBot-Tueka 現状・進捗
 
+> この時点記録は公開仕様ではありません。現在の構成は[アーキテクチャ](./reference/architecture.md)、利用方法は[公式ドキュメント](./index.md)を参照してください。この文書は1リリースだけ保持します。
+
 最終更新: 2026-08-14
 
 実VPSでのみ実施できる確認は [DEPLOYMENT_TODO.md](DEPLOYMENT_TODO.md) に分離している。

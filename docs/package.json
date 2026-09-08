@@ -1,0 +1,17 @@
+{
+  "name": "tueka-documentation",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev --host 127.0.0.1",
+    "build": "vitepress build",
+    "preview": "vitepress preview --host 127.0.0.1"
+  },
+  "devDependencies": {
+    "@fontsource/geist-mono": "^5.2.6",
+    "@fontsource/noto-sans-jp": "^5.2.6",
+    "@fontsource/space-grotesk": "^5.2.6",
+    "vitepress": "^1.6.4"
+  }
+}

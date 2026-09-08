@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 
 PROVIDERS = ("youtube", "twitch", "tiktok", "x", "instagram")
@@ -17,21 +18,69 @@ PROVIDER_EVENTS = {
 TEMPLATE_VARIABLES = ("account", "handle", "title", "text", "url", "platform", "event", "published_at", "thumbnail", "avatar", "viewer_count")
 VARIABLE_PATTERN = re.compile(r"\{(" + "|".join(TEMPLATE_VARIABLES) + r")\}")
 UNKNOWN_VARIABLE_PATTERN = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
+YOUTUBE_CHANNEL_ID = re.compile(r"UC[A-Za-z0-9_-]{22}")
+YOUTUBE_HANDLE_SEPARATORS = frozenset("_-.·")
+
+
+def _youtube_identifier(value: str) -> str:
+    candidate = unicodedata.normalize("NFC", unquote(value).strip()).lstrip("@")
+    if YOUTUBE_CHANNEL_ID.fullmatch(candidate):
+        return candidate
+    if not candidate or len(candidate) > 30 or candidate[0] in YOUTUBE_HANDLE_SEPARATORS or candidate[-1] in YOUTUBE_HANDLE_SEPARATORS:
+        raise ValueError("YouTube handle is invalid")
+    for character in candidate:
+        if character in YOUTUBE_HANDLE_SEPARATORS:
+            continue
+        if unicodedata.category(character)[0] not in {"L", "M", "N"}:
+            raise ValueError("YouTube handle is invalid")
+    directions = {unicodedata.bidirectional(character) for character in candidate}
+    if directions & {"L"} and directions & {"R", "AL"}:
+        raise ValueError("YouTube handle cannot mix left-to-right and right-to-left scripts")
+    return candidate.casefold()
+
+
+def _normalize_youtube_account(value: str) -> str:
+    candidate = value.strip()
+    if not candidate:
+        raise ValueError("YouTube channel is required")
+    if not candidate.startswith(("http://", "https://")):
+        return _youtube_identifier(candidate)
+
+    parsed = urlparse(candidate)
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if host != "youtube.com" and not host.endswith(".youtube.com"):
+        raise ValueError("YouTube channel URL must use youtube.com")
+    parts = [unquote(part) for part in parsed.path.split("/") if part]
+    if not parts:
+        raise ValueError("YouTube channel URL does not contain a channel identifier")
+    kind = parts[0].lower()
+    if kind == "channel":
+        if len(parts) < 2 or not YOUTUBE_CHANNEL_ID.fullmatch(parts[1]):
+            raise ValueError("YouTube channel ID is invalid")
+        return parts[1]
+    if kind in {"c", "user"}:
+        if len(parts) < 2:
+            raise ValueError("YouTube channel URL does not contain a name")
+        return f"{kind}/{_youtube_identifier(parts[1])}"
+    if parts[0].startswith("@"):
+        return _youtube_identifier(parts[0])
+    # YouTube also supports the historical short custom URL form
+    # youtube.com/CustomName, which redirects to the canonical channel URL.
+    return f"custom/{_youtube_identifier(parts[0])}"
 
 
 def normalize_account(provider: str, value: str) -> str:
     if provider not in PROVIDERS:
         raise ValueError("Unsupported provider")
+    if provider == "youtube":
+        return _normalize_youtube_account(value)
     candidate = value.strip()
     if candidate.startswith(("http://", "https://")):
         parsed = urlparse(candidate)
         parts = [part for part in parsed.path.split("/") if part]
-        if provider == "youtube" and "channel" in parts:
-            candidate = parts[parts.index("channel") + 1] if parts.index("channel") + 1 < len(parts) else ""
-        else:
-            candidate = parts[-1] if parts else ""
+        candidate = parts[-1] if parts else ""
     candidate = candidate.strip().lstrip("@")
-    candidate = candidate if provider == "youtube" and candidate.startswith("UC") else candidate.lower()
+    candidate = candidate.lower()
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,160}", candidate):
         raise ValueError("Account ID or handle is invalid")
     return candidate

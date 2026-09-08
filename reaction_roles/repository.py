@@ -116,8 +116,21 @@ class ReactionRoleRepository:
             if not row:
                 has_legacy = c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='guild_modules'").fetchone()
                 legacy = c.execute("SELECT enabled FROM guild_modules WHERE guild_id=? AND module_id='reaction_roles'",(guild_id,)).fetchone() if has_legacy else None
-                if legacy:
-                    now=int(time.time());c.execute("INSERT INTO reaction_role_settings(guild_id,enabled,updated_at) VALUES(?,?,?)",(guild_id,int(legacy["enabled"]),now));row=c.execute("SELECT * FROM reaction_role_settings WHERE guild_id=?",(guild_id,)).fetchone()
+                has_active_message = c.execute(
+                    "SELECT 1 FROM reaction_role_messages_v2 WHERE guild_id=? AND enabled=1 LIMIT 1", (guild_id,)
+                ).fetchone()
+                if legacy or has_active_message:
+                    # Early V2 builds could publish a panel without creating its
+                    # guild settings row. Treat an existing active panel as the
+                    # intended enable signal, while preserving an explicit saved
+                    # disabled setting once a row exists.
+                    enabled = int(legacy["enabled"]) if legacy else 1
+                    now = int(time.time())
+                    c.execute(
+                        "INSERT INTO reaction_role_settings(guild_id,enabled,updated_at) VALUES(?,?,?)",
+                        (guild_id, enabled, now),
+                    )
+                    row = c.execute("SELECT * FROM reaction_role_settings WHERE guild_id=?", (guild_id,)).fetchone()
         return dict(row) if row else {"guild_id": guild_id, "enabled": False, "log_channel_id": None, "denial_dm": True, "denial_dm_cooldown_seconds": 300, "audit_retention_days": 90, "revision": 0}
 
     def save_settings(self, guild_id: int, value: dict[str, Any], expected_revision: int | None) -> dict[str, Any]:
@@ -187,6 +200,13 @@ class ReactionRoleRepository:
     def create_message(self, guild_id: int, value: dict[str, Any], actor_id: int | None = None) -> dict[str, Any]:
         now = int(time.time())
         with self.connection() as c:
+            # The first V2 configuration makes the feature usable immediately.
+            # ON CONFLICT DO NOTHING means a deliberate administrator disable is
+            # never overwritten by creating another configuration.
+            c.execute(
+                "INSERT INTO reaction_role_settings(guild_id,enabled,updated_at) VALUES(?,1,?) ON CONFLICT(guild_id) DO NOTHING",
+                (guild_id, now),
+            )
             cursor = c.execute("""INSERT INTO reaction_role_messages_v2(guild_id,channel_id,message_id,name,source,behavior_type,locked,access_policy,selection_limit,temp_duration_seconds,self_destruct_at,embed_json,link_group_id,enabled,status,created_at,updated_at)
                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (guild_id,value["channel_id"],value["message_id"],value["name"],value["source"],value["behavior_type"],int(value["locked"]),value["access_policy"],value["selection_limit"],value["temp_duration_seconds"],value["self_destruct_at"],json.dumps(value["embed"],ensure_ascii=False),value["link_group_id"],int(value["enabled"]),"active" if value["message_id"] else "pending",now,now))
             config_id = int(cursor.lastrowid); self._replace_children(c, config_id, value)

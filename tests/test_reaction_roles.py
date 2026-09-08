@@ -8,6 +8,7 @@ from unittest.mock import patch
 import discord
 from discord.ext import commands
 from cogs.reaction_roles import ReactionRolesCog
+from dashboard.discord_api import PERMISSION_BITS, effective_channel_permissions
 from reaction_roles.models import ReactionRoleValidationError, normalize_emoji, validate_message
 from reaction_roles.repository import ReactionRoleRepository
 from reaction_roles.service import ReactionRoleService
@@ -88,6 +89,7 @@ class ReactionRoleRepositoryTests(unittest.TestCase):
 
     def test_revision_outbox_and_mapping_identity(self):
         saved = self.service.create(1, message(), actor_id=2)
+        self.assertTrue(self.repo.settings(1)["enabled"])
         self.assertEqual(saved["status"], "pending")
         mapping_id = saved["mappings"][0]["id"]
         saved["name"] = "Updated"
@@ -98,6 +100,17 @@ class ReactionRoleRepositoryTests(unittest.TestCase):
             self.service.update(1, saved["id"], saved, saved["revision"], actor_id=2)
         claimed = self.repo.claim_outbox("test")
         self.assertEqual([item["action"] for item in claimed], ["publish", "sync"])
+
+    def test_explicit_disable_is_not_overwritten_by_new_configuration(self):
+        self.repo.save_settings(1, {"enabled": False}, 0)
+        self.service.create(1, message())
+        self.assertFalse(self.repo.settings(1)["enabled"])
+
+    def test_active_panel_repairs_missing_settings_row(self):
+        self.service.create(1, message())
+        with self.repo.connection() as connection:
+            connection.execute("DELETE FROM reaction_role_settings WHERE guild_id=1")
+        self.assertTrue(self.repo.settings(1)["enabled"])
 
     def test_binding_receipt_survives_role_removal_until_reset(self):
         saved = self.service.create(1, message(behavior="binding"))
@@ -153,6 +166,24 @@ class ReactionRoleRepositoryTests(unittest.TestCase):
         self.repo.delete_message(1, saved["id"], recoverable=True)
         self.assertIsNotNone(self.repo.recovery(1, 123))
         self.assertTrue(self.repo.events(1))
+
+
+class DiscordPermissionTests(unittest.TestCase):
+    def test_channel_overwrites_are_applied_in_discord_order(self):
+        base = PERMISSION_BITS["view_channel"] | PERMISSION_BITS["add_reactions"] | PERMISSION_BITS["manage_messages"]
+        permissions = effective_channel_permissions(
+            1,
+            99,
+            {1, 20},
+            base,
+            [
+                {"id": "1", "type": 0, "allow": "0", "deny": str(PERMISSION_BITS["add_reactions"])},
+                {"id": "20", "type": 0, "allow": str(PERMISSION_BITS["add_reactions"]), "deny": str(PERMISSION_BITS["manage_messages"])},
+                {"id": "99", "type": 1, "allow": str(PERMISSION_BITS["manage_messages"]), "deny": "0"},
+            ],
+        )
+        self.assertTrue(permissions & PERMISSION_BITS["add_reactions"])
+        self.assertTrue(permissions & PERMISSION_BITS["manage_messages"])
 
 
 class ReactionRoleCogTests(unittest.IsolatedAsyncioTestCase):

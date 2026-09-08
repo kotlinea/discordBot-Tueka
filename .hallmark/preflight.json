@@ -1,9 +1,8 @@
 {
-  "date": "2026-08-14",
-  "framework": "FastAPI + Jinja + vanilla CSS/JS; React/Vite migration requested",
-  "font_stack": "Inter declared but not loaded",
-  "palette": "raw hex variables with undefined moderation aliases",
+  "date": "2026-09-08",
+  "framework": "FastAPI + React/TypeScript/Vite dashboard + VitePress documentation",
+  "font_stack": "self-hosted Space Grotesk + Noto Sans JP + Geist Mono",
+  "palette": "canonical OKLCH semantic tokens in tokens.css; Precision, Community and Atmosphere variants",
   "motion": "motion-cut",
-  "spacing": "no shared scale"
+  "spacing": "shared 4px semantic scale"
 }
-

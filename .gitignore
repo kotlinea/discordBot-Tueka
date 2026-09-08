@@ -9,6 +9,9 @@ dashboard/frontend/playwright-report/
 dashboard/frontend/*.tsbuildinfo
 dashboard/frontend/vite.config.js
 dashboard/frontend/vite.config.d.ts
+docs/node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
 data/
 welcome.png
 rank.png

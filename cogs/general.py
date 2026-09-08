@@ -48,9 +48,9 @@ def _leaf_commands(command: app_commands.Command | app_commands.Group) -> list[a
 
 
 class HelpView(discord.ui.View):
-    def __init__(self, author_id: int, pages: list[tuple[str, list[app_commands.Command]]]) -> None:
+    def __init__(self, author_id: int, pages: list[tuple[str, list[app_commands.Command]]], docs_url: str | None = None) -> None:
         super().__init__(timeout=120)
-        self.author_id, self.pages, self.index = author_id, pages, 0
+        self.author_id, self.pages, self.index, self.docs_url = author_id, pages, 0, docs_url
         self._refresh_buttons()
 
     def _refresh_buttons(self) -> None:
@@ -61,7 +61,10 @@ class HelpView(discord.ui.View):
     def embed(self) -> discord.Embed:
         category, commands_for_page = self.pages[self.index]
         lines = [f"`/{command.qualified_name}`\n{command.description or '説明はありません。'}" for command in commands_for_page]
-        return discord.Embed(title=f"コマンド一覧 · {category}", description="\n\n".join(lines), color=discord.Color.blue())
+        embed = discord.Embed(title=f"コマンド一覧 · {category}", description="\n\n".join(lines), color=discord.Color.blue())
+        if self.docs_url:
+            embed.add_field(name="詳しい使い方", value=f"[公式ドキュメント]({self.docs_url.rstrip('/')}/docs/)", inline=False)
+        return embed
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id == self.author_id:
@@ -117,7 +120,7 @@ class GeneralCog(commands.Cog):
         if not pages:
             await interaction.response.send_message("利用できるコマンドはありません。", ephemeral=True)
             return
-        view = HelpView(interaction.user.id, pages)
+        view = HelpView(interaction.user.id, pages, self.bot.settings.dashboard_base_url)
         await interaction.response.send_message(embed=view.embed(), view=view, ephemeral=not all)
 
     @app_commands.command(description="Botの応答速度を計測します。")

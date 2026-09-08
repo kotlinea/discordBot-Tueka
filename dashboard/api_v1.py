@@ -24,6 +24,16 @@ FAMILY_TRIGGERS = {
     "anti_spam": ("message_rate", "duplicate", "mention_rate", "link_rate", "attachment_rate", "reaction_rate", "reaction_burst"),
     "anti_raid": ("join_rate", "leave_rate", "new_account_ratio", "new_member_activity"),
 }
+
+REACTION_ROLE_PERMISSION_NAMES = {
+    "manage_roles": "ロールの管理",
+    "view_channel": "チャンネルを見る",
+    "add_reactions": "リアクションの追加",
+    "read_message_history": "メッセージ履歴を読む",
+    "manage_messages": "メッセージの管理",
+    "send_messages": "メッセージを送信",
+    "embed_links": "埋め込みリンク",
+}
 MODERATION_SECTIONS = ("automod", "anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs")
 ALLOWED_ACTIONS = {"warn", "timeout", "untimeout", "kick", "ban", "unban", "softban", "purge", "lock", "unlock", "lockdown", "unlockdown"}
 
@@ -213,7 +223,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         missing = [] if bot_permissions & ADMINISTRATOR else [name for name in feature.required_bot_permissions if not bot_permissions & PERMISSION_BITS[name]]
         title, description = japanese_copy(feature.id)
         return {
-            "id": feature.id, "category": feature.category, "parent": feature.parent,
+            "id": feature.id, "category": feature.category, "parent": feature.parent, "docs_path": feature.docs_path,
             "title": title, "description": description, "fields": list(feature.fields),
             "required_fields": list(feature.required_fields), "required_bot_permissions": list(feature.required_bot_permissions),
             "enabled": module["enabled"], "settings": _serialize_resource_ids(module["settings"]), "revision": module["revision"],
@@ -801,10 +811,11 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         _, service = reaction_roles_available()
         value = service.validate(dict(body.get("message") or body))
         channels, roles, permissions = await discord.guild_resources(guild_id, use_cache=False)
-        channel_ids = {int(item["id"]) for item in channels if int(item.get("type", -1)) == 0}
+        text_channels = {int(item["id"]): item for item in channels if int(item.get("type", -1)) == 0}
         role_ids = {int(item["id"]) for item in roles}
         emojis = {int(item["id"]) for item in await discord.guild_emojis(guild_id, use_cache=False)}
-        if value["channel_id"] not in channel_ids:
+        channel = text_channels.get(value["channel_id"])
+        if channel is None:
             raise ReactionRoleValidationError("channel_invalid", "このサーバーのテキストチャンネルを選択してください。", "channel_id")
         for index, mapping in enumerate(value["mappings"]):
             if mapping["role_id"] not in role_ids:
@@ -814,12 +825,17 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         for key in ("whitelist_role_ids", "blacklist_role_ids"):
             if any(role_id not in role_ids for role_id in value[key]):
                 raise ReactionRoleValidationError("access_role_invalid", "アクセスRoleを確認してください。", key)
-        required = ["manage_roles", "add_reactions", "read_message_history", "manage_messages"]
+        missing = []
+        if not ((permissions & ADMINISTRATOR) or (permissions & PERMISSION_BITS["manage_roles"])):
+            missing.append("manage_roles")
+        channel_permissions = int(channel.get("bot_permissions", permissions))
+        required = ["view_channel", "add_reactions", "read_message_history", "manage_messages"]
         if value["source"] == "bot":
             required.extend(("send_messages", "embed_links"))
-        missing = [name for name in required if not ((permissions & ADMINISTRATOR) or (permissions & PERMISSION_BITS[name]))]
+        missing.extend(name for name in required if not (channel_permissions & PERMISSION_BITS[name]))
         if missing:
-            raise ReactionRoleValidationError("bot_permission_missing", "Bot権限が不足しています: " + ", ".join(missing), "permissions")
+            labels = [REACTION_ROLE_PERMISSION_NAMES[name] for name in dict.fromkeys(missing)]
+            raise ReactionRoleValidationError("bot_permission_missing", "Bot権限が不足しています: " + "、".join(labels), "permissions")
         if value["source"] == "external":
             message = await discord.channel_message(value["channel_id"], value["message_id"])
             if not message:
@@ -873,8 +889,15 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
 
     @router.post("/guilds/{guild_id}/reaction-roles/preview")
     async def preview_reaction_role(request:Request,guild_id:int)->dict[str,Any]:
-        csrf(request);await manage(request,guild_id);_,service=reaction_roles_available()
-        try:return service.preview(dict((await request.json()).get("message") or {}))
+        csrf(request);body=await request.json();repository,service=reaction_roles_available()
+        try:
+            value,_=await checked_reaction_role(request,guild_id,body)
+            result=service.preview(value)
+            result["diagnostics"].append({"level":"success","message":"対象チャンネルで必要なBot権限とRole階層を確認しました。"})
+            guild_settings=repository.settings(guild_id)
+            if int(guild_settings.get("revision",0))>0 and not guild_settings.get("enabled"):
+                result["diagnostics"].append({"level":"warning","message":"Reaction Roles全体が無効です。有効化するまでRoleは付与されません。"})
+            return result
         except ReactionRoleValidationError as exc:raise rr_error(exc) from exc
 
     @router.post("/guilds/{guild_id}/reaction-roles",status_code=201)

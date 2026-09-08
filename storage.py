@@ -1215,6 +1215,21 @@ class GuildStorage:
                                avatar_url: str | None = None, error: str | None = None) -> bool:
         now = int(time.time())
         with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            current = connection.execute("SELECT provider FROM social_targets WHERE id=? AND lease_owner=?", (target_id, owner)).fetchone()
+            if not current:
+                return False
+            if external_id:
+                canonical = connection.execute(
+                    "SELECT id,status,last_error FROM social_targets WHERE provider=? AND external_id=? AND id<>? ORDER BY id LIMIT 1",
+                    (current["provider"], external_id, target_id),
+                ).fetchone()
+                if canonical:
+                    canonical_id = int(canonical["id"])
+                    connection.execute("UPDATE social_subscriptions SET target_id=?,status=?,last_error=?,updated_at=? WHERE target_id=?",
+                                       (canonical_id, canonical["status"], canonical["last_error"], now, target_id))
+                    deleted = connection.execute("DELETE FROM social_targets WHERE id=? AND lease_owner=?", (target_id, owner))
+                    return deleted.rowcount == 1
             cursor_result = connection.execute("""UPDATE social_targets SET external_id=COALESCE(?,external_id),handle=COALESCE(?,handle),
                 display_name=COALESCE(?,display_name),avatar_url=COALESCE(?,avatar_url),status=?,cursor_json=?,last_error=?,last_checked_at=?,next_check_at=?,
                 lease_owner=NULL,lease_until=NULL,revision=revision+1,updated_at=? WHERE id=? AND lease_owner=?""",

@@ -1,5 +1,7 @@
 # 実環境デプロイ確認 TODO
 
+> 最新の正本は[Linux / VPS](./operations/linux.md)、[更新とロールバック](./operations/upgrade.md)、[環境変数](./reference/environment.md)です。この文書は1リリースだけ保持します。
+
 このリポジトリ内の実装・ローカルテストは完了済みです。以下はVPS、公開ドメイン、Discord Developer Portalへのアクセスがある環境で実施します。
 
 ## 事前設定

@@ -1,5 +1,15 @@
 [
   {
+    "date": "2026-09-08",
+    "macrostructure": "Workbench",
+    "theme": "custom",
+    "theme_axes": "light+dark / geometric-sans / cool",
+    "vibe": "technical exact calm operational",
+    "enrichment": "none",
+    "nav": "N3 side rail + N13 local search",
+    "brief": "Tueka public documentation and operational reference"
+  },
+  {
     "date": "2026-08-14",
     "macrostructure": "Workbench",
     "theme": "custom",
