@@ -8,6 +8,7 @@ from typing import Any
 
 from template_defaults import TEMPLATE_DEFAULTS
 from social_models import default_templates
+from suggestions import normalize_settings as normalize_suggestion_settings
 
 
 class GuildStorage:
@@ -431,9 +432,11 @@ class GuildStorage:
                 settings = self._moderation_settings(settings)
             elif module_id in {"anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"}:
                 settings = self._moderation_submodule_settings(module_id, settings)
+            elif module_id == "suggestions":
+                settings = normalize_suggestion_settings(settings)
             return {"enabled": bool(row["enabled"]), "settings": settings, "revision": int(row["revision"])}
         legacy = self.get_settings(guild_id)
-        defaults = {"welcome": self._welcome_settings({"welcome_channel_id": legacy["welcome_channel_id"]}), "leveling": self._leveling_settings({}, legacy), "autorole": {"default_role_id": legacy["default_role_id"]}, "audit_log": self._audit_log_settings({"management_channel_id": legacy["management_channel_id"]}), "automod": self._automod_settings({}), "moderation": self._moderation_settings({}), "live_stats": self._template_module_settings("live_stats", {}), "temporary_voice": self._template_module_settings("temporary_voice", {})}.get(module_id, self._moderation_submodule_settings(module_id, {}) if module_id in {"anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"} else {})
+        defaults = {"welcome": self._welcome_settings({"welcome_channel_id": legacy["welcome_channel_id"]}), "leveling": self._leveling_settings({}, legacy), "autorole": {"default_role_id": legacy["default_role_id"]}, "audit_log": self._audit_log_settings({"management_channel_id": legacy["management_channel_id"]}), "automod": self._automod_settings({}), "moderation": self._moderation_settings({}), "live_stats": self._template_module_settings("live_stats", {}), "temporary_voice": self._template_module_settings("temporary_voice", {}), "suggestions": normalize_suggestion_settings({})}.get(module_id, self._moderation_submodule_settings(module_id, {}) if module_id in {"anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"} else {})
         return {"enabled": False, "settings": defaults, "revision": 0}
 
     @staticmethod

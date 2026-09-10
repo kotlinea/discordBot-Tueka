@@ -39,7 +39,7 @@ cd ../../docs
 npm run build
 ```
 
-導入、必要権限、全機能、運用、障害対応は[公式ドキュメント](docs/index.md)を参照してください。公開環境では`/docs/`、APIのSwagger UIは`/api/docs`です。
+導入、必要権限、全機能、運用、障害対応は[公式ドキュメント](docs/index.md)を参照してください。公開環境では`/docs/`、APIのSwagger UIは`/api/docs`です。V2完全移行、リファクタリング、Docker化、機能開発の実施順序は[開発ロードマップ](ROADMAP.md)を正本とします。
 
 ## セキュリティ
 

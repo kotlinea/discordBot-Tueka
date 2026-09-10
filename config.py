@@ -65,6 +65,7 @@ class Settings:
         "cogs.community",
         "cogs.tickets",
         "cogs.engagement",
+        "cogs.suggestions",
         "cogs.trust",
         "cogs.audit_log",
         "cogs.welcome",

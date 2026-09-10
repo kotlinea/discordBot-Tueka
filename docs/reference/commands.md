@@ -23,6 +23,7 @@
 | `/vcrank` / `/vcleaderboard` | Voice XPの本人情報／順位 |
 | `/welcome` | Welcome Messageを手動送信 |
 | `/poll` | 最大10択のButton投票 |
+| `/suggest` | 本人だけに表示されるフォームから提案を投稿 |
 | `/rps` | じゃんけん |
 | `/trust_score` / `/clear_trust_score` | Trust Score確認／手動解除 |
 

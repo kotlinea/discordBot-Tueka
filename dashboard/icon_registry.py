@@ -22,6 +22,7 @@ ICONS: dict[str, DashboardIcon] = {
     "ticket": DashboardIcon("Support ticket", '<path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4a2 2 0 0 0 0 4v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4a2 2 0 0 0 0-4zM13 5v2M13 11v2M13 17v2"/>'),
     "chart-bar": DashboardIcon("Bar chart", '<path d="M3 3v18h18M7 16v-5M12 16V7M17 16v-8"/>'),
     "gamepad": DashboardIcon("Gamepad", '<path d="M6 9h12a4 4 0 0 1 3.8 5.3l-1 3A3 3 0 0 1 18 19.5l-2.2-1.1a8.5 8.5 0 0 0-7.6 0L6 19.5a3 3 0 0 1-2.8-2.2l-1-3A4 4 0 0 1 6 9zM7 14h4M9 12v4M16 13h.01M18 15h.01"/>'),
+    "lightbulb": DashboardIcon("Light bulb", '<path d="M9 18h6M10 22h4M8.2 14.4A7 7 0 1 1 15.8 14.4c-.9.7-1.4 1.6-1.5 2.6h-4.6c-.1-1-.6-1.9-1.5-2.6z"/>'),
     "shield-check": DashboardIcon("Trust shield", '<path d="M12 3 4 7v5c0 5 3.4 8.8 8 10 4.6-1.2 8-5 8-10V7zM9 12l2 2 4-4"/>'),
     "bell-ring": DashboardIcon("Notification bell", '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4M4 3 2 5M20 3l2 2"/>'),
     # Brand paths from Simple Icons (CC0-1.0), selected via All SVG Icons.

@@ -17,6 +17,7 @@ from feature_registry import FEATURES, get_feature, japanese_copy
 from social_models import PROVIDERS, PROVIDER_EVENTS, TEMPLATE_VARIABLES, default_templates, normalize_account, render_template, validate_subscription
 from ticketing import TicketRepository, TicketService, TicketValidationError, TranscriptStorage, default_deployment, default_panel, validate_form, validate_panel, validate_panel_bundle, validate_settings
 from reaction_roles import ReactionRoleRepository, ReactionRoleService, ReactionRoleValidationError
+from suggestions import SuggestionRepository, SuggestionValidationError, normalize_settings as normalize_suggestion_settings
 
 
 FAMILY_TRIGGERS = {
@@ -95,6 +96,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
     ticket_service = TicketService(ticket_repository, ticket_transcripts) if ticket_repository and ticket_transcripts else None
     reaction_role_repository = ReactionRoleRepository(settings.database_path) if settings is not None else None
     reaction_role_service = ReactionRoleService(reaction_role_repository, max_mappings=settings.reaction_role_max_mappings_per_message) if reaction_role_repository and settings else None
+    suggestion_repository = SuggestionRepository(storage.database_path)
 
     def token(request: Request) -> str:
         session_id = request.session.get("session_id")
@@ -250,6 +252,53 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         channels, roles, permissions = await resources(request, guild_id)
         emojis = await discord.guild_emojis(guild_id)
         return {"channels": channels, "roles": roles, "emojis": emojis, "bot_permissions": str(permissions)}
+
+    @router.get("/guilds/{guild_id}/suggestions/settings")
+    async def suggestion_settings(request: Request, guild_id: int) -> dict[str, Any]:
+        _, _, permissions = await resources(request, guild_id)
+        return feature_payload(guild_id, get_feature("suggestions"), permissions)
+
+    @router.put("/guilds/{guild_id}/suggestions/settings")
+    async def save_suggestion_settings(request: Request, guild_id: int) -> dict[str, Any]:
+        csrf(request)
+        await manage(request, guild_id, live=True)
+        body = await request.json()
+        try:
+            value = normalize_suggestion_settings(dict(body.get("settings") or {}))
+            channels, roles, permissions = await discord.guild_resources(guild_id, use_cache=False)
+            text_channels = {int(item["id"]) for item in channels if int(item.get("type", -1)) == 0}
+            role_ids = {int(item["id"]) for item in roles}
+            if value["channel_id"] not in text_channels:
+                raise SuggestionValidationError("channel_id", "提案の投稿先を選択してください。")
+            if value["log_channel_id"] is not None and value["log_channel_id"] not in text_channels:
+                raise SuggestionValidationError("log_channel_id", "ログチャンネルを選択してください。")
+            if set(value["review_role_ids"]) - role_ids:
+                raise SuggestionValidationError("review_role_ids", "このサーバーに存在するロールを選択してください。")
+            required = get_feature("suggestions").required_bot_permissions
+            missing = [] if permissions & ADMINISTRATOR else [name for name in required if not permissions & PERMISSION_BITS[name]]
+            if missing:
+                raise SuggestionValidationError("permissions", f"Bot権限が不足しています: {', '.join(missing)}")
+            saved = storage.set_module(
+                guild_id, "suggestions", enabled=bool(body.get("enabled", False)), settings=value,
+                expected_revision=int(body["revision"]) if body.get("revision") is not None else None,
+            )
+        except SuggestionValidationError as exc:
+            raise HTTPException(422, detail={"code": "suggestions_invalid", "message": str(exc), "fields": [{"path": exc.path, "message": str(exc)}]}) from exc
+        except RuntimeError as exc:
+            raise HTTPException(409, detail={"code": "revision_conflict", "message": "設定が別の画面で更新されました。再読み込みしてください。"}) from exc
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(422, detail={"code": "suggestions_invalid", "message": "Suggestions設定を確認してください。"}) from exc
+        return feature_payload(guild_id, get_feature("suggestions"), permissions)
+
+    @router.get("/guilds/{guild_id}/suggestions/items")
+    async def suggestion_items(request: Request, guild_id: int, before: int | None = None, limit: int = 50) -> dict[str, Any]:
+        await manage(request, guild_id)
+        items = suggestion_repository.list(guild_id, before=before, limit=limit)
+        for item in items:
+            for key in ("author_id", "channel_id", "message_id", "reviewer_id"):
+                if item.get(key) is not None:
+                    item[key] = str(item[key])
+        return {"items": items}
 
     def provider_available(provider: str) -> bool:
         if settings is None:

@@ -15,7 +15,7 @@ const featureSidebar = [
     { text: 'ライブ統計', link: '/features/live-stats' },
   ]},
   { text: 'Engagement', items: [
-    { text: '拡張投票', link: '/features/polls' }, { text: 'ミニゲーム', link: '/features/minigames' },
+    { text: '拡張投票', link: '/features/polls' }, { text: 'Suggestions', link: '/features/suggestions' }, { text: 'ミニゲーム', link: '/features/minigames' },
   ]},
 ]
 
