@@ -12,6 +12,7 @@
 | `DISCORD_REDIRECT_URI` | Dashboard必須 | Dashboard | Developer Portalと完全一致するCallback |
 | `SESSION_SECRET` | Dashboard必須 | Dashboard | Session署名鍵。秘密 |
 | `DASHBOARD_BASE_URL` | 公開機能で推奨 | 全Process | 例：`https://bot.example.com` |
+| `BOT_INVITE_URL` | 空 | 未使用 | `.env.example` に存在するが、現在のRuntimeには読取り処理がない。設定しても招待先は変わらない。 |
 | `DASHBOARD_HTTPS_ONLY` | `true` | Dashboard | Secure Cookieを要求 |
 | `DASHBOARD_UI_V2` | `false` | Dashboard | React Dashboardを有効化 |
 | `DASHBOARD_UI_V2_GUILDS` | 空 | Dashboard | V2を有効にするGuild ID一覧 |

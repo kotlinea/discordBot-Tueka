@@ -24,6 +24,8 @@ export default defineConfig({
   description: 'Tuekaの設定、機能、運用、復旧手順',
   base: '/docs/',
   cleanUrls: true,
+  // Development plans and verification logs are repository artifacts, not public guides.
+  srcExclude: ['EXECUTION_PLAN.md', 'PROGRESS0910.md', 'TESTING.md', 'inventory/**'],
   lastUpdated: true,
   ignoreDeadLinks: false,
   locales: {

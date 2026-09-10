@@ -157,7 +157,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
 
     def csrf(request: Request) -> None:
         supplied = request.headers.get("x-csrf-token", "")
-        if not secrets.compare_digest(supplied, request.session.get("csrf_token", "")):
+        if not supplied or not request.session.get("csrf_token") or not secrets.compare_digest(supplied, request.session["csrf_token"]):
             raise HTTPException(403, detail={"code": "csrf_invalid", "message": "画面を再読み込みして、もう一度保存してください。"})
 
     @router.get("/session")
@@ -265,10 +265,13 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         body = await request.json()
         try:
             value = normalize_suggestion_settings(dict(body.get("settings") or {}))
+            enabled = bool(body.get("enabled", False))
+            if body.get("revision") is None:
+                raise SuggestionValidationError("revision", "画面を再読み込みして、もう一度保存してください。")
             channels, roles, permissions = await discord.guild_resources(guild_id, use_cache=False)
             text_channels = {int(item["id"]) for item in channels if int(item.get("type", -1)) == 0}
             role_ids = {int(item["id"]) for item in roles}
-            if value["channel_id"] not in text_channels:
+            if (enabled or value["channel_id"] is not None) and value["channel_id"] not in text_channels:
                 raise SuggestionValidationError("channel_id", "提案の投稿先を選択してください。")
             if value["log_channel_id"] is not None and value["log_channel_id"] not in text_channels:
                 raise SuggestionValidationError("log_channel_id", "ログチャンネルを選択してください。")
@@ -276,10 +279,10 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
                 raise SuggestionValidationError("review_role_ids", "このサーバーに存在するロールを選択してください。")
             required = get_feature("suggestions").required_bot_permissions
             missing = [] if permissions & ADMINISTRATOR else [name for name in required if not permissions & PERMISSION_BITS[name]]
-            if missing:
+            if enabled and missing:
                 raise SuggestionValidationError("permissions", f"Bot権限が不足しています: {', '.join(missing)}")
             saved = storage.set_module(
-                guild_id, "suggestions", enabled=bool(body.get("enabled", False)), settings=value,
+                guild_id, "suggestions", enabled=enabled, settings=value,
                 expected_revision=int(body["revision"]) if body.get("revision") is not None else None,
             )
         except SuggestionValidationError as exc:

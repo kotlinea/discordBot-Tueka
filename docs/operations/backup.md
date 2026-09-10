@@ -10,6 +10,15 @@
 
 稼働中SQLiteを単純コピーせず、SQLite Backup APIまたは全Process停止後の整合したコピーを使用します。
 
+リポジトリの `scripts/db_inventory.py` はSQLite Backup APIで新規Snapshotを作り、整合性と外部キーを検証します。DBの内容をログに表示せず、テーブル件数・列・外部キー等のMetadataを別JSONへ保存します。
+
+```sh
+python scripts/db_inventory.py data/tueka.sqlite3 --backup data/backups/snapshot.sqlite3 --output data/backups/inventory.json
+python scripts/db_inventory.py data/backups/snapshot.sqlite3 --backup data/backups/restored.sqlite3 --output data/backups/restored-inventory.json
+```
+
+既存の出力ファイルは上書きしません。実行ごとに新しいパスを指定してください。復元コマンドは別DBへの復元検証であり、稼働中DBの置換ではありません。暗号化Transcriptや暗号鍵、S3 Objectはこのツールの対象外なので同じ世代を別途保管します。
+
 ## 復元
 
 1. Bot、Dashboard、Workerを停止します。

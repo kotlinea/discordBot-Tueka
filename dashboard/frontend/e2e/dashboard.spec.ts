@@ -7,6 +7,35 @@ const welcome = { ...feature('welcome','community'), title: '入退室', fields:
 const reactionRoles = { ...feature('reaction_roles','community'), title: 'リアクションロール', fields: ['reaction_role_channel_id','reaction_role_ids'], settings: { reaction_role_channel_id: null, reaction_role_ids: [] } }
 const rule = (id: number, name: string) => ({ id, guild_id: 1, family: 'automod', event_type: 'message_create', name, enabled: true, mode: 'enforce', priority: id * 10, stop_on_match: false, trigger_type: 'keyword', trigger_config: { keywords: ['bad'], allow_list: [], match: 'wildcard' }, conditions: { channel_policy: 'all_except', role_policy: 'all_except', channel_ids: [], required_role_ids: [] }, exemptions: { channel_ids: [], role_ids: [] }, actions: [{ type: 'delete' }, { type: 'log', message: '{rule}: {reason}' }], revision: 1 })
 
+test('suggestions save bar validates and persists edits', async ({ page }) => {
+  let writes = 0
+  let settings = { ...feature('suggestions', 'engagement'), settings: {
+    channel_id: '123456789012345678', log_channel_id: null, review_role_ids: [], allow_voting: true, show_author: true,
+    form_title: 'Ideas', form_fields: [{ key: 'idea', label: 'Idea', placeholder: '', style: 'paragraph', required: true, min_length: 1, max_length: 100 }],
+  } }
+  await page.route('**/api/v1/guilds/1/suggestions/items*', route => route.fulfill({ json: { items: [] } }))
+  await page.route('**/api/v1/guilds/1/suggestions/settings', async route => {
+    if (route.request().method() === 'PUT') { writes++; settings = { ...route.request().postDataJSON(), revision: settings.revision + 1 } }
+    await route.fulfill({ json: settings })
+  })
+  await page.goto('/servers/1/suggestions')
+  const label = page.locator('#suggestions-settings input[required]').first()
+  await label.fill('')
+  const saveBar = page.getByRole('region').filter({ has: page.getByRole('button', { name: '変更を保存' }) })
+  await saveBar.getByRole('button', { name: '変更を保存' }).click()
+  expect(await label.evaluate((element: HTMLInputElement) => element.validity.valueMissing)).toBe(true)
+  expect(writes).toBe(0)
+  await label.fill('Updated idea')
+  await saveBar.getByRole('button', { name: '変更を保存' }).click()
+  await expect.poll(() => writes).toBe(1)
+  await expect(saveBar).toHaveCount(0)
+  await page.reload()
+  await expect(label).toHaveValue('Updated idea')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
+  const audit = await new AxeBuilder({ page }).analyze()
+  expect(audit.violations.filter(item => ['critical', 'serious'].includes(item.impact || ''))).toEqual([])
+})
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/session', route => route.fulfill({ json: session }))
   await page.route('**/api/v1/guilds', route => route.fulfill({ json: { items: [{ id: '1', name: 'Maple Server', icon: null }] } }))
@@ -16,18 +45,23 @@ test.beforeEach(async ({ page }) => {
 
 test('resource selections preserve snowflake IDs and module labels are Japanese', async ({ page }) => {
   let saved: Record<string, any> | undefined
-  await page.route('**/api/v1/guilds/1/modules/reaction_roles', async route => {
-    saved = route.request().postDataJSON()
-    await route.fulfill({ json: reactionRoles })
+  const suggestionSettings = { ...feature('suggestions','engagement'), settings: {
+    channel_id: null, log_channel_id: null, review_role_ids: [], allow_voting: true, show_author: true,
+    form_title: 'Ideas', form_fields: [{ key: 'idea', label: 'Idea', placeholder: '', style: 'paragraph', required: true, min_length: 1, max_length: 100 }],
+  } }
+  await page.route('**/api/v1/guilds/1/suggestions/items*', route => route.fulfill({ json: { items: [] } }))
+  await page.route('**/api/v1/guilds/1/suggestions/settings', async route => {
+    if (route.request().method() === 'PUT') saved = route.request().postDataJSON()
+    await route.fulfill({ json: saved ? { ...saved, revision: 2 } : suggestionSettings })
   })
-  await page.goto('/servers/1/modules/reaction_roles')
-  await page.getByLabel('パネル投稿先').selectOption('123456789012345678')
-  await page.getByLabel('メンバー').check()
-  await page.getByLabel('通知').check()
-  await page.getByRole('region', { name: 'Unsaved changes' }).getByRole('button', { name: '変更を保存' }).click()
+  await page.goto('/servers/1/suggestions')
+  await page.getByRole('combobox', { name: /^提案の投稿チャンネル/ }).selectOption('123456789012345678')
+  await page.getByRole('checkbox', { name: 'メンバー', exact: true }).check()
+  await page.getByRole('checkbox', { name: '通知', exact: true }).check()
+  await page.getByRole('region', { name: '未保存の変更があります' }).getByRole('button', { name: '変更を保存' }).click()
   await expect.poll(() => saved).toBeTruthy()
-  expect(saved?.settings.reaction_role_channel_id).toBe('123456789012345678')
-  expect(saved?.settings.reaction_role_ids).toEqual(['123456789012345679', '123456789012345680'])
+  expect(saved?.settings.channel_id).toBe('123456789012345678')
+  expect(saved?.settings.review_role_ids).toEqual(['123456789012345679', '123456789012345680'])
 
   await page.goto('/servers/1/modules/welcome')
   await expect(page.getByText('ウェルカムメッセージ', { exact: true })).toBeVisible()

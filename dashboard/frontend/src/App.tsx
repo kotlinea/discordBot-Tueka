@@ -49,7 +49,7 @@ function LogoutButton() {
 function AccountIdentity({ session }: { session: Session }) { return <div className={s.accountIdentity}><img src={session.user.avatar_url} alt=""/><span>{session.user.name}</span></div> }
 
 function DocsLink({ path = '/docs/', label = 'ドキュメント' }: { path?: string; label?: string }) {
-  return <a className={s.docsButton} href={path} target="_blank" rel="noopener noreferrer"><BookOpen/><span>{label}</span></a>
+  return <a className={s.docsButton} href={path} aria-label={label} target="_blank" rel="noopener noreferrer"><BookOpen/><span>{label}</span></a>
 }
 
 function PreferencesDialog({ session }: { session: Session }) {

@@ -56,6 +56,69 @@ class SuggestionTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             self.service.vote(1, item["id"], 30, 1, settings)
 
+    def test_other_guild_cannot_read_vote_review_or_attach(self):
+        item = self.repository.create(1, 10, 20, {"idea": "Private idea"})
+        self.assertIsNone(self.repository.get(2, item["id"]))
+        self.assertEqual(self.repository.list(2), [])
+        for operation in (
+            lambda: self.repository.vote(2, item["id"], 30, 1),
+            lambda: self.repository.review(2, item["id"], 30, "approved"),
+            lambda: self.repository.attach_message(2, item["id"], 100),
+        ):
+            with self.assertRaises(LookupError):
+                operation()
+        self.repository.mark_delivery_failed(2, item["id"], "failure")
+        self.assertEqual(self.repository.get(1, item["id"])["status"], "pending")
+
+    def test_delivery_failure_persists_and_closes_operations(self):
+        item = self.repository.create(1, 10, 20, {"idea": "Idea"})
+        self.repository.mark_delivery_failed(1, item["id"], "Forbidden")
+        restarted = SuggestionRepository(self.repository.database_path)
+        self.assertEqual(restarted.get(1, item["id"])["status"], "delivery_failed")
+        with self.assertRaises(RuntimeError):
+            restarted.vote(1, item["id"], 30, 1)
+        with self.assertRaises(RuntimeError):
+            restarted.review(1, item["id"], 30, "approved")
+
+    def test_message_and_votes_survive_repository_restart(self):
+        item = self.repository.create(1, 10, 20, {"idea": "Idea"})
+        self.repository.attach_message(1, item["id"], 100)
+        self.repository.vote(1, item["id"], 30, 1)
+        restarted = SuggestionRepository(self.repository.database_path)
+        restored = restarted.get(1, item["id"])
+        self.assertEqual(restored["message_id"], 100)
+        self.assertEqual(restored["upvotes"], 1)
+        self.assertEqual(restarted.vote(1, item["id"], 30, 1)["upvotes"], 0)
+
+    def test_vote_holds_write_lock_before_reading_status(self):
+        import sqlite3
+        from contextlib import closing
+        from unittest.mock import patch
+
+        item = self.repository.create(1, 10, 20, {"idea": "Idea"})
+        original_connect = self.repository._connect
+        competing_writes = []
+
+        def connect():
+            connection = original_connect()
+            def trace(statement):
+                if statement.startswith("SELECT status FROM suggestions"):
+                    with closing(sqlite3.connect(self.repository.database_path, timeout=0)) as other:
+                        try:
+                            other.execute("UPDATE suggestions SET status='approved' WHERE id=?", (item["id"],))
+                        except sqlite3.OperationalError as error:
+                            competing_writes.append(str(error))
+            connection.set_trace_callback(trace)
+            return connection
+
+        with patch.object(self.repository, "_connect", side_effect=connect):
+            result = self.repository.vote(1, item["id"], 30, 1)
+        self.assertEqual(competing_writes, ["database is locked"])
+        self.assertEqual(result["status"], "pending")
+        self.repository.review(1, item["id"], 40, "approved")
+        with self.assertRaises(RuntimeError):
+            self.repository.vote(1, item["id"], 31, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

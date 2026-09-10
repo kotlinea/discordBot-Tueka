@@ -153,6 +153,8 @@ class SuggestionRepository:
             raise ValueError("invalid_vote")
         now = int(time.time())
         with self._connection() as connection:
+            # Serialize the status check and vote with staff review writes.
+            connection.execute("BEGIN IMMEDIATE")
             item = connection.execute("SELECT status FROM suggestions WHERE guild_id=? AND id=?", (guild_id, suggestion_id)).fetchone()
             if item is None:
                 raise LookupError("suggestion_not_found")

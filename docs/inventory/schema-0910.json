@@ -1,0 +1,7547 @@
+{
+  "integrity_ok": true,
+  "foreign_key_violations": 0,
+  "user_version": 0,
+  "tables": [
+    {
+      "name": "app_metadata",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "key",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_app_metadata_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 61
+        },
+        {
+          "file": "storage.py",
+          "line": 1551
+        },
+        {
+          "file": "storage.py",
+          "line": 1629
+        }
+      ]
+    },
+    {
+      "name": "automod_events",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "rule_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "channel_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "message_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "trigger_type",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "evidence_text",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "attachments_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "action_results_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "mode",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "evidence_expires_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "table": "automod_rules",
+          "from": "rule_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "SET NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_automod_events_message_rule",
+          "unique": true
+        },
+        {
+          "name": "idx_automod_events_expiry",
+          "unique": false
+        },
+        {
+          "name": "idx_automod_events_guild_created",
+          "unique": false
+        }
+      ],
+      "decision": "remove after runtime references are removed",
+      "phase": "P1-4",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 148
+        },
+        {
+          "file": "storage.py",
+          "line": 165
+        },
+        {
+          "file": "storage.py",
+          "line": 166
+        },
+        {
+          "file": "storage.py",
+          "line": 167
+        },
+        {
+          "file": "storage.py",
+          "line": 168
+        },
+        {
+          "file": "storage.py",
+          "line": 171
+        },
+        {
+          "file": "storage.py",
+          "line": 185
+        },
+        {
+          "file": "storage.py",
+          "line": 846
+        },
+        {
+          "file": "storage.py",
+          "line": 882
+        },
+        {
+          "file": "storage.py",
+          "line": 927
+        },
+        {
+          "file": "storage.py",
+          "line": 935
+        },
+        {
+          "file": "storage.py",
+          "line": 992
+        }
+      ]
+    },
+    {
+      "name": "automod_migrations",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "migrated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "remove after runtime references are removed",
+      "phase": "P1-4",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 201
+        },
+        {
+          "file": "storage.py",
+          "line": 1009
+        },
+        {
+          "file": "storage.py",
+          "line": 1060
+        }
+      ]
+    },
+    {
+      "name": "automod_rules",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "enabled",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "mode",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "priority",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "stop_on_match",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "trigger_type",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "trigger_config_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "conditions_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "exemptions_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "actions_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_automod_rules_guild",
+          "unique": false
+        }
+      ],
+      "decision": "remove after runtime references are removed",
+      "phase": "P1-4",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 130
+        },
+        {
+          "file": "storage.py",
+          "line": 147
+        },
+        {
+          "file": "storage.py",
+          "line": 163
+        },
+        {
+          "file": "storage.py",
+          "line": 184
+        },
+        {
+          "file": "storage.py",
+          "line": 586
+        },
+        {
+          "file": "storage.py",
+          "line": 587
+        },
+        {
+          "file": "storage.py",
+          "line": 597
+        },
+        {
+          "file": "storage.py",
+          "line": 610
+        },
+        {
+          "file": "storage.py",
+          "line": 613
+        },
+        {
+          "file": "storage.py",
+          "line": 618
+        },
+        {
+          "file": "storage.py",
+          "line": 623
+        },
+        {
+          "file": "storage.py",
+          "line": 634
+        },
+        {
+          "file": "storage.py",
+          "line": 846
+        },
+        {
+          "file": "storage.py",
+          "line": 864
+        },
+        {
+          "file": "storage.py",
+          "line": 876
+        },
+        {
+          "file": "storage.py",
+          "line": 1053
+        },
+        {
+          "file": "dashboard/app.py",
+          "line": 383
+        }
+      ]
+    },
+    {
+      "name": "dashboard_preferences",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "locale",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "appearance",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "color_scheme",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "navigation_collapsed",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 70
+        },
+        {
+          "file": "storage.py",
+          "line": 1568
+        },
+        {
+          "file": "storage.py",
+          "line": 1570
+        },
+        {
+          "file": "storage.py",
+          "line": 1585
+        },
+        {
+          "file": "storage.py",
+          "line": 1589
+        },
+        {
+          "file": "storage.py",
+          "line": 1593
+        },
+        {
+          "file": "storage.py",
+          "line": 1596
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 176
+        }
+      ]
+    },
+    {
+      "name": "dashboard_sessions",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "access_token",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_dashboard_sessions_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 65
+        },
+        {
+          "file": "storage.py",
+          "line": 1556
+        },
+        {
+          "file": "storage.py",
+          "line": 1557
+        },
+        {
+          "file": "storage.py",
+          "line": 1561
+        },
+        {
+          "file": "storage.py",
+          "line": 1566
+        }
+      ]
+    },
+    {
+      "name": "guild_modules",
+      "rows": 16,
+      "columns": [
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 1
+        },
+        {
+          "name": "module_id",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 2
+        },
+        {
+          "name": "enabled",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "settings_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_guild_modules_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 83
+        },
+        {
+          "file": "storage.py",
+          "line": 314
+        },
+        {
+          "file": "storage.py",
+          "line": 334
+        },
+        {
+          "file": "storage.py",
+          "line": 336
+        },
+        {
+          "file": "storage.py",
+          "line": 418
+        },
+        {
+          "file": "storage.py",
+          "line": 568
+        },
+        {
+          "file": "storage.py",
+          "line": 570
+        },
+        {
+          "file": "storage.py",
+          "line": 624
+        },
+        {
+          "file": "storage.py",
+          "line": 627
+        },
+        {
+          "file": "storage.py",
+          "line": 636
+        },
+        {
+          "file": "storage.py",
+          "line": 639
+        },
+        {
+          "file": "storage.py",
+          "line": 690
+        },
+        {
+          "file": "storage.py",
+          "line": 693
+        },
+        {
+          "file": "storage.py",
+          "line": 720
+        },
+        {
+          "file": "storage.py",
+          "line": 723
+        },
+        {
+          "file": "storage.py",
+          "line": 732
+        },
+        {
+          "file": "storage.py",
+          "line": 735
+        },
+        {
+          "file": "storage.py",
+          "line": 845
+        },
+        {
+          "file": "storage.py",
+          "line": 850
+        },
+        {
+          "file": "storage.py",
+          "line": 851
+        },
+        {
+          "file": "storage.py",
+          "line": 860
+        },
+        {
+          "file": "storage.py",
+          "line": 875
+        },
+        {
+          "file": "storage.py",
+          "line": 1005
+        },
+        {
+          "file": "storage.py",
+          "line": 1012
+        },
+        {
+          "file": "storage.py",
+          "line": 1050
+        },
+        {
+          "file": "storage.py",
+          "line": 1387
+        },
+        {
+          "file": "storage.py",
+          "line": 1400
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 852
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 855
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 117
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 118
+        }
+      ]
+    },
+    {
+      "name": "guild_settings",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "management_channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "welcome_channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "default_role_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 42
+        },
+        {
+          "file": "storage.py",
+          "line": 395
+        },
+        {
+          "file": "storage.py",
+          "line": 407
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 949
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 950
+        }
+      ]
+    },
+    {
+      "name": "guild_users",
+      "rows": 2,
+      "columns": [
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 1
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 2
+        },
+        {
+          "name": "xp",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "warn",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_guild_users_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 48
+        },
+        {
+          "file": "storage.py",
+          "line": 956
+        },
+        {
+          "file": "storage.py",
+          "line": 968
+        },
+        {
+          "file": "storage.py",
+          "line": 1057
+        },
+        {
+          "file": "storage.py",
+          "line": 1516
+        },
+        {
+          "file": "storage.py",
+          "line": 1521
+        },
+        {
+          "file": "storage.py",
+          "line": 1541
+        },
+        {
+          "file": "storage.py",
+          "line": 1546
+        },
+        {
+          "file": "storage.py",
+          "line": 1626
+        }
+      ]
+    },
+    {
+      "name": "guild_voice_users",
+      "rows": 2,
+      "columns": [
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 1
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 2
+        },
+        {
+          "name": "xp",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_guild_voice_users_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 55
+        },
+        {
+          "file": "storage.py",
+          "line": 1526
+        },
+        {
+          "file": "storage.py",
+          "line": 1531
+        },
+        {
+          "file": "storage.py",
+          "line": 1536
+        }
+      ]
+    },
+    {
+      "name": "moderation_action_requests",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "moderator_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "target_user_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "options_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "completed_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "result_json",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "dedupe_key",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_moderation_action_requests_pending",
+          "unique": false
+        },
+        {
+          "name": "sqlite_autoindex_moderation_action_requests_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 293
+        },
+        {
+          "file": "storage.py",
+          "line": 308
+        },
+        {
+          "file": "storage.py",
+          "line": 906
+        },
+        {
+          "file": "storage.py",
+          "line": 913
+        },
+        {
+          "file": "storage.py",
+          "line": 918
+        }
+      ]
+    },
+    {
+      "name": "moderation_action_results",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "event_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "sequence",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "action_type",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "case_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "detail_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "table": "moderation_events",
+          "from": "event_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_moderation_action_results_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 249
+        },
+        {
+          "file": "storage.py",
+          "line": 758
+        }
+      ]
+    },
+    {
+      "name": "moderation_cases",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "moderator_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "dm_sent",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "automod_event_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "rule_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "points",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "revoked_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "moderation_event_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "moderation_rule_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 90
+        },
+        {
+          "file": "storage.py",
+          "line": 318
+        },
+        {
+          "file": "storage.py",
+          "line": 329
+        },
+        {
+          "file": "storage.py",
+          "line": 888
+        },
+        {
+          "file": "storage.py",
+          "line": 889
+        },
+        {
+          "file": "storage.py",
+          "line": 1397
+        },
+        {
+          "file": "storage.py",
+          "line": 1424
+        }
+      ]
+    },
+    {
+      "name": "moderation_events",
+      "rows": 16,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "rule_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "family",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "event_type",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "actor_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "actor_kind",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "target_user_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "target_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "evidence_text",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "evidence_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "mode",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "case_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "evidence_expires_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "dedupe_key",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "table": "moderation_rules",
+          "from": "rule_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "SET NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_moderation_events_expiry",
+          "unique": false
+        },
+        {
+          "name": "idx_moderation_events_target",
+          "unique": false
+        },
+        {
+          "name": "idx_moderation_events_guild_created",
+          "unique": false
+        },
+        {
+          "name": "sqlite_autoindex_moderation_events_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 223
+        },
+        {
+          "file": "storage.py",
+          "line": 246
+        },
+        {
+          "file": "storage.py",
+          "line": 247
+        },
+        {
+          "file": "storage.py",
+          "line": 248
+        },
+        {
+          "file": "storage.py",
+          "line": 259
+        },
+        {
+          "file": "storage.py",
+          "line": 747
+        },
+        {
+          "file": "storage.py",
+          "line": 763
+        },
+        {
+          "file": "storage.py",
+          "line": 766
+        },
+        {
+          "file": "storage.py",
+          "line": 781
+        },
+        {
+          "file": "storage.py",
+          "line": 884
+        },
+        {
+          "file": "storage.py",
+          "line": 997
+        }
+      ]
+    },
+    {
+      "name": "moderation_lockdown_snapshots",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "lockdown_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 1
+        },
+        {
+          "name": "channel_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 2
+        },
+        {
+          "name": "role_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 3
+        },
+        {
+          "name": "before_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "applied_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "restore_status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "table": "moderation_lockdowns",
+          "from": "lockdown_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_moderation_lockdown_snapshots_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 274
+        },
+        {
+          "file": "storage.py",
+          "line": 799
+        },
+        {
+          "file": "storage.py",
+          "line": 815
+        }
+      ]
+    },
+    {
+      "name": "moderation_lockdowns",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "source_event_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "started_by",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "started_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "unlock_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "completed_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_moderation_lockdowns_active",
+          "unique": false
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 261
+        },
+        {
+          "file": "storage.py",
+          "line": 273
+        },
+        {
+          "file": "storage.py",
+          "line": 282
+        },
+        {
+          "file": "storage.py",
+          "line": 782
+        },
+        {
+          "file": "storage.py",
+          "line": 789
+        },
+        {
+          "file": "storage.py",
+          "line": 792
+        },
+        {
+          "file": "storage.py",
+          "line": 805
+        },
+        {
+          "file": "storage.py",
+          "line": 810
+        },
+        {
+          "file": "storage.py",
+          "line": 820
+        }
+      ]
+    },
+    {
+      "name": "moderation_migrations",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "migrated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "remove after runtime references are removed",
+      "phase": "P1-4",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 292
+        },
+        {
+          "file": "storage.py",
+          "line": 849
+        },
+        {
+          "file": "storage.py",
+          "line": 894
+        },
+        {
+          "file": "storage.py",
+          "line": 901
+        }
+      ]
+    },
+    {
+      "name": "moderation_points",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "points",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "rule_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "automod_event_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "revoked_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "moderation_rule_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "moderation_event_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "table": "automod_events",
+          "from": "automod_event_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "SET NULL"
+        },
+        {
+          "table": "automod_rules",
+          "from": "rule_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "SET NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_moderation_points_active",
+          "unique": false
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 173
+        },
+        {
+          "file": "storage.py",
+          "line": 187
+        },
+        {
+          "file": "storage.py",
+          "line": 330
+        },
+        {
+          "file": "storage.py",
+          "line": 333
+        },
+        {
+          "file": "storage.py",
+          "line": 783
+        },
+        {
+          "file": "storage.py",
+          "line": 891
+        },
+        {
+          "file": "storage.py",
+          "line": 892
+        },
+        {
+          "file": "storage.py",
+          "line": 940
+        },
+        {
+          "file": "storage.py",
+          "line": 951
+        },
+        {
+          "file": "storage.py",
+          "line": 953
+        },
+        {
+          "file": "storage.py",
+          "line": 962
+        },
+        {
+          "file": "storage.py",
+          "line": 967
+        },
+        {
+          "file": "storage.py",
+          "line": 1058
+        }
+      ]
+    },
+    {
+      "name": "moderation_raid_state",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "active",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "started_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "last_signal_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "source_rule_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "lockdown_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 284
+        },
+        {
+          "file": "storage.py",
+          "line": 826
+        },
+        {
+          "file": "storage.py",
+          "line": 828
+        },
+        {
+          "file": "storage.py",
+          "line": 835
+        }
+      ]
+    },
+    {
+      "name": "moderation_rules",
+      "rows": 2,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "family",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "event_type",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "enabled",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "mode",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "priority",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "stop_on_match",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "trigger_type",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "trigger_config_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "conditions_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "exemptions_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "actions_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "legacy_rule_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_moderation_rules_guild",
+          "unique": false
+        },
+        {
+          "name": "sqlite_autoindex_moderation_rules_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 202
+        },
+        {
+          "file": "storage.py",
+          "line": 222
+        },
+        {
+          "file": "storage.py",
+          "line": 244
+        },
+        {
+          "file": "storage.py",
+          "line": 651
+        },
+        {
+          "file": "storage.py",
+          "line": 652
+        },
+        {
+          "file": "storage.py",
+          "line": 664
+        },
+        {
+          "file": "storage.py",
+          "line": 669
+        },
+        {
+          "file": "storage.py",
+          "line": 680
+        },
+        {
+          "file": "storage.py",
+          "line": 688
+        },
+        {
+          "file": "storage.py",
+          "line": 696
+        },
+        {
+          "file": "storage.py",
+          "line": 706
+        },
+        {
+          "file": "storage.py",
+          "line": 709
+        },
+        {
+          "file": "storage.py",
+          "line": 714
+        },
+        {
+          "file": "storage.py",
+          "line": 719
+        },
+        {
+          "file": "storage.py",
+          "line": 730
+        },
+        {
+          "file": "storage.py",
+          "line": 780
+        },
+        {
+          "file": "storage.py",
+          "line": 878
+        },
+        {
+          "file": "storage.py",
+          "line": 883
+        },
+        {
+          "file": "storage.py",
+          "line": 889
+        },
+        {
+          "file": "storage.py",
+          "line": 892
+        },
+        {
+          "file": "cogs/automod.py",
+          "line": 65
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 1055
+        },
+        {
+          "file": "dashboard/app.py",
+          "line": 334
+        }
+      ]
+    },
+    {
+      "name": "oauth_states",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "state",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "expires_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_oauth_states_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 79
+        },
+        {
+          "file": "storage.py",
+          "line": 1601
+        },
+        {
+          "file": "storage.py",
+          "line": 1602
+        },
+        {
+          "file": "storage.py",
+          "line": 1606
+        }
+      ]
+    },
+    {
+      "name": "poll_votes",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "message_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 1
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 2
+        },
+        {
+          "name": "option_index",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "table": "polls",
+          "from": "message_id",
+          "to": "message_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_poll_votes_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 96
+        },
+        {
+          "file": "storage.py",
+          "line": 1493
+        },
+        {
+          "file": "storage.py",
+          "line": 1494
+        }
+      ]
+    },
+    {
+      "name": "polls",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "message_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "channel_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "creator_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "question",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "options_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "image_url",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "closes_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "feature_registry.py",
+          "line": 37
+        },
+        {
+          "file": "storage.py",
+          "line": 95
+        },
+        {
+          "file": "storage.py",
+          "line": 96
+        },
+        {
+          "file": "storage.py",
+          "line": 315
+        },
+        {
+          "file": "storage.py",
+          "line": 317
+        },
+        {
+          "file": "storage.py",
+          "line": 1475
+        },
+        {
+          "file": "storage.py",
+          "line": 1479
+        },
+        {
+          "file": "storage.py",
+          "line": 1488
+        },
+        {
+          "file": "storage.py",
+          "line": 1503
+        },
+        {
+          "file": "storage.py",
+          "line": 1504
+        },
+        {
+          "file": "cogs/engagement.py",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "reaction_role_access_roles",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "message_config_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 1
+        },
+        {
+          "name": "role_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 2
+        },
+        {
+          "name": "policy",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "table": "reaction_role_messages_v2",
+          "from": "message_config_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_reaction_role_access_roles_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 68
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 168
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 196
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 198
+        }
+      ]
+    },
+    {
+      "name": "reaction_role_assignments",
+      "rows": 2,
+      "columns": [
+        {
+          "name": "message_config_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 1
+        },
+        {
+          "name": "mapping_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 2
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 3
+        },
+        {
+          "name": "role_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "table": "reaction_role_mappings_v2",
+          "from": "mapping_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE"
+        },
+        {
+          "table": "reaction_role_messages_v2",
+          "from": "message_config_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_rr_assignments_due",
+          "unique": false
+        },
+        {
+          "name": "sqlite_autoindex_reaction_role_assignments_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 77
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 83
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 286
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 287
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 301
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 306
+        }
+      ]
+    },
+    {
+      "name": "reaction_role_binding_receipts",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "message_config_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 1
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 2
+        },
+        {
+          "name": "mapping_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "table": "reaction_role_mappings_v2",
+          "from": "mapping_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE"
+        },
+        {
+          "table": "reaction_role_messages_v2",
+          "from": "message_config_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_reaction_role_binding_receipts_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 72
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 291
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 295
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 302
+        }
+      ]
+    },
+    {
+      "name": "reaction_role_events",
+      "rows": 20,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "message_config_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "actor_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "emoji_key",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "role_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "event_type",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "result",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "details_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_rr_events_expiry",
+          "unique": false
+        },
+        {
+          "name": "idx_rr_events_guild",
+          "unique": false
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 925
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 97
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 102
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 103
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 366
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 370
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 376
+        }
+      ]
+    },
+    {
+      "name": "reaction_role_link_groups",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 929
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 46
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 59
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 265
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 271
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 276
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 281
+        }
+      ]
+    },
+    {
+      "name": "reaction_role_mappings_v2",
+      "rows": 2,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "message_config_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "emoji_key",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "emoji_display",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "emoji_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "emoji_name",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "animated",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "role_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "max_members",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "position",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "table": "reaction_role_messages_v2",
+          "from": "message_config_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_reaction_role_mappings_v2_2",
+          "unique": true
+        },
+        {
+          "name": "sqlite_autoindex_reaction_role_mappings_v2_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 62
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 75
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 81
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 167
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 183
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 187
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 191
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 194
+        }
+      ]
+    },
+    {
+      "name": "reaction_role_messages_v2",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "channel_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "message_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "behavior_type",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "locked",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "selection_limit",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "temp_duration_seconds",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "self_destruct_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "embed_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "link_group_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "enabled",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "access_policy",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "table": "reaction_role_link_groups",
+          "from": "link_group_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "SET NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_rr_messages_guild",
+          "unique": false
+        },
+        {
+          "name": "sqlite_autoindex_reaction_role_messages_v2_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 50
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 61
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 66
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 70
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 74
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 80
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 109
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 111
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 120
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 165
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 173
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 177
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 210
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 221
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 225
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 241
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 262
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 266
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 272
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 281
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 286
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 337
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 341
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 345
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 348
+        }
+      ]
+    },
+    {
+      "name": "reaction_role_outbox",
+      "rows": 10,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "message_config_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "payload_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "lease_owner",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "lease_until",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "attempts",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "next_attempt_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_rr_outbox_due",
+          "unique": false
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 91
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 96
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 314
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 323
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 324
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 326
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 331
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 333
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 334
+        }
+      ]
+    },
+    {
+      "name": "reaction_role_panels",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "message_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "role_ids_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "remove after runtime references are removed",
+      "phase": "P1-3",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 92
+        },
+        {
+          "file": "storage.py",
+          "line": 1438
+        },
+        {
+          "file": "storage.py",
+          "line": 1442
+        }
+      ]
+    },
+    {
+      "name": "reaction_role_recovery",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 1
+        },
+        {
+          "name": "deleted_message_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 2
+        },
+        {
+          "name": "snapshot_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_reaction_role_recovery_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 104
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 240
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 246
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 250
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 254
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 377
+        }
+      ]
+    },
+    {
+      "name": "reaction_role_schedules",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "message_config_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "mapping_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "due_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "lease_owner",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "lease_until",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "attempts",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_rr_schedules_due",
+          "unique": false
+        },
+        {
+          "name": "sqlite_autoindex_reaction_role_schedules_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 84
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 90
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 228
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 310
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 355
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 356
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 361
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 362
+        }
+      ]
+    },
+    {
+      "name": "reaction_role_settings",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "enabled",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "log_channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "denial_dm",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "denial_dm_cooldown_seconds",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "audit_retention_days",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 40
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 115
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 130
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 133
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 139
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 143
+        },
+        {
+          "file": "reaction_roles/repository.py",
+          "line": 207
+        }
+      ]
+    },
+    {
+      "name": "safe_browsing_cache",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "url_hash",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "unsafe",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_safe_browsing_cache_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 91
+        },
+        {
+          "file": "storage.py",
+          "line": 1428
+        },
+        {
+          "file": "storage.py",
+          "line": 1432
+        }
+      ]
+    },
+    {
+      "name": "scheduled_moderation_actions",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "due_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "case_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "completed_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "attempts",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_scheduled_moderation_due",
+          "unique": false
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 188
+        },
+        {
+          "file": "storage.py",
+          "line": 200
+        },
+        {
+          "file": "storage.py",
+          "line": 973
+        },
+        {
+          "file": "storage.py",
+          "line": 979
+        },
+        {
+          "file": "storage.py",
+          "line": 985
+        },
+        {
+          "file": "storage.py",
+          "line": 987
+        }
+      ]
+    },
+    {
+      "name": "social_connections",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "account_id",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "account_name",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "access_token_encrypted",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "refresh_token_encrypted",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_social_connections_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 99
+        },
+        {
+          "file": "storage.py",
+          "line": 1270
+        },
+        {
+          "file": "storage.py",
+          "line": 1273
+        },
+        {
+          "file": "storage.py",
+          "line": 1274
+        },
+        {
+          "file": "storage.py",
+          "line": 1285
+        },
+        {
+          "file": "dashboard/app.py",
+          "line": 398
+        },
+        {
+          "file": "dashboard/app.py",
+          "line": 401
+        }
+      ]
+    },
+    {
+      "name": "social_deliveries",
+      "rows": 2,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "subscription_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "event_key",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "discord_channel_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "discord_message_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "attempts",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "next_attempt_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_social_deliveries_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 102
+        },
+        {
+          "file": "storage.py",
+          "line": 362
+        },
+        {
+          "file": "storage.py",
+          "line": 369
+        },
+        {
+          "file": "storage.py",
+          "line": 1346
+        },
+        {
+          "file": "storage.py",
+          "line": 1348
+        },
+        {
+          "file": "storage.py",
+          "line": 1354
+        },
+        {
+          "file": "storage.py",
+          "line": 1359
+        },
+        {
+          "file": "storage.py",
+          "line": 1362
+        },
+        {
+          "file": "storage.py",
+          "line": 1368
+        }
+      ]
+    },
+    {
+      "name": "social_events",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "event_key",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "account_id",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "payload_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "received_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "processed_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "event_type",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "external_event_id",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "occurred_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "attempts",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "available_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "lease_owner",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "lease_until",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_social_events_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 101
+        },
+        {
+          "file": "storage.py",
+          "line": 348
+        },
+        {
+          "file": "storage.py",
+          "line": 361
+        },
+        {
+          "file": "storage.py",
+          "line": 1303
+        },
+        {
+          "file": "storage.py",
+          "line": 1311
+        },
+        {
+          "file": "storage.py",
+          "line": 1319
+        },
+        {
+          "file": "storage.py",
+          "line": 1326
+        },
+        {
+          "file": "storage.py",
+          "line": 1331
+        },
+        {
+          "file": "storage.py",
+          "line": 1336
+        },
+        {
+          "file": "storage.py",
+          "line": 1340
+        },
+        {
+          "file": "storage.py",
+          "line": 1369
+        }
+      ]
+    },
+    {
+      "name": "social_live_messages",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "subscription_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 1
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 2
+        },
+        {
+          "name": "account_id",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 3
+        },
+        {
+          "name": "discord_channel_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "discord_message_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_social_live_messages_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 103
+        },
+        {
+          "file": "storage.py",
+          "line": 1374
+        },
+        {
+          "file": "storage.py",
+          "line": 1378
+        },
+        {
+          "file": "storage.py",
+          "line": 1383
+        }
+      ]
+    },
+    {
+      "name": "social_oauth_states",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "state",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_social_oauth_states_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 100
+        },
+        {
+          "file": "storage.py",
+          "line": 1291
+        },
+        {
+          "file": "storage.py",
+          "line": 1292
+        },
+        {
+          "file": "storage.py",
+          "line": 1297
+        },
+        {
+          "file": "storage.py",
+          "line": 1298
+        }
+      ]
+    },
+    {
+      "name": "social_subscriptions",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "account_id",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "account_name",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "channel_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "role_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "template",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "events_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "enabled",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "target_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "event_channels_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "templates_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_social_subscriptions_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 98
+        },
+        {
+          "file": "storage.py",
+          "line": 312
+        },
+        {
+          "file": "storage.py",
+          "line": 337
+        },
+        {
+          "file": "storage.py",
+          "line": 347
+        },
+        {
+          "file": "storage.py",
+          "line": 371
+        },
+        {
+          "file": "storage.py",
+          "line": 380
+        },
+        {
+          "file": "storage.py",
+          "line": 381
+        },
+        {
+          "file": "storage.py",
+          "line": 390
+        },
+        {
+          "file": "storage.py",
+          "line": 1064
+        },
+        {
+          "file": "storage.py",
+          "line": 1065
+        },
+        {
+          "file": "storage.py",
+          "line": 1084
+        },
+        {
+          "file": "storage.py",
+          "line": 1089
+        },
+        {
+          "file": "storage.py",
+          "line": 1109
+        },
+        {
+          "file": "storage.py",
+          "line": 1112
+        },
+        {
+          "file": "storage.py",
+          "line": 1115
+        },
+        {
+          "file": "storage.py",
+          "line": 1157
+        },
+        {
+          "file": "storage.py",
+          "line": 1161
+        },
+        {
+          "file": "storage.py",
+          "line": 1170
+        },
+        {
+          "file": "storage.py",
+          "line": 1175
+        },
+        {
+          "file": "storage.py",
+          "line": 1177
+        },
+        {
+          "file": "storage.py",
+          "line": 1200
+        },
+        {
+          "file": "storage.py",
+          "line": 1208
+        },
+        {
+          "file": "storage.py",
+          "line": 1232
+        },
+        {
+          "file": "storage.py",
+          "line": 1240
+        },
+        {
+          "file": "storage.py",
+          "line": 1256
+        },
+        {
+          "file": "storage.py",
+          "line": 1257
+        },
+        {
+          "file": "storage.py",
+          "line": 1259
+        },
+        {
+          "file": "storage.py",
+          "line": 1265
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 332
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 339
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 343
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 371
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 392
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 409
+        },
+        {
+          "file": "dashboard/app.py",
+          "line": 397
+        },
+        {
+          "file": "dashboard/app.py",
+          "line": 937
+        }
+      ]
+    },
+    {
+      "name": "social_targets",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "account_key",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "external_id",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "handle",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "display_name",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "avatar_url",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "cursor_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "last_checked_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "next_check_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "lease_owner",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "lease_until",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_social_targets_due",
+          "unique": false
+        },
+        {
+          "name": "sqlite_autoindex_social_targets_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "social_worker.py",
+          "line": 93
+        },
+        {
+          "file": "storage.py",
+          "line": 104
+        },
+        {
+          "file": "storage.py",
+          "line": 124
+        },
+        {
+          "file": "storage.py",
+          "line": 376
+        },
+        {
+          "file": "storage.py",
+          "line": 379
+        },
+        {
+          "file": "storage.py",
+          "line": 1089
+        },
+        {
+          "file": "storage.py",
+          "line": 1123
+        },
+        {
+          "file": "storage.py",
+          "line": 1126
+        },
+        {
+          "file": "storage.py",
+          "line": 1137
+        },
+        {
+          "file": "storage.py",
+          "line": 1140
+        },
+        {
+          "file": "storage.py",
+          "line": 1141
+        },
+        {
+          "file": "storage.py",
+          "line": 1182
+        },
+        {
+          "file": "storage.py",
+          "line": 1186
+        },
+        {
+          "file": "storage.py",
+          "line": 1193
+        },
+        {
+          "file": "storage.py",
+          "line": 1198
+        },
+        {
+          "file": "storage.py",
+          "line": 1207
+        },
+        {
+          "file": "storage.py",
+          "line": 1208
+        },
+        {
+          "file": "storage.py",
+          "line": 1213
+        },
+        {
+          "file": "storage.py",
+          "line": 1222
+        },
+        {
+          "file": "storage.py",
+          "line": 1227
+        },
+        {
+          "file": "storage.py",
+          "line": 1234
+        },
+        {
+          "file": "storage.py",
+          "line": 1236
+        },
+        {
+          "file": "storage.py",
+          "line": 1261
+        },
+        {
+          "file": "storage.py",
+          "line": 1265
+        }
+      ]
+    },
+    {
+      "name": "social_worker_state",
+      "rows": 13,
+      "columns": [
+        {
+          "name": "worker_name",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "heartbeat_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "details_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_social_worker_state_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 125
+        },
+        {
+          "file": "storage.py",
+          "line": 1245
+        },
+        {
+          "file": "storage.py",
+          "line": 1251
+        }
+      ]
+    },
+    {
+      "name": "support_tickets",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "opener_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "closed_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "closed_by",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "transcript_json",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "remove after runtime references are removed",
+      "phase": "P1-2",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 94
+        },
+        {
+          "file": "storage.py",
+          "line": 1460
+        },
+        {
+          "file": "storage.py",
+          "line": 1464
+        },
+        {
+          "file": "storage.py",
+          "line": 1469
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 739
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 741
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 749
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 878
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 879
+        }
+      ]
+    },
+    {
+      "name": "temporary_voice_channels",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "owner_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 93
+        },
+        {
+          "file": "storage.py",
+          "line": 1447
+        },
+        {
+          "file": "storage.py",
+          "line": 1451
+        },
+        {
+          "file": "storage.py",
+          "line": 1456
+        }
+      ]
+    },
+    {
+      "name": "ticket_attachments",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "ticket_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "discord_attachment_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "filename",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "content_type",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "byte_size",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "backend",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "object_key",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "content_hash",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ticket_attachments_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "ticketing/repository.py",
+          "line": 112
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 680
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 685
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 687
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 692
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 697
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 702
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 707
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 734
+        }
+      ]
+    },
+    {
+      "name": "ticket_audit_events",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "ticket_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "actor_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "event_type",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "detail_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "ticketing/repository.py",
+          "line": 156
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 838
+        }
+      ]
+    },
+    {
+      "name": "ticket_blacklist",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 1
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 2
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_by",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ticket_blacklist_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "ticketing/repository.py",
+          "line": 124
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 619
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 621
+        },
+        {
+          "file": "ticketing/service.py",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "name": "ticket_close_requests",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "ticket_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "requested_by",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "resolved_by",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "resolved_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "ticketing/repository.py",
+          "line": 132
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 591
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 592
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 595
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 596
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 601
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 606
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 609
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 614
+        }
+      ]
+    },
+    {
+      "name": "ticket_counters",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "next_number",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "ticketing/repository.py",
+          "line": 91
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 467
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 469
+        }
+      ]
+    },
+    {
+      "name": "ticket_feedback",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "ticket_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "rating",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "comment_encrypted",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "form_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "answers_encrypted_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 829
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 141
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 176
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 177
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 831
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 833
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 846
+        }
+      ]
+    },
+    {
+      "name": "ticket_forms",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "fields_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ticket_forms_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 540
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 73
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 256
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 260
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 267
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 270
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 275
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 295
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 369
+        }
+      ]
+    },
+    {
+      "name": "ticket_guild_settings",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "enabled",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "open_limit",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "language",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "log_channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "transcript_channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "transcript_retention_days",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "close_dm",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "default_auto_close_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "ticketing/repository.py",
+          "line": 61
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 189
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 202
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 206
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 212
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 859
+        }
+      ]
+    },
+    {
+      "name": "ticket_messages",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "ticket_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "discord_message_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "author_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "author_name",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "encrypted_content",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "metadata_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "edited_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "deleted_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_ticket_messages_cursor",
+          "unique": false
+        },
+        {
+          "name": "sqlite_autoindex_ticket_messages_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "ticketing/repository.py",
+          "line": 106
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 111
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 662
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 671
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 675
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 732
+        }
+      ]
+    },
+    {
+      "name": "ticket_migrations",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "name",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "completed_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ticket_migrations_1",
+          "unique": true
+        }
+      ],
+      "decision": "remove after runtime references are removed",
+      "phase": "P1-2",
+      "source_references": [
+        {
+          "file": "ticketing/repository.py",
+          "line": 165
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 852
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 886
+        }
+      ]
+    },
+    {
+      "name": "ticket_on_call",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 1
+        },
+        {
+          "name": "team_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 2
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 3
+        },
+        {
+          "name": "enabled_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ticket_on_call_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "cogs/tickets.py",
+          "line": 254
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 128
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 626
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 628
+        }
+      ]
+    },
+    {
+      "name": "ticket_orphans",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "ticket_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "container_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "resource_type",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "recovered_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ticket_orphans_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "ticketing/repository.py",
+          "line": 160
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 487
+        }
+      ]
+    },
+    {
+      "name": "ticket_outbox",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "ticket_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "actor_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "payload_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "attempts",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "available_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "lease_owner",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "lease_until",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "completed_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_ticket_outbox_due",
+          "unique": false
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "ticketing/repository.py",
+          "line": 118
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 123
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 755
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 758
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 760
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 767
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 770
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 775
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 782
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 785
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 787
+        }
+      ]
+    },
+    {
+      "name": "ticket_panel_messages",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "channel_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "message_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "color",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "panel_ids_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "lease_owner",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "lease_until",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "config_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "previous_channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "previous_message_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ticket_panel_messages_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "cogs/community.py",
+          "line": 154
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 711
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 84
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 169
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 170
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 171
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 172
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 173
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 312
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 316
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 336
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 339
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 344
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 346
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 348
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 384
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 396
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 400
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 407
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 411
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 421
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 425
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 430
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 437
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 440
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 876
+        }
+      ]
+    },
+    {
+      "name": "ticket_panels",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "mode",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "form_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "team_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "category_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "thread_parent_channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "staff_notification_channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "config_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "enabled",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "archived_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ticket_panels_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 580
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 78
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 174
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 281
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 286
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 299
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 302
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 307
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 332
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 373
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 376
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 381
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 419
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 450
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 655
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 867
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 871
+        }
+      ]
+    },
+    {
+      "name": "ticket_participants",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "ticket_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 1
+        },
+        {
+          "name": "subject_type",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 2
+        },
+        {
+          "name": "subject_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 3
+        },
+        {
+          "name": "access",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "added_by",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ticket_participants_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "ticketing/repository.py",
+          "line": 102
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 582
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 586
+        }
+      ]
+    },
+    {
+      "name": "ticket_schedules",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "ticket_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "due_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "attempts",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "completed_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_ticket_schedules_due",
+          "unique": false
+        },
+        {
+          "name": "sqlite_autoindex_ticket_schedules_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "ticketing/repository.py",
+          "line": 150
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 155
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 568
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 794
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 796
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 802
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 807
+        }
+      ]
+    },
+    {
+      "name": "ticket_staff_teams",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "role_ids_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "user_ids_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "admin_user_ids_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "notification_channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "enabled",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ticket_staff_teams_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "ticketing/repository.py",
+          "line": 67
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 225
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 229
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 243
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 246
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 251
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 295
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 369
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 861
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 863
+        }
+      ]
+    },
+    {
+      "name": "ticket_tags",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "content",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_by",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ticket_tags_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "cogs/tickets.py",
+          "line": 660
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 724
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 136
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 631
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 639
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 642
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 647
+        }
+      ]
+    },
+    {
+      "name": "ticket_transcripts",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "ticket_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "backend",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "object_key",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "content_hash",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "byte_size",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "last_error",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ticket_transcripts_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 91
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 96
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 514
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 527
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 766
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 768
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 797
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 807
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 815
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 823
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 831
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 851
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 852
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 145
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 549
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 551
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 552
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 553
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 554
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 711
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 716
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 721
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 725
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 731
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 743
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 812
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 813
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 815
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 820
+        }
+      ]
+    },
+    {
+      "name": "tickets_v2",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "ticket_number",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "panel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "opener_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "interaction_id",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "mode",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "discord_container_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "parent_channel_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "claimed_by",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "close_reason",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "closed_by",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "form_answers_json",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "auto_close_excluded",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "last_user_message_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "last_message_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "notes_thread_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "closing_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "opened_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "closed_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "deleted_at",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "awaiting_return_category_id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_tickets_v2_container",
+          "unique": false
+        },
+        {
+          "name": "idx_tickets_v2_guild_status",
+          "unique": false
+        },
+        {
+          "name": "sqlite_autoindex_tickets_v2_2",
+          "unique": true
+        },
+        {
+          "name": "sqlite_autoindex_tickets_v2_1",
+          "unique": true
+        }
+      ],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "config.py",
+          "line": 48
+        },
+        {
+          "file": "config.py",
+          "line": 109
+        },
+        {
+          "file": "cogs/community.py",
+          "line": 139
+        },
+        {
+          "file": "cogs/community.py",
+          "line": 147
+        },
+        {
+          "file": "cogs/community.py",
+          "line": 178
+        },
+        {
+          "file": "cogs/tickets.py",
+          "line": 100
+        },
+        {
+          "file": "cogs/tickets.py",
+          "line": 640
+        },
+        {
+          "file": "cogs/tickets.py",
+          "line": 730
+        },
+        {
+          "file": "cogs/tickets.py",
+          "line": 749
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 129
+        },
+        {
+          "file": "dashboard/api_v1.py",
+          "line": 209
+        },
+        {
+          "file": "dashboard/app.py",
+          "line": 100
+        },
+        {
+          "file": "dashboard/app.py",
+          "line": 357
+        },
+        {
+          "file": "dashboard/app.py",
+          "line": 1074
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 92
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 100
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 101
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 167
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 168
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 175
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 447
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 456
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 459
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 464
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 470
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 472
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 478
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 483
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 492
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 496
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 499
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 512
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 517
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 522
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 529
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 536
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 541
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 548
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 549
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 551
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 552
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 553
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 554
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 559
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 565
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 573
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 655
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 666
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 697
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 711
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 733
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 742
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 820
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 828
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 843
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 844
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 845
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 846
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 880
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 883
+        },
+        {
+          "file": "ticketing/repository.py",
+          "line": 884
+        }
+      ]
+    },
+    {
+      "name": "trust_events",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "not_null": false,
+          "primary_key": 1
+        },
+        {
+          "name": "guild_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "category",
+          "type": "TEXT",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "weight",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "not_null": false,
+          "primary_key": 0
+        },
+        {
+          "name": "created_at",
+          "type": "INTEGER",
+          "not_null": true,
+          "primary_key": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "decision": "retain",
+      "phase": "retain",
+      "source_references": [
+        {
+          "file": "storage.py",
+          "line": 97
+        },
+        {
+          "file": "storage.py",
+          "line": 1402
+        },
+        {
+          "file": "storage.py",
+          "line": 1408
+        },
+        {
+          "file": "storage.py",
+          "line": 1414
+        },
+        {
+          "file": "storage.py",
+          "line": 1419
+        }
+      ]
+    }
+  ]
+}
