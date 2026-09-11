@@ -31,7 +31,7 @@ class MigrationTests(unittest.TestCase):
 
     def test_empty_database_and_reapplication(self):
         result = apply(self.db, self.backups)
-        self.assertEqual(result['applied'], ['0001_suggestions.sql'])
+        self.assertEqual(result['applied'], ['0001_suggestions.sql', '0002_remove_legacy_tickets.sql'])
         self.assertEqual(inventory(Path(result['snapshot']))['tables'], [])
         repository = SuggestionRepository(self.db)
         item = repository.create(1, 2, 3, {'idea': 'keep'})
@@ -46,6 +46,22 @@ class MigrationTests(unittest.TestCase):
         result = apply(self.db, self.backups)
         self.assertTrue(Path(result['snapshot']).exists())
         self.assertEqual(repository.get(1, item['id'])['answers'], {'idea': 'existing'})
+
+    def test_concurrent_runners_apply_each_version_once(self):
+        from concurrent.futures import ThreadPoolExecutor
+        self.seed()
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            results = list(workers.map(lambda _: apply(self.db, self.backups), range(2)))
+        self.assertEqual(sum(len(result['applied']) for result in results), 2)
+        self.assertEqual(len(list(self.backups.glob('*.sqlite3'))), 1)
+        with closing(sqlite3.connect(self.db)) as connection:
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0], 2)
+
+    def test_runtime_initialization_does_not_change_migrated_suggestions_schema(self):
+        apply(self.db, self.backups)
+        before = inventory(self.db)
+        SuggestionRepository(self.db)
+        self.assertEqual(inventory(self.db), before)
 
     def test_failed_ddl_rolls_back_data_schema_and_history(self):
         self.seed()

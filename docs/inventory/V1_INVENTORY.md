@@ -97,6 +97,8 @@
 
 ## 復旧と未確認事項
 
+- 2026-09-11追記：P1-2で `support_tickets` / `ticket_migrations` のRuntime参照・DDLを除去し、0002にDROPを追加。上表は2026-09-10のSnapshotを記録した時点Inventoryとして保持する。P1-2の複製DB検証では保持67表100行が一致し、旧2表の削除・再適用・旧Schema非復活を検証した。原運用DBへの適用を意味しない。
+
 - 原DBは変更していない。Backupと復元先は `data/backups/p0-0910/` に保持しGit対象外。
 - 遠隔運用DBやS3 Transcriptはアクセス確認していない。ローカルDBの検証を本番のBackup/Restore成功とは扱わない。
 - V1専用行のRuntime自動移行は追加しない。旧Imageへ戻す場合は対応Snapshot復元が必要になる可能性があり、以後の新規データが失われる境界をMigrationごとに記録する。

@@ -49,7 +49,7 @@ def default_settings() -> dict[str, Any]:
             "no_user_reply_minutes": 0,
             "inactivity_minutes": 0,
         },
-        "revision": 1,
+        "revision": 0,
     }
 
 
@@ -125,7 +125,7 @@ def validate_settings(value: dict[str, Any]) -> dict[str, Any]:
     auto["no_user_reply_minutes"] = max(0, min(int(auto["no_user_reply_minutes"]), 525600))
     auto["inactivity_minutes"] = max(0, min(int(auto["inactivity_minutes"]), 525600))
     result["default_auto_close"] = auto
-    result["revision"] = max(1, int(result.get("revision", 1)))
+    result["revision"] = max(0, int(result.get("revision", 0)))
     return result
 
 

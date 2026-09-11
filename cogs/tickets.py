@@ -96,8 +96,6 @@ class TicketsCog(commands.Cog):
         self.publish_panels.cancel()
         self.maintain_transcripts.cancel()
 
-    def enabled(self, guild_id: int) -> bool:
-        return bool(self.bot.settings.tickets_v2 and (not self.bot.settings.tickets_v2_guilds or guild_id in self.bot.settings.tickets_v2_guilds))
 
     async def _staff(self, member: discord.Member, panel: dict[str, Any] | None) -> bool:
         if member.guild_permissions.manage_guild:
@@ -190,7 +188,7 @@ class TicketsCog(commands.Cog):
             raise
 
     async def show_open(self, interaction: discord.Interaction, panel_id: int) -> None:
-        if not interaction.guild or not self.enabled(interaction.guild.id):
+        if not interaction.guild:
             await interaction.response.send_message("この機能は現在利用できません。", ephemeral=True)
             return
         panel = self.repository.panel(interaction.guild.id, panel_id)
@@ -388,10 +386,6 @@ class TicketsCog(commands.Cog):
                 else:
                     await interaction.response.send_message("Close Requestを却下しました。", ephemeral=True)
             return
-        if custom_id == "tueka-ticket:create":
-            panels = self.repository.panels(interaction.guild.id)
-            if panels: await self.show_open(interaction, panels[0]["id"])
-            return
         parts = custom_id.split(":")
         if len(parts) != 3 or parts[0] != "tueka-ticket" or not parts[2].isdigit():
             return
@@ -439,7 +433,7 @@ class TicketsCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
-        if not message.guild or message.author.bot or not self.enabled(message.guild.id):
+        if not message.guild or message.author.bot:
             return
         ticket = self.repository.ticket_for_container(message.channel.id)
         if ticket and ticket["status"] in {"open", "awaiting_user"} and self.transcripts.available:
@@ -458,7 +452,7 @@ class TicketsCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
-        if not after.guild or after.author.bot or not self.enabled(after.guild.id):
+        if not after.guild or after.author.bot:
             return
         ticket = self.repository.ticket_for_container(after.channel.id)
         if ticket and ticket["status"] == "open" and self.transcripts.available:
@@ -472,8 +466,6 @@ class TicketsCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member) -> None:
-        if not self.enabled(member.guild.id):
-            return
         defaults = self.repository.settings(member.guild.id)["default_auto_close"]
         for ticket in self.repository.tickets(member.guild.id, status="open", limit=200):
             if int(ticket["opener_id"]) != member.id or ticket.get("auto_close_excluded"):
@@ -776,7 +768,7 @@ class TicketsCog(commands.Cog):
         self.repository.expire_close_requests()
         for schedule in self.repository.due_schedules():
             ticket = self.repository.ticket(int(schedule["ticket_id"]))
-            if ticket and ticket["status"] == "open" and not ticket.get("auto_close_excluded") and self.enabled(int(ticket["guild_id"])):
+            if ticket and ticket["status"] == "open" and not ticket.get("auto_close_excluded"):
                 self.repository.queue_outbox(ticket["id"], "auto_close", self.bot.user.id if self.bot.user else 0, {"reason": "Auto Close · " + str(schedule["kind"])})
             self.repository.complete_schedule(int(schedule["id"]))
 
@@ -832,7 +824,6 @@ class TicketsCog(commands.Cog):
 
     @tasks.loop(hours=1)
     async def maintain_transcripts(self) -> None:
-        await self.service.migrate_legacy_transcripts()
         if self.transcripts.s3.get("bucket"):
             for item in self.repository.local_transcripts():
                 try:
@@ -864,9 +855,8 @@ class TicketsCog(commands.Cog):
     async def before_auto_close(self) -> None:
         await self.bot.wait_until_ready()
         for guild in self.bot.guilds:
-            if self.enabled(guild.id):
-                for ticket in self.repository.tickets(guild.id, status="open", limit=200):
-                    self.service.schedule_ticket(ticket)
+            for ticket in self.repository.tickets(guild.id, status="open", limit=200):
+                self.service.schedule_ticket(ticket)
 
     @publish_panels.before_loop
     async def before_publish_panels(self) -> None:

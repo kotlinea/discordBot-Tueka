@@ -46,7 +46,6 @@
 - `/ticket close`、`close-request`、`reopen`
 - `/ticket blacklist`、`setup`、`stats`
 - 短縮：`/t open`、`/t close`
-- 互換：`/publish_ticket_panel`、`/close_ticket`
 
 Thread ModeではClaimとNotesではなくJoin／On-Callを使用します。ReopenはArchive済みThread Ticketだけが対象です。
 

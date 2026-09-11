@@ -14,8 +14,6 @@
 | `DASHBOARD_BASE_URL` | 公開機能で推奨 | 全Process | 例：`https://bot.example.com` |
 | `BOT_INVITE_URL` | 空 | 未使用 | `.env.example` に存在するが、現在のRuntimeには読取り処理がない。設定しても招待先は変わらない。 |
 | `DASHBOARD_HTTPS_ONLY` | `true` | Dashboard | Secure Cookieを要求 |
-| `DASHBOARD_UI_V2` | `false` | Dashboard | React Dashboardを有効化 |
-| `DASHBOARD_UI_V2_GUILDS` | 空 | Dashboard | V2を有効にするGuild ID一覧 |
 | `DATA_DIR` | `data` | 全Process | Data Directory |
 | `DATABASE_PATH` | `data/tueka.sqlite3` | 全Process | 共通SQLite Path |
 | `LOG_LEVEL` | `INFO` | 全Process | Log Level |
@@ -54,8 +52,6 @@ Provider資格情報を変更した場合はDashboardとSocial Workerを再起�
 
 | 変数 | 既定値 | 内容 |
 | --- | --- | --- |
-| `TICKETS_V2` | `false` | Ticket V2を有効化 |
-| `TICKETS_V2_GUILDS` | 空 | 有効化するGuild ID一覧 |
 | `TICKET_ENCRYPTION_KEY` | 空 | Transcript、回答、Noteの暗号鍵。秘密 |
 | `TICKET_S3_ENDPOINT_URL` | 空 | S3互換Endpoint |
 | `TICKET_S3_REGION` | 空 | Region |

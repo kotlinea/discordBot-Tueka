@@ -1,1 +1,0 @@
-(()=>{if(typeof translations==='undefined')return;Object.assign(translations.ja,{'feature.automod':'AutoMod','feature.automod.description':'柔軟なルール、例外、複数アクションでサーバーを保護します。'});Object.assign(translations.en,{'feature.automod':'AutoMod','feature.automod.description':'Protect the server with flexible rules, exemptions, and ordered actions.'});language(root.lang)})();

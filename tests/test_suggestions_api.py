@@ -81,3 +81,15 @@ class SuggestionsApiTests(unittest.TestCase):
         self.assertFalse(result.json()['enabled'])
         value.update(revision=1, enabled=True)
         self.assertEqual(self.save(value).status_code, 422)
+
+    def test_audit_member_category_requires_permission_in_v2_api(self):
+        from dashboard.discord_api import PERMISSION_BITS
+        from feature_registry import get_feature
+        permissions = sum(PERMISSION_BITS[name] for name in get_feature('audit_log').required_bot_permissions)
+        self.discord.guild_resources.return_value = ([{'id': '10', 'type': 0}], [], permissions)
+        self.url = '/api/v1/guilds/1/modules/audit_log'
+        payload = {'enabled': True, 'revision': 0, 'settings': {'management_channel_id': '10', 'log_member': True}}
+        self.assertEqual(self.save(payload).status_code, 422)
+        self.assertFalse(self.storage.module_enabled(1, 'audit_log'))
+        self.discord.guild_resources.return_value = ([{'id': '10', 'type': 0}], [], permissions | PERMISSION_BITS['view_audit_log'])
+        self.assertEqual(self.save(payload).status_code, 200)

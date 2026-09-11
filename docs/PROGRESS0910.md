@@ -135,3 +135,49 @@
 - Backup/Restoreツールの使用方法とTranscript等の対象外資材を正式Backupページに追加した。
 - 判定：現在アクセスできるローカル設定先についてP0-4のSnapshot・復元・削除Inventory作成を完了。遠隔本番DBへの破壊的Migrationは、その環境での新しいSnapshot/Inventory検証を別途条件とする。
 - 次はP1-0の最小番号付きMigration基盤。実DBへの削除はまだ実施していない。空DB・Snapshot複製のFixtureで適用履歴、Snapshot、Transaction、途中失敗Rollback、再適用を検証してからDomain単位のV1除去へ進む。
+
+## 2026-09-11 — P1-0 番号付きMigration基盤
+
+- 実装：`migrate.py` と `migrations/0001_suggestions.sql` を追加。0001は既存Suggestions仕様の3表・Indexを作成し、V1表は削除しない。
+- `BEGIN IMMEDIATE` で書込みを直列化し、DDL実行前に別のread-only接続からSnapshotを取得する。未適用ファイル全体と履歴更新を一つのTransactionで実行する。
+- `schema_migrations` に番号・ファイル名・改行正規化後SHA256・日時を記録。適用済みファイル改変、番号欠落、不一致履歴を拒否する。再適用時は更新・新Snapshotとも発生しない。
+- SQL内のTransaction制御、PRAGMA、ATTACH/DETACHをauthorizerで拒否。Migration内COMMITが失敗時Rollbackを無効化しないことを検証した。
+- ローカルDBの保全Snapshotを `data/backups/p1-0911/fixture.sqlite3` へ複製して0001を適用。元69テーブルの全行内容が一致し、追加後73テーブル、整合性成功・FK違反0件。再適用結果はapplied空配列、snapshot null。原運用DBには適用していない。
+- Migration専用テストは最初の7件がWindowsで0.487秒、Linuxで0.384秒ですべて成功。並行実行・初期化互換性の2件を追加後、Windows Python 3.13.7で9件成功、0.467秒。
+- 最終回帰：固定Linux Python 3.13環境に現在ソースをread-only mountし、全165テスト成功、50.408秒。ログ `.venv-p0/p1-migration-linux-tests.log`。
+- `docs/operations/migrations.md` を追加し、停止・Stage/複製DBでの事前検証・Snapshotの範囲・Rollback・追加規約を記載。Docsナビゲーションへ追加。Docs build成功、10.38秒。
+- レビュー観点：Backup失敗時はDDLなし、途中DROP/CREATE失敗後にデータ/Schema/履歴が元に戻る、FK失敗Rollback、同時Runnerが一度だけ適用、既存V2データ保持、再適用不変、コンストラクタ再初期化と0001のSchema一致を確認した。
+- 作業中に既存変更がCommit `c110970` へ取り込まれたことを確認した。こちらからCommit・Reset・巻戻しは行っていない。
+- 判定：P1-0の基盤実装・テスト・レビューを完了。既存Domain全体のDDL CLI統一はPhase 2の対象。V1削除時の再作成防止は、そのDomainのRuntime参照/旧DDL削除と番号付きMigrationを同時に実施し、再初期化テストで確認する。現時点でV1表は未削除。
+- 次の作業単位はP1-1：Dashboard SPA常時化、旧管理画面・旧保存Route除去、正式URL/OAuth/CSRF/Guild認可/Docs配信の回帰検証。なるべく一つの作業単位で実装・テスト・レビューまで完了させる。Phase 1全体は継続中。
+
+## 2026-09-11 — P1-1 Dashboard SPA統一
+
+- Dashboard Flag・Guild Allowlist分岐、旧管理テンプレート8件、旧CSS/JavaScript6件、旧保存Routeと互換Redirectを除去。公開ランディング・404・認証・Webhookは保持した。
+- 現行SPAのURLを明示的に配信し、未知・廃止URLは404、Frontend未buildは503、SPA HTMLは再検証必須とした。APIの `/api/v1` は現行契約として維持した。
+- 旧保存処理の必須入力・Bot権限検証を汎用V2保存APIへ引き継いだ。Audit MemberのView Audit Log不足を保存拒否するAPIテストへ置き換えた。
+- レビューで旧Social OAuth開始URLの残存を検出。認証処理を `/social/oauth/{provider}/connect/{guild_id}` へ移し、旧管理フォームURLは廃止。callback URLは保持し、戻り先は現行SPAに変更した。新開始RouteのCSRF未設定拒否を検証した。Providerとの実接続は未検証。
+- Windows Python 3.13の全170件成功（38.283秒、`.venv-p0/p1-dashboard-python.log`）。その後のOAuth開始URL変更と追加テストについて配信・認証テスト6件成功（1.787秒）。最終差分全体で171件を再実行したとは扱わない。
+- Frontend型検査・build成功、Vitest10件成功。進行中だったDashboard Playwrightの終了コード0を回収し、28件成功・57.2秒を確認した。Docs build成功、Docs Playwright10件成功・22.6秒。最後のアーキテクチャ説明追加は文章のみであり、このDocs build後の変更。
+- 配信回帰では正式URL、旧Flag無視、未build503、旧URL/POST廃止、OAuth state再利用拒否、セッション・ログアウト、Guild拒否、公開画面、UI資産・Docsヘッダーを確認。`git diff --check` 成功。外部StageのOAuth/Discord実動は未実施。
+- README、環境変数、design、更新資料をSPA常時化へ同期。変更は未コミットのまま保持し、他の既存差分を巻き戻していない。
+- 判定：P1-1の実装・ローカル回帰・レビューを完了。Phase 1全体は未完了。次はP1-2のTicket V2固定と旧Ticket/平文Transcript移行除去、番号付き削除Migration、空DB・V2/混在Fixture・再起動検証。
+
+## 2026-09-11 — P1-2 Ticket V2固定と旧処理削除
+
+- 前回はP1-1の実装・検証と進捗記録を完了。現在の作業ツリーを再確認し、P1-2を継続した。
+- `config.py` のTicket切替Flag/Allowlist、CogとAPIの切替判定を削除。受付の有効・無効はV2のGuild設定で管理し、受付停止時も既存Ticketと保留処理を保持する。
+- Community Cogから旧Ticket作成・旧ボタン・`publish_ticket_panel` / `close_ticket` の旧コマンドとV2委譲を削除。Tickets Cogの旧 `tueka-ticket:create` Fallbackを削除し、現行 `tueka-ticket:open:<id>` と `/ticket` / `/t` を維持した。
+- Repositoryの旧Ticket自動Import、移行済み判定、平文Transcript読出し・クリア処理、Serviceの暗号化移行、定期処理からの移行呼出しを削除。GuildStorageの旧Ticket CRUD/DDLも除去した。
+- `0002_remove_legacy_tickets.sql` は `support_tickets` / `ticket_migrations` の2表だけをDROP。V2 Panel/Ticket/Transcript/Outbox/Scheduleと共有設定表は保持する。Runtime再初期化で旧2表は復活しない。
+- Feature一覧のTicket表示をV2設定から取得し、V2保存時の旧共有設定への二重書込みを除去。汎用Module保存のTicket受付を廃止し専用APIへ統一した。
+- API回帰で初回保存のrevision競合漏れを検出。未保存revisionを0、初回保存を1にし、設定APIではrevision必須・不一致409にした。旧Flagがfalse、旧Allowlistが不正形式でもV2 APIが動き、認証・Guild/Staff権限・CSRFを維持することを確認した。
+- `test_ticket_migration.py` は空DB、直前0001から混在DBへの適用、V2専用DB、再適用、再初期化、DROP後の失敗Rollbackを検証。混在Fixtureでは全保持表の行内容と暗号化Blobを比較し、Transcript復号・Outbox再取得・Schedule読出しを確認した。
+- ローカル保全Snapshotを `data/backups/p1-ticket-0911/fixture.sqlite3` へ複製し0001/0002を適用。保持67テーブル・100行一致、integrity成功、FK違反0、再適用applied空配列。原DB・原Snapshotは変更していない。旧データは適用前自動Snapshotに保持される。
+- 初回全体検証では旧CRUDを呼ぶ既存テスト、追加Thread Fixtureの必須項目漏れ、Linuxの既存0.24秒判定が失敗。旧テストを現行Domain検証へ置換、Fixture修正、並行通信テストをBarrier方式へ変更した。全リクエスト開始前は応答せず、直列化なら失敗する検証へ置き換えた。
+- 最終全体検証：Windows Python 3.13で178件成功・36.124秒、固定Linux Python 3.13コンテナで178件成功・66.891秒。ログ `.venv-p0/p1-ticket-windows-verified.log` / `p1-ticket-linux-verified.log`。その後BotのCog読込みテストを1件追加し、Migration関連6件成功・0.721秒。現行計179件全体を再実行したとは扱わない。
+- Bot読込みテストはDiscord接続なしでCommunity/Tickets Cogをloadし、旧Flag属性なしで `/ticket` / `/t` が登録され、旧コマンド・旧Schemaが復活しないことを確認した。実Guild上のCommand同期・Channel/Thread操作はStage検証として残る。
+- Docs build成功・12.28秒、Docs Playwright10件成功・28.0秒。正式Ticketページへ鍵・起動・移行・復旧説明を移管し、旧Flag/旧コマンド案内を削除。README・Linux起動・更新・復元手順に番号付きCLIを反映した。Frontendコードは本単位では変更していない。
+- 作業中に既存差分がStageされたことを確認。こちらからCommit/Stage/Resetは行っていない。追加テスト・記録の差分はそのまま保持する。
+- 判定：P1-2の実装・ローカルテスト・レビューを完了。遠隔本番DB、Stage Discord/OAuth、S3復元は未検証。Phase 1全体は継続中。
+- 次はP1-3：Reaction RolesのSafety旧ボタン・旧Panel保存、API Legacy表示/Wizard、旧公開コマンドと旧参照を除去し、`reaction_role_panels` の削除Migrationを追加する。V2設定・マッピング・付与状態・期限・修復を保持し、共有 `guild_modules` は巻き込まない。

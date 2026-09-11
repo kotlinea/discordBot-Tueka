@@ -133,17 +133,11 @@ class GuildStorageTests(unittest.TestCase):
         self.storage.save_reaction_role_panel(10, 1, [2, 3])
         self.assertEqual(self.storage.reaction_role_panel(10), {"guild_id": 1, "role_ids": [2, 3]})
 
-    def test_community_automation_state_is_guild_scoped(self):
+    def test_temporary_voice_state_is_guild_scoped(self):
         self.storage.add_temporary_voice_channel(10, 1, 2)
         self.assertEqual(self.storage.temporary_voice_channel(10), {"guild_id": 1, "owner_id": 2})
         self.storage.remove_temporary_voice_channel(10)
         self.assertIsNone(self.storage.temporary_voice_channel(10))
-        self.storage.create_ticket(20, 1, 2)
-        self.storage.close_ticket(20, 3, [{"content": "help"}])
-        ticket = self.storage.ticket(20)
-        self.assertEqual(ticket["status"], "closed")
-        self.assertEqual(ticket["closed_by"], 3)
-        self.assertEqual(json.loads(ticket["transcript_json"]), [{"content": "help"}])
 
     def test_poll_votes_are_atomic_per_member_and_can_close(self):
         self.storage.create_poll(30, 1, 4, 2, "Question", ["A", "B"], None, None)

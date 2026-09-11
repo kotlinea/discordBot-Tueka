@@ -1,7 +1,5 @@
 import asyncio
 import json
-import sqlite3
-from contextlib import closing
 import tempfile
 import unittest
 from datetime import datetime
@@ -33,6 +31,14 @@ class TicketV2Tests(unittest.TestCase):
             validate_form({"name": "Too many", "fields": [{"label": str(index)} for index in range(6)]})
         with self.assertRaises(ValueError):
             validate_panel({"name": "Thread", "mode": "private_thread", "team_id": self.team["id"]})
+
+    def test_disabled_intake_rejects_new_tickets_but_preserves_existing_ticket(self):
+        ticket, _ = self.service.reserve(1, self.panel['id'], 10, 'before-disable', set())
+        self.repository.save_settings(1, {'enabled': False})
+        with self.assertRaises(TicketValidationError) as rejected:
+            self.service.reserve(1, self.panel['id'], 11, 'after-disable', set())
+        self.assertEqual(rejected.exception.code, 'disabled')
+        self.assertEqual(self.repository.ticket(ticket['id']), ticket)
 
     def test_reservation_is_idempotent_and_limit_is_guild_wide(self):
         first, _ = self.service.reserve(1, self.panel["id"], 10, "same", set())
@@ -142,21 +148,6 @@ class TicketV2Tests(unittest.TestCase):
         resumed = self.repository.resume_awaiting_user(ticket["id"])
         self.assertEqual("open", resumed["status"])
         self.assertIsNone(resumed["awaiting_return_category_id"])
-
-    def test_legacy_migration_is_idempotent_and_removes_plaintext_after_verification(self):
-        path = self.root / "legacy.db"
-        with closing(sqlite3.connect(path)) as connection:
-            connection.execute("CREATE TABLE guild_modules(guild_id INTEGER,module_id TEXT,enabled INTEGER,settings_json TEXT)")
-            connection.execute("CREATE TABLE support_tickets(channel_id INTEGER PRIMARY KEY,guild_id INTEGER,opener_id INTEGER,status TEXT,created_at INTEGER,closed_at INTEGER,closed_by INTEGER,transcript_json TEXT)")
-            connection.execute("INSERT INTO guild_modules VALUES(1,'tickets',1,?)", (json.dumps({"ticket_category_id": 100}),))
-            connection.execute("INSERT INTO support_tickets VALUES(200,1,10,'closed',1,2,99,?)", (json.dumps([{"author": "member", "content": "legacy"}]),))
-            connection.commit()
-        repository = TicketRepository(path)
-        service = TicketService(repository, TranscriptStorage(self.root / "legacy-blobs", Fernet.generate_key().decode("ascii")))
-        self.assertEqual(1, asyncio.run(service.migrate_legacy_transcripts()))
-        self.assertEqual(0, asyncio.run(service.migrate_legacy_transcripts()))
-        with closing(sqlite3.connect(path)) as connection:
-            self.assertIsNone(connection.execute("SELECT transcript_json FROM support_tickets").fetchone()[0])
 
 
 if __name__ == "__main__":

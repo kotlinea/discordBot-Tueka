@@ -24,7 +24,7 @@ python scripts/db_inventory.py data/backups/snapshot.sqlite3 --backup data/backu
 1. Bot、Dashboard、Workerを停止します。
 2. 現在のDBとTranscriptを別名で保全します。
 3. 同じ世代のDB、Transcript、暗号鍵を復元します。
-4. `migrate_json.py`を実行します。
+4. 更新先Versionへ復元する場合は `migrate_json.py` と[番号付きMigration](./migrations.md)を実行します。旧VersionへのRollbackでは、そのVersionに対応するSnapshotとアプリを組にして復元し、新しい削除Migrationを適用しないでください。
 5. Dashboard、Bot、Workerの順に起動します。
 6. Ticket Transcript復号、Social Cursor、期限Schedule、Outboxを確認します。
 

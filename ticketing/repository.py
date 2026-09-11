@@ -162,7 +162,6 @@ class TicketRepository:
                     resource_type TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', reason TEXT,
                     created_at INTEGER NOT NULL, recovered_at INTEGER, UNIQUE(guild_id,container_id)
                 );
-                CREATE TABLE IF NOT EXISTS ticket_migrations (name TEXT PRIMARY KEY, completed_at INTEGER NOT NULL);
             """)
             self._add_column(connection, "tickets_v2", "notes_thread_id", "INTEGER")
             self._add_column(connection, "tickets_v2", "closing_at", "INTEGER")
@@ -175,7 +174,6 @@ class TicketRepository:
             self._add_column(connection, "tickets_v2", "awaiting_return_category_id", "INTEGER")
             self._add_column(connection, "ticket_feedback", "form_id", "INTEGER")
             self._add_column(connection, "ticket_feedback", "answers_encrypted_json", "TEXT NOT NULL DEFAULT '{}'")
-        self.migrate_legacy()
         self.recover_incomplete_closes()
 
     @staticmethod
@@ -200,7 +198,7 @@ class TicketRepository:
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             current = connection.execute("SELECT revision FROM ticket_guild_settings WHERE guild_id=?", (guild_id,)).fetchone()
-            if current and expected_revision is not None and int(current["revision"]) != expected_revision:
+            if expected_revision is not None and (int(current["revision"]) if current else 0) != expected_revision:
                 raise RuntimeError("revision_conflict")
             if current:
                 connection.execute("""UPDATE ticket_guild_settings SET enabled=?,open_limit=?,language=?,log_channel_id=?,transcript_channel_id=?,
@@ -733,20 +731,6 @@ class TicketRepository:
             connection.execute("UPDATE tickets_v2 SET form_answers_json='{}' WHERE id=?", (ticket_id,))
             connection.execute("UPDATE ticket_attachments SET status='deleted' WHERE ticket_id=?", (ticket_id,))
 
-    def legacy_plaintext_transcripts(self, limit: int = 20) -> list[dict[str, Any]]:
-        with self._connection() as connection:
-            tables = {row["name"] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-            if "support_tickets" not in tables:
-                return []
-            rows = connection.execute("""SELECT legacy.channel_id,legacy.transcript_json,v2.* FROM support_tickets legacy
-                JOIN tickets_v2 v2 ON v2.discord_container_id=legacy.channel_id
-                LEFT JOIN ticket_transcripts tr ON tr.ticket_id=v2.id
-                WHERE legacy.transcript_json IS NOT NULL AND legacy.transcript_json<>'' AND tr.id IS NULL LIMIT ?""", (max(1, min(limit, 100)),)).fetchall()
-        return [self._item(row) or {} for row in rows]
-
-    def clear_legacy_transcript(self, channel_id: int) -> None:
-        with self._connection() as connection:
-            connection.execute("UPDATE support_tickets SET transcript_json=NULL WHERE channel_id=?", (channel_id,))
 
     def queue_outbox(self, ticket_id: int, action: str, actor_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         now = int(time.time())
@@ -845,42 +829,3 @@ class TicketRepository:
             closed_30d = connection.execute("SELECT COUNT(*) FROM tickets_v2 WHERE guild_id=? AND status='closed' AND closed_at>=?", (guild_id, int(time.time()) - 30 * 86400)).fetchone()[0]
             rating = connection.execute("SELECT AVG(f.rating) FROM ticket_feedback f JOIN tickets_v2 t ON t.id=f.ticket_id WHERE t.guild_id=?", (guild_id,)).fetchone()[0]
         return {"open": int(open_count), "unclaimed": int(unclaimed), "closed_30d": int(closed_30d), "average_rating": round(float(rating), 2) if rating is not None else None}
-
-    def migrate_legacy(self) -> None:
-        with self._connection() as connection:
-            tables = {row["name"] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-            if "guild_modules" not in tables or connection.execute("SELECT 1 FROM ticket_migrations WHERE name='legacy_ticket_v2'").fetchone():
-                return
-            connection.execute("BEGIN IMMEDIATE")
-            modules = connection.execute("SELECT guild_id,enabled,settings_json FROM guild_modules WHERE module_id='tickets'").fetchall()
-            now = int(time.time())
-            for module in modules:
-                guild_id, settings = int(module["guild_id"]), json.loads(module["settings_json"] or "{}")
-                connection.execute("INSERT OR IGNORE INTO ticket_guild_settings(guild_id,enabled,log_channel_id,transcript_channel_id,updated_at) VALUES(?,?,?,?,?)",
-                    (guild_id, int(module["enabled"]), settings.get("ticket_log_channel_id"), settings.get("ticket_log_channel_id"), now))
-                team = connection.execute("SELECT id FROM ticket_staff_teams WHERE guild_id=? AND name='Default Staff'", (guild_id,)).fetchone()
-                if not team:
-                    team_id = int(connection.execute("INSERT INTO ticket_staff_teams(guild_id,name,role_ids_json,created_at,updated_at) VALUES(?,?,?,?,?)",
-                        (guild_id, "Default Staff", json.dumps([settings["ticket_staff_role_id"]] if settings.get("ticket_staff_role_id") else []), now, now)).lastrowid)
-                else:
-                    team_id = int(team["id"])
-                panel = connection.execute("SELECT id FROM ticket_panels WHERE guild_id=? AND name='Default Panel'", (guild_id,)).fetchone()
-                if not panel and settings.get("ticket_category_id"):
-                    config = default_panel(); config.update({"name": "Default Panel", "team_id": team_id, "category_id": settings.get("ticket_category_id")})
-                    columns = {"name", "description", "mode", "form_id", "team_id", "category_id", "thread_parent_channel_id", "staff_notification_channel_id", "enabled", "revision"}
-                    panel_id = int(connection.execute("""INSERT INTO ticket_panels(guild_id,name,description,mode,team_id,category_id,config_json,created_at,updated_at)
-                        VALUES(?,?,?,?,?,?,?,?,?)""", (guild_id, config["name"], settings.get("ticket_panel_description") or config["description"], "channel", team_id, config["category_id"], json.dumps({key: val for key, val in config.items() if key not in columns}, ensure_ascii=False), now, now)).lastrowid)
-                else:
-                    panel_id = int(panel["id"]) if panel else None
-                if panel_id and settings.get("ticket_panel_channel_id"):
-                    connection.execute("INSERT OR IGNORE INTO ticket_panel_messages(guild_id,name,channel_id,title,description,panel_ids_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                        (guild_id, "Default Panel Message", settings["ticket_panel_channel_id"], settings.get("ticket_panel_title") or "サポートチケット", settings.get("ticket_panel_description") or "サポートが必要な場合はボタンを押してください。", json.dumps([panel_id]), now, now))
-                if panel_id and "support_tickets" in tables:
-                    for legacy in connection.execute("SELECT * FROM support_tickets WHERE guild_id=?", (guild_id,)).fetchall():
-                        exists = connection.execute("SELECT 1 FROM tickets_v2 WHERE discord_container_id=?", (legacy["channel_id"],)).fetchone()
-                        if exists:
-                            continue
-                        counter = connection.execute("SELECT COALESCE(MAX(ticket_number),0)+1 FROM tickets_v2 WHERE guild_id=?", (guild_id,)).fetchone()[0]
-                        connection.execute("""INSERT INTO tickets_v2(guild_id,ticket_number,panel_id,opener_id,mode,discord_container_id,status,created_at,opened_at,closed_at,closed_by)
-                            VALUES(?,?,?,?,? ,?,?,?,?,?,?)""", (guild_id, int(counter), panel_id, legacy["opener_id"], "channel", legacy["channel_id"], legacy["status"], legacy["created_at"], legacy["created_at"], legacy["closed_at"], legacy["closed_by"]))
-            connection.execute("INSERT INTO ticket_migrations(name,completed_at) VALUES('legacy_ticket_v2',?)", (now,))

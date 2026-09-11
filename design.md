@@ -37,8 +37,6 @@ Locked multi-page design system. `tokens.css` is canonical; page-specific raw co
 
 ## Build and release
 - Install and build the SPA from `dashboard/frontend` with `npm install` and `npm run build`.
-- Set `DASHBOARD_UI_V2=true` to serve the complete SPA for dashboard routes. Keep it false for the Jinja rollback UI.
-- Optionally set `DASHBOARD_UI_V2_GUILDS` to a comma-separated guild ID allowlist during rollout.
 - The generated `dist`, dependency tree, and Playwright artifacts are intentionally not tracked.
 
 ## Discord permissions
@@ -46,3 +44,5 @@ Locked multi-page design system. `tokens.css` is canonical; page-specific raw co
 - Reaction cleanup and purge require Manage Messages.
 - Audit-log actor correlation requires View Audit Log.
 - Timeout, Kick, and Ban require their corresponding Discord permissions and still respect role hierarchy at execution time.
+
+The authenticated dashboard always uses the React SPA. Build assets before startup; there is no Jinja administration fallback.

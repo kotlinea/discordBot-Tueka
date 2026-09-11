@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import re
 import time
-import json
 from datetime import datetime
 from typing import Any
 
@@ -145,26 +144,3 @@ class TicketService:
             raise
         self.repository.audit(ticket["guild_id"], "ticket_closed", actor_id, ticket_id, {"transcript_id": transcript["id"]})
         return closed, transcript
-
-    async def migrate_legacy_transcripts(self, limit: int = 20) -> int:
-        if not self.transcripts.available:
-            return 0
-        migrated = 0
-        for ticket in self.repository.legacy_plaintext_transcripts(limit):
-            try:
-                legacy = json.loads(str(ticket.get("transcript_json") or "[]"))
-                if not isinstance(legacy, list):
-                    raise ValueError("legacy transcript")
-                payload = {"version": 1, "ticket": {key: ticket.get(key) for key in ("id", "guild_id", "ticket_number", "panel_id", "opener_id", "mode", "created_at", "opened_at")},
-                           "form_answers": {}, "closed_by": ticket.get("closed_by"), "close_reason": ticket.get("close_reason") or "Legacy migration",
-                           "closed_at": ticket.get("closed_at"), "messages": legacy}
-                stored = await self.transcripts.save(int(ticket["guild_id"]), int(ticket["id"]), payload)
-                # Verify decryption and integrity before deleting legacy plaintext.
-                await self.transcripts.load(stored.backend, stored.object_key, stored.content_hash)
-                retention = self.repository.settings(int(ticket["guild_id"]))["transcript_retention_days"]
-                self.repository.save_transcript(int(ticket["id"]), stored.backend, stored.object_key, stored.content_hash, stored.byte_size, int(time.time()) + retention * 86400)
-                self.repository.clear_legacy_transcript(int(ticket["channel_id"]))
-                migrated += 1
-            except Exception:
-                continue
-        return migrated

@@ -8,6 +8,7 @@
 python3.13 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python migrate_json.py
+.venv/bin/python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrations
 cd dashboard/frontend && npm ci && npm run build
 cd ../../docs && npm ci && npm run build
 ```

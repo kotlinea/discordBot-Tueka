@@ -18,20 +18,20 @@ Tuekaは、Discordサーバーのモデレーション、コミュニティ運�
 
 ## 最短セットアップ
 
-1. Python 3.13で仮想環境を作成し、`pip install -r requirements.txt`を実行します。
+1. Python 3.13で仮想環境を作成し、`pip install --require-hashes -r requirements.lock`を実行します。
 2. `.env.example`を`.env`へコピーし、Discord BotとOAuthの値を設定します。
-3. `python migrate_json.py`でDBを初期化・移行します。
+3. `python migrate_json.py`でDBを初期化し、`python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrations`で番号付きMigrationを適用します。DBパスを変更している場合は引数も合わせます。既存環境は先に全Processを停止・Backupしてください。
 4. Botを`python bot.py`、Dashboardを`python -m uvicorn dashboard.app:app --host 127.0.0.1 --port 8000`で起動します。
 5. ソーシャル通知を使う場合は`python social_worker.py`も起動します。
 
-Dashboard V2を使用する場合は、先に`dashboard/frontend`で`npm install`と`npm run build`を実行し、`DASHBOARD_UI_V2=true`を設定します。
+管理画面はReact SPAです。起動前に`dashboard/frontend`で`npm ci`と`npm run build`を実行します。ビルド済み資産がない場合は503を返します。
 
-ドキュメントサイトは`docs`で`npm install`と`npm run build`を実行すると、Dashboardの`/docs/`から公開されます。
+ドキュメントサイトは`docs`で`npm ci`と`npm run build`を実行すると、Dashboardの`/docs/`から公開されます。
 
 ## テスト
 
 ```powershell
-.venv\Scripts\python.exe -m pytest
+.venv\Scripts\python.exe -m unittest discover -s tests -p 'test_*.py'
 cd dashboard/frontend
 npm test
 npm run build

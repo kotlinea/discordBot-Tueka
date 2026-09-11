@@ -126,8 +126,8 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         return result
 
     def tickets_available(guild_id: int) -> None:
-        if not settings or not settings.tickets_v2 or (settings.tickets_v2_guilds and guild_id not in settings.tickets_v2_guilds) or not ticket_repository or not ticket_service:
-            raise HTTPException(404, detail={"code": "tickets_v2_disabled", "message": "Ticket V2はこのサーバーで利用できません。"})
+        if not ticket_repository or not ticket_service:
+            raise HTTPException(503, detail={"code": "tickets_unavailable", "message": "Ticketを初期化できません。"})
 
     async def ticket_actor(request: Request, guild_id: int, *, require_manage: bool = False) -> tuple[int, bool]:
         access = token(request)
@@ -206,7 +206,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
                 continue
             administrator = bool(int(item.get("permissions", "0")) & ADMINISTRATOR)
             ticket_staff = False
-            if not administrator and settings and settings.tickets_v2 and (not settings.tickets_v2_guilds or guild_id in settings.tickets_v2_guilds) and ticket_repository:
+            if not administrator and ticket_repository:
                 teams = ticket_repository.teams(guild_id)
                 if teams:
                     member = await discord.guild_member(guild_id, user_id)
@@ -221,7 +221,11 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         return await discord.guild_resources(guild_id, use_cache=not live)
 
     def feature_payload(guild_id: int, feature: Any, bot_permissions: int) -> dict[str, Any]:
-        module = storage.get_module(guild_id, feature.id)
+        if feature.id == 'tickets':
+            value = ticket_repository.settings(guild_id) if ticket_repository else {'enabled': False, 'revision': 0}
+            module = {'enabled': value['enabled'], 'revision': value['revision'], 'settings': value}
+        else:
+            module = storage.get_module(guild_id, feature.id)
         missing = [] if bot_permissions & ADMINISTRATOR else [name for name in feature.required_bot_permissions if not bot_permissions & PERMISSION_BITS[name]]
         title, description = japanese_copy(feature.id)
         return {
@@ -526,8 +530,9 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
             await validate_ticket_resources(guild_id, value)
             if value["enabled"] and not ticket_transcripts.available:
                 raise ValueError("TICKET_ENCRYPTION_KEY")
-            saved = ticket_repository.save_settings(guild_id, value, int(body["revision"]) if body.get("revision") else None)
-            storage.set_module(guild_id, "tickets", enabled=saved["enabled"])
+            if body.get("revision") is None:
+                raise ValueError("revision")
+            saved = ticket_repository.save_settings(guild_id, value, int(body["revision"]))
             for ticket in ticket_repository.tickets(guild_id, status="open", limit=200): ticket_service.schedule_ticket(ticket)
             ticket_repository.audit(guild_id, "settings_updated", actor, detail={})
             return ticket_ids(saved)
@@ -1031,14 +1036,35 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
     async def save_module(request: Request, guild_id: int, module_id: str) -> dict[str, Any]:
         csrf(request)
         await manage(request, guild_id, live=True)
+        if module_id == 'tickets':
+            raise HTTPException(404, detail={"code": "module_not_found", "message": "Ticket専用設定APIを使用してください。"})
         try:
-            get_feature(module_id)
+            feature = get_feature(module_id)
             body = await request.json()
-            channels, roles, _ = await discord.guild_resources(guild_id, use_cache=False)
+            channels, roles, permissions = await discord.guild_resources(guild_id, use_cache=False)
             values = body.get("settings", {})
             if not isinstance(values, dict):
                 raise ValueError("settings")
             validate_resource_ids(values, {int(item["id"]) for item in channels}, {int(item["id"]) for item in roles})
+            if bool(body.get('enabled')):
+                required = set(feature.required_bot_permissions)
+                if any(not values.get(field) for field in feature.required_fields):
+                    raise ValueError('required_settings')
+                if module_id == 'audit_log' and values.get('log_member'):
+                    required.add('view_audit_log')
+                if module_id == 'leveling':
+                    if values.get('voice_enabled') and not values.get('voice_notification_channel_id'):
+                        raise ValueError('voice_notification_channel_id')
+                    if values.get('text_role_rewards') or values.get('voice_role_rewards'):
+                        required.add('manage_roles')
+                if module_id == 'welcome':
+                    for prefix in ('welcome', 'leave'):
+                        if values.get(f'{prefix}_enabled'):
+                            content = str(values.get(f'{prefix}_content') or '').strip()
+                            if not values.get(f'{prefix}_channel_id') or not content or (values.get(f'{prefix}_format', 'text') == 'text' and len(content) > 2000):
+                                raise ValueError('welcome_settings')
+                if not permissions & ADMINISTRATOR and any(not permissions & PERMISSION_BITS[name] for name in required):
+                    raise ValueError('missing_permissions')
             saved = storage.set_module(guild_id, module_id, enabled=bool(body.get("enabled")), settings=_normalize_resource_ids(values),
                                        expected_revision=int(body["revision"]) if body.get("revision") is not None else None)
             return {**saved, "settings": _serialize_resource_ids(saved["settings"])}

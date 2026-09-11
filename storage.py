@@ -91,7 +91,6 @@ class GuildStorage:
                 CREATE TABLE IF NOT EXISTS safe_browsing_cache (url_hash TEXT PRIMARY KEY, unsafe INTEGER NOT NULL, expires_at INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS reaction_role_panels (message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, role_ids_json TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS temporary_voice_channels (channel_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, owner_id INTEGER NOT NULL, created_at INTEGER NOT NULL);
-                CREATE TABLE IF NOT EXISTS support_tickets (channel_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, opener_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at INTEGER NOT NULL, closed_at INTEGER, closed_by INTEGER, transcript_json TEXT);
                 CREATE TABLE IF NOT EXISTS polls (message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, channel_id INTEGER NOT NULL, creator_id INTEGER NOT NULL, question TEXT NOT NULL, options_json TEXT NOT NULL, image_url TEXT, closes_at INTEGER, status TEXT NOT NULL DEFAULT 'open', created_at INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS poll_votes (message_id INTEGER NOT NULL, user_id INTEGER NOT NULL, option_index INTEGER NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (message_id,user_id), FOREIGN KEY(message_id) REFERENCES polls(message_id) ON DELETE CASCADE);
                 CREATE TABLE IF NOT EXISTS trust_events (id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, user_id INTEGER NOT NULL, category TEXT NOT NULL, weight INTEGER NOT NULL, reason TEXT, created_at INTEGER NOT NULL);
@@ -1455,18 +1454,6 @@ class GuildStorage:
         with self._connection() as c:
             c.execute("DELETE FROM temporary_voice_channels WHERE channel_id=?", (channel_id,))
 
-    def create_ticket(self, channel_id: int, guild_id: int, opener_id: int) -> None:
-        with self._connection() as c:
-            c.execute("INSERT INTO support_tickets (channel_id,guild_id,opener_id,status,created_at) VALUES (?,?,?,'open',?)", (channel_id, guild_id, opener_id, int(time.time())))
-
-    def ticket(self, channel_id: int) -> dict[str, Any] | None:
-        with self._connection() as c:
-            row = c.execute("SELECT * FROM support_tickets WHERE channel_id=?", (channel_id,)).fetchone()
-        return dict(row) if row else None
-
-    def close_ticket(self, channel_id: int, closed_by: int, transcript: list[dict[str, Any]]) -> None:
-        with self._connection() as c:
-            c.execute("UPDATE support_tickets SET status='closed',closed_at=?,closed_by=?,transcript_json=? WHERE channel_id=? AND status='open'", (int(time.time()), closed_by, json.dumps(transcript, ensure_ascii=False), channel_id))
 
     def create_poll(self, message_id: int, guild_id: int, channel_id: int, creator_id: int, question: str, options: list[str], image_url: str | None, closes_at: int | None) -> None:
         if not 2 <= len(options) <= 10:

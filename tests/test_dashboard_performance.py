@@ -1,5 +1,4 @@
 import asyncio
-import time
 import unittest
 from pathlib import Path
 
@@ -9,13 +8,15 @@ from dashboard.discord_api import DiscordAPI
 
 
 class FakeDiscordClient:
-    def __init__(self, delay: float = 0) -> None:
-        self.delay, self.calls = delay, []
+    def __init__(self, parallel_requests: int = 0) -> None:
+        self.calls = []
+        self.barrier = asyncio.Barrier(parallel_requests) if parallel_requests else None
 
     async def request(self, method, url, **kwargs):
         self.calls.append((method, url, kwargs))
-        if self.delay:
-            await asyncio.sleep(self.delay)
+        if self.barrier:
+            # No response may complete until all independent requests have started.
+            await self.barrier.wait()
         if url.endswith("/users/@me"):
             payload = {"id": "1", "username": "Tueka"}
         elif url.endswith("/users/@me/guilds"):
@@ -72,21 +73,17 @@ class DashboardPerformanceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(client.calls), 8)
 
     async def test_guild_resources_are_requested_in_parallel(self):
-        client = FakeDiscordClient(delay=0.1)
+        client = FakeDiscordClient(parallel_requests=3)
         api = self.api_with(client)
-        started = time.perf_counter()
-        await api.guild_resources(10, use_cache=False)
-        self.assertLess(time.perf_counter() - started, 0.24)
+        await asyncio.wait_for(api.guild_resources(10, use_cache=False), timeout=5)
         self.assertEqual(len(client.calls), 3)
 
     async def test_manageable_guild_sources_are_requested_in_parallel(self):
-        client = FakeDiscordClient(delay=0.1)
+        client = FakeDiscordClient(parallel_requests=2)
         api = self.api_with(client)
-        started = time.perf_counter()
-        await api.manageable_guilds("user-token", use_cache=False)
-        self.assertLess(time.perf_counter() - started, 0.24)
+        await asyncio.wait_for(api.manageable_guilds("user-token", use_cache=False), timeout=5)
         self.assertEqual(len(client.calls), 2)
 
     def test_dashboard_script_does_not_fetch_identity(self):
-        script = Path("dashboard/static/dashboard.js").read_text(encoding="utf-8")
+        script = Path("dashboard/frontend/src/api.ts").read_text(encoding="utf-8")
         self.assertNotIn("/api/identity", script)

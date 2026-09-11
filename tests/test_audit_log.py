@@ -15,11 +15,6 @@ class AuditLogCogTests(unittest.TestCase):
     def test_log_text_is_bounded(self):
         self.assertLessEqual(len(AuditLogCog._short("x" * 2000)), 900)
 
-    def test_member_category_requires_audit_log_permission_in_dashboard(self):
-        template = Path("dashboard/templates/module_settings.html").read_text(encoding="utf-8")
-        self.assertIn("toast.missing_permissions", template)
-        self.assertIn('name="log_member"', template)
-
     def test_moderation_log_categories_are_selected_per_event(self):
         self.assertEqual(AuditLogCog._event_key("📝 メッセージ編集"), "message_edit")
         self.assertEqual(AuditLogCog._event_key("🗑️ メッセージ削除"), "message_delete")

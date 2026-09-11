@@ -1,10 +1,7 @@
-"""Community automation: statistics voice channels, temporary voice, and tickets."""
-import asyncio
+"""Community automation: statistics voice channels and temporary voice."""
 import logging
-from datetime import timezone
 
 import discord
-from discord import app_commands
 from discord.ext import commands, tasks
 
 from storage import GuildStorage
@@ -23,11 +20,6 @@ class CommunityCog(commands.Cog):
     def cog_unload(self) -> None:
         self.refresh_live_stats.cancel()
 
-    async def _module_enabled(self, interaction: discord.Interaction, module_id: str) -> bool:
-        if interaction.guild is None or not self.storage.module_enabled(interaction.guild.id, module_id):
-            await interaction.response.send_message("この機能は管理者により無効です。", ephemeral=True)
-            return False
-        return True
 
     async def update_stats(self, guild: discord.Guild) -> None:
         settings = self.storage.get_module(guild.id, "live_stats")["settings"]
@@ -102,114 +94,6 @@ class CommunityCog(commands.Cog):
             await member.move_to(channel, reason="Temporary voice channel")
         except discord.HTTPException:
             LOGGER.warning("Could not create temporary voice channel", exc_info=True)
-
-    async def _create_ticket(self, interaction: discord.Interaction) -> None:
-        assert interaction.guild is not None and isinstance(interaction.user, discord.Member)
-        if not self.storage.module_enabled(interaction.guild.id, "tickets"):
-            await interaction.response.send_message("この機能は管理者により無効です。", ephemeral=True)
-            return
-        settings = self.storage.get_module(interaction.guild.id, "tickets")["settings"]
-        category = interaction.guild.get_channel(int(settings.get("ticket_category_id") or 0))
-        staff_role = interaction.guild.get_role(int(settings.get("ticket_staff_role_id") or 0))
-        if not isinstance(category, discord.CategoryChannel) or staff_role is None:
-            await interaction.response.send_message("チケット設定が不完全です。", ephemeral=True)
-            return
-        existing = [channel for channel in category.text_channels if self.storage.ticket(channel.id) and self.storage.ticket(channel.id)["opener_id"] == interaction.user.id and self.storage.ticket(channel.id)["status"] == "open"]
-        if existing:
-            await interaction.response.send_message(f"すでに開いているチケットがあります: {existing[0].mention}", ephemeral=True)
-            return
-        overwrites = {
-            interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
-            staff_role: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, manage_messages=True),
-            interaction.guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True, read_message_history=True),
-        }
-        try:
-            channel = await interaction.guild.create_text_channel(f"ticket-{interaction.user.name}"[:100], category=category, overwrites=overwrites, reason="Support ticket")
-        except discord.HTTPException:
-            await interaction.response.send_message("チケットを作成できませんでした。Botの権限を確認してください。", ephemeral=True)
-            return
-        self.storage.create_ticket(channel.id, interaction.guild.id, interaction.user.id)
-        await channel.send(f"{interaction.user.mention} チケットを作成しました。スタッフが対応します。終了するには `/close_ticket` を使います。")
-        await interaction.response.send_message(f"チケットを作成しました: {channel.mention}", ephemeral=True)
-
-    @commands.Cog.listener()
-    async def on_interaction(self, interaction: discord.Interaction) -> None:
-        if interaction.type is discord.InteractionType.component and (interaction.data or {}).get("custom_id") == "tueka-ticket:create" and interaction.guild:
-            if self.bot.settings.tickets_v2 and (not self.bot.settings.tickets_v2_guilds or interaction.guild.id in self.bot.settings.tickets_v2_guilds):
-                return
-            await self._create_ticket(interaction)
-
-    @app_commands.command(description="設定済みのサポートチケット用ボタンを投稿します。")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    @app_commands.guild_only()
-    async def publish_ticket_panel(self, interaction: discord.Interaction) -> None:
-        if interaction.guild and self.bot.settings.tickets_v2 and (not self.bot.settings.tickets_v2_guilds or interaction.guild.id in self.bot.settings.tickets_v2_guilds):
-            cog = self.bot.get_cog("TicketsCog")
-            configs = cog.repository.panel_messages(interaction.guild.id) if cog else []
-            if not configs:
-                await interaction.response.send_message("ダッシュボードのTicket > Panel Messagesで投稿内容を作成してください。", ephemeral=True)
-                return
-            with cog.repository._connection() as connection:
-                connection.execute("UPDATE ticket_panel_messages SET status='draft',lease_owner=NULL,lease_until=NULL WHERE guild_id=?", (interaction.guild.id,))
-            await interaction.response.send_message("Panel Messageの投稿・更新をキューへ追加しました。", ephemeral=True)
-            return
-        if not await self._module_enabled(interaction, "tickets"):
-            return
-        assert interaction.guild is not None
-        settings = self.storage.get_module(interaction.guild.id, "tickets")["settings"]
-        channel = interaction.guild.get_channel(int(settings.get("ticket_panel_channel_id") or 0))
-        if not isinstance(channel, discord.TextChannel):
-            await interaction.response.send_message("ダッシュボードでパネル投稿先を設定してください。", ephemeral=True)
-            return
-        embed = discord.Embed(title=str(settings.get("ticket_panel_title") or "サポートチケット"), description=str(settings.get("ticket_panel_description") or "サポートが必要な場合は、下のボタンを押してください。"))
-        view = discord.ui.View(timeout=None)
-        view.add_item(discord.ui.Button(label="チケットを作成", style=discord.ButtonStyle.primary, custom_id="tueka-ticket:create"))
-        try:
-            await channel.send(embed=embed, view=view)
-        except discord.HTTPException:
-            await interaction.response.send_message("パネルを投稿できませんでした。Botの権限を確認してください。", ephemeral=True)
-            return
-        await interaction.response.send_message("サポートチケット用パネルを投稿しました。", ephemeral=True)
-
-    @app_commands.command(description="このチケットを閉じ、議事録を保存します。")
-    @app_commands.guild_only()
-    async def close_ticket(self, interaction: discord.Interaction) -> None:
-        if interaction.guild and self.bot.settings.tickets_v2 and (not self.bot.settings.tickets_v2_guilds or interaction.guild.id in self.bot.settings.tickets_v2_guilds):
-            cog = self.bot.get_cog("TicketsCog")
-            ticket = cog.repository.ticket_for_container(interaction.channel_id or 0) if cog else None
-            if not cog or not ticket:
-                await interaction.response.send_message("このチャンネルは開いているTicketではありません。", ephemeral=True)
-                return
-            await interaction.response.defer(ephemeral=True)
-            await cog.close_container(interaction, ticket, "解決済み")
-            return
-        if not await self._module_enabled(interaction, "tickets"):
-            return
-        assert interaction.guild is not None and isinstance(interaction.channel, discord.TextChannel)
-        ticket = self.storage.ticket(interaction.channel.id)
-        if not ticket or ticket["status"] != "open":
-            await interaction.response.send_message("このチャンネルは開いているチケットではありません。", ephemeral=True)
-            return
-        staff_role_id = self.storage.get_module(interaction.guild.id, "tickets")["settings"].get("ticket_staff_role_id")
-        is_staff = isinstance(interaction.user, discord.Member) and (interaction.user.guild_permissions.manage_channels or any(role.id == staff_role_id for role in interaction.user.roles))
-        if interaction.user.id != ticket["opener_id"] and not is_staff:
-            await interaction.response.send_message("チケット作成者またはスタッフだけが閉じられます。", ephemeral=True)
-            return
-        await interaction.response.defer(ephemeral=True)
-        messages = [message async for message in interaction.channel.history(limit=200, oldest_first=True)]
-        transcript = [{"author_id": message.author.id, "author": str(message.author), "content": message.content, "created_at": message.created_at.replace(tzinfo=timezone.utc).isoformat()} for message in messages]
-        self.storage.close_ticket(interaction.channel.id, interaction.user.id, transcript)
-        log_id = self.storage.get_module(interaction.guild.id, "tickets")["settings"].get("ticket_log_channel_id")
-        log = interaction.guild.get_channel(int(log_id)) if log_id else None
-        if isinstance(log, discord.TextChannel):
-            await log.send(f"チケット `{interaction.channel.name}` を {interaction.user.mention} が閉じました。議事録はSQLiteに保存済みです。")
-        await interaction.followup.send("チケットを閉じました。チャンネルは5秒後に削除されます。", ephemeral=True)
-        await asyncio.sleep(5)
-        try:
-            await interaction.channel.delete(reason="Support ticket closed")
-        except discord.HTTPException:
-            LOGGER.warning("Could not delete closed ticket channel", exc_info=True)
 
 
 async def setup(bot: commands.Bot) -> None:

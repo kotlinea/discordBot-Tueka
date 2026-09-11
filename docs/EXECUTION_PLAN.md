@@ -2,6 +2,18 @@
 
 策定日：2026-09-10。方針と実施順序の正本は [ROADMAP.md](../ROADMAP.md)。本書は、その方針を現在のコードに対応付けた作業計画であり、新しい公開仕様ではない。
 
+## 現在地と次の実行順序（2026-09-11確認）
+
+以下の初回調査表は策定時点の記録である。P0-1〜P0-4、P1-0、P1-1、P1-2はローカル実装・検証の完了記録を `PROGRESS0910.md` に保存している。次の着手はP1-3。遠隔本番へのMigrationとStage実動は未完了であり、ローカル検証とリリース判定を区別する。以下は依存順序と各単位の確認事項を保持した一覧である。
+
+1. **P1-1を閉じる。** `dashboard/app.py` のSPA配信、管理テンプレート・旧資産・旧POST削除、API側へ引き継いだ入力・権限検証をレビューする。正式URL、OAuth、CSRF、Guild認可、未build時503、静的資産・Docsの回帰結果を揃え、進捗へ記録する。既存差分を保持し、P0からやり直さない。
+2. **P1-2：Ticket。** `config.py` のFlagとAllowlist、Repository初期化時の `migrate_legacy`、Cogからの平文Transcript移行を除去する。旧テーブル削除Migrationを同じ単位に含め、V2 Ticket・暗号化Transcript・保留処理の保持と再起動後の旧Schema非復活を検証する。
+3. **P1-3：Reaction Roles。** `reaction_roles/repository.py` の旧共有設定参照を含め、Legacy UI・Wizard・旧コマンドの利用箇所を除去する。共有 `guild_modules` 自体は他機能が利用するため一括削除しない。
+4. **P1-4：Moderation。** `cogs/automod.py` の起動時旧移行とCSV読込みを除去する。旧Rule/Eventへの外部キーと参照を解消してからMigrationを適用し、現行Case・Point・処置履歴を保持する。
+5. **P1-5をPhase 1の出口とする。** JSON移行・旧DDL・一時文書の残存を検査し、Bot・Dashboard・Workerを再起動してV1が復活しないことを確認する。その後にPhase 2のDomain分割へ進む。
+
+各単位はコード・Migration・テスト・正式Docs・進捗記録までを一つのレビュー対象とする。遠隔本番DBのSnapshot/Inventory、StageでのDiscord・OAuth・Webhook実動は既存記録でも未検証であり、ローカル成功だけでリリース済みとは扱わない。Phase 2以降の実施方針・受入条件は後述を維持し、詳細な対象ファイルはPhase 1終了時に再確定する。
+
 ## 1. 判断と調査範囲
 
 直近の目標は新機能追加ではなく、Phase 0の検証基盤確立とPhase 1のV1除去である。続いて責務を整理し、その構造を本番用コンテナへ載せる。既存機能の運用品質を満たしてからPhase 5へ進む。
