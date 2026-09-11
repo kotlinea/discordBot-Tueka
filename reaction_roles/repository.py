@@ -114,21 +114,18 @@ class ReactionRoleRepository:
         with self.connection() as c:
             row = c.execute("SELECT * FROM reaction_role_settings WHERE guild_id=?", (guild_id,)).fetchone()
             if not row:
-                has_legacy = c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='guild_modules'").fetchone()
-                legacy = c.execute("SELECT enabled FROM guild_modules WHERE guild_id=? AND module_id='reaction_roles'",(guild_id,)).fetchone() if has_legacy else None
                 has_active_message = c.execute(
                     "SELECT 1 FROM reaction_role_messages_v2 WHERE guild_id=? AND enabled=1 LIMIT 1", (guild_id,)
                 ).fetchone()
-                if legacy or has_active_message:
+                if has_active_message:
                     # Early V2 builds could publish a panel without creating its
                     # guild settings row. Treat an existing active panel as the
                     # intended enable signal, while preserving an explicit saved
                     # disabled setting once a row exists.
-                    enabled = int(legacy["enabled"]) if legacy else 1
                     now = int(time.time())
                     c.execute(
                         "INSERT INTO reaction_role_settings(guild_id,enabled,updated_at) VALUES(?,?,?)",
-                        (guild_id, enabled, now),
+                        (guild_id, 1, now),
                     )
                     row = c.execute("SELECT * FROM reaction_role_settings WHERE guild_id=?", (guild_id,)).fetchone()
         return dict(row) if row else {"guild_id": guild_id, "enabled": False, "log_channel_id": None, "denial_dm": True, "denial_dm_cooldown_seconds": 300, "audit_retention_days": 90, "revision": 0}

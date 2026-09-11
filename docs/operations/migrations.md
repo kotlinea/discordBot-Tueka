@@ -35,4 +35,4 @@ python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrat
 - 削除対象のRuntime読書きとコンストラクタDDLの除去。Bot/Dashboard/Workerの再初期化で旧テーブルが復活しないこと。
 - 旧Imageへ戻す手順と、Snapshot復元で失われる更新範囲。
 
-0002は `support_tickets` と `ticket_migrations` を削除し、V2 Ticket・暗号化Transcript・配送待ち処理を保持します。旧データの自動変換は行いません。旧アプリへのRollbackには適用前Snapshotと対応するファイル・鍵が必要です。Reaction Roles・Moderationの削除は後続の番号で実施します。
+0002は `support_tickets` と `ticket_migrations` を削除し、V2 Ticket・暗号化Transcript・配送待ち処理を保持します。0003は旧 `reaction_role_panels` のみ削除し、V2の付与状態・期限・復旧記録を保持します。旧データの自動変換は行いません。旧アプリへのRollbackには適用前Snapshotと対応するファイル・鍵が必要です。Moderationの削除は後続の番号で実施します。

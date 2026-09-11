@@ -125,13 +125,6 @@ class GuildStorageTests(unittest.TestCase):
         self.assertEqual(case["expires_at"], 100)
         self.assertEqual(case["dm_sent"], 1)
 
-    def test_reaction_role_panel_rejects_unsafe_sizes_and_round_trips(self):
-        with self.assertRaises(ValueError):
-            self.storage.save_reaction_role_panel(10, 1, [])
-        with self.assertRaises(ValueError):
-            self.storage.save_reaction_role_panel(10, 1, list(range(26)))
-        self.storage.save_reaction_role_panel(10, 1, [2, 3])
-        self.assertEqual(self.storage.reaction_role_panel(10), {"guild_id": 1, "role_ids": [2, 3]})
 
     def test_temporary_voice_state_is_guild_scoped(self):
         self.storage.add_temporary_voice_channel(10, 1, 2)

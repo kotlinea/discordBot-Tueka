@@ -221,8 +221,9 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         return await discord.guild_resources(guild_id, use_cache=not live)
 
     def feature_payload(guild_id: int, feature: Any, bot_permissions: int) -> dict[str, Any]:
-        if feature.id == 'tickets':
-            value = ticket_repository.settings(guild_id) if ticket_repository else {'enabled': False, 'revision': 0}
+        if feature.id in {'tickets', 'reaction_roles'}:
+            repository = ticket_repository if feature.id == 'tickets' else reaction_role_repository
+            value = repository.settings(guild_id) if repository else {'enabled': False, 'revision': 0}
             module = {'enabled': value['enabled'], 'revision': value['revision'], 'settings': value}
         else:
             module = storage.get_module(guild_id, feature.id)
@@ -907,10 +908,8 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         await manage(request, guild_id)
         repository, _ = reaction_roles_available()
         items=repository.messages(guild_id)
-        legacy=storage.get_module(guild_id,"reaction_roles")
         return {"settings":rr_payload(repository.settings(guild_id)),"items":[rr_payload(item) for item in items],
             "summary":{"active":sum(1 for item in items if item["enabled"] and item["status"]=="active"),"pending":sum(1 for item in items if item["status"]=="pending"),"failed":sum(1 for item in items if item["status"]=="failed"),"scheduled":sum(1 for item in items if item.get("self_destruct_at"))},
-            "legacy":{"configured":bool(legacy["settings"].get("reaction_role_ids")),"role_ids":[str(item) for item in legacy["settings"].get("reaction_role_ids",[])],"title":legacy["settings"].get("reaction_role_title","")},
             "recoveries":[{**item,"deleted_message_id":str(item["deleted_message_id"])} for item in repository.recoveries(guild_id)]}
 
     @router.put("/guilds/{guild_id}/reaction-roles/settings")
@@ -921,7 +920,6 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
             log_channel=int(body["log_channel_id"]) if body.get("log_channel_id") else None
             if log_channel is not None and log_channel not in text_ids:raise ValueError("log_channel_id")
             saved=repository.save_settings(guild_id,{**body,"log_channel_id":log_channel},int(body["revision"]) if body.get("revision") is not None else None)
-            storage.set_module(guild_id,"reaction_roles",enabled=bool(saved["enabled"]),settings=storage.get_module(guild_id,"reaction_roles")["settings"])
             return rr_payload(saved)
         except RuntimeError as exc:raise HTTPException(409,detail={"code":"revision_conflict","message":"別の管理者が設定を更新しました。"}) from exc
         except (TypeError,ValueError) as exc:raise HTTPException(422,detail={"code":"settings_invalid","message":"ログ先と通知設定を確認してください。"}) from exc
@@ -1036,8 +1034,8 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
     async def save_module(request: Request, guild_id: int, module_id: str) -> dict[str, Any]:
         csrf(request)
         await manage(request, guild_id, live=True)
-        if module_id == 'tickets':
-            raise HTTPException(404, detail={"code": "module_not_found", "message": "Ticket専用設定APIを使用してください。"})
+        if module_id in {'tickets', 'reaction_roles'}:
+            raise HTTPException(404, detail={"code": "module_not_found", "message": "機能専用の設定APIを使用してください。"})
         try:
             feature = get_feature(module_id)
             body = await request.json()

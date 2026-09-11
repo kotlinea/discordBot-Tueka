@@ -89,7 +89,6 @@ class GuildStorage:
                 );
                 CREATE TABLE IF NOT EXISTS moderation_cases (id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, user_id INTEGER NOT NULL, moderator_id INTEGER, action TEXT NOT NULL, reason TEXT, expires_at INTEGER, dm_sent INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS safe_browsing_cache (url_hash TEXT PRIMARY KEY, unsafe INTEGER NOT NULL, expires_at INTEGER NOT NULL);
-                CREATE TABLE IF NOT EXISTS reaction_role_panels (message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, role_ids_json TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS temporary_voice_channels (channel_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, owner_id INTEGER NOT NULL, created_at INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS polls (message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, channel_id INTEGER NOT NULL, creator_id INTEGER NOT NULL, question TEXT NOT NULL, options_json TEXT NOT NULL, image_url TEXT, closes_at INTEGER, status TEXT NOT NULL DEFAULT 'open', created_at INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS poll_votes (message_id INTEGER NOT NULL, user_id INTEGER NOT NULL, option_index INTEGER NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (message_id,user_id), FOREIGN KEY(message_id) REFERENCES polls(message_id) ON DELETE CASCADE);
@@ -1430,16 +1429,6 @@ class GuildStorage:
     def cache_url_result(self, url_hash: str, unsafe: bool, ttl: int = 3600) -> None:
         with self._connection() as c: c.execute("INSERT OR REPLACE INTO safe_browsing_cache VALUES (?,?,?)",(url_hash,int(unsafe),int(time.time())+ttl))
 
-    def save_reaction_role_panel(self, message_id: int, guild_id: int, role_ids: list[int]) -> None:
-        if not 1 <= len(role_ids) <= 25 or len(set(role_ids)) != len(role_ids):
-            raise ValueError("Reaction role panels require 1 to 25 unique roles")
-        with self._connection() as c:
-            c.execute("INSERT OR REPLACE INTO reaction_role_panels (message_id,guild_id,role_ids_json) VALUES (?,?,?)", (message_id, guild_id, json.dumps(role_ids)))
-
-    def reaction_role_panel(self, message_id: int) -> dict[str, Any] | None:
-        with self._connection() as c:
-            row = c.execute("SELECT guild_id, role_ids_json FROM reaction_role_panels WHERE message_id=?", (message_id,)).fetchone()
-        return {"guild_id": row["guild_id"], "role_ids": json.loads(row["role_ids_json"])} if row else None
 
     def add_temporary_voice_channel(self, channel_id: int, guild_id: int, owner_id: int) -> None:
         with self._connection() as c:

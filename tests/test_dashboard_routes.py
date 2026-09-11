@@ -126,6 +126,31 @@ class DashboardRouteTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/v1/guilds/1/tickets').status_code, 200)
         self.assertEqual(self.client.get('/api/v1/guilds/3/tickets').status_code, 403)
 
+    def test_reaction_roles_uses_only_v2_settings_and_omits_legacy_contract(self):
+        self.module.storage.set_module(1, 'reaction_roles', enabled=True, settings={'reaction_role_ids': [123]})
+        url = '/api/v1/guilds/1/reaction-roles'
+        self.assertEqual(self.client.get(url).status_code, 401)
+        csrf = self.login()
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.module.api.can_manage.return_value = True
+        self.module.api.guild_resources = AsyncMock(return_value=([], [], 8))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertNotIn('legacy', response.json())
+        settings = response.json()['settings']
+        self.assertFalse(settings['enabled'])
+        settings['enabled'] = True
+        self.assertEqual(self.client.put(url + '/settings', json=settings).status_code, 403)
+        saved = self.client.put(url + '/settings', json=settings, headers={'x-csrf-token': csrf})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertEqual(self.client.put(url + '/settings', json=settings, headers={'x-csrf-token': csrf}).status_code, 409)
+        self.assertEqual(self.client.put('/api/v1/guilds/1/modules/reaction_roles', json={}, headers={'x-csrf-token': csrf}).status_code, 404)
+        features = self.client.get('/api/v1/guilds/1/features').json()['items']
+        feature = next(item for item in features if item['id'] == 'reaction_roles')
+        self.assertEqual(feature['revision'], saved.json()['revision'])
+        self.assertEqual(feature['fields'], [])
+        self.assertNotIn('reaction_role_ids', feature['settings'])
+
     def test_built_ui_and_documentation_assets_are_served(self):
         root = Path(self.temp.name)
         for prefix in ('ui', 'docs'):

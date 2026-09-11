@@ -1,4 +1,4 @@
-"""Guild-scoped safety modules: moderation, filtering, spam and reaction roles."""
+"""Guild-scoped safety modules: moderation, filtering and spam."""
 import asyncio
 import hashlib
 import logging
@@ -212,62 +212,6 @@ class SafetyCog(commands.Cog):
             settings = self.storage.get_module(guild_id, "chat_filter")["settings"]
             if await self._filter_message(message, settings):
                 await self._delete_and_warn(message, "chat_filter", "フィルタールールまたは危険なURLを検知", settings.get("filter_action") == "delete_warn")
-
-    @app_commands.command(description="ダッシュボードのリアクションロール設定からボタンパネルを投稿します。")
-    @app_commands.checks.has_permissions(manage_roles=True)
-    @app_commands.guild_only()
-    async def publish_reaction_roles(self, interaction: discord.Interaction):
-        if not await self._enabled(interaction, "reaction_roles"):
-            return
-        assert interaction.guild is not None
-        settings = self.storage.get_module(interaction.guild.id, "reaction_roles")["settings"]
-        channel = interaction.guild.get_channel(int(settings.get("reaction_role_channel_id", 0)))
-        role_ids = [int(role_id) for role_id in settings.get("reaction_role_ids", [])][:25]
-        if not isinstance(channel, discord.TextChannel) or not role_ids:
-            await interaction.response.send_message("ダッシュボードで投稿先チャンネルとロールを設定してください。", ephemeral=True)
-            return
-        roles = [interaction.guild.get_role(role_id) for role_id in role_ids]
-        roles = [role for role in roles if role and not role.is_default() and not role.managed and interaction.guild.me and role < interaction.guild.me.top_role]
-        if not roles:
-            await interaction.response.send_message("Botが付与できるロールがありません。", ephemeral=True)
-            return
-        view = discord.ui.View(timeout=None)
-        for role in roles:
-            view.add_item(discord.ui.Button(label=role.name[:80], style=discord.ButtonStyle.secondary, custom_id=f"tueka-rr:{role.id}"))
-        panel = await channel.send(embed=discord.Embed(title=str(settings.get("reaction_role_title") or "ロールを選択"), description=str(settings.get("reaction_role_description") or "ボタンでロールを付与・解除できます。")), view=view)
-        self.storage.save_reaction_role_panel(panel.id, interaction.guild.id, [role.id for role in roles])
-        await interaction.response.send_message("リアクションロールパネルを投稿しました。", ephemeral=True)
-
-    @commands.Cog.listener()
-    async def on_interaction(self, interaction: discord.Interaction):
-        if interaction.type is not discord.InteractionType.component or not interaction.guild or not isinstance(interaction.user, discord.Member):
-            return
-        custom_id = (interaction.data or {}).get("custom_id", "")
-        if not isinstance(custom_id, str) or not custom_id.startswith("tueka-rr:") or interaction.message is None:
-            return
-        panel = self.storage.reaction_role_panel(interaction.message.id)
-        if not panel or panel["guild_id"] != interaction.guild.id or not self.storage.module_enabled(interaction.guild.id, "reaction_roles"):
-            await interaction.response.send_message("このロールパネルは現在利用できません。", ephemeral=True)
-            return
-        try:
-            role_id = int(custom_id.split(":", 1)[1])
-        except ValueError:
-            return
-        role = interaction.guild.get_role(role_id)
-        me = interaction.guild.me
-        if role_id not in panel["role_ids"] or role is None or role.managed or role.is_default() or me is None or role >= me.top_role:
-            await interaction.response.send_message("このロールは付与できません。", ephemeral=True)
-            return
-        try:
-            if role in interaction.user.roles:
-                await interaction.user.remove_roles(role, reason="Reaction role button")
-                message = f"{role.name} を解除しました。"
-            else:
-                await interaction.user.add_roles(role, reason="Reaction role button")
-                message = f"{role.name} を付与しました。"
-            await interaction.response.send_message(message, ephemeral=True)
-        except discord.HTTPException:
-            await interaction.response.send_message("ロールを変更できませんでした。Botの権限とロール順を確認してください。", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

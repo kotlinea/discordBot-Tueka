@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
 const session = { user: { id: '1', name: 'Moderator', avatar_url: 'https://cdn.discordapp.com/embed/avatars/0.png' }, csrf_token: 'csrf', preferences: { locale: 'ja', appearance: 'precision', color_scheme: 'light', navigation_collapsed: false, revision: 1 } }
 const feature = (id: string, category: string, parent: string | null = null) => ({ id, category, parent, title: id, description: `${id} settings`, fields: [], required_fields: [], required_bot_permissions: [], enabled: true, settings: {}, revision: 1, missing_permissions: [] })
 const welcome = { ...feature('welcome','community'), title: '入退室', fields: ['welcome_enabled','welcome_channel_id','welcome_format','welcome_content'], settings: { welcome_enabled: false, welcome_channel_id: null, welcome_format: 'text', welcome_content: '' } }
-const reactionRoles = { ...feature('reaction_roles','community'), title: 'リアクションロール', fields: ['reaction_role_channel_id','reaction_role_ids'], settings: { reaction_role_channel_id: null, reaction_role_ids: [] } }
+const reactionRoles = { ...feature('reaction_roles','community'), title: 'リアクションロール', fields: [], settings: { enabled: false, revision: 0 } }
 const rule = (id: number, name: string) => ({ id, guild_id: 1, family: 'automod', event_type: 'message_create', name, enabled: true, mode: 'enforce', priority: id * 10, stop_on_match: false, trigger_type: 'keyword', trigger_config: { keywords: ['bad'], allow_list: [], match: 'wildcard' }, conditions: { channel_policy: 'all_except', role_policy: 'all_except', channel_ids: [], required_role_ids: [] }, exemptions: { channel_ids: [], role_ids: [] }, actions: [{ type: 'delete' }, { type: 'log', message: '{rule}: {reason}' }], revision: 1 })
 
 test('suggestions save bar validates and persists edits', async ({ page }) => {
@@ -41,6 +41,24 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/guilds', route => route.fulfill({ json: { items: [{ id: '1', name: 'Maple Server', icon: null }] } }))
   await page.route('**/api/v1/guilds/1/overview', route => route.fulfill({ json: { guild_id: '1', features: [feature('moderation','moderation'), feature('automod','moderation','moderation'), feature('anti_spam','moderation','moderation'), feature('anti_raid','moderation','moderation'), feature('infractions','moderation','moderation'), feature('moderation_actions','moderation','moderation'), feature('moderation_logs','moderation','moderation'), feature('tickets','community'), welcome, reactionRoles], resources: { channels: [], roles: [], bot_permissions: '8' }, moderation: { summary: {}, events: [], lockdown: null } } }))
   await page.route('**/api/v1/guilds/1/resources', route => route.fulfill({ json: { channels: [{ id: '123456789012345678', name: '一般', type: 0 }, { id: '123456789012345681', name: 'サポート', type: 4 }], roles: [{ id: '123456789012345679', name: 'メンバー' }, { id: '123456789012345680', name: '通知' }], emojis: [{ id: '123456789012345682', name: 'ticket', animated: false }], bot_permissions: '8' } }))
+})
+
+test('reaction roles overview uses the native contract without legacy fields', async ({ page }) => {
+  await page.route('**/api/v1/guilds/1/reaction-roles', route => route.fulfill({ json: {
+    settings: { enabled: false, revision: 0, log_channel_id: null, denial_dm: true, denial_dm_cooldown_seconds: 300 },
+    items: [], summary: { active: 0, pending: 0, failed: 0, scheduled: 0 }, recoveries: [],
+  } }))
+  await page.route('**/api/v1/guilds/1/reaction-roles/events*', route => route.fulfill({ json: { items: [] } }))
+  await page.route('**/api/v1/guilds/1/reaction-roles/link-groups', route => route.fulfill({ json: { items: [] } }))
+  await page.goto('/servers/1/reaction-roles')
+  await expect(page.getByRole('heading', { name: 'リアクションロール', exact: true })).toBeVisible()
+  await expect(page.getByText('Reaction Roleはありません', { exact: true })).toBeVisible()
+  await expect(page.getByText('旧設定を移行', { exact: true })).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
+  const audit = await new AxeBuilder({ page }).analyze()
+  expect(audit.violations.filter(item => ['critical', 'serious'].includes(item.impact || ''))).toEqual([])
+  await page.getByRole('link', { name: 'Reaction Roleを作成', exact: true }).first().click()
+  await expect(page.getByRole('heading', { name: 'Reaction Roleを作成', exact: true })).toBeVisible()
 })
 
 test('resource selections preserve snowflake IDs and module labels are Japanese', async ({ page }) => {

@@ -91,7 +91,7 @@ class TicketRemovalTests(unittest.TestCase):
         blob_file = self.root / 'blobs' / transcript['object_key']
         encrypted = blob_file.read_bytes()
         result = apply(self.db, self.backups)
-        self.assertEqual(result['applied'], ['0002_remove_legacy_tickets.sql'])
+        self.assertEqual(result['applied'], ['0002_remove_legacy_tickets.sql', '0003_remove_legacy_reaction_roles.sql'])
         with closing(sqlite3.connect(result['snapshot'])) as snapshot:
             self.assertIn('V1 only', snapshot.execute('SELECT transcript_json FROM support_tickets').fetchone()[0])
             self.assertEqual(snapshot.execute('SELECT COUNT(*) FROM ticket_migrations').fetchone()[0], 1)
@@ -143,7 +143,7 @@ class TicketRemovalTests(unittest.TestCase):
         directory.mkdir()
         for source in Path('migrations').glob('*.sql'):
             shutil.copyfile(source, directory / source.name)
-        (directory / '0003_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0004_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         self.assertEqual(repository.settings(1), saved)

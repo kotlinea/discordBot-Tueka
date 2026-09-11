@@ -57,6 +57,5 @@ Thread ModeではClaimとNotesではなくJoin／On-Callを使用します。Reo
 - Link：`/reactionrole link create|list|unlink`
 - 保守：`/reactionrole manage show|fix|fixforeign|edit|color|move|selfdestruct|reset-binding`
 - 短縮：`/r add|addmany|remove|show|fix|aio|aiou|aiov|aioi|normal|unique|verify|binding|drop|reversed|temp|lock|unlock`
-- Legacy Panel：`/publish_reaction_roles`
 
 `addmany`とAIOの複数対応はModalへ1行ずつ入力します。PurgeとSelfdestructは対象Messageと復旧可能性を確認して実行してください。

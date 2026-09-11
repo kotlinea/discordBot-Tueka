@@ -181,3 +181,20 @@
 - 作業中に既存差分がStageされたことを確認。こちらからCommit/Stage/Resetは行っていない。追加テスト・記録の差分はそのまま保持する。
 - 判定：P1-2の実装・ローカルテスト・レビューを完了。遠隔本番DB、Stage Discord/OAuth、S3復元は未検証。Phase 1全体は継続中。
 - 次はP1-3：Reaction RolesのSafety旧ボタン・旧Panel保存、API Legacy表示/Wizard、旧公開コマンドと旧参照を除去し、`reaction_role_panels` の削除Migrationを追加する。V2設定・マッピング・付与状態・期限・修復を保持し、共有 `guild_modules` は巻き込まない。
+
+## 2026-09-11 — P1-3 Reaction Roles旧処理削除
+
+- 前回P1-2の完了記録と現在のStage済み差分を確認して着手。既存差分のCommit/Stage/Resetは行っていない。
+- Safety Cogの旧 `publish_reaction_roles` コマンド、`tueka-rr:` ボタンlistener、GuildStorageの旧Panel CRUD/DDLを削除。現行 `/reactionrole` / `/r` とNative Reaction処理は維持した。
+- ReactionRoleRepositoryの `guild_modules` 参照を除去。既存V2の有効メッセージから不足設定行を補う処理は維持し、明示的な無効設定を上書きしない。V1設定だけのGuildは自動有効化しない。
+- Overview APIの `legacy` 応答、FrontendのLegacy表示・移行Wizard・日英翻訳・専用CSSを削除。Registryの旧入力項目も除去し、Feature一覧はV2設定から取得する。
+- 専用設定保存の旧共有設定への二重書込みを除去。汎用Module APIのReaction Roles保存は404とし、現行専用APIへ統一した。認証・Guild認可・CSRF・revision競合の回帰を追加した。
+- `0003_remove_legacy_reaction_roles.sql` は `reaction_role_panels` のみDROP。V2設定・メッセージ・マッピング・付与状態・期限・Outbox・復旧記録と共有設定表を保持する。
+- 新規Migrationテストで空DB、0002からのV2専用/混在DB更新、全保持表の行一致、再初期化、再適用、Snapshot内旧データ、後続SQL失敗時のDROP Rollbackを確認。適用後の期限取得・Outbox取得・付与状態・復旧記録も確認した。
+- ローカル複製DBを `data/backups/p1-rr-0911/fixture.sqlite3` に作り0003を適用。保持69テーブル・100行一致、integrity成功、FK違反0、再適用applied空。原DBと前段の保全Fixtureは未変更。
+- Windows Python 3.13全182件成功・25.192秒、固定Linux Python 3.13コンテナ全182件成功・39.896秒。ログ `.venv-p0/p1-rr-python.log` / `p1-rr-linux.log`。
+- Frontend型検査/build成功（Vite 7.02秒）、Vitest10件成功（3.07秒）、Dashboard Playwright32件成功（1.3分）。追加E2EはLegacyフィールドなしのOverview、空状態、作成画面への遷移、4画面幅、重大Accessibility違反なしを検証した。
+- Docs build成功・60.72秒、Docs Playwright10件成功・18.6秒。正式Reaction RolesページとCommand/Migration資料を更新。Docs E2Eは既存のトップ/検索/長文Ticketページの共通回帰であり、全Docsページの視覚検査ではない。
+- レビューでReaction Rolesの旧DB参照・旧ボタン・Wizardの残存なしを確認。現行各Type、Link、期限、修復、Discordコマンド読込みは既存テストも含めて成功。最後の変更は末尾空行とCogの説明文のみ。`git diff --check` 成功。
+- 判定：P1-3の実装・ローカル検証・レビューを完了。実GuildのRole付与/解除・Command同期、Stage、遠隔DB適用は未実施。Phase 1全体は継続中。
+- 次はP1-4：旧AutoMod listener/評価、CSV Import、旧警告・旧イベント移行Fallbackを除去。旧Rule/EventへのFKと旧ID列を先に解消し、現行Rule/Case/Point/Event/期限付き解除を保全する削除Migrationを追加する。共有Case/Point/XP表全体は削除しない。

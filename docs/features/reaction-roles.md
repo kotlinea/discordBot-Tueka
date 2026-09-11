@@ -6,7 +6,15 @@ keywords: Reaction Roles normal unique verify binding drop reversed temp lock li
 
 # リアクションロール
 
-EmojiへのリアクションでMemberがRoleを取得・解除できます。新規設定はネイティブリアクション方式です。旧ボタンPanelはLegacyとして互換表示されます。
+EmojiへのリアクションでMemberがRoleを取得・解除できます。設定はネイティブリアクション方式です。旧ボタンPanel・旧公開コマンド・移行Wizardは廃止しています。現行設定はDashboardまたは `/reactionrole` コマンドから管理してください。
+
+## 更新とデータ保持
+
+全Processを停止してDBを保全し、[番号付きMigration](../operations/migrations.md)を適用します。0003は旧 `reaction_role_panels` だけを削除し、V2の設定・メッセージ・マッピング・付与状態・期限処理・復旧用データを保持します。V1共有設定を有効化状態へ自動反映しません。旧ボタンの再利用・自動変換は行わないため、必要な設定は現行画面から作成してください。
+
+旧VersionへのRollbackには対応するアプリと適用前DB Snapshotを復元します。Snapshot以後の設定・付与履歴は復元先に含まれません。DB復元だけではDiscord上のRoleを巻き戻せないため、実際のRole状態との突合も必要です。
+
+Native reaction configurations are retained. Migration 0003 removes legacy button panels only; current assignments, expiry schedules, outbox and recovery records remain available.
 
 ## 動作Type
 
