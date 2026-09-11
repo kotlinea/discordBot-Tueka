@@ -19,6 +19,12 @@ Discord Event
 
 ## 判定順
 
+更新時は全Processを停止してDBを保全し、[番号付きMigration](../operations/migrations.md)を適用してください。0004は旧AutoMod表・移行判定表と旧ID列・Warningカウンタを削除します。現行Rule、Case、Point、Event、処置結果、期限付き解除、XPは保持し、V1専用データは自動変換しません。
+
+Migration 0004 retains current moderation records and links, scheduled actions, and XP. Legacy data remains only in the pre-migration snapshot. Rolling back requires the matching application and database snapshot; restoring a database does not undo actions already performed in Discord.
+
+旧VersionへのRollbackは対応するアプリと適用前Snapshotを復元します。Snapshot以後の更新は失われ、Discord上で既に行われた処置はDB復元だけでは取り消されません。稼働再開前に処置と期限付き解除の状態を突合してください。
+
 1. 対象イベントとactor種別を確認
 2. Moderation全体免疫を適用
 3. AutoMod、Anti-Spam、Anti-Raidなど機能別免疫を適用

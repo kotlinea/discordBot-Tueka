@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 from automod.models import default_rule, validate_rule
-from automod.service import ModerationService
+from automod.service import ActionContext, ModerationService
 from storage import GuildStorage
 
 
@@ -26,16 +26,16 @@ class AutoModStorageTests(unittest.TestCase):
         return validate_rule(value)
 
     def test_rule_crud_updates_revision_and_is_guild_scoped(self):
-        saved = self.storage.save_automod_rule(1, self.keyword_rule())
-        first_revision = self.storage.get_module(1, "automod")["settings"]["rules_revision"]
-        self.assertEqual(self.storage.automod_rule(1, saved["id"])["name"], "words")
-        self.assertIsNone(self.storage.automod_rule(2, saved["id"]))
+        saved = self.storage.save_moderation_rule(1, self.keyword_rule())
+        first_revision = self.storage.get_module(1, "moderation")["settings"]["rules_revision"]
+        self.assertEqual(self.storage.moderation_rule(1, saved["id"])["name"], "words")
+        self.assertIsNone(self.storage.moderation_rule(2, saved["id"]))
         saved["name"] = "updated"
-        updated = self.storage.save_automod_rule(1, saved, saved["id"])
+        updated = self.storage.save_moderation_rule(1, saved, saved["id"])
         self.assertEqual(updated["revision"], 2)
-        self.assertGreater(self.storage.get_module(1, "automod")["settings"]["rules_revision"], first_revision)
-        self.assertTrue(self.storage.delete_automod_rule(1, saved["id"]))
-        self.assertFalse(self.storage.delete_automod_rule(1, saved["id"]))
+        self.assertGreater(self.storage.get_module(1, "moderation")["settings"]["rules_revision"], first_revision)
+        self.assertTrue(self.storage.delete_moderation_rule(1, saved["id"]))
+        self.assertFalse(self.storage.delete_moderation_rule(1, saved["id"]))
 
     def test_rule_order_and_stop_flag_are_saved_together(self):
         first = self.storage.save_moderation_rule(1, {**self.keyword_rule(), "name": "first"})
@@ -50,25 +50,25 @@ class AutoModStorageTests(unittest.TestCase):
             self.storage.reorder_moderation_rules(1, "automod", [{"id": first["id"], "revision": first["revision"], "stop_on_match": False}])
 
     def test_points_expire_revoke_and_events_purge_evidence(self):
-        event_id = self.storage.create_automod_event(1, None, 2, 3, 4, "keyword", "reason", "secret", [{"filename": "x.txt"}], "enforce", 1)
+        event_id = self.storage.create_moderation_event(1, family="automod", event_type="message_create", source="automod", reason="reason", target_user_id=2, channel_id=3, target_id=4, evidence_text="secret", evidence={"attachments": [{"filename": "x.txt"}]})
         self.assertIsNotNone(event_id)
-        _, before, after = self.storage.add_points(1, 2, 2, "active", automod_event_id=event_id)
+        _, before, after = self.storage.add_points(1, 2, 2, "active", moderation_event_id=event_id)
         self.storage.add_points(1, 2, 3, "expired", expires_at=int(time.time()) - 1)
         self.assertEqual((before, after, self.storage.active_points(1, 2)), (0, 2, 2))
         self.assertEqual(self.storage.revoke_points(1, 2), 2)
         self.assertEqual(self.storage.active_points(1, 2), 0)
         with self.storage._connection() as connection:
-            connection.execute("UPDATE automod_events SET evidence_expires_at=0 WHERE id=?", (event_id,))
-        self.assertEqual(self.storage.purge_automod_evidence(), 1)
+            connection.execute("UPDATE moderation_events SET evidence_expires_at=0 WHERE id=?", (event_id,))
+        self.assertEqual(self.storage.purge_moderation_evidence(), 1)
         with self.storage._connection() as connection:
-            event = connection.execute("SELECT evidence_text,attachments_json FROM automod_events WHERE id=?", (event_id,)).fetchone()
+            event = connection.execute("SELECT evidence_text,evidence_json FROM moderation_events WHERE id=?", (event_id,)).fetchone()
         self.assertIsNone(event["evidence_text"])
-        self.assertEqual(json.loads(event["attachments_json"]), [])
+        self.assertEqual(json.loads(event["evidence_json"]), {})
 
     def test_duplicate_message_rule_event_is_ignored(self):
-        saved = self.storage.save_automod_rule(1, self.keyword_rule())
-        first = self.storage.create_automod_event(1, saved["id"], 2, 3, 4, "keyword", "reason", "text", [], "enforce")
-        duplicate = self.storage.create_automod_event(1, saved["id"], 2, 3, 4, "keyword", "reason", "text", [], "enforce")
+        saved = self.storage.save_moderation_rule(1, self.keyword_rule())
+        first = self.storage.create_moderation_event(1, family="automod", event_type="message_create", source="automod", reason="reason", rule_id=saved["id"], target_user_id=2, channel_id=3, target_id=4, dedupe_key="one")
+        duplicate = self.storage.create_moderation_event(1, family="automod", event_type="message_create", source="automod", reason="reason", rule_id=saved["id"], target_user_id=2, channel_id=3, target_id=4, dedupe_key="one")
         self.assertIsInstance(first, int)
         self.assertIsNone(duplicate)
 
@@ -78,39 +78,7 @@ class AutoModStorageTests(unittest.TestCase):
         self.storage.complete_moderation_action(action_id)
         self.assertEqual(self.storage.due_moderation_actions(now=2), [])
 
-    def test_legacy_migration_is_idempotent_and_preserves_warning_points(self):
-        self.storage.set_module(1, "moderation", enabled=True, settings={"escalation_enabled": True, "escalation_threshold": 3,
-            "escalation_action": "timeout", "escalation_timeout_minutes": 45})
-        self.storage.set_module(1, "chat_filter", enabled=True, settings={"filter_keywords": "foo\nbar", "filter_regex": "b.z",
-            "filter_action": "delete_warn", "safe_browsing_enabled": True})
-        self.storage.set_module(1, "anti_spam", enabled=True, settings={"spam_window_seconds": 10, "spam_message_limit": 5,
-            "spam_mention_limit": 8, "spam_duplicate_limit": 3, "spam_action": "timeout", "spam_timeout_minutes": 15})
-        with self.storage._connection() as connection:
-            connection.execute("INSERT INTO guild_users(guild_id,user_id,warn) VALUES(1,9,2)")
-        self.assertEqual(self.storage.migrate_legacy_automod(["legacy"]), 1)
-        self.assertEqual(self.storage.migrate_legacy_automod(["legacy"]), 0)
-        rules = self.storage.automod_rules(1)
-        self.assertEqual(len(rules), 7)
-        self.assertEqual(len({item["name"] for item in rules}), 7)
-        self.assertEqual(rules[0]["trigger_config"]["match"], "contains")
-        self.assertEqual(self.storage.active_points(1, 9), 2)
-        settings = self.storage.get_module(1, "automod")["settings"]
-        self.assertEqual(settings["point_thresholds"][0]["action"]["duration_minutes"], 45)
 
-    def test_v2_migration_splits_families_and_keeps_links(self):
-        self.storage.set_module(1,"automod",enabled=True)
-        keyword = self.storage.save_automod_rule(1,self.keyword_rule())
-        spam = default_rule("message_rate")
-        spam.update({"name":"spam","mode":"enforce","actions":[{"type":"delete"}]})
-        spam = self.storage.save_automod_rule(1,validate_rule(spam))
-        event = self.storage.create_automod_event(1,keyword["id"],2,3,4,"keyword","reason","body",[],"enforce")
-        self.storage.add_case(1,2,"warn","reason",automod_event_id=event,rule_id=keyword["id"])
-        self.assertEqual(self.storage.migrate_moderation_v2(),1)
-        self.assertEqual(self.storage.migrate_moderation_v2(),0)
-        self.assertEqual({item["family"] for item in self.storage.moderation_rules(1)},{"automod","anti_spam"})
-        case = self.storage.recent_cases(1,2)[0]
-        self.assertEqual(case["moderation_event_id"],event)
-        self.assertIsNotNone(case["moderation_rule_id"])
 
     def test_generic_events_actions_lockdown_and_queue_are_durable(self):
         rule = self.storage.save_moderation_rule(1,{**self.keyword_rule(),"family":"automod","event_type":"message_create"})
@@ -145,12 +113,12 @@ class ModerationThresholdTests(unittest.IsolatedAsyncioTestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.storage = GuildStorage(Path(self.temp_dir.name) / "bot.sqlite3")
         self.service = ModerationService(None, self.storage)
-        settings = self.storage.get_module(1, "automod")["settings"]
+        settings = self.storage.get_module(1, "infractions")["settings"]
         settings["point_thresholds"] = [
             {"points": 3, "action": {"type": "timeout", "duration_minutes": 10}},
             {"points": 5, "action": {"type": "ban"}},
         ]
-        self.storage.set_module(1, "automod", enabled=True, settings=settings)
+        self.storage.set_module(1, "infractions", enabled=True, settings=settings)
 
     async def asyncTearDown(self):
         self.temp_dir.cleanup()
@@ -164,6 +132,31 @@ class ModerationThresholdTests(unittest.IsolatedAsyncioTestCase):
         self.service.apply_case.reset_mock()
         self.assertIsNone(await self.service._apply_threshold(SimpleNamespace(id=1), object(), 5, 6, "points", 10, 20))
         self.service.apply_case.assert_not_awaited()
+
+    async def test_disabled_infractions_never_falls_back_to_old_thresholds(self):
+        self.storage.set_module(1, 'infractions', enabled=False)
+        self.storage.set_module(1, 'automod', enabled=True, settings={'point_thresholds': [
+            {'points': 1, 'action': {'type': 'ban'}},
+        ]})
+        self.storage.set_module(1, 'moderation', enabled=True, settings={
+            'escalation_enabled': True, 'escalation_threshold': 1, 'escalation_action': 'ban',
+        })
+        self.service.apply_case = AsyncMock()
+        self.assertIsNone(await self.service._apply_threshold(SimpleNamespace(id=1), object(), 0, 5, 'points', None, None))
+        self.service.apply_case.assert_not_awaited()
+
+    async def test_points_action_records_only_current_rule_and_event_links(self):
+        rule = self.storage.save_moderation_rule(1, validate_rule({**default_rule('keyword'),
+            'mode': 'enforce', 'trigger_config': {'keywords': ['bad']}, 'actions': [{'type': 'points', 'points': 1}]}))
+        event = self.storage.create_moderation_event(1, family='automod', event_type='message_create',
+            source='automod', reason='rule', rule_id=rule['id'])
+        context = ActionContext(SimpleNamespace(id=1), SimpleNamespace(id=2))
+        results = await self.service.execute_actions(context, rule, 'rule', event, {})
+        self.assertEqual(results[0]['status'], 'success', results)
+        case = self.storage.recent_cases(1, 2)[0]
+        self.assertEqual(case['moderation_rule_id'], rule['id'])
+        self.assertEqual(case['moderation_event_id'], event)
+        self.assertEqual(self.storage.active_points(1, 2), 1)
 
 
 if __name__ == "__main__":

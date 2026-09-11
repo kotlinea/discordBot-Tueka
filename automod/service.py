@@ -85,8 +85,7 @@ class ModerationService:
 
     async def apply_case(self, guild: discord.Guild, member: discord.Member, action: str, reason: str | None,
                          moderator_id: int | None = None, duration_minutes: int = 0, notify: bool = True,
-                         *, automod_event_id: int | None = None, rule_id: int | None = None,
-                         moderation_event_id: int | None = None, moderation_rule_id: int | None = None,
+                         *, moderation_event_id: int | None = None, moderation_rule_id: int | None = None,
                          source: str = "manual", actor: discord.Member | None = None) -> int:
         error = self.manageable(actor, member, action)
         if error:
@@ -113,7 +112,7 @@ class ModerationService:
             raise ValueError("Unknown moderation action")
         dm_sent = await self.dm(member, f"{guild.name}で {action} が実行されました。理由: {reason or 'なし'}") if notify else False
         case_id = self.storage.add_case(guild.id, member.id, action, reason, moderator_id, expires_at, dm_sent,
-            automod_event_id=automod_event_id, rule_id=rule_id, moderation_event_id=moderation_event_id,
+            moderation_event_id=moderation_event_id,
             moderation_rule_id=moderation_rule_id, source=source)
         if action == "tempban" and expires_at:
             self.storage.schedule_moderation_action(guild.id, member.id, "unban", expires_at, reason, case_id)
@@ -135,23 +134,12 @@ class ModerationService:
         case_id = self.storage.add_case(guild.id, member.id, "warn", reason, moderator_id, None, dm_sent, source="manual", points=1)
         await self.log_manual(guild, f"Moderation Case #{case_id}", f"`warn` ({after}pt): {member} ({member.id})\n理由: {reason or 'なし'}", category="warning")
         await self._apply_threshold(guild, member, before, after, reason or "警告ポイント", None, None)
-        return self.storage.get_user(guild.id, member.id)["warn"]
+        return after
 
     async def _apply_threshold(self, guild: discord.Guild, member: discord.Member, before: int, after: int, reason: str,
                                event_id: int | None, rule_id: int | None) -> dict[str, Any] | None:
         infraction_module = self.storage.get_module(guild.id, "infractions")
         thresholds = infraction_module["settings"].get("point_thresholds", []) if infraction_module["enabled"] else []
-        if not thresholds and not self.storage.moderation_v2_migrated(guild.id):
-            thresholds = self.storage.get_module(guild.id, "automod")["settings"].get("point_thresholds", [])
-        if not thresholds and self.storage.moderation_v2_migrated(guild.id):
-            return None
-        if not thresholds:
-            legacy = self.storage.get_module(guild.id, "moderation")["settings"]
-            if legacy.get("escalation_enabled"):
-                action = {"type": legacy.get("escalation_action", "timeout")}
-                if action["type"] == "timeout":
-                    action["duration_minutes"] = int(legacy.get("escalation_timeout_minutes", 60))
-                thresholds = [{"points": int(legacy.get("escalation_threshold", 3)), "action": action}]
         crossed = [item for item in thresholds if before < int(item.get("points", 0)) <= after]
         if not crossed:
             return None
@@ -269,7 +257,7 @@ class ModerationService:
                     expiry_days = int(action.get("expires_days", 30))
                     expires_at = int(time.time()) + expiry_days * 86400 if expiry_days else None
                     _, before, after = self.storage.add_points(guild.id, member.id, int(action.get("points", 1)), reason,
-                        rule_id=rule.get("legacy_rule_id"), moderation_rule_id=rule.get("id"), moderation_event_id=event_id, expires_at=expires_at)
+                        moderation_rule_id=rule.get("id"), moderation_event_id=event_id, expires_at=expires_at)
                     case_id = self.storage.add_case(guild.id, member.id, "warn", reason, None, expires_at, False,
                         moderation_event_id=event_id, moderation_rule_id=rule.get("id"), source=rule.get("family", "automod"), points=int(action.get("points", 1)))
                     results.append({"type": action_type, "status": "success", "case_id": case_id, "before": before, "after": after})
@@ -348,27 +336,3 @@ class ModerationService:
             await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
         except discord.HTTPException:
             LOGGER.warning("Could not write Moderation log", exc_info=True)
-
-    async def execute_rule(self, message: discord.Message, rule: dict[str, Any], reason: str, event_id: int,
-                           automod_settings: dict[str, Any]) -> list[dict[str, Any]]:
-        member = message.author if isinstance(message.author, discord.Member) else None
-        results = await self.execute_actions(ActionContext(message.guild, member, message, message.channel, actor=message.author), rule, reason, event_id, automod_settings)
-        await self.log_automod(message, rule, event_id, reason, results, automod_settings)
-        return results
-
-    async def log_automod(self, message: discord.Message, rule: dict[str, Any], event_id: int, reason: str,
-                          results: list[dict[str, Any]], settings: dict[str, Any]) -> None:
-        channel = self._log_channel(message.guild, settings)
-        if channel is None:
-            return
-        rendered = ", ".join(f"{item.get('type')}: {item.get('status')}" for item in results) or "記録のみ"
-        embed = discord.Embed(title=f"AutoMod Event #{event_id}", description=reason[:4000],
-            color=discord.Color.gold() if rule.get("mode") == "monitor" else discord.Color.red())
-        embed.add_field(name="ルール", value=f"{rule.get('name')} (`{rule.get('trigger_type')}`)", inline=False)
-        embed.add_field(name="対象", value=f"{message.author} ({message.author.id})", inline=False)
-        embed.add_field(name="チャンネル", value=f"#{getattr(message.channel, 'name', message.channel.id)} ({message.channel.id})", inline=False)
-        embed.add_field(name="実行結果", value=rendered[:1024], inline=False)
-        try:
-            await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
-        except discord.HTTPException:
-            LOGGER.warning("Could not write AutoMod log", exc_info=True)

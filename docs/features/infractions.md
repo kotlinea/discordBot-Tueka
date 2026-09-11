@@ -21,4 +21,4 @@ Warning Actionは設定したpointsを加算し、失効期間を設定できま
 
 ユーザー検索から現在points、Warning数、理由、発生源、担当者、期限、取消状態、関連するModeration Eventを確認します。手動調整と取消は管理者操作として記録されます。
 
-既存の非失効Warningは互換pointsとして表示されます。移行処理だけで制裁が発動することはありません。
+現行のPoint記録を正本とし、有効期限・取消状態を反映して合計します。旧Warningカウンタや旧AutoMod設定からの自動Import・処置Fallbackはありません。既に現行Pointとして保存されている記録は保持します。

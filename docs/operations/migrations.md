@@ -1,6 +1,6 @@
 # 番号付きDB Migration
 
-Phase 1で追加した明示CLIは、`migrations/0001_名前.sql` から番号順にSQLを適用します。0001はSuggestionsの3テーブルとIndex、0002は旧Ticketの2テーブル削除を扱います。Bot全体の初期化を置き換えるCLIへの統一は後続作業です。
+Phase 1で追加した明示CLIは、`migrations/0001_名前.sql` から番号順にSQLを適用します。0001はSuggestionsの作成、0002は旧Ticket、0003は旧Reaction Roles、0004は旧Moderationの削除を扱います。Bot全体の初期化を置き換えるCLIへの統一は後続作業です。
 
 ```sh
 python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrations
@@ -35,4 +35,8 @@ python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrat
 - 削除対象のRuntime読書きとコンストラクタDDLの除去。Bot/Dashboard/Workerの再初期化で旧テーブルが復活しないこと。
 - 旧Imageへ戻す手順と、Snapshot復元で失われる更新範囲。
 
-0002は `support_tickets` と `ticket_migrations` を削除し、V2 Ticket・暗号化Transcript・配送待ち処理を保持します。0003は旧 `reaction_role_panels` のみ削除し、V2の付与状態・期限・復旧記録を保持します。旧データの自動変換は行いません。旧アプリへのRollbackには適用前Snapshotと対応するファイル・鍵が必要です。Moderationの削除は後続の番号で実施します。
+0002は `support_tickets` と `ticket_migrations` を削除し、V2 Ticket・暗号化Transcript・配送待ち処理を保持します。0003は旧 `reaction_role_panels` のみ削除し、V2の付与状態・期限・復旧記録を保持します。
+
+0004は `automod_rules` / `automod_events` / `automod_migrations` / `moderation_migrations` と旧ID列・`guild_users.warn` を削除します。現行のRule・Event・処置結果は子テーブルから退避/再作成し、外部キーの連鎖削除で関連付けが失われないようにします。Case・Point・XP・期限付き処置は保持します。
+
+旧データの自動変換は行いません。旧アプリへのRollbackには適用前Snapshotと対応するファイル・鍵が必要です。Snapshot以後の更新は復元先に含まれません。

@@ -17,7 +17,6 @@
 | `DATA_DIR` | `data` | 全Process | Data Directory |
 | `DATABASE_PATH` | `data/tueka.sqlite3` | 全Process | 共通SQLite Path |
 | `LOG_LEVEL` | `INFO` | 全Process | Log Level |
-| `BANNED_WORDS_FILE` | `banned_words.csv` | Migration | Legacy禁止語のImport元 |
 
 変更後は対象Processを再起動します。OAuth URLを変更した場合はDiscord Developer Portalも更新します。
 

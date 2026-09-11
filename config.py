@@ -49,7 +49,6 @@ class Settings:
     dashboard_base_url: str | None
     data_dir: Path
     database_path: Path
-    banned_words_file: Path
     log_level: str = "INFO"
     extensions: tuple[str, ...] = (
         "cogs.general",
@@ -108,6 +107,5 @@ class Settings:
             dashboard_base_url=os.getenv("DASHBOARD_BASE_URL"),
             data_dir=BASE_DIR / os.getenv("DATA_DIR", "data"),
             database_path=BASE_DIR / os.getenv("DATABASE_PATH", "data/tueka.sqlite3"),
-            banned_words_file=BASE_DIR / os.getenv("BANNED_WORDS_FILE", "banned_words.csv"),
             log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
         )

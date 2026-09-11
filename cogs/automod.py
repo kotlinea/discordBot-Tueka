@@ -2,11 +2,9 @@
 from __future__ import annotations
 
 import asyncio
-import csv
 import hashlib
 import logging
 import time
-from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
@@ -32,19 +30,7 @@ class AutoModCog(commands.Cog):
         self.safe_browsing_limit = asyncio.Semaphore(4)
         self._cache: dict[int, tuple[int, list[dict[str, Any]]]] = {}
         self._locks: dict[tuple[int, int], asyncio.Lock] = {}
-        self.storage.migrate_legacy_automod(self._banned_words(bot.settings.banned_words_file))
-        self.storage.migrate_moderation_v2()
 
-    @staticmethod
-    def _banned_words(path: Path) -> list[str]:
-        if not path.exists():
-            return []
-        try:
-            with path.open(encoding="utf-8") as handle:
-                return [word.strip().lower() for row in csv.reader(handle) for word in row if word.strip()]
-        except OSError:
-            LOGGER.warning("Could not read legacy banned words during migration", exc_info=True)
-            return []
 
     async def cog_load(self) -> None:
         self.maintenance.start()
@@ -254,7 +240,6 @@ class AutoModCog(commands.Cog):
 
     @tasks.loop(seconds=60)
     async def maintenance(self) -> None:
-        self.storage.purge_automod_evidence()
         self.storage.purge_moderation_evidence()
         self.engine.prune()
         for pending in self.storage.due_moderation_actions():

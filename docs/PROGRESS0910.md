@@ -198,3 +198,21 @@
 - レビューでReaction Rolesの旧DB参照・旧ボタン・Wizardの残存なしを確認。現行各Type、Link、期限、修復、Discordコマンド読込みは既存テストも含めて成功。最後の変更は末尾空行とCogの説明文のみ。`git diff --check` 成功。
 - 判定：P1-3の実装・ローカル検証・レビューを完了。実GuildのRole付与/解除・Command同期、Stage、遠隔DB適用は未実施。Phase 1全体は継続中。
 - 次はP1-4：旧AutoMod listener/評価、CSV Import、旧警告・旧イベント移行Fallbackを除去。旧Rule/EventへのFKと旧ID列を先に解消し、現行Rule/Case/Point/Event/期限付き解除を保全する削除Migrationを追加する。共有Case/Point/XP表全体は削除しない。
+
+## 2026-09-12 — P1-4 Moderation旧処理・旧Schema削除
+
+- 前段では旧CSV読込み・起動時Import・停止済みlistenerと旧閾値Fallbackを除去し、184件の回帰成功を確認。その作業を継続して旧SQL・旧列の削除まで実施した。
+- AutoMod Cogの起動時V1/V2自動移行、禁止語CSV読込み、旧Evidence定期削除を除去。Moderation/Safety Cogの停止済み旧listenerと旧フィルター補助処理を削除し、`BANNED_WORDS_FILE` を設定・環境資料から除去した。
+- GuildStorageの旧AutoMod Rule/Event CRUD・移行判定・旧Warningカウンタ操作を削除。Case/Pointの旧ID引数・書込み、Serviceの旧ID参照と未使用の旧実行/ログ経路も除去した。
+- Point閾値処置は有効なInfractions設定だけを使用し、旧AutoMod閾値・旧段階処置へFallbackしない。警告の応答は現行の有効Point合計を使用する。XPは保持し、JSON Importの旧warn書込みも除去した。JSON移行自体はP1-5で削除予定。
+- `0004_remove_legacy_moderation.sql` を追加。旧 `automod_rules` / `automod_events` / `automod_migrations` / `moderation_migrations`、Case/Pointの旧ID列、Ruleの `legacy_rule_id`、`guild_users.warn` を削除する。
+- Ruleの再作成時にON DELETEが現行Event/処置結果を変更しないよう、対象6表の保持列をTransaction内の作業表へコピーし、子→親の順でDROP、親→子の順で復元する。Index・制約を再作成し、作業表を除去する。SQLiteの外部キー検査は無効化していない。
+- `tests/fixtures/moderation_pre_p1.sql` は保全DBから確認した旧Schemaのみを含み、ユーザー行は含まない。新規Migrationテストで空DB、直前0003からV2専用/混在DB、保持列全行一致、Rule/Event/処置結果の関連付け、Case/Point/XP/期限付き解除、再初期化、再適用、失敗時Schema/データ/履歴Rollbackを確認した。
+- 旧CRUDテストは現行Rule/Event CRUD・Evidence保持期限・重複拒否の検証へ変更。旧移行成功テストは削除Migrationの保持/破棄検証へ置換した。旧regex補助テストは旧listener非登録の検証へ変更し、現行Regexエンジンの検証は維持した。
+- Point Actionの実行テストを追加し、旧Rule引数がなくても処置がsuccessとなり、現行Rule/Eventに紐づくCaseとPointが保存されることを確認。Infractions無効時の旧閾値非実行と、CSVパス属性なしのCog読込み・DB不変も確認した。
+- ローカル保全Fixtureを `data/backups/p1-moderation-0912/fixture.sqlite3` へ複製し0004を適用。保持65テーブル・98行の保持列が一致、integrity成功、FK違反0、再適用applied空。原DB・原Snapshotは未変更。
+- 最終全体検証：Windows Python 3.13で186件成功・21.478秒、固定Linux Python 3.13コンテナで186件成功・30.248秒。ログ `.venv-p0/p1-moderation-windows-final.log` / `p1-moderation-linux-final.log`。Docs build成功・5.68秒。
+- 正式Moderation/AutoMod/Infractions・Migration・環境資料へ、設定正本、削除対象、停止/Backup、RollbackとDiscord処置の突合を反映。Frontendは本単位では変更していない。
+- レビューでRuntimeから旧Rule/Event/移行判定/CSV参照がなく、旧列のDDL再作成もないことを確認。`git diff --check` 成功。作業途中にP1-3がCommit `5f3f139` へ取り込まれたことを確認し、既存変更を巻き戻していない。
+- 判定：P1-4の実装・ローカルテスト・レビューを完了。StageでのDiscord実処置/期限付き解除・遠隔DB適用は未実施。Phase 1全体は未完了。
+- 次はP1-5：JSON移行不要を現在のInventoryで確定し、`migrate_json.py` / `migrated` / JSON移行済み判定を除去。残存V1設定Fallback・Schema・一時文書を点検し、必要情報を正式Docsへ移管して起動/更新/復旧を番号付きCLIへ統一する。Bot/Dashboard/Worker再初期化後の旧構造非復活とPhase 1の全体出口条件を検証する。

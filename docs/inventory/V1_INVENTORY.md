@@ -97,6 +97,8 @@
 
 ## 復旧と未確認事項
 
+- 2026-09-12追記：P1-4の0004で旧AutoMod/移行判定4表と旧ID/Warning列を除去。P1-3複製DBに適用し、保持65表98行の保持列一致・整合性・FKを確認。現行Rule/Event/処置結果のリンクは混在Fixtureでも検証した。原DBには未適用。上表の時点Inventoryは書き換えない。
+
 - 2026-09-11追記：P1-3で `reaction_role_panels` のRuntime参照・DDLを除去し、0003にDROPを追加。P1-2複製DBからの検証では保持69表100行が一致。V2の付与状態・期限・Outbox・復旧データはFixtureテストでも保持を確認した。原運用DBには未適用。
 
 - 2026-09-11追記：P1-2で `support_tickets` / `ticket_migrations` のRuntime参照・DDLを除去し、0002にDROPを追加。上表は2026-09-10のSnapshotを記録した時点Inventoryとして保持する。P1-2の複製DB検証では保持67表100行が一致し、旧2表の削除・再適用・旧Schema非復活を検証した。原運用DBへの適用を意味しない。

@@ -4,10 +4,11 @@ from cogs.safety import MAX_TIMEOUT, SafetyCog
 
 
 class SafetyValidationTests(unittest.TestCase):
-    def test_regex_rejects_invalid_or_risky_patterns(self):
-        self.assertIsNotNone(SafetyCog._safe_regex(r"discord\\.gg/\\w+"))
-        self.assertIsNone(SafetyCog._safe_regex("(a+)+$"))
-        self.assertIsNone(SafetyCog._safe_regex("["))
+    def test_legacy_message_handlers_are_not_registered(self):
+        from cogs.moderation import ModerationCog
+        for cog in (SafetyCog, ModerationCog):
+            self.assertFalse(hasattr(cog, '_legacy_on_message_disabled'))
+            self.assertNotIn('on_message', {name for name, _ in cog.__cog_listeners__})
 
     def test_timeout_limit_matches_discord_limit(self):
         self.assertEqual(MAX_TIMEOUT, 28 * 24 * 60)

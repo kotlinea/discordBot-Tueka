@@ -1165,7 +1165,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         current = storage.moderation_rule(guild_id, rule_id)
         if not current or current["family"] != family:
             raise HTTPException(404, detail={"code": "rule_not_found", "message": "ルールが見つかりません。"})
-        copy = {key: value for key, value in current.items() if key not in {"id", "guild_id", "revision", "created_at", "updated_at", "legacy_rule_id"}}
+        copy = {key: value for key, value in current.items() if key not in {"id", "guild_id", "revision", "created_at", "updated_at"}}
         copy.update({"name": f"{current['name']} (コピー)"[:100], "enabled": False, "priority": storage.next_moderation_rule_priority(guild_id, family)})
         return _serialize_rule_resource_ids(storage.save_moderation_rule(guild_id, validate_rule(copy)))
 
