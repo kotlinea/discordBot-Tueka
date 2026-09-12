@@ -247,3 +247,22 @@
 - Runtimeの残存参照を点検。Reaction RolesのLink互換性表示とYouTubeの過去URL形式対応はV1アプリ互換ではない。既存V2 Reaction Rolesメッセージから不足設定を補う修復は前段の方針どおり保持する。現行SchemaのコンストラクタDDL/ALTERは残り、P2-1の対象とする。最後の変更は説明コメント・Docs・進捗のみで、`git diff --check` 成功。
 - 判定：P1-5のローカル実装・Migration・検証・正式Docs・レビューを完了。Phase 1のローカル開発出口を満たした。Stageの実Discord/OAuth/Webhook、遠隔DB適用、実Transcript/S3復元は未実施であり、リリース承認・本番移行完了とは扱わない。Goal全体はPhase 2〜5を含めて継続中。
 - 次はP2-1：全Repositoryの接続/DDL/ALTER/起動時更新を棚卸しし、共通DB層と後続Migrationへ移す。既存0001〜0006を改変せず、空DB・現在のV2 Schema・直前版更新を検証する。Runtimeは未適用Schemaで明確に失敗させ、テストFixtureも明示Migrationへ切り替える。P2-2のDomain分割はこの受入後に進める。Commit/Stage/Resetは行っていない。
+
+## 2026-09-13 — P2-1 共通DB層・明示Migrationへ統一
+
+- P1-5の差分がユーザー側でStageされていることを確認して着手。その後Commit `93756c5` へ取り込まれたことを確認した。既存変更のCommit/Stage/Resetは行っていない。
+- GuildStorage、Ticket、Reaction Roles、Suggestionsの初期化結果から現行64テーブル・23IndexのDDLを抽出し、`0007_current_schema.sql` を追加。既存0001〜0006は変更していない。RuntimeからCREATE/ALTER/executescriptと直接sqlite3.connectを除去した。
+- `database.py` に接続・Transaction・WAL・busy timeout・読取り専用接続・整合性Inventory・Backup・Schema履歴検査を集約。`migrate.py` と `scripts/db_inventory.py` も共通層を利用する。Inventory CLIの直接実行も確認した。
+- 接続の書込み待ちは10秒へ統一（Ticketだけ従来30秒）。WALへの初回切替で並行Migrationの競合を検出したため、既にWALなら切替を省略し、BUSY/LOCKEDだけを上限付きで再試行する。Migrationの同時実行テストと通常Domainの並行処理テストで検証した。
+- RepositoryのコンストラクタはDBを自動作成・更新せず、読取り専用の履歴検査で不存在・未適用・checksum不一致をSchemaNotReadyとして拒否する。BotはDiscord接続前に検査する。Dashboard/Workerも保存層生成時に検査し、3起動経路で未適用DBを変更しないテストを追加した。
+- 現行Ticketの未完了Close復旧とReaction Rolesの不足設定修復はDomain処理として保持した。Schema変更ではなく、P2-2以降に責務を再評価する。Repositoryの接続メソッド名は呼出し契約を維持し、内部を共通Transactionへ委譲した。
+- 元の初期化処理にあった39件の条件付き列追加を0007へ移設。`-- tueka: add-column-if-missing` 注釈付きの単一ALTERだけをCLIが扱い、既存列は値/定義を変更せず、不足列を追加してからIndexを作成する。Schema照会はCLI自身が行い、Migration本文のTransaction/PRAGMA/ATTACH制限は維持する。注釈もSQL checksumに含める。
+- 条件付き列追加の初回テストで正規表現Matchの取り出しミスを検出して修正。不足列追加、既存値保持、不正注釈の拒否、Rollback、旧V2の不足列をCLIで補った後の起動を確認した。
+- `tests/db_support.py` でRuntimeテストのDBを明示Migrationで準備するよう変更。旧版Migrationテストは現行データを準備した後に旧DDL/履歴のFixtureを構成し、Runtimeで旧版DBを自動初期化する前提を除去した。Moderationは記録済みの旧Schemaを再構築して、元の旧FK/列と現行行の保持検証を継続する。
+- 回帰でWindowsのFixture接続未Closeと、廃止したSuggestionRepository._connectへのテスト依存も検出。接続を明示Closeし、投票の書込みロック検証は共通database.connectを監視する方式へ変更した。状態読取り前に競合書込みを拒否する検証内容は維持する。
+- 共通DBテストは不存在DBを作らないこと、未適用/不正履歴で全Dump不変、全RepositoryのWAL/FK/timeout一致、再初期化不変、成功Commit、IntegrityErrorとKeyboardInterrupt時のRollbackを検証する。
+- 最終全Python回帰：Windows Python 3.13で200件成功・37.313秒、固定Linux Python 3.13コンテナで200件成功・44.069秒。ログ `.venv-p0/p2-final-windows.log` / `p2-final-linux.log`。Docs build成功・9.75秒、ログ `.venv-p0/p2-docs.log`。Frontendソースは変更していないため、本単位ではFrontend/Playwrightを再実行していない。
+- P1保全DBから `data/backups/p2-schema-0913/final.sqlite3` を作り最終0007を適用。保持64表97行、列・FK・IndexのMetadata一致、整合性成功・FK違反0、全Repository生成後も保持、再適用なし。原DB・P1保全DBは変更していない。`p2-schema-0912` は条件付きALTER追加前の開発途中候補でchecksumが異なるため、継続検証には9/13のfinalを使う。
+- Inventory CLIの最終結果は履歴表込み65表104行、整合性成功・FK違反0。Migration CLIの再実行はapplied空・snapshotなし。Runtimeの4Repositoryに直接接続/DDLが残らないことを検索確認し、`git diff --check` 成功。
+- 正式Architecture・機能追加手順・Migration資料へ、共通DB境界、起動時拒否、条件付き列追加、テストDB準備を反映。最後の変更は進捗と実行計画のみ。
+- 判定：P2-1のローカル実装・テスト・Docs・レビューを完了。Phase 2全体は継続中で、Stage・遠隔本番DB適用は未実施。次はP2-2としてDashboardのSession/OAuth state/Preferences・Guild設定からDomain別Repositoryへ分離し、Community→Engagement→Social→Moderationへ依存順に進める。Ticket Serviceの直接SQLも移設対象とする。

@@ -1,3 +1,4 @@
+from dashboard.repository import DashboardRepository
 """Versioned JSON API consumed by the dashboard v2 SPA."""
 from __future__ import annotations
 
@@ -87,6 +88,7 @@ def _serialize_rule_resource_ids(rule: dict[str, Any]) -> dict[str, Any]:
 
 def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -> APIRouter:
     router = APIRouter(prefix="/api/v1")
+    dashboard_repository = DashboardRepository(storage.database_path)
     ticket_repository = TicketRepository(settings.database_path) if settings is not None else None
     ticket_transcripts = TranscriptStorage(settings.data_dir / "ticket-transcripts", settings.ticket_encryption_key, s3={
         "endpoint_url": settings.ticket_s3_endpoint_url, "region": settings.ticket_s3_region, "bucket": settings.ticket_s3_bucket,
@@ -100,7 +102,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
 
     def token(request: Request) -> str:
         session_id = request.session.get("session_id")
-        value = storage.dashboard_session_token(session_id) if session_id else None
+        value = dashboard_repository.dashboard_session_token(session_id) if session_id else None
         if not value:
             raise HTTPException(401, detail={"code": "authentication_required", "message": "ログインが必要です。"})
         return value
@@ -173,7 +175,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         return {
             "user": {"id": str(user["id"]), "name": user.get("global_name") or user["username"], "avatar_url": avatar_url},
             "csrf_token": request.session.get("csrf_token", ""),
-            "preferences": storage.dashboard_preferences(int(user["id"])),
+            "preferences": dashboard_repository.dashboard_preferences(int(user["id"])),
         }
 
     @router.put("/preferences")
@@ -182,7 +184,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         access = token(request)
         user, body = await discord.current_user(access), await request.json()
         try:
-            return storage.set_dashboard_preferences(
+            return dashboard_repository.set_dashboard_preferences(
                 int(user["id"]), locale=str(body.get("locale", "ja")),
                 appearance=str(body.get("appearance", "precision")), color_scheme=str(body.get("color_scheme", "system")),
                 navigation_collapsed=bool(body.get("navigation_collapsed", False)),

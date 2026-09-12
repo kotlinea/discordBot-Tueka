@@ -1,3 +1,4 @@
+from db_support import prepare_database
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,7 +13,7 @@ class SuggestionsCogTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.bot = SimpleNamespace(settings=SimpleNamespace(database_path=Path(self.temp.name) / 'test.db'))
+        self.bot = SimpleNamespace(settings=SimpleNamespace(database_path=prepare_database(Path(self.temp.name) / 'test.db')))
         self.cog = SuggestionsCog(self.bot)
         self.cog.storage.set_module(1, 'suggestions', enabled=True, settings={'channel_id': 10, 'review_role_ids': [40]})
         self.channel = MagicMock(spec=discord.TextChannel)

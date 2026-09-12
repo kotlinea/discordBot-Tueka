@@ -5,9 +5,9 @@ import json
 import re
 import sqlite3
 import time
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from database import require_current, transaction
+from typing import Any, Iterable
 
 from .models import default_panel, default_settings, validate_deployment, validate_form, validate_panel, validate_panel_bundle, validate_settings
 
@@ -23,23 +23,11 @@ JSON_FIELDS = {
 class TicketRepository:
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        self._initialize()
+        require_current(self.database_path)
+        self.recover_incomplete_closes()
 
-    @contextmanager
-    def _connection(self) -> Iterator[sqlite3.Connection]:
-        connection = sqlite3.connect(self.database_path, timeout=30)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys=ON")
-        connection.execute("PRAGMA journal_mode=WAL")
-        try:
-            yield connection
-            connection.commit()
-        except Exception:
-            connection.rollback()
-            raise
-        finally:
-            connection.close()
+    def _connection(self):
+        return transaction(self.database_path)
 
     @staticmethod
     def _item(row: sqlite3.Row | None) -> dict[str, Any] | None:
@@ -54,133 +42,6 @@ class TicketRepository:
                 except (TypeError, json.JSONDecodeError):
                     value[target] = [] if source.endswith("ids_json") or source in {"fields_json", "panel_ids_json"} else {}
         return value
-
-    def _initialize(self) -> None:
-        with self._connection() as connection:
-            connection.executescript("""
-                CREATE TABLE IF NOT EXISTS ticket_guild_settings (
-                    guild_id INTEGER PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, open_limit INTEGER NOT NULL DEFAULT 1,
-                    language TEXT NOT NULL DEFAULT 'ja', log_channel_id INTEGER, transcript_channel_id INTEGER,
-                    transcript_retention_days INTEGER NOT NULL DEFAULT 365, close_dm INTEGER NOT NULL DEFAULT 1,
-                    default_auto_close_json TEXT NOT NULL DEFAULT '{}', revision INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS ticket_staff_teams (
-                    id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, name TEXT NOT NULL, role_ids_json TEXT NOT NULL DEFAULT '[]',
-                    user_ids_json TEXT NOT NULL DEFAULT '[]', admin_user_ids_json TEXT NOT NULL DEFAULT '[]', notification_channel_id INTEGER,
-                    enabled INTEGER NOT NULL DEFAULT 1, revision INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
-                    UNIQUE(guild_id,name)
-                );
-                CREATE TABLE IF NOT EXISTS ticket_forms (
-                    id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, name TEXT NOT NULL, title TEXT NOT NULL,
-                    fields_json TEXT NOT NULL DEFAULT '[]', revision INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
-                    UNIQUE(guild_id,name)
-                );
-                CREATE TABLE IF NOT EXISTS ticket_panels (
-                    id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
-                    mode TEXT NOT NULL, form_id INTEGER, team_id INTEGER, category_id INTEGER, thread_parent_channel_id INTEGER,
-                    staff_notification_channel_id INTEGER, config_json TEXT NOT NULL DEFAULT '{}', enabled INTEGER NOT NULL DEFAULT 1,
-                    revision INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(guild_id,name)
-                );
-                CREATE TABLE IF NOT EXISTS ticket_panel_messages (
-                    id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, name TEXT NOT NULL, channel_id INTEGER NOT NULL, message_id INTEGER,
-                    title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', color TEXT NOT NULL DEFAULT '#5865F2',
-                    panel_ids_json TEXT NOT NULL DEFAULT '[]', config_json TEXT NOT NULL DEFAULT '{}', status TEXT NOT NULL DEFAULT 'draft', last_error TEXT,
-                    lease_owner TEXT, lease_until INTEGER, revision INTEGER NOT NULL DEFAULT 1,
-                    created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(guild_id,name)
-                );
-                CREATE TABLE IF NOT EXISTS ticket_counters (guild_id INTEGER PRIMARY KEY, next_number INTEGER NOT NULL DEFAULT 1);
-                CREATE TABLE IF NOT EXISTS tickets_v2 (
-                    id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, ticket_number INTEGER NOT NULL, panel_id INTEGER, opener_id INTEGER NOT NULL,
-                    interaction_id TEXT, mode TEXT NOT NULL, discord_container_id INTEGER, parent_channel_id INTEGER, status TEXT NOT NULL DEFAULT 'creating',
-                    claimed_by INTEGER, close_reason TEXT, closed_by INTEGER, form_answers_json TEXT NOT NULL DEFAULT '{}',
-                    auto_close_excluded INTEGER NOT NULL DEFAULT 0, last_user_message_at INTEGER, last_message_at INTEGER,
-                    notes_thread_id INTEGER, closing_at INTEGER, awaiting_return_category_id INTEGER, created_at INTEGER NOT NULL, opened_at INTEGER, closed_at INTEGER, deleted_at INTEGER, revision INTEGER NOT NULL DEFAULT 1,
-                    UNIQUE(guild_id,ticket_number), UNIQUE(interaction_id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_tickets_v2_guild_status ON tickets_v2(guild_id,status,created_at);
-                CREATE INDEX IF NOT EXISTS idx_tickets_v2_container ON tickets_v2(discord_container_id);
-                CREATE TABLE IF NOT EXISTS ticket_participants (
-                    ticket_id INTEGER NOT NULL, subject_type TEXT NOT NULL, subject_id INTEGER NOT NULL, access TEXT NOT NULL DEFAULT 'member',
-                    added_by INTEGER, created_at INTEGER NOT NULL, PRIMARY KEY(ticket_id,subject_type,subject_id)
-                );
-                CREATE TABLE IF NOT EXISTS ticket_messages (
-                    id INTEGER PRIMARY KEY, ticket_id INTEGER NOT NULL, discord_message_id INTEGER, author_id INTEGER, author_name TEXT,
-                    kind TEXT NOT NULL DEFAULT 'message', encrypted_content TEXT, metadata_json TEXT NOT NULL DEFAULT '{}',
-                    edited_at INTEGER, deleted_at INTEGER, created_at INTEGER NOT NULL, UNIQUE(ticket_id,discord_message_id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_ticket_messages_cursor ON ticket_messages(ticket_id,id);
-                CREATE TABLE IF NOT EXISTS ticket_attachments (
-                    id INTEGER PRIMARY KEY, ticket_id INTEGER NOT NULL, discord_attachment_id INTEGER NOT NULL,
-                    filename TEXT NOT NULL, content_type TEXT, byte_size INTEGER NOT NULL, backend TEXT NOT NULL,
-                    object_key TEXT NOT NULL, content_hash TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'ready', created_at INTEGER NOT NULL,
-                    UNIQUE(ticket_id,discord_attachment_id)
-                );
-                CREATE TABLE IF NOT EXISTS ticket_outbox (
-                    id INTEGER PRIMARY KEY, ticket_id INTEGER NOT NULL, action TEXT NOT NULL, actor_id INTEGER NOT NULL,
-                    payload_json TEXT NOT NULL DEFAULT '{}', status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
-                    available_at INTEGER NOT NULL, lease_owner TEXT, lease_until INTEGER, last_error TEXT, created_at INTEGER NOT NULL, completed_at INTEGER
-                );
-                CREATE INDEX IF NOT EXISTS idx_ticket_outbox_due ON ticket_outbox(status,available_at,lease_until);
-                CREATE TABLE IF NOT EXISTS ticket_blacklist (
-                    guild_id INTEGER NOT NULL, user_id INTEGER NOT NULL, reason TEXT, created_by INTEGER, created_at INTEGER NOT NULL,
-                    PRIMARY KEY(guild_id,user_id)
-                );
-                CREATE TABLE IF NOT EXISTS ticket_on_call (
-                    guild_id INTEGER NOT NULL, team_id INTEGER NOT NULL, user_id INTEGER NOT NULL, enabled_at INTEGER NOT NULL,
-                    PRIMARY KEY(guild_id,team_id,user_id)
-                );
-                CREATE TABLE IF NOT EXISTS ticket_close_requests (
-                    id INTEGER PRIMARY KEY, ticket_id INTEGER NOT NULL, requested_by INTEGER NOT NULL, reason TEXT, status TEXT NOT NULL DEFAULT 'pending',
-                    expires_at INTEGER NOT NULL, resolved_by INTEGER, resolved_at INTEGER, created_at INTEGER NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS ticket_tags (
-                    id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, name TEXT NOT NULL, content TEXT NOT NULL,
-                    created_by INTEGER, revision INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
-                    UNIQUE(guild_id,name)
-                );
-                CREATE TABLE IF NOT EXISTS ticket_feedback (
-                    ticket_id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, rating INTEGER NOT NULL, comment_encrypted TEXT,
-                    form_id INTEGER, answers_encrypted_json TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS ticket_transcripts (
-                    id INTEGER PRIMARY KEY, ticket_id INTEGER NOT NULL, version INTEGER NOT NULL DEFAULT 1, backend TEXT NOT NULL,
-                    object_key TEXT NOT NULL, content_hash TEXT NOT NULL, byte_size INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'ready',
-                    last_error TEXT, expires_at INTEGER NOT NULL, created_at INTEGER NOT NULL, UNIQUE(ticket_id,version)
-                );
-                CREATE TABLE IF NOT EXISTS ticket_schedules (
-                    id INTEGER PRIMARY KEY, ticket_id INTEGER NOT NULL, kind TEXT NOT NULL, due_at INTEGER NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT,
-                    created_at INTEGER NOT NULL, completed_at INTEGER, UNIQUE(ticket_id,kind)
-                );
-                CREATE INDEX IF NOT EXISTS idx_ticket_schedules_due ON ticket_schedules(status,due_at);
-                CREATE TABLE IF NOT EXISTS ticket_audit_events (
-                    id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, ticket_id INTEGER, actor_id INTEGER, event_type TEXT NOT NULL,
-                    detail_json TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS ticket_orphans (
-                    id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, ticket_id INTEGER, container_id INTEGER NOT NULL,
-                    resource_type TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', reason TEXT,
-                    created_at INTEGER NOT NULL, recovered_at INTEGER, UNIQUE(guild_id,container_id)
-                );
-            """)
-            self._add_column(connection, "tickets_v2", "notes_thread_id", "INTEGER")
-            self._add_column(connection, "tickets_v2", "closing_at", "INTEGER")
-            self._add_column(connection, "ticket_panel_messages", "lease_owner", "TEXT")
-            self._add_column(connection, "ticket_panel_messages", "lease_until", "INTEGER")
-            self._add_column(connection, "ticket_panel_messages", "config_json", "TEXT NOT NULL DEFAULT '{}'")
-            self._add_column(connection, "ticket_panel_messages", "previous_channel_id", "INTEGER")
-            self._add_column(connection, "ticket_panel_messages", "previous_message_id", "INTEGER")
-            self._add_column(connection, "ticket_panels", "archived_at", "INTEGER")
-            self._add_column(connection, "tickets_v2", "awaiting_return_category_id", "INTEGER")
-            self._add_column(connection, "ticket_feedback", "form_id", "INTEGER")
-            self._add_column(connection, "ticket_feedback", "answers_encrypted_json", "TEXT NOT NULL DEFAULT '{}'")
-        self.recover_incomplete_closes()
-
-    @staticmethod
-    def _add_column(connection: sqlite3.Connection, table: str, name: str, definition: str) -> None:
-        columns = {str(row["name"]) for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
-        if name not in columns:
-            connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
 
     def settings(self, guild_id: int) -> dict[str, Any]:
         with self._connection() as connection:

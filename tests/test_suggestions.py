@@ -1,3 +1,4 @@
+from db_support import prepare_database
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,7 +9,7 @@ from suggestions import SuggestionRepository, SuggestionService, SuggestionValid
 class SuggestionTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
-        self.repository = SuggestionRepository(Path(self.directory.name) / "suggestions.sqlite3")
+        self.repository = SuggestionRepository(prepare_database(Path(self.directory.name) / "suggestions.sqlite3"))
         self.service = SuggestionService(self.repository)
 
     def tearDown(self):
@@ -73,7 +74,7 @@ class SuggestionTests(unittest.TestCase):
     def test_delivery_failure_persists_and_closes_operations(self):
         item = self.repository.create(1, 10, 20, {"idea": "Idea"})
         self.repository.mark_delivery_failed(1, item["id"], "Forbidden")
-        restarted = SuggestionRepository(self.repository.database_path)
+        restarted = SuggestionRepository(prepare_database(self.repository.database_path))
         self.assertEqual(restarted.get(1, item["id"])["status"], "delivery_failed")
         with self.assertRaises(RuntimeError):
             restarted.vote(1, item["id"], 30, 1)
@@ -84,7 +85,7 @@ class SuggestionTests(unittest.TestCase):
         item = self.repository.create(1, 10, 20, {"idea": "Idea"})
         self.repository.attach_message(1, item["id"], 100)
         self.repository.vote(1, item["id"], 30, 1)
-        restarted = SuggestionRepository(self.repository.database_path)
+        restarted = SuggestionRepository(prepare_database(self.repository.database_path))
         restored = restarted.get(1, item["id"])
         self.assertEqual(restored["message_id"], 100)
         self.assertEqual(restored["upvotes"], 1)
@@ -96,11 +97,11 @@ class SuggestionTests(unittest.TestCase):
         from unittest.mock import patch
 
         item = self.repository.create(1, 10, 20, {"idea": "Idea"})
-        original_connect = self.repository._connect
+        from database import connect as original_connect
         competing_writes = []
 
-        def connect():
-            connection = original_connect()
+        def connect(*args, **kwargs):
+            connection = original_connect(*args, **kwargs)
             def trace(statement):
                 if statement.startswith("SELECT status FROM suggestions"):
                     with closing(sqlite3.connect(self.repository.database_path, timeout=0)) as other:
@@ -111,7 +112,7 @@ class SuggestionTests(unittest.TestCase):
             connection.set_trace_callback(trace)
             return connection
 
-        with patch.object(self.repository, "_connect", side_effect=connect):
+        with patch("database.connect", side_effect=connect):
             result = self.repository.vote(1, item["id"], 30, 1)
         self.assertEqual(competing_writes, ["database is locked"])
         self.assertEqual(result["status"], "pending")

@@ -1,3 +1,4 @@
+from db_support import prepare_database, set_fixture_version
 import shutil
 import sqlite3
 import tempfile
@@ -46,14 +47,7 @@ class ModerationRemovalTests(unittest.TestCase):
             self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(), [])
 
     def seed(self, mixed):
-        if mixed:
-            with closing(sqlite3.connect(self.db)) as connection:
-                connection.executescript(Path('tests/fixtures/moderation_pre_p1.sql').read_text(encoding='utf-8'))
-        previous = self.root / 'previous'
-        previous.mkdir(exist_ok=True)
-        for source in sorted(Path('migrations').glob('*.sql'))[:3]:
-            shutil.copyfile(source, previous / source.name)
-        apply(self.db, self.backups, previous)
+        prepare_database(self.db)
         storage = GuildStorage(self.db)
         storage.add_xp(1, 2, 999)
         rule = storage.save_moderation_rule(1, validate_rule({**default_rule('keyword'), 'trigger_config': {'keywords': ['bad']}}))
@@ -65,6 +59,20 @@ class ModerationRemovalTests(unittest.TestCase):
         storage.schedule_moderation_action(1, 2, 'unban', 1, 'keep schedule', case)
         if mixed:
             with storage._connection() as connection:
+                # Rebuild the fixture using the recorded pre-removal schema, preserving current rows.
+                tables = ['moderation_rules', 'guild_users', 'moderation_cases', 'moderation_points',
+                          'moderation_events', 'moderation_action_results']
+                columns = {}
+                for table in tables:
+                    columns[table] = [row[1] for row in connection.execute(f'PRAGMA table_info({table})')]
+                    connection.execute(f'CREATE TEMP TABLE fixture_copy_{table} AS SELECT * FROM {table}')
+                for table in reversed(tables):
+                    connection.execute(f'DROP TABLE {table}')
+                connection.executescript(Path('tests/fixtures/moderation_pre_p1.sql').read_text(encoding='utf-8'))
+                for table in tables:
+                    fields = ','.join(columns[table])
+                    connection.execute(f'INSERT INTO {table}({fields}) SELECT {fields} FROM fixture_copy_{table}')
+                    connection.execute(f'DROP TABLE fixture_copy_{table}')
                 connection.executescript("""
                     INSERT INTO automod_rules(id,guild_id,name,trigger_type,created_at,updated_at) VALUES(50,1,'old','keyword',1,1);
                     INSERT INTO automod_events(id,guild_id,rule_id,user_id,channel_id,trigger_type,reason,mode,created_at) VALUES(50,1,50,2,3,'keyword','old','enforce',1);
@@ -75,6 +83,7 @@ class ModerationRemovalTests(unittest.TestCase):
                     UPDATE moderation_cases SET rule_id=50,automod_event_id=50;
                     UPDATE moderation_rules SET legacy_rule_id=50;
                 """)
+        set_fixture_version(self.db, 3)
         return storage, rule, event, case
 
     def test_empty_database_and_restart(self):
@@ -91,7 +100,7 @@ class ModerationRemovalTests(unittest.TestCase):
                 storage, rule, event, case = self.seed(mixed)
                 before = self.retained()
                 result = apply(self.db, self.backups)
-                self.assertEqual(result['applied'], ['0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql'])
+                self.assertEqual(result['applied'], ['0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql'])
                 self.assertEqual(self.retained(), before)
                 storage = GuildStorage(self.db)
                 self.assertEqual(self.retained(), before)
@@ -115,7 +124,7 @@ class ModerationRemovalTests(unittest.TestCase):
             before = list(connection.iterdump())
         directory = self.root / 'failure'
         shutil.copytree('migrations', directory)
-        (directory / '0007_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0008_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         with closing(sqlite3.connect(self.db)) as connection:

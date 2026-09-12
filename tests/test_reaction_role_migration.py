@@ -1,3 +1,4 @@
+from db_support import prepare_database, set_fixture_version
 import shutil
 import sqlite3
 import tempfile
@@ -52,7 +53,7 @@ class ReactionRoleRemovalTests(unittest.TestCase):
                 previous.mkdir()
                 for name in ('0001_suggestions.sql', '0002_remove_legacy_tickets.sql'):
                     shutil.copyfile(Path('migrations') / name, previous / name)
-                apply(self.db, self.backups, previous)
+                prepare_database(self.db)
                 storage = GuildStorage(self.db)
                 repository = ReactionRoleRepository(self.db)
                 service = ReactionRoleService(repository)
@@ -68,9 +69,10 @@ class ReactionRoleRemovalTests(unittest.TestCase):
                 if mixed:
                     with closing(sqlite3.connect(self.db)) as connection:
                         connection.executescript("CREATE TABLE reaction_role_panels(message_id INTEGER PRIMARY KEY,guild_id INTEGER,role_ids_json TEXT); INSERT INTO reaction_role_panels VALUES(200,2,'[900]');")
+                set_fixture_version(self.db, 2)
                 before = self.rows()
                 result = apply(self.db, self.backups)
-                self.assertEqual(result['applied'], ['0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql'])
+                self.assertEqual(result['applied'], ['0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql'])
                 if mixed:
                     with closing(sqlite3.connect(result['snapshot'])) as snapshot:
                         self.assertEqual(snapshot.execute('SELECT role_ids_json FROM reaction_role_panels').fetchone()[0], '[900]')
@@ -91,7 +93,7 @@ class ReactionRoleRemovalTests(unittest.TestCase):
         directory.mkdir()
         for source in Path('migrations').glob('*.sql'):
             shutil.copyfile(source, directory / source.name)
-        (directory / '0007_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0008_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         with closing(sqlite3.connect(self.db)) as connection:

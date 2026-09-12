@@ -1,3 +1,4 @@
+from db_support import prepare_database, set_fixture_version
 import json
 import shutil
 import sqlite3
@@ -24,7 +25,7 @@ class SharedSettingsRemovalTests(unittest.TestCase):
         for path in Path('migrations').glob('*.sql'):
             if int(path.name[:4]) <= 4:
                 shutil.copy(path, directory)
-        apply(self.db, self.backups, directory)
+        prepare_database(self.db)
         store = GuildStorage(self.db)
         store.add_xp(1, 99, 42)
         with closing(sqlite3.connect(self.db)) as connection:
@@ -45,11 +46,12 @@ class SharedSettingsRemovalTests(unittest.TestCase):
                 connection.execute('INSERT INTO guild_modules VALUES(?,?,?,?,?)',
                                    (guild, module, 1, json.dumps(settings), 7))
             connection.commit()
+        set_fixture_version(self.db, 4)
 
     def test_preserves_effective_settings_revision_and_unrelated_data(self):
         self.seed()
         result = apply(self.db, self.backups)
-        self.assertEqual(result['applied'], ['0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql'])
+        self.assertEqual(result['applied'], ['0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql'])
         for _ in range(2):
             store = GuildStorage(self.db)
             for guild, channel in [(1, 10), (2, None), (3, 333)]:
@@ -84,7 +86,7 @@ class SharedSettingsRemovalTests(unittest.TestCase):
             before = list(connection.iterdump())
         directory = self.root / 'failure'
         shutil.copytree('migrations', directory)
-        (directory / '0007_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0008_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         with closing(sqlite3.connect(self.db)) as connection:

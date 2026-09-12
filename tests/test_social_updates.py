@@ -1,3 +1,4 @@
+from db_support import prepare_database
 import unittest
 import tempfile
 from pathlib import Path
@@ -32,7 +33,7 @@ class SocialUpdateTests(unittest.TestCase):
 class SocialDeliveryTests(unittest.IsolatedAsyncioTestCase):
     async def test_current_live_start_and_end_do_not_fall_back_to_old_live(self):
         with tempfile.TemporaryDirectory() as directory:
-            storage = GuildStorage(Path(directory) / 'test.db')
+            storage = GuildStorage(prepare_database(Path(directory) / 'test.db'))
             storage.save_social_subscription_v2(1, 'twitch', 'creator', 10, ['live'], {},
                                                 default_templates('twitch', ['live']))
             storage.set_module(1, 'twitch_updates', enabled=True)

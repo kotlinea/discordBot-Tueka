@@ -12,6 +12,8 @@ Guild設定は型、初期値、上限、Discord Resource種別をServer側で�
 
 ## 非同期処理
 
+保存変更は[番号付きMigration](../operations/migrations.md)へ追加し、RepositoryのコンストラクタへDDLを追加しないでください。接続とTransactionは `database.py` を使います。テストDBも先に明示Migrationで作成します。通常のRuntimeテストでは `tests/db_support.py` の `prepare_database` を利用でき、旧版Fixtureの試験とは分けます。
+
 Discord配送や外部API処理をHTTP Request内で長時間実行せず、OutboxまたはLease付きJobへ保存します。冪等Key、Retry可能／恒久失敗、Timeout、Concurrency上限を定義します。
 
 ## ドキュメント

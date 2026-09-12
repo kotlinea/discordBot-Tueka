@@ -1,6 +1,6 @@
 # 番号付きDB Migration
 
-明示CLIは、`migrations/0001_名前.sql` から番号順にSQLを適用します。0001はSuggestionsの作成、0002は旧Ticket、0003は旧Reaction Roles、0004は旧Moderation、0005は共有設定FallbackとJSON移行済み判定、0006はSocialの旧単一Template列の削除を扱います。新規導入もこのCLIを先に実行します。現行Domainの不足テーブルはまだ各Repositoryの初期化時に作成されます。全DDLのCLIへの集約はPhase 2で行います。
+明示CLIは、`migrations/0001_名前.sql` から番号順にSQLを適用します。0001はSuggestionsの作成、0002は旧Ticket、0003は旧Reaction Roles、0004は旧Moderation、0005は共有設定FallbackとJSON移行済み判定、0006はSocialの旧単一Template列の削除を扱います。新規導入もこのCLIを先に実行します。0007で現行64テーブル・23Indexと不足列の作成をCLIへ集約しました。RuntimeはDDLを実行せず、DB不存在・未適用・履歴不一致ならSchemaNotReadyで起動を拒否します。
 
 ```sh
 python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrations
@@ -46,3 +46,16 @@ JSON V1ファイルのImportは廃止しました。起動時にJSONからXP・�
 0006はSocial購読の旧単一 `template` 列を削除し、現行のイベント別 `templates_json`、購読ID・Target・Cursor・配送履歴を保持します。購読の旧形式を起動時にTargetやイベント別Templateへ変換する処理と、旧 `live` イベントへの配送Fallbackは廃止しました。現在のイベント名は `live_start` / `live_end` です。
 
 共有表内の旧購読行も、残す列の値は変更しません。Targetがない行からTargetを自動作成したり、機能を自動で有効化したりしません。配送には現行Targetが必要です。旧購読の運用を再開する場合は、Dashboardから現行形式で再登録し、重複設定を整理してください。Migrationの更新対象は現行V2のSchemaを持つDBであり、過去の純V1 Schemaへの自動Importは提供しません。適用に失敗した場合は原DBへ手動でDDLを継ぎ足さず、SnapshotとSchemaを確認してください。
+
+## 既存テーブルへの列追加
+
+0007には、以前のRuntimeが行っていた39件の条件付き列追加も含みます。指定列が存在する場合は値と定義を変更せず、不足する場合だけ追加します。Index作成より前に適用します。
+
+```sql
+-- tueka: add-column-if-missing
+ALTER TABLE example ADD COLUMN new_value INTEGER NOT NULL DEFAULT 0;
+```
+
+この注釈はTuekaのCLIが解釈します。単一の `ALTER TABLE ... ADD COLUMN` 以外や、存在しないテーブルへの指定は拒否します。注釈も適用履歴のハッシュ対象です。CLI自身のSchema照会後にSQLの実行制限を適用するため、Migration本文のTransaction / PRAGMA / ATTACH操作は引き続き許可しません。
+
+アプリとMigrationファイルは同じVersionを配布してください。起動エラー時に履歴を手動で書き換えず、3Processを停止して対応するCLIを実行します。SQLの変更が必要なら適用済みファイルを編集せず、次の番号を追加します。

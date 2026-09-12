@@ -1,3 +1,5 @@
+from dashboard.repository import DashboardRepository
+from db_support import prepare_database
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,8 +18,9 @@ class SuggestionsApiTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.storage = GuildStorage(Path(self.temp.name) / 'test.db')
-        self.storage.create_dashboard_session('test-session', 'test-token', 3600)
+        self.storage = GuildStorage(prepare_database(Path(self.temp.name) / 'test.db'))
+        self.dashboard_repository = DashboardRepository(self.storage.database_path)
+        self.dashboard_repository.create_dashboard_session('test-session', 'test-token', 3600)
         self.session = {'session_id': 'test-session', 'csrf_token': 'test-csrf'}
         self.discord = SimpleNamespace(
             can_manage=AsyncMock(return_value=True),

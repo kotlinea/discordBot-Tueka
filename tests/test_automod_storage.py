@@ -1,3 +1,4 @@
+from db_support import prepare_database
 import json
 import tempfile
 import time
@@ -14,7 +15,7 @@ from storage import GuildStorage
 class AutoModStorageTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.storage = GuildStorage(Path(self.temp_dir.name) / "bot.sqlite3")
+        self.storage = GuildStorage(prepare_database(Path(self.temp_dir.name) / "bot.sqlite3"))
 
     def tearDown(self):
         self.temp_dir.cleanup()
@@ -111,7 +112,7 @@ class AutoModStorageTests(unittest.TestCase):
 class ModerationThresholdTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.storage = GuildStorage(Path(self.temp_dir.name) / "bot.sqlite3")
+        self.storage = GuildStorage(prepare_database(Path(self.temp_dir.name) / "bot.sqlite3"))
         self.service = ModerationService(None, self.storage)
         settings = self.storage.get_module(1, "infractions")["settings"]
         settings["point_thresholds"] = [

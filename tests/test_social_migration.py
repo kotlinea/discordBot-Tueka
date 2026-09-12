@@ -1,3 +1,4 @@
+from db_support import prepare_database, set_fixture_version
 import shutil
 import sqlite3
 import tempfile
@@ -24,7 +25,7 @@ class SocialRemovalTests(unittest.TestCase):
         for path in Path('migrations').glob('*.sql'):
             if int(path.name[:4]) <= 5:
                 shutil.copy(path, directory)
-        apply(self.db, self.backups, directory)
+        prepare_database(self.db)
         store = GuildStorage(self.db)
         subscription = store.save_social_subscription_v2(1, 'youtube', 'UC1', 10, ['video'], {},
                                                         default_templates('youtube', ['video']))
@@ -40,6 +41,7 @@ class SocialRemovalTests(unittest.TestCase):
                 connection.execute("""INSERT INTO social_subscriptions
                     (id,guild_id,provider,account_id,account_name,channel_id,events_json,created_at,updated_at,template)
                     VALUES(99,2,'twitch','old','old',11,'["live"]',1,1,'old text')""")
+        set_fixture_version(self.db, 5)
         return subscription
 
     def retained(self):
@@ -60,7 +62,7 @@ class SocialRemovalTests(unittest.TestCase):
                 subscription = self.seed(mixed)
                 before = self.retained()
                 result = apply(self.db, self.backups)
-                self.assertEqual(result['applied'], ['0006_remove_legacy_social_template.sql'])
+                self.assertEqual(result['applied'], ['0006_remove_legacy_social_template.sql', '0007_current_schema.sql'])
                 for _ in range(2):
                     store = GuildStorage(self.db)
                     self.assertEqual(self.retained(), before)
@@ -87,7 +89,7 @@ class SocialRemovalTests(unittest.TestCase):
             before = list(connection.iterdump())
         directory = self.root / 'failure'
         shutil.copytree('migrations', directory)
-        (directory / '0007_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0008_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         with closing(sqlite3.connect(self.db)) as connection:

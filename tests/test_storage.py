@@ -1,3 +1,5 @@
+from dashboard.repository import DashboardRepository
+from db_support import prepare_database
 import json
 import tempfile
 import unittest
@@ -12,7 +14,8 @@ class GuildStorageTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.root = Path(self.temp_dir.name)
-        self.storage = GuildStorage(self.root / "bot.sqlite3")
+        self.storage = GuildStorage(prepare_database(self.root / "bot.sqlite3"))
+        self.dashboard_repository = DashboardRepository(self.storage.database_path)
 
     def tearDown(self):
         self.temp_dir.cleanup()
@@ -39,15 +42,15 @@ class GuildStorageTests(unittest.TestCase):
         self.assertFalse(leveling["settings"]["voice_enabled"])
 
     def test_dashboard_session_is_expiring_and_revocable(self):
-        self.storage.create_dashboard_session("session", "access-token", 60)
-        self.assertEqual(self.storage.dashboard_session_token("session"), "access-token")
-        self.storage.delete_dashboard_session("session")
-        self.assertIsNone(self.storage.dashboard_session_token("session"))
+        self.dashboard_repository.create_dashboard_session("session", "access-token", 60)
+        self.assertEqual(self.dashboard_repository.dashboard_session_token("session"), "access-token")
+        self.dashboard_repository.delete_dashboard_session("session")
+        self.assertIsNone(self.dashboard_repository.dashboard_session_token("session"))
 
     def test_oauth_state_is_single_use(self):
-        self.storage.create_oauth_state("state")
-        self.assertTrue(self.storage.consume_oauth_state("state"))
-        self.assertFalse(self.storage.consume_oauth_state("state"))
+        self.dashboard_repository.create_oauth_state("state")
+        self.assertTrue(self.dashboard_repository.consume_oauth_state("state"))
+        self.assertFalse(self.dashboard_repository.consume_oauth_state("state"))
 
     def test_module_toggle_preserves_its_settings(self):
         self.storage.set_module(1, "welcome", enabled=True, settings={"welcome_channel_id": 10, "default_role_id": 20})

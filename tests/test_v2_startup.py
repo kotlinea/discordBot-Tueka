@@ -12,9 +12,35 @@ from bot import TuekaBot
 from config import Settings
 from migrate import apply
 from social_worker import SocialWorker
+from database import SchemaNotReady, readonly
+from db_support import set_fixture_version
 
 
 class V2StartupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_pending_schema_stops_all_entry_points_without_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            db = root / 'test.db'
+            apply(db, root / 'backups')
+            set_fixture_version(db, 6)
+            with closing(readonly(db)) as connection:
+                before = list(connection.iterdump())
+            env = {'DISCORD_TOKEN': 'test-token', 'DISCORD_CLIENT_ID': '1',
+                   'DISCORD_CLIENT_SECRET': 'test-secret', 'SESSION_SECRET': 'test-session',
+                   'DISCORD_REDIRECT_URI': 'http://testserver/oauth/callback',
+                   'DATA_DIR': str(root), 'DATABASE_PATH': str(db)}
+            with patch.dict(os.environ, env, clear=True):
+                settings = Settings.from_env()
+                for entry in (TuekaBot, SocialWorker):
+                    with self.assertRaisesRegex(SchemaNotReady, 'migrate.py'):
+                        entry(settings)
+                spec = importlib.util.spec_from_file_location('dashboard_pending', 'dashboard/app.py')
+                module = importlib.util.module_from_spec(spec)
+                with self.assertRaises(SchemaNotReady):
+                    spec.loader.exec_module(module)
+            with closing(readonly(db)) as connection:
+                self.assertEqual(list(connection.iterdump()), before)
+
     async def test_all_bot_extensions_dashboard_and_worker_restart_without_v1(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

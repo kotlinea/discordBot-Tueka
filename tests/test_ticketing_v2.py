@@ -1,3 +1,4 @@
+from db_support import prepare_database
 import asyncio
 import json
 import tempfile
@@ -16,7 +17,7 @@ class TicketV2Tests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
-        self.repository = TicketRepository(self.root / "tickets.db")
+        self.repository = TicketRepository(prepare_database(self.root / "tickets.db"))
         self.storage = TranscriptStorage(self.root / "blobs", Fernet.generate_key().decode("ascii"))
         self.service = TicketService(self.repository, self.storage)
         self.repository.save_settings(1, {"enabled": True, "open_limit": 1})
@@ -73,7 +74,7 @@ class TicketV2Tests(unittest.TestCase):
         ticket, _ = self.service.reserve(1, self.panel["id"], 10, "scheduled", set())
         ticket = self.repository.activate_ticket(ticket["id"], 300, 100)
         self.service.schedule_ticket(ticket)
-        reopened = TicketRepository(self.root / "tickets.db")
+        reopened = TicketRepository(prepare_database(self.root / "tickets.db"))
         with reopened._connection() as connection:
             row = connection.execute("SELECT kind,status FROM ticket_schedules WHERE ticket_id=?", (ticket["id"],)).fetchone()
         self.assertEqual(("no_user_reply", "pending"), tuple(row))

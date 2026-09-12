@@ -1,3 +1,4 @@
+from db_support import prepare_database, set_fixture_version
 import sqlite3
 import tempfile
 import unittest
@@ -31,7 +32,7 @@ class MigrationTests(unittest.TestCase):
 
     def test_empty_database_and_reapplication(self):
         result = apply(self.db, self.backups)
-        self.assertEqual(result['applied'], ['0001_suggestions.sql', '0002_remove_legacy_tickets.sql', '0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql'])
+        self.assertEqual(result['applied'], ['0001_suggestions.sql', '0002_remove_legacy_tickets.sql', '0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql'])
         self.assertEqual(inventory(Path(result['snapshot']))['tables'], [])
         repository = SuggestionRepository(self.db)
         item = repository.create(1, 2, 3, {'idea': 'keep'})
@@ -41,8 +42,10 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(repository.get(1, item['id'])['answers'], {'idea': 'keep'})
 
     def test_existing_v2_data_is_preserved(self):
+        prepare_database(self.db)
         repository = SuggestionRepository(self.db)
         item = repository.create(1, 2, 3, {'idea': 'existing'})
+        set_fixture_version(self.db, 6)
         result = apply(self.db, self.backups)
         self.assertTrue(Path(result['snapshot']).exists())
         self.assertEqual(repository.get(1, item['id'])['answers'], {'idea': 'existing'})
@@ -52,10 +55,10 @@ class MigrationTests(unittest.TestCase):
         self.seed()
         with ThreadPoolExecutor(max_workers=2) as workers:
             results = list(workers.map(lambda _: apply(self.db, self.backups), range(2)))
-        self.assertEqual(sum(len(result['applied']) for result in results), 6)
+        self.assertEqual(sum(len(result['applied']) for result in results), 7)
         self.assertEqual(len(list(self.backups.glob('*.sqlite3'))), 1)
         with closing(sqlite3.connect(self.db)) as connection:
-            self.assertEqual(connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0], 6)
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0], 7)
 
     def test_runtime_initialization_does_not_change_migrated_suggestions_schema(self):
         apply(self.db, self.backups)
@@ -81,6 +84,29 @@ class MigrationTests(unittest.TestCase):
         with self.assertRaises(sqlite3.DatabaseError):
             apply(self.db, self.backups, directory)
         self.assertEqual(inventory(self.db)['tables'][0]['name'], 'preserved')
+
+    def test_conditional_column_addition_preserves_existing_values(self):
+        directory = self.sql("""CREATE TABLE example(id INTEGER PRIMARY KEY, existing TEXT);
+            INSERT INTO example VALUES(1,'keep');
+-- tueka: add-column-if-missing
+ALTER TABLE example ADD COLUMN existing TEXT DEFAULT 'replace';
+-- tueka: add-column-if-missing
+ALTER TABLE example ADD COLUMN added INTEGER NOT NULL DEFAULT 7;
+""")
+        apply(self.db, self.backups, directory)
+        with closing(sqlite3.connect(self.db)) as connection:
+            self.assertEqual(connection.execute('SELECT * FROM example').fetchall(), [(1, 'keep', 7)])
+        self.assertEqual(apply(self.db, self.backups, directory), {'applied': [], 'snapshot': None})
+
+    def test_conditional_annotation_does_not_allow_other_sql_or_escape_rollback(self):
+        self.seed()
+        for sql in ('COMMIT;', 'PRAGMA foreign_keys=OFF;', 'ALTER TABLE absent ADD COLUMN x TEXT;'):
+            with self.subTest(sql=sql):
+                directory = self.sql('DROP TABLE preserved;\n-- tueka: add-column-if-missing\n' + sql)
+                with self.assertRaises(ValueError):
+                    apply(self.db, self.backups, directory)
+                with closing(sqlite3.connect(self.db)) as connection:
+                    self.assertEqual(connection.execute('SELECT value FROM preserved').fetchone()[0], 'keep')
 
     def test_history_checksum_change_is_rejected(self):
         directory = self.sql('CREATE TABLE example(id INTEGER);')

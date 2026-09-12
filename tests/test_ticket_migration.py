@@ -1,3 +1,4 @@
+from db_support import prepare_database, set_fixture_version
 import asyncio
 import shutil
 import sqlite3
@@ -54,7 +55,7 @@ class TicketRemovalTests(unittest.TestCase):
         previous = self.root / 'previous'
         previous.mkdir()
         shutil.copyfile('migrations/0001_suggestions.sql', previous / '0001_suggestions.sql')
-        apply(self.db, self.backups, previous)
+        prepare_database(self.db)
         GuildStorage(self.db)
         repository = TicketRepository(self.db)
         blobs = TranscriptStorage(self.root / 'blobs', Fernet.generate_key().decode('ascii'))
@@ -87,11 +88,12 @@ class TicketRemovalTests(unittest.TestCase):
         repository = TicketRepository(self.db)
         self.assertIsNone(repository.ticket_for_container(999))
         self.assertFalse(repository.settings(2)['enabled'])
+        set_fixture_version(self.db, 1)
         before = self.contents()
         blob_file = self.root / 'blobs' / transcript['object_key']
         encrypted = blob_file.read_bytes()
         result = apply(self.db, self.backups)
-        self.assertEqual(result['applied'], ['0002_remove_legacy_tickets.sql', '0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql'])
+        self.assertEqual(result['applied'], ['0002_remove_legacy_tickets.sql', '0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql'])
         with closing(sqlite3.connect(result['snapshot'])) as snapshot:
             self.assertIn('V1 only', snapshot.execute('SELECT transcript_json FROM support_tickets').fetchone()[0])
             self.assertEqual(snapshot.execute('SELECT COUNT(*) FROM ticket_migrations').fetchone()[0], 1)
@@ -121,12 +123,14 @@ class TicketRemovalTests(unittest.TestCase):
         self.assertIn('open', {command.name for command in cog.ticket.commands})
 
     def test_existing_v2_only_database_does_not_require_legacy_tables(self):
+        prepare_database(self.db)
         repository = TicketRepository(self.db)
         settings = repository.save_settings(8, {'enabled': True, 'open_limit': 4})
         team = repository.save_team(8, {'name': 'Team', 'role_ids': [80]})
         panel = repository.save_panel(8, {'name': 'Thread', 'mode': 'private_thread', 'thread_parent_channel_id': 81, 'staff_notification_channel_id': 84, 'team_id': team['id']})
         ticket = repository.reserve_ticket(8, panel['id'], 82, 'thread', {})
         ticket = repository.activate_ticket(ticket['id'], 83, 81)
+        set_fixture_version(self.db, 1)
         apply(self.db, self.backups)
         reopened = TicketRepository(self.db)
         self.assertEqual(reopened.settings(8), settings)
@@ -135,15 +139,16 @@ class TicketRemovalTests(unittest.TestCase):
         self.assert_no_legacy()
 
     def test_failure_after_legacy_drop_restores_tables_data_and_history(self):
+        prepare_database(self.db)
         repository = TicketRepository(self.db)
         saved = repository.save_settings(1, {'enabled': True})
         with closing(sqlite3.connect(self.db)) as connection:
-            connection.executescript("CREATE TABLE support_tickets(id INTEGER PRIMARY KEY,transcript_json TEXT); INSERT INTO support_tickets VALUES(1,'private'); CREATE TABLE ticket_migrations(name TEXT);")
+            connection.executescript("CREATE TABLE support_tickets(id INTEGER PRIMARY KEY,transcript_json TEXT); INSERT INTO support_tickets VALUES(1,'private'); CREATE TABLE ticket_migrations(name TEXT); DROP TABLE schema_migrations;")
         directory = self.root / 'failing'
         directory.mkdir()
         for source in Path('migrations').glob('*.sql'):
             shutil.copyfile(source, directory / source.name)
-        (directory / '0007_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0008_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         self.assertEqual(repository.settings(1), saved)
@@ -153,6 +158,7 @@ class TicketRemovalTests(unittest.TestCase):
             self.assertIsNone(connection.execute("SELECT name FROM sqlite_master WHERE name='schema_migrations'").fetchone())
 
     def test_bot_loads_current_ticket_commands_without_rollout_settings(self):
+        prepare_database(self.db)
         async def load():
             async with commands.Bot(command_prefix='!', intents=discord.Intents.none()) as bot:
                 bot.settings = SimpleNamespace(database_path=self.db, data_dir=self.root,

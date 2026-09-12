@@ -11,7 +11,7 @@ import uuid
 from contextlib import closing
 from pathlib import Path
 
-from scripts.db_inventory import backup
+from database import backup, connect
 
 MIGRATIONS = Path(__file__).parent / 'migrations'
 
@@ -43,12 +43,27 @@ def statements(sql: str):
             raise ValueError('Migration has an unterminated SQL statement')
 
 
+def prepare_statement(connection: sqlite3.Connection, statement: str) -> str | None:
+    """Resolve an explicitly annotated additive column operation before execution."""
+    marker = '-- tueka: add-column-if-missing\n'
+    stripped = statement.lstrip()
+    if not stripped.startswith(marker):
+        return statement
+    sql = stripped[len(marker):].strip()
+    match = re.fullmatch(r'ALTER TABLE ([a-z_][a-z0-9_]*) ADD COLUMN ([a-z_][a-z0-9_]*)\s+(.+);', sql, flags=re.S)
+    if not match:
+        raise ValueError('add-column-if-missing requires one ALTER TABLE ADD COLUMN statement')
+    table, column = match.group(1, 2)
+    columns = {row[1] for row in connection.execute(f'PRAGMA table_info("{table}")')}
+    if not columns:
+        raise ValueError(f'Cannot add a column to missing table: {table}')
+    return None if column in columns else sql
+
+
 def apply(database: Path, backup_dir: Path, directory: Path = MIGRATIONS) -> dict:
     migrations = load(directory)
     database.parent.mkdir(parents=True, exist_ok=True)
-    with closing(sqlite3.connect(database, timeout=10, isolation_level=None)) as connection:
-        connection.execute('PRAGMA foreign_keys=ON')
-        connection.execute('PRAGMA busy_timeout=10000')
+    with closing(connect(database, create=True, autocommit=True, rows=False)) as connection:
         connection.execute('BEGIN IMMEDIATE')
         try:
             exists = connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").fetchone()
@@ -69,12 +84,15 @@ def apply(database: Path, backup_dir: Path, directory: Path = MIGRATIONS) -> dic
             def authorize(action, arg1, arg2, db_name, trigger):
                 return sqlite3.SQLITE_DENY if action in forbidden else sqlite3.SQLITE_OK
             for version, name, checksum, sql in pending:
-                connection.set_authorizer(authorize)
-                try:
-                    for statement in statements(sql):
+                for statement in statements(sql):
+                    statement = prepare_statement(connection, statement)
+                    if statement is None:
+                        continue
+                    connection.set_authorizer(authorize)
+                    try:
                         connection.execute(statement)
-                finally:
-                    connection.set_authorizer(None)
+                    finally:
+                        connection.set_authorizer(None)
                 connection.execute('INSERT INTO schema_migrations VALUES(?,?,?,?)', (version, name, checksum, int(time.time())))
             if connection.execute('PRAGMA foreign_key_check').fetchone() is not None:
                 raise ValueError('Foreign-key verification failed')

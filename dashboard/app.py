@@ -1,3 +1,4 @@
+from dashboard.repository import DashboardRepository
 """FastAPI dashboard entry point. Run with: uvicorn dashboard.app:app"""
 import os
 import json
@@ -36,6 +37,7 @@ if not all((client_id, client_secret, redirect_uri, session_secret)):
     raise RuntimeError("Dashboard OAuth settings are missing. Configure .env from .env.example.")
 
 storage = GuildStorage(settings.database_path)
+dashboard_repository = DashboardRepository(settings.database_path)
 api = DiscordAPI(settings.discord_token, client_id, client_secret, redirect_uri)
 social_cipher = SocialTokenCipher(settings.social_token_encryption_key)
 
@@ -154,7 +156,7 @@ def render_page(request: Request, name: str, context: dict, status_code: int = 2
 
 def session_token(request: Request) -> str:
     session_id = request.session.get("session_id")
-    token = storage.dashboard_session_token(session_id) if session_id else None
+    token = dashboard_repository.dashboard_session_token(session_id) if session_id else None
     if not token:
         raise HTTPException(status_code=401, detail="ログインが必要です")
     return token
@@ -194,21 +196,21 @@ async def home(request: Request):
 
 def session_token_or_none(request: Request) -> str | None:
     session_id = request.session.get("session_id")
-    return storage.dashboard_session_token(session_id) if session_id else None
+    return dashboard_repository.dashboard_session_token(session_id) if session_id else None
 
 
 @app.get("/login")
 async def login(request: Request):
     state = secrets.token_urlsafe(32)
     request.session.clear()
-    storage.create_oauth_state(state)
+    dashboard_repository.create_oauth_state(state)
     params = urlencode({"client_id": client_id, "redirect_uri": redirect_uri, "response_type": "code", "scope": "identify guilds", "state": state})
     return RedirectResponse(f"https://discord.com/oauth2/authorize?{params}", status_code=303)
 
 
 @app.get("/oauth/callback")
 async def oauth_callback(request: Request, code: str | None = None, state: str | None = None):
-    if not code or not state or not storage.consume_oauth_state(state):
+    if not code or not state or not dashboard_repository.consume_oauth_state(state):
         raise HTTPException(status_code=400, detail="OAuth state が無効です")
     try:
         token_data = await api.exchange_code(code)
@@ -216,7 +218,7 @@ async def oauth_callback(request: Request, code: str | None = None, state: str |
         raise HTTPException(status_code=401, detail="Discordログインに失敗しました") from exc
     request.session.clear()
     session_id = secrets.token_urlsafe(32)
-    storage.create_dashboard_session(session_id, token_data["access_token"], int(token_data.get("expires_in", 604800)))
+    dashboard_repository.create_dashboard_session(session_id, token_data["access_token"], int(token_data.get("expires_in", 604800)))
     request.session["session_id"] = session_id
     request.session["csrf_token"] = secrets.token_urlsafe(32)
     return RedirectResponse("/servers", status_code=303)
@@ -226,7 +228,7 @@ async def oauth_callback(request: Request, code: str | None = None, state: str |
 async def logout(request: Request):
     session_id = request.session.get("session_id")
     if session_id:
-        storage.delete_dashboard_session(session_id)
+        dashboard_repository.delete_dashboard_session(session_id)
     request.session.clear()
     return RedirectResponse("/", status_code=303)
 

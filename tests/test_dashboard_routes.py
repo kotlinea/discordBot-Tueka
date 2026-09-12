@@ -1,3 +1,4 @@
+from db_support import prepare_database
 import importlib.util
 import os
 import tempfile
@@ -17,7 +18,7 @@ class DashboardRouteTests(unittest.TestCase):
         root = Path(self.temp.name)
         env = {'DISCORD_TOKEN': 'test-token', 'DISCORD_CLIENT_ID': '1', 'DISCORD_CLIENT_SECRET': 'test-secret',
                'DISCORD_REDIRECT_URI': 'http://testserver/oauth/callback', 'SESSION_SECRET': 'test-session-secret',
-               'DASHBOARD_HTTPS_ONLY': 'false', 'DATABASE_PATH': str(root / 'test.db'), 'DATA_DIR': str(root),
+               'DASHBOARD_HTTPS_ONLY': 'false', 'DATABASE_PATH': str(prepare_database(root / 'test.db')), 'DATA_DIR': str(root),
                'DASHBOARD_UI_V2': 'false', 'DASHBOARD_UI_V2_GUILDS': '999',
                'TICKETS_V2': 'false', 'TICKETS_V2_GUILDS': 'retired-allowlist'}
         with patch.dict(os.environ, env):
@@ -114,7 +115,7 @@ class DashboardRouteTests(unittest.TestCase):
 
     def test_ticket_staff_guild_visibility_without_allowlist(self):
         from ticketing import TicketRepository
-        repository = TicketRepository(self.module.settings.database_path)
+        repository = TicketRepository(prepare_database(self.module.settings.database_path))
         repository.save_team(1, {'name': 'Staff', 'user_ids': [2]})
         self.login()
         self.module.api.user_guilds = AsyncMock(return_value=[{'id': '1', 'name': 'Support', 'permissions': '0'}, {'id': '3', 'name': 'Other', 'permissions': '0'}])

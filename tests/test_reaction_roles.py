@@ -1,3 +1,4 @@
+from db_support import prepare_database
 import tempfile
 import time
 import unittest
@@ -81,7 +82,7 @@ class ReactionRoleModelTests(unittest.TestCase):
 class ReactionRoleRepositoryTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.repo = ReactionRoleRepository(Path(self.temp.name) / "rr.sqlite3")
+        self.repo = ReactionRoleRepository(prepare_database(Path(self.temp.name) / "rr.sqlite3"))
         self.service = ReactionRoleService(self.repo)
 
     def tearDown(self):
@@ -250,7 +251,7 @@ class ReactionRoleCogTests(unittest.IsolatedAsyncioTestCase):
     async def test_command_groups_load_without_discord_connection(self):
         with tempfile.TemporaryDirectory() as directory:
             bot = commands.Bot(command_prefix="/", intents=discord.Intents.none())
-            bot.settings = SimpleNamespace(database_path=Path(directory) / "rr.sqlite3", reaction_role_max_mappings_per_message=20)
+            bot.settings = SimpleNamespace(database_path=prepare_database(Path(directory) / "rr.sqlite3"), reaction_role_max_mappings_per_message=20)
             async with bot:
                 await bot.load_extension("cogs.reaction_roles")
                 root = bot.tree.get_command("reactionrole")

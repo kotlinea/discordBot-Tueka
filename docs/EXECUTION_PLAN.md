@@ -2,16 +2,18 @@
 
 策定日：2026-09-10。方針と実施順序の正本は [ROADMAP.md](../ROADMAP.md)。本書は、その方針を現在のコードに対応付けた作業計画であり、新しい公開仕様ではない。
 
-## 現在地と次の実行順序（2026-09-12確認）
+## 現在地と次の実行順序（2026-09-13確認）
 
 以下の初回調査表は策定時点の記録である。P0-1〜P0-4、P1-0〜P1-5のローカル実装・検証結果は `PROGRESS0910.md` に保存した。P1-5ではJSON移行・共有設定Fallback・Social旧変換・一時文書を整理し、0005/0006とWindows/Linux全192件の回帰、Frontend/Docs build、Vitest/Playwrightを検証した。実Guild、遠隔本番DB、Stageのリリース判定は未完了であり、ローカル実装完了と区別する。
 
-次の開発単位は **P2-1：共通DB接続と明示Migrationへの統一**。
+P2-1はローカル実装・検証を完了した。`database.py` に接続・Transaction・WAL・Backup・Schema履歴検査を集約し、0007に現行Schemaと39件の条件付き列追加を移した。全RepositoryのコンストラクタDDLを除去し、Bot / Dashboard / Workerは未適用Schemaで起動を拒否する。Windows/Linux各200件とDocs build、保全DB複製の保持検証を完了している。
 
-1. `storage.py` とTicket / Reaction Roles / Suggestionsの接続・コンストラクタDDL・ALTER・起動時データ更新を一覧化する。空DBの最終Schemaと既存V2 Schemaを比較し、制約・Index・既定値・保持データを移設対象へ含める。
-2. 共通接続、Transaction、WAL、busy timeout、Backup、適用履歴検査を整備する。後続番号のMigrationで不足する現行Schemaを作成し、既存の0001〜0006は改変しない。
-3. 各RuntimeのDDLを除去し、未適用Schemaでは明確に起動失敗させる。新規導入・直前版更新・再適用・Rollback・Bot/Dashboard/Worker再起動を検証する。テストFixtureも明示Migrationで準備する方式へ揃える。
-4. P2-1の受入後にP2-2のDomain別Repository分割へ進む。ServiceやAPIの大規模分割を同じ単位に混ぜず、公開動作を維持する。
+次の開発単位は **P2-2：Domain別Repositoryの分離**。
+
+1. DashboardのSession・OAuth state・Preferences・Guild設定の読書きと呼出し先を一覧化する。まず認証/個人設定の保存を分離し、設定のDomain固有正規化との境界を明確にする。
+2. Community→Engagement→Social→Moderationの順を依存表で確認し、DomainごとにSQLをRepositoryへ移す。全体の一括移動を避け、各単位で現行API/Cog/Workerの契約を維持する。
+3. 既存Ticket Serviceの直接SQLもRepositoryへ移す。接続はP2-1の共通層を使い、新たなSchema変更が必要なら0008以降へ追加する。0001〜0007は改変しない。
+4. 保存・再読込、Guild境界、Session期限、認可、revision、無効化、Outbox/期限処理の既存テストと必要なContract testを実行する。API Routerの大規模分割やUI変更はP2-5/6で行う。
 
 各単位はコード・Migration・テスト・正式Docs・進捗記録までを一つのレビュー対象とする。遠隔本番DBのSnapshot/Inventory、StageでのDiscord・OAuth・Webhook実動は既存記録でも未検証であり、ローカル成功だけでリリース済みとは扱わない。Phase 2以降の実施方針・受入条件は後述を維持し、詳細な対象ファイルはPhase 1終了時に再確定する。
 
@@ -124,7 +126,7 @@ ROADMAPの順序を維持する。各機能をDBだけ・画面だけで公開�
 - SQLite競合、Outbox滞留、Worker停止、Discord側成功後のDB失敗を重点監視する。特にRetryは「最大回数」だけでなく冪等性と補償を検証する。
 - 本番DB InventoryとStage検証には、運用環境・テストGuild・OAuth/Provider設定へのアクセスが必要。アクセスがない期間も、コードInventory、Fixture、コンテナ、Contract testの整備は進められる。
 
-直近の着手はP2-1。P0-1〜P1-5のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
+直近の着手はP2-2。P0-1〜P2-1のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
 
 ## 8. 再調査に基づく具体的な実行単位（2026-09-12）
 

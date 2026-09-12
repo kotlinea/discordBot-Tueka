@@ -7,10 +7,12 @@ from discord import app_commands
 from discord.ext import commands
 
 from config import Settings
+from database import require_current
 
 
 class TuekaBot(commands.Bot):
     def __init__(self, settings: Settings) -> None:
+        require_current(settings.database_path)
         intents = discord.Intents.default()
         intents.members = True
         intents.message_content = True

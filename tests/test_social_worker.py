@@ -1,9 +1,11 @@
+from db_support import prepare_database
 import tempfile
 import time
 import unittest
 import hashlib
 import hmac
 import sqlite3
+from contextlib import closing
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from datetime import datetime, timedelta, timezone
@@ -224,7 +226,7 @@ class YouTubeAdapterTests(unittest.IsolatedAsyncioTestCase):
 class SocialStorageV2Tests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.storage = GuildStorage(Path(self.temp.name) / "test.sqlite3")
+        self.storage = GuildStorage(prepare_database(Path(self.temp.name) / "test.sqlite3"))
 
     def tearDown(self):
         self.temp.cleanup()
@@ -283,15 +285,14 @@ class SocialStorageV2Tests(unittest.TestCase):
             connection.commit()
         finally:
             connection.close()
-        migrated = GuildStorage(path)
-        item = migrated.social_subscription(1)
-        self.assertEqual(item["events"], ["live"])
-        self.assertIsNone(item["target_id"])
-        self.assertEqual(item["templates"], {})
-        self.assertFalse(migrated.module_enabled(1, "twitch_updates"))
-        self.assertEqual(migrated.matching_social_subscriptions("twitch", "Creator", "live"), [])
-        GuildStorage(path)
-        self.assertEqual(len(migrated.social_targets("twitch")), 0)
+        from database import SchemaNotReady
+        with self.assertRaises(SchemaNotReady):
+            GuildStorage(path)
+        with closing(sqlite3.connect(path)) as connection:
+            self.assertEqual(connection.execute('SELECT events_json FROM social_subscriptions').fetchone()[0], '["live"]')
+            self.assertNotIn('target_id', {row[1] for row in connection.execute('PRAGMA table_info(social_subscriptions)')})
+            self.assertIsNone(connection.execute("SELECT name FROM sqlite_master WHERE name='social_targets'").fetchone())
+
 
 
 if __name__ == "__main__":

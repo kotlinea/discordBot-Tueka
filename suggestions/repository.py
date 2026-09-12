@@ -4,79 +4,18 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from database import require_current, transaction
+from typing import Any
 
 
 class SuggestionRepository:
-    def __init__(self, database_path: Path) -> None:
+    def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        self.initialize()
+        require_current(self.database_path)
 
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.database_path, timeout=10)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA journal_mode=WAL")
-        connection.execute("PRAGMA foreign_keys=ON")
-        return connection
-
-    @contextmanager
-    def _connection(self) -> Iterator[sqlite3.Connection]:
-        connection = self._connect()
-        try:
-            yield connection
-            connection.commit()
-        except Exception:
-            connection.rollback()
-            raise
-        finally:
-            connection.close()
-
-    def initialize(self) -> None:
-        with self._connection() as connection:
-            connection.executescript("""
-                CREATE TABLE IF NOT EXISTS suggestions (
-                    id INTEGER PRIMARY KEY,
-                    guild_id INTEGER NOT NULL,
-                    channel_id INTEGER NOT NULL,
-                    message_id INTEGER,
-                    author_id INTEGER NOT NULL,
-                    answers_json TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'pending',
-                    reviewer_id INTEGER,
-                    reviewed_at INTEGER,
-                    created_at INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL,
-                    revision INTEGER NOT NULL DEFAULT 1
-                );
-                CREATE INDEX IF NOT EXISTS idx_suggestions_guild_created
-                    ON suggestions(guild_id, created_at DESC);
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_suggestions_message
-                    ON suggestions(guild_id, message_id) WHERE message_id IS NOT NULL;
-                CREATE TABLE IF NOT EXISTS suggestion_votes (
-                    suggestion_id INTEGER NOT NULL,
-                    user_id INTEGER NOT NULL,
-                    value INTEGER NOT NULL CHECK(value IN (-1, 1)),
-                    created_at INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL,
-                    PRIMARY KEY(suggestion_id, user_id),
-                    FOREIGN KEY(suggestion_id) REFERENCES suggestions(id) ON DELETE CASCADE
-                );
-                CREATE TABLE IF NOT EXISTS suggestion_events (
-                    id INTEGER PRIMARY KEY,
-                    suggestion_id INTEGER NOT NULL,
-                    guild_id INTEGER NOT NULL,
-                    actor_id INTEGER NOT NULL,
-                    event_type TEXT NOT NULL,
-                    detail_json TEXT NOT NULL DEFAULT '{}',
-                    created_at INTEGER NOT NULL,
-                    FOREIGN KEY(suggestion_id) REFERENCES suggestions(id) ON DELETE CASCADE
-                );
-                CREATE INDEX IF NOT EXISTS idx_suggestion_events_guild_created
-                    ON suggestion_events(guild_id, created_at DESC);
-            """)
+    def _connection(self):
+        return transaction(self.database_path)
 
     @staticmethod
     def _item(row: sqlite3.Row, *, upvotes: int = 0, downvotes: int = 0) -> dict[str, Any]:

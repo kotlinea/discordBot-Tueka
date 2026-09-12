@@ -4,111 +4,18 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from database import require_current, transaction
+from typing import Any
 
 
 class ReactionRoleRepository:
-    def __init__(self, database_path: Path) -> None:
+    def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        self.initialize()
+        require_current(self.database_path)
 
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.database_path, timeout=10)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA journal_mode=WAL")
-        connection.execute("PRAGMA foreign_keys=ON")
-        return connection
-
-    @contextmanager
-    def connection(self) -> Iterator[sqlite3.Connection]:
-        connection = self._connect()
-        try:
-            yield connection
-            connection.commit()
-        except Exception:
-            connection.rollback()
-            raise
-        finally:
-            connection.close()
-
-    def initialize(self) -> None:
-        with self.connection() as c:
-            c.executescript("""
-            CREATE TABLE IF NOT EXISTS reaction_role_settings (
-                guild_id INTEGER PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
-                log_channel_id INTEGER, denial_dm INTEGER NOT NULL DEFAULT 1 CHECK(denial_dm IN (0,1)),
-                denial_dm_cooldown_seconds INTEGER NOT NULL DEFAULT 300, audit_retention_days INTEGER NOT NULL DEFAULT 90,
-                revision INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS reaction_role_link_groups (
-                id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, name TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1,
-                created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS reaction_role_messages_v2 (
-                id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, channel_id INTEGER NOT NULL, message_id INTEGER,
-                name TEXT NOT NULL, source TEXT NOT NULL CHECK(source IN ('bot','external')),
-                behavior_type TEXT NOT NULL, locked INTEGER NOT NULL DEFAULT 0 CHECK(locked IN (0,1)),
-                access_policy TEXT NOT NULL DEFAULT 'blacklist' CHECK(access_policy IN ('whitelist','blacklist')),
-                selection_limit INTEGER, temp_duration_seconds INTEGER, self_destruct_at INTEGER,
-                embed_json TEXT NOT NULL DEFAULT '{}', link_group_id INTEGER, enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)),
-                status TEXT NOT NULL DEFAULT 'pending', last_error TEXT, revision INTEGER NOT NULL DEFAULT 1,
-                created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
-                UNIQUE(guild_id,message_id), FOREIGN KEY(link_group_id) REFERENCES reaction_role_link_groups(id) ON DELETE SET NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_rr_messages_guild ON reaction_role_messages_v2(guild_id,enabled,id);
-            CREATE TABLE IF NOT EXISTS reaction_role_mappings_v2 (
-                id INTEGER PRIMARY KEY, message_config_id INTEGER NOT NULL, emoji_key TEXT NOT NULL, emoji_display TEXT NOT NULL,
-                emoji_id INTEGER, emoji_name TEXT, animated INTEGER NOT NULL DEFAULT 0, role_id INTEGER NOT NULL,
-                max_members INTEGER, position INTEGER NOT NULL, UNIQUE(message_config_id,emoji_key),
-                UNIQUE(message_config_id,role_id), FOREIGN KEY(message_config_id) REFERENCES reaction_role_messages_v2(id) ON DELETE CASCADE
-            );
-            CREATE TABLE IF NOT EXISTS reaction_role_access_roles (
-                message_config_id INTEGER NOT NULL, role_id INTEGER NOT NULL, policy TEXT NOT NULL CHECK(policy IN ('whitelist','blacklist')),
-                PRIMARY KEY(message_config_id,role_id), FOREIGN KEY(message_config_id) REFERENCES reaction_role_messages_v2(id) ON DELETE CASCADE
-            );
-            CREATE TABLE IF NOT EXISTS reaction_role_binding_receipts (
-                message_config_id INTEGER NOT NULL, user_id INTEGER NOT NULL, mapping_id INTEGER NOT NULL, created_at INTEGER NOT NULL,
-                PRIMARY KEY(message_config_id,user_id), FOREIGN KEY(message_config_id) REFERENCES reaction_role_messages_v2(id) ON DELETE CASCADE,
-                FOREIGN KEY(mapping_id) REFERENCES reaction_role_mappings_v2(id) ON DELETE CASCADE
-            );
-            CREATE TABLE IF NOT EXISTS reaction_role_assignments (
-                message_config_id INTEGER NOT NULL, mapping_id INTEGER NOT NULL, user_id INTEGER NOT NULL, role_id INTEGER NOT NULL,
-                state TEXT NOT NULL DEFAULT 'active', expires_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
-                PRIMARY KEY(message_config_id,mapping_id,user_id), FOREIGN KEY(message_config_id) REFERENCES reaction_role_messages_v2(id) ON DELETE CASCADE,
-                FOREIGN KEY(mapping_id) REFERENCES reaction_role_mappings_v2(id) ON DELETE CASCADE
-            );
-            CREATE INDEX IF NOT EXISTS idx_rr_assignments_due ON reaction_role_assignments(state,expires_at);
-            CREATE TABLE IF NOT EXISTS reaction_role_schedules (
-                id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, message_config_id INTEGER, mapping_id INTEGER, user_id INTEGER,
-                kind TEXT NOT NULL, due_at INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'pending', lease_owner TEXT, lease_until INTEGER,
-                attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT, created_at INTEGER NOT NULL,
-                UNIQUE(kind,message_config_id,mapping_id,user_id,due_at)
-            );
-            CREATE INDEX IF NOT EXISTS idx_rr_schedules_due ON reaction_role_schedules(state,due_at,lease_until);
-            CREATE TABLE IF NOT EXISTS reaction_role_outbox (
-                id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, message_config_id INTEGER, action TEXT NOT NULL,
-                payload_json TEXT NOT NULL DEFAULT '{}', state TEXT NOT NULL DEFAULT 'pending', lease_owner TEXT, lease_until INTEGER,
-                attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at INTEGER NOT NULL DEFAULT 0, last_error TEXT, created_at INTEGER NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_rr_outbox_due ON reaction_role_outbox(state,next_attempt_at,lease_until);
-            CREATE TABLE IF NOT EXISTS reaction_role_events (
-                id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, message_config_id INTEGER, user_id INTEGER, actor_id INTEGER,
-                emoji_key TEXT, role_id INTEGER, event_type TEXT NOT NULL, result TEXT NOT NULL, reason TEXT,
-                details_json TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_rr_events_guild ON reaction_role_events(guild_id,created_at DESC);
-            CREATE INDEX IF NOT EXISTS idx_rr_events_expiry ON reaction_role_events(expires_at);
-            CREATE TABLE IF NOT EXISTS reaction_role_recovery (
-                guild_id INTEGER NOT NULL, deleted_message_id INTEGER NOT NULL, snapshot_json TEXT NOT NULL,
-                created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, PRIMARY KEY(guild_id,deleted_message_id)
-            );
-            """)
-            columns={row["name"] for row in c.execute("PRAGMA table_info(reaction_role_messages_v2)").fetchall()}
-            if "access_policy" not in columns:
-                c.execute("ALTER TABLE reaction_role_messages_v2 ADD COLUMN access_policy TEXT NOT NULL DEFAULT 'blacklist'")
+    def connection(self):
+        return transaction(self.database_path)
 
     def settings(self, guild_id: int) -> dict[str, Any]:
         with self.connection() as c:
