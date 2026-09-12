@@ -216,3 +216,34 @@
 - レビューでRuntimeから旧Rule/Event/移行判定/CSV参照がなく、旧列のDDL再作成もないことを確認。`git diff --check` 成功。作業途中にP1-3がCommit `5f3f139` へ取り込まれたことを確認し、既存変更を巻き戻していない。
 - 判定：P1-4の実装・ローカルテスト・レビューを完了。StageでのDiscord実処置/期限付き解除・遠隔DB適用は未実施。Phase 1全体は未完了。
 - 次はP1-5：JSON移行不要を現在のInventoryで確定し、`migrate_json.py` / `migrated` / JSON移行済み判定を除去。残存V1設定Fallback・Schema・一時文書を点検し、必要情報を正式Docsへ移管して起動/更新/復旧を番号付きCLIへ統一する。Bot/Dashboard/Worker再初期化後の旧構造非復活とPhase 1の全体出口条件を検証する。
+
+## 2026-09-12 — P1-5 JSON・共有設定・一時文書の整理（継続中）
+
+- 実行計画を現在のコードと進捗へ照合し、古い「P0-1から着手」を修正。P2以降の依存と受入条件を作業単位に分けた。P1-4までの完了記録を保持し、Commit/Stage/Resetは行っていない。
+- ローカル `data` 直下のJSONは0件。`migrate_json.py`、GuildStorageのJSON Import・移行済み判定を削除。JSONファイルを置いてもXPへ取り込まないことをテストした。遠隔本番のJSON有無は未確認。
+- `0005_remove_shared_settings_fallback.sql` を追加。V2が現在参照するWelcome / Autorole / Leveling / Audit設定の実効値を `guild_modules` に固定してから `guild_settings` を削除する。`app_metadata` 自体は保持し、JSON移行マーカーだけを削除する。
+- GuildStorageの共有設定CRUD・get/setラッパー・読込時Fallbackを削除。`set_management` の共有設定への二重書込みを除去。明示null、既存設定、有効状態、revisionを維持し、未保存の候補は無効・revision 0で保存する。既存Auditのカテゴリ未指定によるメッセージログはMigrationで明示値に変換し、新規設定はカテゴリの明示選択を必要とする。
+- 新規Migrationテストで設定・XP・他Metadata保持、直前0004からの更新、再適用、Snapshot、途中失敗時の全Dump一致、再初期化、空DBを検証。新規テーブルのenabled制約も確認した。既存のMigrationテストは0005を含む適用順と後続失敗SQL番号へ更新した。
+- `test_v2_startup.py` はBotの全16 ExtensionとCommand登録、Dashboard lifespan、SocialWorker初期化を同一DBで2回実行し、旧表/旧列の非復活とSchema不変を確認する。DiscordのCommand同期だけをMockし、実Discord接続・Provider通信・配送Loopの実動を証明するものではない。
+- 初回の指定モジュール実行でReaction Rolesテストの既存import方式が失敗したため、CIと同じ `unittest discover -s tests` で全体を実行した。最終Windows Python 3.13は189件成功・18.119秒。ログ `.venv-p0/p1-cleanup-windows-final.log`。
+- 保全DBの複製 `data/backups/p1-cleanup-0912/fixture.sqlite3` に0005を適用し、変更前実装と比較した16組の機能設定の実効値、保持62表81行、他Metadataが一致。制約調整後の最終SQLは原保全DBから別途作った `final.sqlite3` に適用し、検証済み候補との全データ一致、integrity成功、FK違反0、再適用なしを確認した。初期候補は最終SQLとchecksumが異なるため、以後の継続検証には `final.sqlite3` を使用する。原DB・前段の保全DBは変更していない。
+- `PROGRESS0814.md` / `DEPLOYMENT_TODO.md` / `FEATURE_MODULE_GUIDE.md` / `TICKETS_V2.md` を削除。現行の操作・復旧説明は正式Docsに保持し、実環境確認はLinux運用ページへ移管した。VitePressの旧文書除外指定・文書テストの旧例外を除去。README、日英導入、Linux、更新、復元を番号付きCLIへ揃え、導入はPython Lockとnpm ciへ統一した。
+- Frontend型検査/build成功（Vite 4.11秒）、Vitest10件成功（3.96秒）。ログ `.venv-p0/p1-cleanup-frontend-build.log` / `p1-cleanup-vitest.log`。Frontendソース変更はない。`git diff --check` 成功。
+- Linuxコンテナ全PythonテストとDocs buildは、自動承認レビューが使用量上限で失敗して起動されなかった。許可済みFrontend検証はsession 29658から完了結果を回収した。拒否された操作を別経路で迂回していない。再実行の承認をユーザーへ依頼した。Dashboard/Docs Playwrightも本単位では未実行。
+- 残存調査で `storage.initialize` のSocial旧購読→Target/Template変換、Provider Moduleの自動作成、未使用の旧 `save_social_subscription` とEventラッパーを確認。`tests/test_social_worker.py` の旧購読自動移行成功テストも残る。YouTubeの旧Custom URL解決は外部URL仕様への対応であり、V1アプリ互換とは区別する。Reaction Rolesの不足設定行補完は既存V2メッセージの修復として前段で保持したもの。
+- 次の作業：Socialの現行V2データ・読書き経路をInventoryし、旧購読変換と旧APIラッパーを除去する。必要なSchema処理は番号付きMigrationと同じ単位で扱い、現行購読・Target・Cursor・配送・期限処理を保持する。その後、Linux全Python・Docs build・Dashboard/Docs Playwrightを実行し、P1-5/Phase 1の出口を再判定する。コンストラクタDDL全体の明示CLI移設はP2-1で行う。
+- 判定：P1-5は未完了。StageでのDiscord/OAuth/Webhook・遠隔本番DB適用も未実施。Phase 2へはまだ進めていない。現在確認できたテストの成功をPhase 1全体の完成やリリース済みとは扱わない。
+
+## 2026-09-12 — P1-5完了・Phase 1ローカル検証の引継ぎ
+
+- 上記P1-5の継続作業を実施。ユーザーから上限解消後の再実行承認を受け、使用量状態で上限到達なしを確認し、LinuxテストとDocs buildを通常の承認経路で再実行した。最初の拒否は解消済みで、現在実行待ちのプロセスはない。
+- Socialの旧購読からTarget/Templateへの起動時変換、Provider Module自動作成、未使用の旧保存/Event書込みを削除。Cogの旧liveイベントへのFallbackと旧live専用分岐も削除した。現行Module設定の明示的な無効状態を起動時に変更しない。
+- `0006_remove_legacy_social_template.sql` は購読表を現行列で再作成し、旧単一template列だけを除去する。現行イベント別Template、ID・有効状態・revision・Target/Cursor・Event・配送・Live Messageを保持する。共有表の旧行は他列の値を保持するがTargetを自動生成せず、配送には現行TargetとのJOINを必須にした。純V1 Schemaの自動Importは提供しない。
+- Social Migrationテストで直前0005、V2専用/混在Fixture、保持全行一致、再初期化、再適用、Snapshot、後続0007失敗による全DumpのRollbackを検証。旧自動移行成功テストは旧行を変換/有効化せず配送しない検証へ変更した。
+- Discord配送テストを追加。旧live購読へlive_startをFallback配送せず、現行live_startは1回送信、live_endは保存済みMessageを編集して追跡を解除することをMockのDiscord Channelで確認した。実Guildの権限・HTTP挙動の検証を代替するものではない。
+- 保全DB `data/backups/p1-cleanup-0912/final.sqlite3` を `data/backups/p1-social-0912/final.sqlite3` に複製して0006を適用。保持64テーブル97行の全保持列一致、Runtime再初期化2回後も一致、integrity成功・FK違反0・再適用なし。原DB・前段Snapshotは変更していない。今後の継続検証はこの0006適用済み保全Fixtureを基準にできる。
+- 最終全Pythonテスト：Windows Python 3.13で192件成功・30.187秒、固定Linux Python 3.13コンテナで192件成功・38.944秒。ログ `.venv-p0/p1-final-windows.log` / `p1-final-linux.log`。全ExtensionとDashboard/Workerの再初期化では旧Social template列の非復活も確認した。
+- Frontend型検査/build成功（4.11秒）、Vitest10件成功（3.96秒）、Dashboard Playwright32件成功（46.2秒）、Docs Playwright10件成功（17.7秒）。最後のSocial Runtime変更はPython全回帰で検証し、Frontendソースは変更していない。Social説明追加後の最終Docs build成功（9.59秒）、ログ `.venv-p0/p1-final-docs.log`。Docs E2Eは共通ページ/検索/長文の回帰で、全運用ページの実操作検証ではない。
+- Runtimeの残存参照を点検。Reaction RolesのLink互換性表示とYouTubeの過去URL形式対応はV1アプリ互換ではない。既存V2 Reaction Rolesメッセージから不足設定を補う修復は前段の方針どおり保持する。現行SchemaのコンストラクタDDL/ALTERは残り、P2-1の対象とする。最後の変更は説明コメント・Docs・進捗のみで、`git diff --check` 成功。
+- 判定：P1-5のローカル実装・Migration・検証・正式Docs・レビューを完了。Phase 1のローカル開発出口を満たした。Stageの実Discord/OAuth/Webhook、遠隔DB適用、実Transcript/S3復元は未実施であり、リリース承認・本番移行完了とは扱わない。Goal全体はPhase 2〜5を含めて継続中。
+- 次はP2-1：全Repositoryの接続/DDL/ALTER/起動時更新を棚卸しし、共通DB層と後続Migrationへ移す。既存0001〜0006を改変せず、空DB・現在のV2 Schema・直前版更新を検証する。Runtimeは未適用Schemaで明確に失敗させ、テストFixtureも明示Migrationへ切り替える。P2-2のDomain分割はこの受入後に進める。Commit/Stage/Resetは行っていない。

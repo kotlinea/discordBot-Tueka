@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 from template_defaults import TEMPLATE_DEFAULTS
-from social_models import default_templates
 from suggestions import normalize_settings as normalize_suggestion_settings
 
 
@@ -39,12 +38,6 @@ class GuildStorage:
     def initialize(self) -> None:
         with self._connection() as connection:
             connection.executescript("""
-                CREATE TABLE IF NOT EXISTS guild_settings (
-                    guild_id INTEGER PRIMARY KEY,
-                    management_channel_id INTEGER,
-                    welcome_channel_id INTEGER,
-                    default_role_id INTEGER
-                );
                 CREATE TABLE IF NOT EXISTS guild_users (
                     guild_id INTEGER NOT NULL,
                     user_id INTEGER NOT NULL,
@@ -92,7 +85,7 @@ class GuildStorage:
                 CREATE TABLE IF NOT EXISTS polls (message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, channel_id INTEGER NOT NULL, creator_id INTEGER NOT NULL, question TEXT NOT NULL, options_json TEXT NOT NULL, image_url TEXT, closes_at INTEGER, status TEXT NOT NULL DEFAULT 'open', created_at INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS poll_votes (message_id INTEGER NOT NULL, user_id INTEGER NOT NULL, option_index INTEGER NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (message_id,user_id), FOREIGN KEY(message_id) REFERENCES polls(message_id) ON DELETE CASCADE);
                 CREATE TABLE IF NOT EXISTS trust_events (id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, user_id INTEGER NOT NULL, category TEXT NOT NULL, weight INTEGER NOT NULL, reason TEXT, created_at INTEGER NOT NULL);
-                CREATE TABLE IF NOT EXISTS social_subscriptions (id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, provider TEXT NOT NULL, account_id TEXT NOT NULL, account_name TEXT NOT NULL, channel_id INTEGER NOT NULL, role_id INTEGER, template TEXT NOT NULL DEFAULT '', events_json TEXT NOT NULL DEFAULT '[]', enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(guild_id, provider, account_id));
+                CREATE TABLE IF NOT EXISTS social_subscriptions (id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, provider TEXT NOT NULL, account_id TEXT NOT NULL, account_name TEXT NOT NULL, channel_id INTEGER NOT NULL, role_id INTEGER, events_json TEXT NOT NULL DEFAULT '[]', enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, target_id INTEGER, event_channels_json TEXT NOT NULL DEFAULT '{}', templates_json TEXT NOT NULL DEFAULT '{}', status TEXT NOT NULL DEFAULT 'pending', last_error TEXT, revision INTEGER NOT NULL DEFAULT 1, UNIQUE(guild_id, provider, account_id));
                 CREATE TABLE IF NOT EXISTS social_connections (id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, provider TEXT NOT NULL, account_id TEXT NOT NULL, account_name TEXT NOT NULL, access_token_encrypted TEXT NOT NULL, refresh_token_encrypted TEXT, expires_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(guild_id, provider, account_id));
                 CREATE TABLE IF NOT EXISTS social_oauth_states (state TEXT PRIMARY KEY, guild_id INTEGER NOT NULL, provider TEXT NOT NULL, expires_at INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS social_events (id INTEGER PRIMARY KEY, provider TEXT NOT NULL, event_key TEXT NOT NULL UNIQUE, account_id TEXT NOT NULL, payload_json TEXT NOT NULL, received_at INTEGER NOT NULL, processed_at INTEGER);
@@ -254,11 +247,6 @@ class GuildStorage:
                 );
                 CREATE INDEX IF NOT EXISTS idx_moderation_action_requests_pending ON moderation_action_requests(status,created_at);
             """)
-            # Split the original all-in-one social card without dropping any
-            # existing subscription or its enabled state.
-            for row in connection.execute("SELECT DISTINCT guild_id, provider FROM social_subscriptions").fetchall():
-                module_id = f"{row['provider']}_updates"
-                connection.execute("INSERT OR IGNORE INTO guild_modules(guild_id,module_id,enabled,settings_json) VALUES(?,?,1,'{}')", (row["guild_id"], module_id))
             poll_columns = {row["name"] for row in connection.execute("PRAGMA table_info(polls)").fetchall()}
             if poll_columns and "image_url" not in poll_columns:
                 connection.execute("ALTER TABLE polls ADD COLUMN image_url TEXT")
@@ -312,51 +300,6 @@ class GuildStorage:
             }.items():
                 if name not in delivery_columns:
                     connection.execute(f"ALTER TABLE social_deliveries ADD COLUMN {name} {definition}")
-            now = int(time.time())
-            for row in connection.execute("SELECT id,provider,account_id,account_name,target_id FROM social_subscriptions").fetchall():
-                if row["target_id"] is not None:
-                    continue
-                raw_account = str(row["account_id"]).strip().lstrip("@")
-                account_key = raw_account if row["provider"] == "youtube" and raw_account.startswith("UC") else raw_account.lower()
-                connection.execute("""INSERT INTO social_targets(provider,account_key,external_id,handle,display_name,status,next_check_at,created_at,updated_at)
-                    VALUES(?,?,?,?,?,'pending',0,?,?) ON CONFLICT(provider,account_key) DO NOTHING""",
-                    (row["provider"], account_key, row["account_id"], account_key, row["account_name"], now, now))
-                target = connection.execute("SELECT id FROM social_targets WHERE provider=? AND account_key=?", (row["provider"], account_key)).fetchone()
-                connection.execute("UPDATE social_subscriptions SET target_id=? WHERE id=?", (target["id"], row["id"]))
-            for row in connection.execute("SELECT id,provider,template,events_json,templates_json FROM social_subscriptions").fetchall():
-                events = json.loads(row["events_json"])
-                if row["provider"] == "twitch" and "live" in events:
-                    events = ["live_start", "live_end"]
-                if not json.loads(row["templates_json"] or "{}"):
-                    templates = default_templates(row["provider"], events)
-                    if row["template"]:
-                        for template in templates.values():
-                            template["description"] = row["template"]
-                    connection.execute("UPDATE social_subscriptions SET events_json=?,templates_json=?,status='pending' WHERE id=?",
-                                       (json.dumps(events), json.dumps(templates, ensure_ascii=False), row["id"]))
-
-    def get_settings(self, guild_id: int) -> dict[str, int | None]:
-        with self._connection() as connection:
-            row = connection.execute("SELECT * FROM guild_settings WHERE guild_id = ?", (guild_id,)).fetchone()
-        keys = ("management_channel_id", "welcome_channel_id", "default_role_id")
-        return {key: row[key] if row else None for key in keys}
-
-    def update_settings(self, guild_id: int, **settings: int | None) -> None:
-        allowed = {"management_channel_id", "welcome_channel_id", "default_role_id"}
-        if set(settings) - allowed:
-            raise ValueError("Unknown guild setting")
-        current = self.get_settings(guild_id)
-        current.update(settings)
-        with self._connection() as connection:
-            connection.execute(
-                """INSERT INTO guild_settings (guild_id, management_channel_id, welcome_channel_id, default_role_id)
-                   VALUES (?, ?, ?, ?)
-                   ON CONFLICT(guild_id) DO UPDATE SET
-                     management_channel_id = excluded.management_channel_id,
-                     welcome_channel_id = excluded.welcome_channel_id,
-                     default_role_id = excluded.default_role_id""",
-                (guild_id, current["management_channel_id"], current["welcome_channel_id"], current["default_role_id"]),
-            )
 
     def get_module(self, guild_id: int, module_id: str) -> dict[str, Any]:
         with self._connection() as connection:
@@ -368,9 +311,9 @@ class GuildStorage:
             elif module_id in {"live_stats", "temporary_voice"}:
                 settings = self._template_module_settings(module_id, settings)
             elif module_id == "audit_log":
-                settings = self._audit_log_settings(settings, preserve_legacy_message=True)
+                settings = self._audit_log_settings(settings)
             elif module_id == "leveling":
-                settings = self._leveling_settings(settings, self.get_settings(guild_id))
+                settings = self._leveling_settings(settings)
             elif module_id == "automod":
                 settings = self._automod_settings(settings)
             elif module_id == "moderation":
@@ -380,13 +323,12 @@ class GuildStorage:
             elif module_id == "suggestions":
                 settings = normalize_suggestion_settings(settings)
             return {"enabled": bool(row["enabled"]), "settings": settings, "revision": int(row["revision"])}
-        legacy = self.get_settings(guild_id)
-        defaults = {"welcome": self._welcome_settings({"welcome_channel_id": legacy["welcome_channel_id"]}), "leveling": self._leveling_settings({}, legacy), "autorole": {"default_role_id": legacy["default_role_id"]}, "audit_log": self._audit_log_settings({"management_channel_id": legacy["management_channel_id"]}), "automod": self._automod_settings({}), "moderation": self._moderation_settings({}), "live_stats": self._template_module_settings("live_stats", {}), "temporary_voice": self._template_module_settings("temporary_voice", {}), "suggestions": normalize_suggestion_settings({})}.get(module_id, self._moderation_submodule_settings(module_id, {}) if module_id in {"anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"} else {})
+        defaults = {"welcome": self._welcome_settings({}), "leveling": self._leveling_settings({}), "autorole": {"default_role_id": None}, "audit_log": self._audit_log_settings({}), "automod": self._automod_settings({}), "moderation": self._moderation_settings({}), "live_stats": self._template_module_settings("live_stats", {}), "temporary_voice": self._template_module_settings("temporary_voice", {}), "suggestions": normalize_suggestion_settings({})}.get(module_id, self._moderation_submodule_settings(module_id, {}) if module_id in {"anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"} else {})
         return {"enabled": False, "settings": defaults, "revision": 0}
 
     @staticmethod
     def _welcome_settings(settings: dict[str, Any]) -> dict[str, Any]:
-        """Normalize legacy welcome settings without silently enabling messages."""
+        """Apply defaults without silently enabling messages."""
         defaults = {
             "welcome_enabled": False,
             "welcome_channel_id": None,
@@ -401,8 +343,6 @@ class GuildStorage:
         for field in ("welcome_content", "leave_content"):
             if not str(defaults.get(field) or "").strip():
                 defaults[field] = TEMPLATE_DEFAULTS[field]
-        # Old releases only had a channel. It remains a selectable candidate;
-        # no old message text means the new feature stays disabled.
         if defaults["welcome_format"] not in {"text", "embed"}:
             defaults["welcome_format"] = "text"
         if defaults["leave_format"] not in {"text", "embed"}:
@@ -422,8 +362,8 @@ class GuildStorage:
         return defaults
 
     @staticmethod
-    def _audit_log_settings(settings: dict[str, Any], *, preserve_legacy_message: bool = False) -> dict[str, Any]:
-        """Normalize category toggles while preserving the old message-only log."""
+    def _audit_log_settings(settings: dict[str, Any]) -> dict[str, Any]:
+        """Apply explicit category defaults."""
         defaults: dict[str, Any] = {
             "management_channel_id": None,
             "log_message": False,
@@ -434,15 +374,12 @@ class GuildStorage:
             "log_server": False,
         }
         defaults.update(settings)
-        category_keys = ("log_message", "log_voice", "log_channel", "log_member", "log_role", "log_server")
-        if preserve_legacy_message and defaults["management_channel_id"] and not any(key in settings for key in category_keys):
-            defaults["log_message"] = True
         return defaults
 
     @staticmethod
-    def _leveling_settings(settings: dict[str, Any], legacy: dict[str, int | None]) -> dict[str, Any]:
+    def _leveling_settings(settings: dict[str, Any]) -> dict[str, Any]:
         defaults: dict[str, Any] = {
-            "text_notification_channel_id": legacy["management_channel_id"],
+            "text_notification_channel_id": None,
             "text_role_rewards": [],
             "voice_enabled": False,
             "voice_notification_channel_id": None,
@@ -818,34 +755,10 @@ class GuildStorage:
 
     def matching_social_subscriptions(self, provider: str, account_id: str, event_type: str) -> list[dict[str, Any]]:
         with self._connection() as connection:
-            rows = connection.execute("""SELECT s.* FROM social_subscriptions s LEFT JOIN social_targets t ON t.id=s.target_id
+            rows = connection.execute("""SELECT s.* FROM social_subscriptions s JOIN social_targets t ON t.id=s.target_id
                 WHERE s.provider=? AND (s.account_id=? OR t.external_id=? OR t.account_key=?) AND s.enabled=1""",
                 (provider, account_id, account_id, account_id.lower().lstrip("@"))).fetchall()
         return [self._social_subscription_row(row) for row in rows if event_type in json.loads(row["events_json"])]
-
-    def save_social_subscription(self, guild_id: int, provider: str, account_id: str, account_name: str, channel_id: int, role_id: int | None, template: str, events: list[str], enabled: bool = True, subscription_id: int | None = None, *, max_count: int = 10) -> int:
-        if provider not in {"youtube", "twitch", "tiktok", "x", "instagram"} or len(events) == 0 or len(template) > 1000:
-            raise ValueError("Invalid social subscription")
-        raw_account = account_id.strip().lstrip("@")
-        account_key = raw_account if provider == "youtube" and raw_account.startswith("UC") else raw_account.lower()
-        target = self.ensure_social_target(provider, account_key)
-        template_events = ["live_start", "live_end"] if provider == "twitch" and events == ["live"] else events
-        templates = default_templates(provider, template_events)
-        if template:
-            for item in templates.values():
-                item["description"] = template
-        now = int(time.time())
-        with self._connection() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            if subscription_id is None:
-                count = connection.execute("SELECT COUNT(*) FROM social_subscriptions WHERE guild_id=? AND provider=?", (guild_id, provider)).fetchone()[0]
-                if count >= max_count:
-                    raise ValueError("Provider account limit reached")
-                cursor = connection.execute("""INSERT INTO social_subscriptions(guild_id,provider,account_id,account_name,channel_id,role_id,template,events_json,enabled,created_at,updated_at,target_id,templates_json,status)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')""", (guild_id, provider, account_id, account_name, channel_id, role_id, template, json.dumps(template_events), int(enabled), now, now, target["id"], json.dumps(templates, ensure_ascii=False)))
-                return int(cursor.lastrowid)
-            connection.execute("UPDATE social_subscriptions SET provider=?,account_id=?,account_name=?,channel_id=?,role_id=?,template=?,events_json=?,enabled=?,updated_at=?,target_id=?,templates_json=?,status='pending',revision=revision+1 WHERE id=? AND guild_id=?", (provider, account_id, account_name, channel_id, role_id, template, json.dumps(template_events), int(enabled), now, target["id"], json.dumps(templates, ensure_ascii=False), subscription_id, guild_id))
-            return subscription_id
 
     def ensure_social_target(self, provider: str, account_key: str) -> dict[str, Any]:
         if provider not in {"youtube", "twitch", "tiktok", "x", "instagram"} or not account_key:
@@ -891,9 +804,9 @@ class GuildStorage:
                     raise OverflowError("Provider account limit reached")
                 try:
                     cursor = connection.execute("""INSERT INTO social_subscriptions
-                        (guild_id,provider,account_id,account_name,channel_id,role_id,template,events_json,enabled,created_at,updated_at,target_id,event_channels_json,templates_json,status,revision)
-                        VALUES(?,?,?,?,?,?,?, ?,?,?,?, ?,?,?, 'pending',1)""",
-                        (guild_id, provider, account_key, account_key, channel_id, role_id, "", json.dumps(events), int(enabled), now, now,
+                        (guild_id,provider,account_id,account_name,channel_id,role_id,events_json,enabled,created_at,updated_at,target_id,event_channels_json,templates_json,status,revision)
+                        VALUES(?,?,?,?,?,?, ?,?,?,?, ?,?,?, 'pending',1)""",
+                        (guild_id, provider, account_key, account_key, channel_id, role_id, json.dumps(events), int(enabled), now, now,
                          target["id"], json.dumps(event_channels), json.dumps(templates, ensure_ascii=False)))
                     subscription_id = int(cursor.lastrowid)
                 except sqlite3.IntegrityError as exc:
@@ -1029,11 +942,6 @@ class GuildStorage:
             row = connection.execute("SELECT guild_id FROM social_oauth_states WHERE state=? AND provider=? AND expires_at>=?", (state, provider, now)).fetchone()
             connection.execute("DELETE FROM social_oauth_states WHERE state=?", (state,))
         return int(row["guild_id"]) if row else None
-
-    def enqueue_social_event(self, provider: str, event_key: str, account_id: str, payload: dict[str, Any]) -> bool:
-        with self._connection() as connection:
-            cursor = connection.execute("INSERT OR IGNORE INTO social_events(provider,event_key,account_id,payload_json,received_at) VALUES(?,?,?,?,?)", (provider, event_key, account_id, json.dumps(payload), int(time.time())))
-        return cursor.rowcount == 1
 
     def enqueue_social_event_v2(self, provider: str, external_event_id: str, account_id: str, event_type: str,
                                 payload: dict[str, Any], *, occurred_at: int | None = None) -> bool:
@@ -1213,13 +1121,7 @@ class GuildStorage:
             c.execute("UPDATE polls SET status='closed' WHERE status='open' AND closes_at IS NOT NULL AND closes_at<=?", (now,))
         return [dict(row) for row in rows]
 
-    # Compatibility helpers for small existing consumers.
-    def get(self, guild_id: int, key: str, default: Any = None) -> Any:
-        return self.get_settings(guild_id).get(key, default)
-
-    def set(self, guild_id: int, key: str, value: Any) -> None:
-        self.update_settings(guild_id, **{key: value})
-
+    # Text and voice leveling statistics.
     def get_user(self, guild_id: int, user_id: int) -> dict[str, int]:
         with self._connection() as connection:
             row = connection.execute("SELECT xp FROM guild_users WHERE guild_id = ? AND user_id = ?", (guild_id, user_id)).fetchone()
@@ -1250,10 +1152,6 @@ class GuildStorage:
         with self._connection() as connection:
             rows = connection.execute("SELECT user_id, xp FROM guild_users WHERE guild_id = ? ORDER BY xp DESC, user_id ASC LIMIT ?", (guild_id, limit)).fetchall()
         return [{"user_id": row["user_id"], "xp": row["xp"]} for row in rows]
-
-    def migrated(self) -> bool:
-        with self._connection() as connection:
-            return connection.execute("SELECT 1 FROM app_metadata WHERE key = 'json_migration_v1'").fetchone() is not None
 
     def create_dashboard_session(self, session_id: str, access_token: str, expires_in: int) -> None:
         now = int(time.time())
@@ -1310,26 +1208,3 @@ class GuildStorage:
         with self._connection() as connection:
             cursor = connection.execute("DELETE FROM oauth_states WHERE state = ? AND expires_at > ?", (state, int(time.time())))
         return cursor.rowcount == 1
-
-    def migrate_json(self, data_dir: Path) -> int:
-        if self.migrated():
-            return 0
-        migrated = 0
-        for path in data_dir.glob("*.json"):
-            try:
-                raw = json.loads(path.read_text(encoding="utf-8"))
-                guild_id = int(path.stem)
-            except (ValueError, json.JSONDecodeError):
-                continue
-            settings = {key: raw.get(key) for key in ("management_channel_id", "welcome_channel_id", "default_role_id") if key in raw}
-            if settings:
-                self.update_settings(guild_id, **settings)
-            for user_id, user in raw.get("users", raw).items():
-                if not isinstance(user, dict) or not str(user_id).isdigit():
-                    continue
-                with self._connection() as connection:
-                    connection.execute("INSERT OR REPLACE INTO guild_users (guild_id, user_id, xp) VALUES (?, ?, ?)", (guild_id, int(user_id), int(user.get("xp", 0))))
-            migrated += 1
-        with self._connection() as connection:
-            connection.execute("INSERT INTO app_metadata (key, value) VALUES ('json_migration_v1', 'complete')")
-        return migrated

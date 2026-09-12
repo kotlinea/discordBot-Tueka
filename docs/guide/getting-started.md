@@ -16,9 +16,9 @@ OAuth2 Redirectsへ`DISCORD_REDIRECT_URI`と完全に同じURLを登録します
 
 ```powershell
 py -3.13 -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m pip install --require-hashes -r requirements.lock
 Copy-Item .env.example .env
-.venv\Scripts\python.exe migrate_json.py
+.venv\Scripts\python.exe migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrations
 ```
 
 最低限、`DISCORD_TOKEN`、`DISCORD_CLIENT_ID`、`DISCORD_CLIENT_SECRET`、`DISCORD_REDIRECT_URI`、`SESSION_SECRET`を設定します。
@@ -27,10 +27,10 @@ Copy-Item .env.example .env
 
 ```powershell
 Set-Location dashboard/frontend
-npm install
+npm ci
 npm run build
 Set-Location ../../docs
-npm install
+npm ci
 npm run build
 Set-Location ..
 ```

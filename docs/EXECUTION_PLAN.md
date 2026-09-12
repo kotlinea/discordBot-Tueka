@@ -2,15 +2,16 @@
 
 策定日：2026-09-10。方針と実施順序の正本は [ROADMAP.md](../ROADMAP.md)。本書は、その方針を現在のコードに対応付けた作業計画であり、新しい公開仕様ではない。
 
-## 現在地と次の実行順序（2026-09-11確認）
+## 現在地と次の実行順序（2026-09-12確認）
 
-以下の初回調査表は策定時点の記録である。P0-1〜P0-4、P1-0〜P1-4はローカル実装・検証の完了記録を `PROGRESS0910.md` に保存している。次の着手はP1-5。遠隔本番へのMigrationとStage実動は未完了であり、ローカル検証とリリース判定を区別する。以下は依存順序と各単位の確認事項を保持した一覧である。
+以下の初回調査表は策定時点の記録である。P0-1〜P0-4、P1-0〜P1-5のローカル実装・検証結果は `PROGRESS0910.md` に保存した。P1-5ではJSON移行・共有設定Fallback・Social旧変換・一時文書を整理し、0005/0006とWindows/Linux全192件の回帰、Frontend/Docs build、Vitest/Playwrightを検証した。実Guild、遠隔本番DB、Stageのリリース判定は未完了であり、ローカル実装完了と区別する。
 
-1. **P1-1を閉じる。** `dashboard/app.py` のSPA配信、管理テンプレート・旧資産・旧POST削除、API側へ引き継いだ入力・権限検証をレビューする。正式URL、OAuth、CSRF、Guild認可、未build時503、静的資産・Docsの回帰結果を揃え、進捗へ記録する。既存差分を保持し、P0からやり直さない。
-2. **P1-2：Ticket。** `config.py` のFlagとAllowlist、Repository初期化時の `migrate_legacy`、Cogからの平文Transcript移行を除去する。旧テーブル削除Migrationを同じ単位に含め、V2 Ticket・暗号化Transcript・保留処理の保持と再起動後の旧Schema非復活を検証する。
-3. **P1-3：Reaction Roles。** `reaction_roles/repository.py` の旧共有設定参照を含め、Legacy UI・Wizard・旧コマンドの利用箇所を除去する。共有 `guild_modules` 自体は他機能が利用するため一括削除しない。
-4. **P1-4：Moderation。** `cogs/automod.py` の起動時旧移行とCSV読込みを除去する。旧Rule/Eventへの外部キーと参照を解消してからMigrationを適用し、現行Case・Point・処置履歴を保持する。
-5. **P1-5をPhase 1の出口とする。** JSON移行・旧DDL・一時文書の残存を検査し、Bot・Dashboard・Workerを再起動してV1が復活しないことを確認する。その後にPhase 2のDomain分割へ進む。
+次の開発単位は **P2-1：共通DB接続と明示Migrationへの統一**。
+
+1. `storage.py` とTicket / Reaction Roles / Suggestionsの接続・コンストラクタDDL・ALTER・起動時データ更新を一覧化する。空DBの最終Schemaと既存V2 Schemaを比較し、制約・Index・既定値・保持データを移設対象へ含める。
+2. 共通接続、Transaction、WAL、busy timeout、Backup、適用履歴検査を整備する。後続番号のMigrationで不足する現行Schemaを作成し、既存の0001〜0006は改変しない。
+3. 各RuntimeのDDLを除去し、未適用Schemaでは明確に起動失敗させる。新規導入・直前版更新・再適用・Rollback・Bot/Dashboard/Worker再起動を検証する。テストFixtureも明示Migrationで準備する方式へ揃える。
+4. P2-1の受入後にP2-2のDomain別Repository分割へ進む。ServiceやAPIの大規模分割を同じ単位に混ぜず、公開動作を維持する。
 
 各単位はコード・Migration・テスト・正式Docs・進捗記録までを一つのレビュー対象とする。遠隔本番DBのSnapshot/Inventory、StageでのDiscord・OAuth・Webhook実動は既存記録でも未検証であり、ローカル成功だけでリリース済みとは扱わない。Phase 2以降の実施方針・受入条件は後述を維持し、詳細な対象ファイルはPhase 1終了時に再確定する。
 
@@ -123,4 +124,39 @@ ROADMAPの順序を維持する。各機能をDBだけ・画面だけで公開�
 - SQLite競合、Outbox滞留、Worker停止、Discord側成功後のDB失敗を重点監視する。特にRetryは「最大回数」だけでなく冪等性と補償を検証する。
 - 本番DB InventoryとStage検証には、運用環境・テストGuild・OAuth/Provider設定へのアクセスが必要。アクセスがない期間も、コードInventory、Fixture、コンテナ、Contract testの整備は進められる。
 
-直近の着手はP0-1。次にP0-2、P0-3、P0-4を終えて削除範囲を確定する。納期はBaselineとInventoryから作業量を見積もって設定し、Phase 2以降の詳細チケットは前Phase終了時のコードを基準に更新する。
+直近の着手はP2-1。P0-1〜P1-5のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
+
+## 8. 再調査に基づく具体的な実行単位（2026-09-12）
+
+今回の更新は計画策定のみ。README、ROADMAP、Architecture、進捗、Migration一覧、Bot / Worker起動処理、保存層、Repository、Service、API、Frontendの実行コマンドとCIを静的に照合した。186件のPython成功などは `PROGRESS0910.md` の既存記録であり、今回再実行した結果ではない。調査開始時の作業ツリーはクリーンだった。
+
+### P1-5の実施・検証範囲（ローカル完了）
+
+1. **削除範囲を確定する。** `migrate_json.py`、`GuildStorage.migrated` / `migrate_json`、`json_migration_v1` の参照と入力JSONの必要性をInventoryで確認する。ローカル調査で遠隔本番の状況を断定しない。
+2. **現行設定を保全する。** `storage.py` のWelcome / Leveling / Autorole / Audit設定は現在も共有設定や旧形式を参照する。読書き箇所と有効値を一覧化し、必要な値を番号付きMigrationで固定してからRuntimeの互換分岐を削除する。共有テーブル全体を名前だけで削除しない。Social初期化時のデータ補完も、V1移行か現行V2の修復かを分類する。
+3. **初期化手順を成立させる。** JSON CLIが現在担うDB初期化の代替を整えてから削除する。全RepositoryのDDL移設はP2-1で行うが、P1-5終了時点でも空DBから正式手順だけで起動できることを必須とする。
+4. **正式Docsへ統合する。** README、日英Getting Started、Linux、Upgrade、Backupを番号付きCLIへ統一する。`PROGRESS0814.md`、`DEPLOYMENT_TODO.md`、`FEATURE_MODULE_GUIDE.md`、`TICKETS_V2.md` は必要事項の移管後に削除し、VitePress設定とリンクを点検する。現在の進捗記録 `PROGRESS0910.md` は保持する。
+5. **Phase 1の出口を検証する。** 空DB・直前版・V2専用・混在Fixtureで保持データ、再適用、途中失敗Rollbackを検証する。Bot / Dashboard / Workerの再初期化後にも旧Schemaが復活しないこと、全Python・Frontend・Docs・Accessibility検証の成功を記録する。実Discord・OAuth・WebhookはStageで別途確認する。
+
+### P1-5以降の作業分割
+
+各行を一つのレビュー単位の目安とする。大きい行はDomainごとに分割し、途中でも起動可能な状態を保つ。
+
+| ID | 具体的な変更 | 前提・受入条件 |
+| --- | --- | --- |
+| P2-1 | 共通DB接続と明示Migrationへ統一。`storage.py` とTicket / Reaction Roles / SuggestionsのコンストラクタDDLを移設する。 | P1-5。空DB初期化・既存更新・未適用時の明確な起動失敗・接続設定の一致。 |
+| P2-2 | Dashboard設定/認証→Community→Engagement→Social→Moderationの順でSQLをRepositoryへ移す。Ticket Serviceの直接SQLも移す。 | P2-1。移動前後の契約テストと保存・再読込が一致。順序は依存表で最終確認する。 |
+| P2-3 | Ticket / Reaction Rolesの実装を比較し、Outbox / ScheduleのProtocol・Runnerを抽出、Social / Moderationへ適用する。 | P2-2の対象Domain。Lease所有権、失効、再試行、重複、Dead Letter、保持期限を共通テストで保証。 |
+| P2-4 | ServiceのDiscord操作をAdapterへ移し、失敗分類と補償・孤立Resourceの復旧を統一する。 | 対象Repositoryの分離。Discord成功後DB失敗、権限喪失、再起動の異常系を検証。 |
+| P2-5 | `dashboard/api_v1.py` をDomain Routerへ分割し、認証・CSRF・Guild認可・revisionを共通化する。 | 応答Contract testを先に追加。現行 `/api/v1` URLと認可境界を維持。 |
+| P2-6 | OpenAPI型生成、入力制約の共有、共通UI抽出、`App.tsx` 分割、Route遅延読込み、翻訳Namespace分割。 | P2-5。型生成の差分検査、保存往復、競合・権限・4画面幅・日英・テーマ・キーボード操作を検証。 |
+| P3-1 | SPA / Docsを含む本番Imageとコマンド別entrypointを作る。 | Phase 2出口。非root・read-onlyでBot / Dashboard / Worker / Migrationが起動する。 |
+| P3-2 | dev / stage / prodのCompose、永続Volume、Migration後の起動順、秘密情報の注入を整える。 | P3-1。空Volume導入・更新・環境分離・Stageと本番の同一digestを確認。 |
+| P3-3 | Readiness、Heartbeat、Outbox滞留・SQLite競合の監視、ログ/Resource制限を追加する。 | P3-2。Worker停止や配送失敗を注入し検出可能。閾値はStage実測から決める。 |
+| P3-4 | Backup / Restoreコマンドと運用手順を完成させる。 | P3-2。別Volume復元、Transcript復号、保留処理再開、Snapshotを伴うRollbackを実演。 |
+| P4-1 | 全機能の実装・テスト・実機検証を対応付け、安定/改善中/利用不可をRegistry・UI・Docsへ反映する。 | Phase 3出口。未検証の機能を安定と表示しない。 |
+| P4-2〜6 | Moderation→Ticket→Reaction Roles→Social→Suggestionsを第5節のシナリオで完成させる。 | P4-1。各機能の正常系・部分失敗・復旧までDashboardから運用可能。 |
+| P4-7 | 全画面の空状態・権限不足・競合・復旧・Docs案内と日英/モバイル操作を最終確認する。 | P4-2〜6。横断検証とStage受入の記録が揃う。 |
+| P5-1〜7 | 第6節の7機能を記載順に、一機能ずつDBからBot・API・UI・運用まで完成させる。 | Phase 4出口。共通基盤を再利用し、各機能のMigration・権限・無効化・Retention・復旧・Docsを含めて受入する。 |
+
+実装担当は変更・テスト・Docs、レビュー担当はデータ保持と公開契約、運用担当はStage・Backup復元を確認する。担当者名は未定。各単位の着手時に担当・見積り・依存を確定し、完了時にコマンド、結果、未検証事項、次の着手点を進捗へ残す。外部環境が未準備でもローカルの設計・検証整備は進められるが、リリース判定は第7節の条件を満たすまで保留する。

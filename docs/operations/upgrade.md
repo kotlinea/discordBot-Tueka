@@ -6,7 +6,7 @@
 2. 現在のCommit IDと依存Versionを記録します。
 3. 3Processを停止します。
 4. Python依存を更新します。
-5. `migrate_json.py`を実行し、続いて[番号付きMigration](./migrations.md)を適用します。0002から旧Ticket表の削除を含むため、事前に複製DBで検証します。
+5. [番号付きMigration](./migrations.md)を適用します。0002から旧Ticket表の削除を含むため、事前に複製DBで検証します。
 6. Dashboard FrontendとDocsを`npm ci && npm run build`で再Buildします。
 7. Dashboard、Bot、Workerを起動し、Health、Command、保存、配送を確認します。
 

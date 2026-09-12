@@ -19,7 +19,6 @@ class ModerationCog(commands.Cog):
         module = self.storage.get_module(interaction.guild.id, "audit_log")
         module["settings"]["management_channel_id"] = channel.id
         self.storage.set_module(interaction.guild.id, "audit_log", enabled=module["enabled"], settings=module["settings"])
-        self.storage.set(interaction.guild.id, "management_channel_id", channel.id)
         await interaction.response.send_message(f"サーバーログチャネルを `{channel.name}` に設定しました。", ephemeral=True)
 
     @app_commands.command(description="このチャネルのメッセージを削除します。")

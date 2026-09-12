@@ -97,6 +97,10 @@
 
 ## 復旧と未確認事項
 
+- P1-5 Social残存調査：保全DBの購読1件・Target1件・Event1件・配送2件を確認。Target欠落/参照切れ、空Template、旧liveイベント、非空の旧単一templateは0件。購読表を参照する外部キーは0件。0006で旧単一template列のみを落とし、共有表の他列・行・IDを保持する。Runtimeの旧Target/Template変換、旧保存/Event書込み、live配送Fallbackを除去する。Targetのない旧行は自動変換・自動有効化せず、配送対象にしない。
+
+- 2026-09-12 P1-5追記：ローカル `data` 直下のJSONファイルは0件。JSON V1のRuntime Importを廃止する。0005は現在のV2が参照する共有設定の実効値を `guild_modules` に固定してから `guild_settings` を削除し、`app_metadata` の `json_migration_v1` キーだけを削除する。有効状態・revision・明示null・XP・他Metadataを保持する。上表は初回Snapshotの時点記録として保持する。遠隔本番のJSON有無は未確認。
+
 - 2026-09-12追記：P1-4の0004で旧AutoMod/移行判定4表と旧ID/Warning列を除去。P1-3複製DBに適用し、保持65表98行の保持列一致・整合性・FKを確認。現行Rule/Event/処置結果のリンクは混在Fixtureでも検証した。原DBには未適用。上表の時点Inventoryは書き換えない。
 
 - 2026-09-11追記：P1-3で `reaction_role_panels` のRuntime参照・DDLを除去し、0003にDROPを追加。P1-2複製DBからの検証では保持69表100行が一致。V2の付与状態・期限・Outbox・復旧データはFixtureテストでも保持を確認した。原運用DBには未適用。

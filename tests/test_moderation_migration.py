@@ -91,7 +91,7 @@ class ModerationRemovalTests(unittest.TestCase):
                 storage, rule, event, case = self.seed(mixed)
                 before = self.retained()
                 result = apply(self.db, self.backups)
-                self.assertEqual(result['applied'], ['0004_remove_legacy_moderation.sql'])
+                self.assertEqual(result['applied'], ['0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql'])
                 self.assertEqual(self.retained(), before)
                 storage = GuildStorage(self.db)
                 self.assertEqual(self.retained(), before)
@@ -115,7 +115,7 @@ class ModerationRemovalTests(unittest.TestCase):
             before = list(connection.iterdump())
         directory = self.root / 'failure'
         shutil.copytree('migrations', directory)
-        (directory / '0005_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0007_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         with closing(sqlite3.connect(self.db)) as connection:

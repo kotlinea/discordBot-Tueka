@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from storage import GuildStorage
+from social_models import default_templates
 from template_defaults import TEMPLATE_DEFAULTS
 
 
@@ -17,9 +18,9 @@ class GuildStorageTests(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_settings_and_user_stats_are_shared(self):
-        self.storage.update_settings(1, management_channel_id=10, welcome_channel_id=11, default_role_id=12)
+        self.storage.set_module(1, "welcome", enabled=False, settings={"welcome_channel_id": 11})
         self.storage.add_xp(1, 99, 25)
-        self.assertEqual(self.storage.get_settings(1)["welcome_channel_id"], 11)
+        self.assertEqual(self.storage.get_module(1, "welcome")["settings"]["welcome_channel_id"], 11)
         self.assertEqual(self.storage.get_user(1, 99), {"xp": 25})
 
     def test_voice_xp_is_independent_from_text_xp_and_ranked(self):
@@ -30,21 +31,12 @@ class GuildStorageTests(unittest.TestCase):
         self.assertEqual(self.storage.get_voice_user(1, 99)["xp"], 10)
         self.assertEqual(self.storage.voice_leaderboard(1), [{"user_id": 100, "xp": 20}, {"user_id": 99, "xp": 10}])
 
-    def test_leveling_uses_legacy_management_channel_as_candidate(self):
-        self.storage.update_settings(1, management_channel_id=77)
+    def test_leveling_uses_explicit_notification_channel(self):
+        self.storage.set_module(1, "leveling", enabled=False, settings={"text_notification_channel_id": 77})
         leveling = self.storage.get_module(1, "leveling")
         self.assertFalse(leveling["enabled"])
         self.assertEqual(leveling["settings"]["text_notification_channel_id"], 77)
         self.assertFalse(leveling["settings"]["voice_enabled"])
-
-    def test_json_migration_is_one_time_and_preserves_data(self):
-        data_dir = self.root / "data"
-        data_dir.mkdir()
-        (data_dir / "123.json").write_text(json.dumps({"management_channel_id": 7, "users": {"4": {"xp": 42}}}), encoding="utf-8")
-        self.assertEqual(self.storage.migrate_json(data_dir), 1)
-        self.assertEqual(self.storage.get_settings(123)["management_channel_id"], 7)
-        self.assertEqual(self.storage.get_user(123, 4), {"xp": 42})
-        self.assertEqual(self.storage.migrate_json(data_dir), 0)
 
     def test_dashboard_session_is_expiring_and_revocable(self):
         self.storage.create_dashboard_session("session", "access-token", 60)
@@ -81,33 +73,34 @@ class GuildStorageTests(unittest.TestCase):
         self.assertEqual(self.storage.get_module(1, "live_stats")["settings"]["stats_template"], TEMPLATE_DEFAULTS["stats_template"])
         self.assertEqual(self.storage.get_module(1, "temporary_voice")["settings"]["temp_voice_name"], TEMPLATE_DEFAULTS["temp_voice_name"])
 
-    def test_legacy_role_setting_maps_to_autorole(self):
-        self.storage.update_settings(1, default_role_id=20)
+    def test_autorole_uses_own_settings(self):
+        self.storage.set_module(1, "autorole", enabled=False, settings={"default_role_id": 20})
         self.assertEqual(self.storage.get_module(1, "autorole")["settings"]["default_role_id"], 20)
 
-    def test_legacy_welcome_channel_becomes_disabled_welcome_candidate(self):
-        self.storage.update_settings(1, welcome_channel_id=20)
+    def test_welcome_channel_alone_does_not_enable_messages(self):
+        self.storage.set_module(1, "welcome", enabled=False, settings={"welcome_channel_id": 20})
         welcome = self.storage.get_module(1, "welcome")
         self.assertFalse(welcome["enabled"])
         self.assertEqual(welcome["settings"]["welcome_channel_id"], 20)
         self.assertFalse(welcome["settings"]["welcome_enabled"])
         self.assertFalse(welcome["settings"]["leave_enabled"])
 
-    def test_legacy_audit_log_keeps_message_category_and_new_categories_are_off(self):
+    def test_audit_log_requires_explicit_category_selection(self):
         self.storage.set_module(1, "audit_log", enabled=True, settings={"management_channel_id": 20})
         audit_log = self.storage.get_module(1, "audit_log")
-        self.assertTrue(audit_log["settings"]["log_message"])
+        self.assertFalse(audit_log["settings"]["log_message"])
         self.assertFalse(audit_log["settings"]["log_voice"])
         self.assertFalse(audit_log["settings"]["log_member"])
         self.assertFalse(self.storage.get_module(2, "audit_log")["settings"]["log_message"])
 
     def test_social_subscription_limit_and_event_deduplication(self):
+        templates = default_templates("youtube", ["video"])
         for index in range(10):
-            self.storage.save_social_subscription(1, "youtube", f"UC{index}", f"Channel {index}", 100, None, "{account}", ["video"])
-        with self.assertRaises(ValueError):
-            self.storage.save_social_subscription(1, "youtube", "UC-over", "Over", 100, None, "", ["video"])
-        self.assertTrue(self.storage.enqueue_social_event("youtube", "video:1", "UC0", {"type": "video"}))
-        self.assertFalse(self.storage.enqueue_social_event("youtube", "video:1", "UC0", {"type": "video"}))
+            self.storage.save_social_subscription_v2(1, "youtube", f"UC{index}", 100, ["video"], {}, templates)
+        with self.assertRaises(OverflowError):
+            self.storage.save_social_subscription_v2(1, "youtube", "UC-over", 100, ["video"], {}, templates)
+        self.assertTrue(self.storage.enqueue_social_event_v2("youtube", "video:1", "UC0", "video", {"type": "video"}))
+        self.assertFalse(self.storage.enqueue_social_event_v2("youtube", "video:1", "UC0", "video", {"type": "video"}))
         self.assertEqual(len(self.storage.matching_social_subscriptions("youtube", "UC0", "video")), 1)
 
     def test_social_oauth_state_is_single_use_and_bound_to_provider(self):

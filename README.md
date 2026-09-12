@@ -20,7 +20,7 @@ Tuekaは、Discordサーバーのモデレーション、コミュニティ運�
 
 1. Python 3.13で仮想環境を作成し、`pip install --require-hashes -r requirements.lock`を実行します。
 2. `.env.example`を`.env`へコピーし、Discord BotとOAuthの値を設定します。
-3. `python migrate_json.py`でDBを初期化し、`python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrations`で番号付きMigrationを適用します。DBパスを変更している場合は引数も合わせます。既存環境は先に全Processを停止・Backupしてください。
+3. `python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrations`で番号付きMigrationを適用します。DBパスを変更している場合は引数も合わせます。既存環境は先に全Processを停止・Backupしてください。
 4. Botを`python bot.py`、Dashboardを`python -m uvicorn dashboard.app:app --host 127.0.0.1 --port 8000`で起動します。
 5. ソーシャル通知を使う場合は`python social_worker.py`も起動します。
 

@@ -274,7 +274,7 @@ class SocialStorageV2Tests(unittest.TestCase):
         self.assertEqual(claimed[0]["status"], "orphaned")
         self.assertTrue(self.storage.delete_social_target(claimed[0]["id"], "cleanup-worker"))
 
-    def test_legacy_subscription_migration_is_idempotent(self):
+    def test_old_subscription_is_not_imported_or_enabled_at_startup(self):
         path = Path(self.temp.name) / "legacy.sqlite3"
         connection = sqlite3.connect(path)
         try:
@@ -285,11 +285,13 @@ class SocialStorageV2Tests(unittest.TestCase):
             connection.close()
         migrated = GuildStorage(path)
         item = migrated.social_subscription(1)
-        self.assertEqual(item["events"], ["live_start", "live_end"])
-        self.assertTrue(item["target_id"])
-        self.assertIn("live_start", item["templates"])
+        self.assertEqual(item["events"], ["live"])
+        self.assertIsNone(item["target_id"])
+        self.assertEqual(item["templates"], {})
+        self.assertFalse(migrated.module_enabled(1, "twitch_updates"))
+        self.assertEqual(migrated.matching_social_subscriptions("twitch", "Creator", "live"), [])
         GuildStorage(path)
-        self.assertEqual(len(migrated.social_targets("twitch")), 1)
+        self.assertEqual(len(migrated.social_targets("twitch")), 0)
 
 
 if __name__ == "__main__":

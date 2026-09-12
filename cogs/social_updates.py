@@ -55,10 +55,9 @@ class SocialUpdatesCog(commands.Cog):
 
     async def _deliver(self, event: dict) -> bool:
         payload = event["payload"]
-        event_type = str(event.get("event_type") or payload.get("event") or payload.get("type", ""))
-        matching_type = "live" if event_type in {"live_start", "live_end"} and not self.storage.matching_social_subscriptions(event["provider"], event["account_id"], event_type) else event_type
+        event_type = str(event["event_type"])
         retry_needed = False
-        for subscription in self.storage.matching_social_subscriptions(event["provider"], event["account_id"], matching_type):
+        for subscription in self.storage.matching_social_subscriptions(event["provider"], event["account_id"], event_type):
             if not self.storage.module_enabled(subscription["guild_id"], MODULE_FOR_PROVIDER[event["provider"]]):
                 continue
             guild = self.bot.get_guild(subscription["guild_id"])
@@ -94,7 +93,7 @@ class SocialUpdatesCog(commands.Cog):
             try:
                 message = await channel.send(content=content or None, embed=embed, allowed_mentions=discord.AllowedMentions(everyone=False, users=False, roles=[role] if role else False))
                 self.storage.update_social_delivery(subscription["id"], event["event_key"], message.id)
-                if event_type in {"live", "live_start"}:
+                if event_type == "live_start":
                     self.storage.set_social_live_message(subscription["id"], event["provider"], event["account_id"], channel.id, message.id)
             except discord.HTTPException as exc:
                 retry = not isinstance(exc, discord.Forbidden) and getattr(exc, "status", 500) in {429, 500, 502, 503, 504}

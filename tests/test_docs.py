@@ -62,8 +62,6 @@ class DocumentationTests(unittest.TestCase):
     def test_no_document_contains_example_secrets(self):
         forbidden = ("DISCORD_TOKEN=", "SESSION_SECRET=", "PRIVATE KEY-----", "Authorization: Bot ")
         for page in DOCS.rglob("*.md"):
-            if page.name in {"FEATURE_MODULE_GUIDE.md", "DEPLOYMENT_TODO.md", "PROGRESS0814.md", "TICKETS_V2.md"}:
-                continue
             text = page.read_text(encoding="utf-8")
             for marker in forbidden:
                 self.assertNotIn(marker, text, f"Secret-like marker in {page}")

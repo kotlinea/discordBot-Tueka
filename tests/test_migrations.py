@@ -31,7 +31,7 @@ class MigrationTests(unittest.TestCase):
 
     def test_empty_database_and_reapplication(self):
         result = apply(self.db, self.backups)
-        self.assertEqual(result['applied'], ['0001_suggestions.sql', '0002_remove_legacy_tickets.sql', '0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql'])
+        self.assertEqual(result['applied'], ['0001_suggestions.sql', '0002_remove_legacy_tickets.sql', '0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql'])
         self.assertEqual(inventory(Path(result['snapshot']))['tables'], [])
         repository = SuggestionRepository(self.db)
         item = repository.create(1, 2, 3, {'idea': 'keep'})
@@ -52,10 +52,10 @@ class MigrationTests(unittest.TestCase):
         self.seed()
         with ThreadPoolExecutor(max_workers=2) as workers:
             results = list(workers.map(lambda _: apply(self.db, self.backups), range(2)))
-        self.assertEqual(sum(len(result['applied']) for result in results), 4)
+        self.assertEqual(sum(len(result['applied']) for result in results), 6)
         self.assertEqual(len(list(self.backups.glob('*.sqlite3'))), 1)
         with closing(sqlite3.connect(self.db)) as connection:
-            self.assertEqual(connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0], 4)
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0], 6)
 
     def test_runtime_initialization_does_not_change_migrated_suggestions_schema(self):
         apply(self.db, self.backups)

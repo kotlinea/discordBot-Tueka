@@ -1,6 +1,6 @@
 # 番号付きDB Migration
 
-Phase 1で追加した明示CLIは、`migrations/0001_名前.sql` から番号順にSQLを適用します。0001はSuggestionsの作成、0002は旧Ticket、0003は旧Reaction Roles、0004は旧Moderationの削除を扱います。Bot全体の初期化を置き換えるCLIへの統一は後続作業です。
+明示CLIは、`migrations/0001_名前.sql` から番号順にSQLを適用します。0001はSuggestionsの作成、0002は旧Ticket、0003は旧Reaction Roles、0004は旧Moderation、0005は共有設定FallbackとJSON移行済み判定、0006はSocialの旧単一Template列の削除を扱います。新規導入もこのCLIを先に実行します。現行Domainの不足テーブルはまだ各Repositoryの初期化時に作成されます。全DDLのCLIへの集約はPhase 2で行います。
 
 ```sh
 python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrations
@@ -39,4 +39,10 @@ python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrat
 
 0004は `automod_rules` / `automod_events` / `automod_migrations` / `moderation_migrations` と旧ID列・`guild_users.warn` を削除します。現行のRule・Event・処置結果は子テーブルから退避/再作成し、外部キーの連鎖削除で関連付けが失われないようにします。Case・Point・XP・期限付き処置は保持します。
 
-旧データの自動変換は行いません。旧アプリへのRollbackには適用前Snapshotと対応するファイル・鍵が必要です。Snapshot以後の更新は復元先に含まれません。
+0005はV2が共有設定から参照していたWelcome・Autorole・Leveling・Auditの実効値を `guild_modules` へ固定し、`guild_settings` を削除します。明示設定、JSONのnull、有効/無効、revisionを保持します。未保存の候補は無効・revision 0で保存し、自動有効化しません。既存Audit設定にカテゴリ指定がない場合だけ、従来有効だったメッセージカテゴリを明示保存します。汎用 `app_metadata` は保持し、JSON移行マーカーだけを削除します。
+
+JSON V1ファイルのImportは廃止しました。起動時にJSONからXP・設定を取り込む処理はありません。旧アプリへのRollbackには適用前Snapshotと対応するファイル・鍵が必要です。Snapshot以後の更新は復元先に含まれません。
+
+0006はSocial購読の旧単一 `template` 列を削除し、現行のイベント別 `templates_json`、購読ID・Target・Cursor・配送履歴を保持します。購読の旧形式を起動時にTargetやイベント別Templateへ変換する処理と、旧 `live` イベントへの配送Fallbackは廃止しました。現在のイベント名は `live_start` / `live_end` です。
+
+共有表内の旧購読行も、残す列の値は変更しません。Targetがない行からTargetを自動作成したり、機能を自動で有効化したりしません。配送には現行Targetが必要です。旧購読の運用を再開する場合は、Dashboardから現行形式で再登録し、重複設定を整理してください。Migrationの更新対象は現行V2のSchemaを持つDBであり、過去の純V1 Schemaへの自動Importは提供しません。適用に失敗した場合は原DBへ手動でDDLを継ぎ足さず、SnapshotとSchemaを確認してください。
