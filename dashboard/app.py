@@ -1,4 +1,3 @@
-from dashboard.repository import DashboardRepository
 """FastAPI dashboard entry point. Run with: uvicorn dashboard.app:app"""
 import os
 import json
@@ -19,11 +18,12 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from config import Settings
+from dashboard.repository import DashboardRepository
 from dashboard.discord_api import DiscordAPI
 from dashboard.timing import add as add_timing, begin as begin_timing, end as end_timing
-from storage import GuildStorage
-from social_crypto import SocialTokenCipher
-from social_webhooks import verify_twitch_signature, verify_youtube_signature
+from social import SocialRepository
+from social.crypto import SocialTokenCipher
+from social.webhooks import verify_twitch_signature, verify_youtube_signature
 from dashboard.api_v1 import create_api_router
 
 
@@ -36,7 +36,7 @@ session_secret = os.getenv("SESSION_SECRET")
 if not all((client_id, client_secret, redirect_uri, session_secret)):
     raise RuntimeError("Dashboard OAuth settings are missing. Configure .env from .env.example.")
 
-storage = GuildStorage(settings.database_path)
+social_repository = SocialRepository(settings.database_path)
 dashboard_repository = DashboardRepository(settings.database_path)
 api = DiscordAPI(settings.discord_token, client_id, client_secret, redirect_uri)
 social_cipher = SocialTokenCipher(settings.social_token_encryption_key)
@@ -65,7 +65,7 @@ app.mount("/ui", StaticFiles(directory=FRONTEND_DIST, check_dir=False), name="da
 DOCS_DIST = BASE_DIR.parent / "docs" / ".vitepress" / "dist"
 app.mount("/docs", StaticFiles(directory=DOCS_DIST, html=True, check_dir=False), name="documentation")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
-app.include_router(create_api_router(storage, api, settings))
+app.include_router(create_api_router(settings.database_path, api, settings))
 
 
 def spa_response():
@@ -254,11 +254,11 @@ async def begin_social_connection(request: Request, guild_id: int, provider: str
         return RedirectResponse(f"{target}?error=social-token-key", status_code=303)
     state = secrets.token_urlsafe(32)
     if provider == "tiktok" and settings.tiktok_client_key and settings.tiktok_redirect_uri:
-        storage.create_social_oauth_state(state, guild_id, provider)
+        social_repository.create_social_oauth_state(state, guild_id, provider)
         params = urlencode({"client_key": settings.tiktok_client_key, "response_type": "code", "scope": "user.info.basic,video.list", "redirect_uri": settings.tiktok_redirect_uri, "state": state})
         return RedirectResponse(f"https://www.tiktok.com/v2/auth/authorize/?{params}", status_code=303)
     if provider == "instagram" and settings.instagram_app_id and settings.instagram_redirect_uri:
-        storage.create_social_oauth_state(state, guild_id, provider)
+        social_repository.create_social_oauth_state(state, guild_id, provider)
         params = urlencode({"client_id": settings.instagram_app_id, "redirect_uri": settings.instagram_redirect_uri, "response_type": "code", "scope": "instagram_business_basic", "state": state})
         return RedirectResponse(f"https://www.instagram.com/oauth/authorize?{params}", status_code=303)
     return RedirectResponse(f"{target}?error=social-provider-unavailable", status_code=303)
@@ -268,7 +268,7 @@ async def begin_social_connection(request: Request, guild_id: int, provider: str
 async def social_oauth_callback(provider: str, code: str | None = None, state: str | None = None, error: str | None = None):
     if not state or error:
         raise HTTPException(status_code=400, detail="ソーシャルOAuth認証が拒否されました")
-    guild_id = storage.consume_social_oauth_state(state, provider)
+    guild_id = social_repository.consume_social_oauth_state(state, provider)
     if guild_id is None or not code:
         raise HTTPException(status_code=400, detail="ソーシャルOAuth state が無効です")
     try:
@@ -291,7 +291,7 @@ async def social_oauth_callback(provider: str, code: str | None = None, state: s
         raise HTTPException(status_code=502, detail="ソーシャルOAuthトークンの取得に失敗しました") from exc
     if not token or not account_id:
         raise HTTPException(status_code=502, detail="ソーシャルOAuthの応答が不完全です")
-    storage.save_social_connection(guild_id, provider, str(account_id), str(account_name), social_cipher.encrypt(str(token)), social_cipher.encrypt(str(payload["refresh_token"])) if payload.get("refresh_token") else None, int(time.time()) + int(payload.get("expires_in", 0)) if payload.get("expires_in") else None)
+    social_repository.save_social_connection(guild_id, provider, str(account_id), str(account_name), social_cipher.encrypt(str(token)), social_cipher.encrypt(str(payload["refresh_token"])) if payload.get("refresh_token") else None, int(time.time()) + int(payload.get("expires_in", 0)) if payload.get("expires_in") else None)
     return RedirectResponse(f"/servers/{guild_id}/social/{provider}?saved=connected", status_code=303)
 
 
@@ -307,7 +307,7 @@ async def youtube_webhook_verify(request: Request):
         topic = request.query_params.get("hub.topic", "")
         channel_id = parse_qs(urlparse(topic).query).get("channel_id", [""])[0]
         if channel_id:
-            storage.invalidate_social_target("youtube", channel_id, request.query_params.get("hub.reason", "WebSub subscription denied"))
+            social_repository.invalidate_social_target("youtube", channel_id, request.query_params.get("hub.reason", "WebSub subscription denied"))
     return PlainTextResponse(request.query_params.get("hub.challenge", ""))
 
 
@@ -330,7 +330,7 @@ async def youtube_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Invalid YouTube webhook payload")
     if not video_id or not account_id:
         raise HTTPException(status_code=400, detail="YouTube event is incomplete")
-    storage.wake_social_target("youtube", account_id)
+    social_repository.wake_social_target("youtube", account_id)
     return PlainTextResponse("ok")
 
 
@@ -352,7 +352,7 @@ async def twitch_webhook(request: Request):
         condition = (payload.get("subscription") or {}).get("condition") or {}
         account = str(condition.get("broadcaster_user_id", ""))
         if account:
-            storage.invalidate_social_target("twitch", account, str((payload.get("subscription") or {}).get("status") or "EventSub subscription revoked"))
+            social_repository.invalidate_social_target("twitch", account, str((payload.get("subscription") or {}).get("status") or "EventSub subscription revoked"))
         return PlainTextResponse("ok")
     event, subscription = payload.get("event") or {}, payload.get("subscription") or {}
     raw_type = str(subscription.get("type", ""))
@@ -362,7 +362,7 @@ async def twitch_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Unsupported Twitch event")
     external_id = str(event.get("id") or message_id)
     handle = str(event.get("broadcaster_user_login", ""))
-    storage.enqueue_social_event_v2("twitch", external_id, account_id, event_type, {
+    social_repository.enqueue_social_event_v2("twitch", external_id, account_id, event_type, {
         "account": event.get("broadcaster_user_name") or handle, "handle": handle, "title": event.get("title") or "配信を開始しました",
         "text": "", "url": f"https://twitch.tv/{handle}", "platform": "Twitch", "event": event_type, "type": event_type,
         "published_at": event.get("started_at", ""), "thumbnail": "", "avatar": "", "viewer_count": "",

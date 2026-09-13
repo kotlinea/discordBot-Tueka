@@ -6,20 +6,22 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from storage import GuildStorage
+from engagement import EngagementRepository
+from guild_settings import GuildSettingsRepository
 
 
 class EngagementCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.storage = GuildStorage(bot.settings.database_path)
+        self.engagement_repository = EngagementRepository(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
         self.close_expired_polls.start()
 
     def cog_unload(self) -> None:
         self.close_expired_polls.cancel()
 
     async def _enabled(self, interaction: discord.Interaction, module: str) -> bool:
-        if interaction.guild is None or not self.storage.module_enabled(interaction.guild.id, module):
+        if interaction.guild is None or not self.guild_settings.module_enabled(interaction.guild.id, module):
             await interaction.response.send_message("この機能は管理者により無効です。", ephemeral=True)
             return False
         return True
@@ -58,7 +60,7 @@ class EngagementCog(commands.Cog):
         message = await interaction.original_response()
         assert interaction.guild is not None and interaction.channel is not None
         closes_at = int(time.time()) + duration_minutes * 60 if duration_minutes else None
-        self.storage.create_poll(message.id, interaction.guild.id, interaction.channel.id, interaction.user.id, question, choices, image_url, closes_at)
+        self.engagement_repository.create_poll(message.id, interaction.guild.id, interaction.channel.id, interaction.user.id, question, choices, image_url, closes_at)
         await message.edit(view=self._view(message.id, choices))
 
     @commands.Cog.listener()
@@ -73,11 +75,11 @@ class EngagementCog(commands.Cog):
             message_id, option = int(message_id), int(raw_option)
         except ValueError:
             return
-        poll = self.storage.poll(message_id)
-        if not poll or poll["guild_id"] != interaction.guild.id or not self.storage.module_enabled(interaction.guild.id, "advanced_polls"):
+        poll = self.engagement_repository.poll(message_id)
+        if not poll or poll["guild_id"] != interaction.guild.id or not self.guild_settings.module_enabled(interaction.guild.id, "advanced_polls"):
             await interaction.response.send_message("この投票は現在利用できません。", ephemeral=True)
             return
-        counts = self.storage.cast_poll_vote(message_id, interaction.user.id, option)
+        counts = self.engagement_repository.cast_poll_vote(message_id, interaction.user.id, option)
         if counts is None:
             await interaction.response.send_message("この投票は終了しています。", ephemeral=True)
             return
@@ -85,7 +87,7 @@ class EngagementCog(commands.Cog):
 
     @tasks.loop(seconds=30)
     async def close_expired_polls(self) -> None:
-        for poll in self.storage.close_expired_polls():
+        for poll in self.engagement_repository.close_expired_polls():
             guild = self.bot.get_guild(poll["guild_id"])
             channel = guild.get_channel(poll["channel_id"]) if guild else None
             if not isinstance(channel, discord.TextChannel):

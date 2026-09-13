@@ -10,7 +10,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from storage import GuildStorage
+from guild_settings import GuildSettingsRepository
 
 
 MAX_EMBED_TOTAL_LENGTH = 6_000
@@ -92,7 +92,7 @@ class HelpView(discord.ui.View):
 class GeneralCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.storage = GuildStorage(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
 
     async def _available_commands(self, interaction: discord.Interaction, include_all: bool) -> list[tuple[str, list[app_commands.Command]]]:
         categories: dict[str, list[app_commands.Command]] = {}
@@ -102,7 +102,7 @@ class GeneralCog(commands.Cog):
                 cog_name = type(binding).__name__ if binding else "GeneralCog"
                 if not include_all:
                     module_id = _COG_MODULES.get(cog_name)
-                    if module_id and interaction.guild and not self.storage.module_enabled(interaction.guild.id, module_id):
+                    if module_id and interaction.guild and not self.guild_settings.module_enabled(interaction.guild.id, module_id):
                         continue
                     if cog_name == "AICog" and not getattr(binding, "client", None):
                         continue

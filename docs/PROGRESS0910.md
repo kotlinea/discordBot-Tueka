@@ -266,3 +266,37 @@
 - Inventory CLIの最終結果は履歴表込み65表104行、整合性成功・FK違反0。Migration CLIの再実行はapplied空・snapshotなし。Runtimeの4Repositoryに直接接続/DDLが残らないことを検索確認し、`git diff --check` 成功。
 - 正式Architecture・機能追加手順・Migration資料へ、共通DB境界、起動時拒否、条件付き列追加、テストDB準備を反映。最後の変更は進捗と実行計画のみ。
 - 判定：P2-1のローカル実装・テスト・Docs・レビューを完了。Phase 2全体は継続中で、Stage・遠隔本番DB適用は未実施。次はP2-2としてDashboardのSession/OAuth state/Preferences・Guild設定からDomain別Repositoryへ分離し、Community→Engagement→Social→Moderationへ依存順に進める。Ticket Serviceの直接SQLも移設対象とする。
+
+## 2026-09-13 — P2-2 Dashboard認証・個人設定の分離（継続中）
+
+- 現在の差分を保持して、GuildStorageのSession・Discord OAuth state・Preferencesの7メソッドと呼出し箇所を確認。`dashboard/repository.py` のDashboardRepositoryへSQLを移し、GuildStorageから該当メソッドを除去した。旧保存層への委譲や継承は追加していない。
+- DashboardのHTML/OAuth経路とJSON APIが専用Repositoryを直接使用する。共通database.pyのTransaction・Schema検査を利用し、Schema変更・追加Migrationはない。SocialのProvider OAuth stateは別DomainとしてまだGuildStorageに残る。
+- 既存のStorage/APIテストも専用Repositoryへ切り替えた。専用テストでSession期限境界・失効・再生成後の読取り、期限切れOAuth stateと並行消費の一回性、個人設定のユーザー分離・保存再読込・revision競合を確認した。共通DBの起動拒否/接続設定テストにも新Repositoryを追加した。
+- 初回回帰で新importがfuture importより前に置かれた問題を検出し修正。最終全PythonテストはWindows203件成功・44.148秒、固定Linuxコンテナ203件成功・60.163秒。ログ `.venv-p0/p2-dashboard-windows.log` / `p2-dashboard-linux.log`。実Discord/OAuth実動を行ったとは扱わない。
+- Architectureに現在の保存境界を反映し、`git diff --check` 成功。Frontendソース・Schema・保全DBは変更していない。本単位ではFrontend/Docs build・Playwrightは再実行していない。
+- 判定：Dashboard認証・個人設定の分離を完了したが、P2-2全体は未完了。次はGuild設定の保存とDomain固有正規化の境界を整理し、Community→Engagement→Social→ModerationのRepository分離とTicket Serviceの直接SQL移設へ進む。API URL・認可・保存往復・revision・無効化を維持する。既存差分のCommit/Stage/Resetは行っていない。
+
+## 2026-09-13 — P2-2 Guild設定の保存・正規化を分離（継続中）
+
+- 現在の作業ツリーを確認して継続。Guild Moduleのget/set/module_enabledを `guild_settings/repository.py` へ、7種の既定値/正規化関数を `guild_settings/models.py` へ移した。Schema・保存形式・既定値の動作は変更していない。
+- Dashboard APIのModule表示/保存・Social機能切替・Moderation有効判定はGuildSettingsRepositoryを直接利用する。未分離のCog向けにはGuildStorageの3メソッドを委譲窓口として一時的に残した。巨大保存層への新しい設定SQL追加は不要になったが、P2-2全体の分離はまだ完了していない。
+- ModerationのRule更新と同じTransactionで実行するguild_modules更新は維持し、純粋なmoderation_settings関数だけを参照するよう変更した。Transactionを分断しないため、そのSQLはModeration Repositoryへ移す単位で整理する。有効Guild一覧やTrust連携の直接SQLも残作業として把握した。
+- 専用テストでGuild分離、無効化時の設定保持、再生成後の読取り、revision競合、DBを使わない正規化・入力辞書の非変更を確認。共通DBの起動拒否・接続ポリシーテストにもGuildSettingsRepositoryを追加した。
+- 最終全Pythonテスト：Windows205件成功・44.648秒、固定Linuxコンテナ205件成功・60.484秒。ログ `.venv-p0/p2-guild-windows.log` / `p2-guild-linux.log`。Architectureへ保存境界と一時委譲・未分離部分を明記し、`git diff --check` 成功。Frontend/Schema/保全DBは変更せず、本単位のDocs build・Playwright再実行は行っていない。
+- 次はCommunity側の一時VC・レベリング等の保存と呼出し先を整理する。有効Guild一覧は設定Repositoryへ移し、Cogが設定とDomain保存を明示的に使う構成へ進める。続いてEngagement、Social、Moderation、Ticket Serviceの直接SQLを扱う。P2-2・Phase 2・Goal全体は継続中。Commit/Stage/Resetは行っていない。
+
+## 2026-09-14 — P2-2 Domain別Repository分離を完了
+
+- 前回までのDashboard認証・個人設定、Guild設定の分離に続き、Community→Engagement→Social→Moderationの順にSQLと呼出し先を整理した。Domainの途中で本単位の完了とはせず、Ticketの直接SQL移設と全回帰まで実行した。
+- `community/repository.py` に一時VC・テキスト/音声XPの9メソッド、`engagement/repository.py` にPollの4メソッド、`social/repository.py` に35メソッド、`moderation/repository.py` に37メソッドを配置。有効Guild一覧はGuildSettingsRepositoryへ移した。接続・Schema検査は全9種類のRepositoryが共通database.pyを使用する。
+- Cogは設定とDomain保存を明示的に生成し、ModerationServiceには両Repositoryを注入する。Dashboard APIはDBパスから必要なRepositoryを直接生成。HTTP URL・認可・CSRF・revision契約は維持した。旧GuildStorageと一時委譲窓口を含む `storage.py` を除去した。
+- ファイル構造をDomain構造へ合わせ、Socialのモデル・暗号化・Provider・Webhook・Worker実装を `social/` に移設。`social_worker.py` は既存CLIを維持する薄い入口とした。従来 `automod/` にあったモデル・Engine・Adapter・ModerationServiceは `moderation/` に統合し、呼出しとテストのimportを更新した。
+- ModerationのRuleとrules_revision、CaseとTrustイベントは同一Transactionを維持した。移設した85メソッドのSQL文字列をHEADの旧保存層とAST比較し、変更0件を確認。Schemaと0001〜0007は変更していない。
+- Ticket ServiceのBlacklist照会に加え、Cogの当番一覧・Panel移動・Tag・自動Close除外・削除記録もTicketRepositoryへ移した。Service / Cog / API / Workerに直接SQLやRepositoryの接続内部呼出しを残さない境界テストを追加した。
+- Communityの並行XP加算・Guild分離・一時VC再読込、Pollの投票変更・期限・Message分離、TicketのBlacklist/Guild境界・Tag正規化・revision/再読込を検証。Audit Logが設定だけでなくModerationイベントを書き込むことを特定し、専用保存先へ接続してDiscord送信後の永続化テストを追加した。
+- 初回のDomain回帰でテストが旧 `storage` 属性を参照する6件を検出し、実際の設定/Domain境界へ変更。移動後の既存207件が成功した後、新規契約テストを含む最終全回帰を実行した。
+- 最終Windows Python 3.13：211件成功・157.608秒。固定Linux Python 3.13コンテナ：211件成功・106.193秒。ログ `.venv-p0/p2-domain-final-windows.log` / `p2-domain-final-linux.log`。Docs build成功・9.82秒、ログ `.venv-p0/p2-domain-docs.log`。Frontend変更はなく、本単位ではFrontend/Playwrightは再実行していない。
+- P2-1最終保全DBから `data/backups/p2-domains-0914/final.sqlite3` を新規複製。9種類のRepositoryを2回生成後も元の全SQL Dumpと一致。履歴込み65表104行、整合性成功・FK違反0。検査結果の表示で整数にlenを使ったミスだけを修正して再読取り確認した。原DBと既存保全DBを変更していない。
+- 正式ArchitectureにDomain別の配置・Transaction所有・CLIの入口と実装の境界を記載。実行計画の現在地をP2-3へ更新し、過去の調査表は履歴として保持。`git diff --check` 成功。Commit/Stage/Resetは行っていない。
+- 判定：P2-2のローカル実装・テスト・正式Docsを完了。Phase 2全体とGoalは未完了。次はP2-3として4DomainのClaim/Lease/Retry/期限処理を比較し、共通Protocol/Runnerと所有者・失効・重複・Dead Letter・Retentionの契約を実装する。必要なSchema追加は0008以降。Discord操作分離はP2-4、Router/UIはP2-5/6へ順番に進む。
+- Stage実Discord/OAuth/Webhook、遠隔本番DB適用、実Transcript/S3復元は未実施のリリースゲートとして継続する。ローカルのP2-2完了をPhase 2全体・本番移行・Goal達成とは扱わない。

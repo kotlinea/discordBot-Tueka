@@ -6,8 +6,9 @@ import socket
 import discord
 from discord.ext import commands, tasks
 
-from storage import GuildStorage
-from social_models import default_templates, render_template
+from social import SocialRepository
+from guild_settings import GuildSettingsRepository
+from social.models import default_templates, render_template
 
 
 MODULE_FOR_PROVIDER = {"youtube": "youtube_updates", "twitch": "twitch_updates", "tiktok": "tiktok_updates", "x": "x_updates", "instagram": "instagram_updates"}
@@ -16,7 +17,8 @@ MODULE_FOR_PROVIDER = {"youtube": "youtube_updates", "twitch": "twitch_updates",
 class SocialUpdatesCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.storage = GuildStorage(bot.settings.database_path)
+        self.social_repository = SocialRepository(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
         self.owner = f"discord:{socket.gethostname()}:{os.getpid()}"
         self.deliver_events.start()
 
@@ -57,18 +59,18 @@ class SocialUpdatesCog(commands.Cog):
         payload = event["payload"]
         event_type = str(event["event_type"])
         retry_needed = False
-        for subscription in self.storage.matching_social_subscriptions(event["provider"], event["account_id"], event_type):
-            if not self.storage.module_enabled(subscription["guild_id"], MODULE_FOR_PROVIDER[event["provider"]]):
+        for subscription in self.social_repository.matching_social_subscriptions(event["provider"], event["account_id"], event_type):
+            if not self.guild_settings.module_enabled(subscription["guild_id"], MODULE_FOR_PROVIDER[event["provider"]]):
                 continue
             guild = self.bot.get_guild(subscription["guild_id"])
             channel_id = int(subscription.get("event_channels", {}).get(event_type) or subscription["channel_id"])
             channel = guild.get_channel(channel_id) if guild else None
             if not isinstance(channel, discord.TextChannel):
-                if self.storage.record_social_delivery(subscription["id"], event["event_key"], channel_id, None, "pending"):
-                    self.storage.fail_social_delivery(subscription["id"], event["event_key"], "Discord channel is unavailable", retry=False)
+                if self.social_repository.record_social_delivery(subscription["id"], event["event_key"], channel_id, None, "pending"):
+                    self.social_repository.fail_social_delivery(subscription["id"], event["event_key"], "Discord channel is unavailable", retry=False)
                 continue
             if event_type == "live_end":
-                saved = self.storage.social_live_message(subscription["id"], event["provider"], event["account_id"])
+                saved = self.social_repository.social_live_message(subscription["id"], event["provider"], event["account_id"])
                 if saved:
                     saved_channel = guild.get_channel(saved["discord_channel_id"])
                     if isinstance(saved_channel, discord.TextChannel):
@@ -76,38 +78,38 @@ class SocialUpdatesCog(commands.Cog):
                             message = await saved_channel.fetch_message(saved["discord_message_id"])
                             _, ended_embed = self._notification(subscription, event_type, payload)
                             await message.edit(embed=ended_embed, allowed_mentions=discord.AllowedMentions.none())
-                            self.storage.record_social_delivery(subscription["id"], event["event_key"], saved_channel.id, message.id, "sent")
-                            self.storage.clear_social_live_message(subscription["id"], event["provider"], event["account_id"])
+                            self.social_repository.record_social_delivery(subscription["id"], event["event_key"], saved_channel.id, message.id, "sent")
+                            self.social_repository.clear_social_live_message(subscription["id"], event["provider"], event["account_id"])
                             continue
                         except discord.NotFound:
                             pass
                         except discord.HTTPException as exc:
                             retry_needed = True
-                            self.storage.fail_social_delivery(subscription["id"], event["event_key"], str(exc), retry=True)
+                            self.social_repository.fail_social_delivery(subscription["id"], event["event_key"], str(exc), retry=True)
                             continue
-            if not self.storage.record_social_delivery(subscription["id"], event["event_key"], channel.id, None, "pending"):
+            if not self.social_repository.record_social_delivery(subscription["id"], event["event_key"], channel.id, None, "pending"):
                 continue
             text, embed = self._notification(subscription, event_type, payload)
             role = guild.get_role(subscription["role_id"]) if subscription["role_id"] else None
             content = f"{role.mention}\n{text}" if role else text
             try:
                 message = await channel.send(content=content or None, embed=embed, allowed_mentions=discord.AllowedMentions(everyone=False, users=False, roles=[role] if role else False))
-                self.storage.update_social_delivery(subscription["id"], event["event_key"], message.id)
+                self.social_repository.update_social_delivery(subscription["id"], event["event_key"], message.id)
                 if event_type == "live_start":
-                    self.storage.set_social_live_message(subscription["id"], event["provider"], event["account_id"], channel.id, message.id)
+                    self.social_repository.set_social_live_message(subscription["id"], event["provider"], event["account_id"], channel.id, message.id)
             except discord.HTTPException as exc:
                 retry = not isinstance(exc, discord.Forbidden) and getattr(exc, "status", 500) in {429, 500, 502, 503, 504}
-                self.storage.fail_social_delivery(subscription["id"], event["event_key"], str(exc), retry=retry)
+                self.social_repository.fail_social_delivery(subscription["id"], event["event_key"], str(exc), retry=retry)
                 retry_needed = retry_needed or retry
         return not retry_needed
 
     @tasks.loop(seconds=5)
     async def deliver_events(self) -> None:
-        for event in self.storage.claim_social_events(self.owner, limit=10, lease_seconds=120):
+        for event in self.social_repository.claim_social_events(self.owner, limit=10, lease_seconds=120):
             if await self._deliver(event):
-                self.storage.mark_social_event_processed(event["id"])
+                self.social_repository.mark_social_event_processed(event["id"])
             else:
-                self.storage.retry_social_event(event["id"], "One or more Discord deliveries need retry")
+                self.social_repository.retry_social_event(event["id"], "One or more Discord deliveries need retry")
 
     @deliver_events.before_loop
     async def before_deliver_events(self) -> None:

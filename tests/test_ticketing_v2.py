@@ -27,6 +27,34 @@ class TicketV2Tests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def test_extracted_persistence_operations_preserve_scope_and_revision(self):
+        repository = self.repository
+        repository.set_blacklist(1, 10, 99, 'blocked')
+        self.assertTrue(repository.is_blacklisted(1, 10))
+        self.assertFalse(repository.is_blacklisted(2, 10))
+        with self.assertRaises(TicketValidationError) as rejected:
+            self.service.validate_open(1, self.panel['id'], 10, set())
+        self.assertEqual(rejected.exception.code, 'blacklisted')
+        repository.set_blacklist(1, 10, 99, None)
+        repository.set_on_call(1, self.team['id'], 99, True)
+        self.assertEqual(repository.on_call_members(1, self.team['id']), [99])
+        self.assertEqual(repository.on_call_members(2, self.team['id']), [])
+        repository.save_tag(1, 'Greeting', 'Hello', 99)
+        self.assertEqual(repository.tag(1, 'GREETING'), {'content': 'Hello'})
+        self.assertIsNone(repository.tag(2, 'Greeting'))
+        ticket, _ = self.service.reserve(1, self.panel['id'], 10, 'persist', set())
+        self.assertFalse(repository.transfer_panel(ticket['id'], self.panel['id']))
+        ticket = repository.activate_ticket(ticket['id'], 200, 100)
+        revision = ticket['revision']
+        self.assertTrue(repository.transfer_panel(ticket['id'], self.panel['id']))
+        repository.set_auto_close_excluded(ticket['id'], True)
+        repository.mark_deleted(ticket['id'], 123)
+        restarted = TicketRepository(repository.database_path)
+        saved = restarted.ticket(ticket['id'])
+        self.assertEqual(saved['revision'], revision + 3)
+        self.assertTrue(saved['auto_close_excluded'])
+        self.assertEqual(saved['deleted_at'], 123)
+
     def test_form_and_panel_limits(self):
         with self.assertRaises(ValueError):
             validate_form({"name": "Too many", "fields": [{"label": str(index)} for index in range(6)]})

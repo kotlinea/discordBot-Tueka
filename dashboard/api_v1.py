@@ -1,21 +1,25 @@
-from dashboard.repository import DashboardRepository
 """Versioned JSON API consumed by the dashboard v2 SPA."""
 from __future__ import annotations
+from dashboard.repository import DashboardRepository
+from guild_settings import GuildSettingsRepository
 
 import secrets
 import sqlite3
 import time
 import importlib.util
 from typing import Any
+from pathlib import Path
+from social import SocialRepository
+from moderation import ModerationRepository
 from urllib.parse import quote
 
 from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import Response
 
-from automod import AutoModEngine, MessageContext, default_rule, validate_rule
+from moderation import AutoModEngine, MessageContext, default_rule, validate_rule
 from dashboard.discord_api import ADMINISTRATOR, PERMISSION_BITS
 from feature_registry import FEATURES, get_feature, japanese_copy
-from social_models import PROVIDERS, PROVIDER_EVENTS, TEMPLATE_VARIABLES, default_templates, normalize_account, render_template, validate_subscription
+from social.models import PROVIDERS, PROVIDER_EVENTS, TEMPLATE_VARIABLES, default_templates, normalize_account, render_template, validate_subscription
 from ticketing import TicketRepository, TicketService, TicketValidationError, TranscriptStorage, default_deployment, default_panel, validate_form, validate_panel, validate_panel_bundle, validate_settings
 from reaction_roles import ReactionRoleRepository, ReactionRoleService, ReactionRoleValidationError
 from suggestions import SuggestionRepository, SuggestionValidationError, normalize_settings as normalize_suggestion_settings
@@ -86,9 +90,12 @@ def _serialize_rule_resource_ids(rule: dict[str, Any]) -> dict[str, Any]:
     return serialized
 
 
-def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -> APIRouter:
+def create_api_router(database_path: str | Path, discord: Any, settings: Any | None = None) -> APIRouter:
     router = APIRouter(prefix="/api/v1")
-    dashboard_repository = DashboardRepository(storage.database_path)
+    social_repository = SocialRepository(database_path)
+    moderation_repository = ModerationRepository(database_path)
+    dashboard_repository = DashboardRepository(database_path)
+    guild_settings_repository = GuildSettingsRepository(database_path)
     ticket_repository = TicketRepository(settings.database_path) if settings is not None else None
     ticket_transcripts = TranscriptStorage(settings.data_dir / "ticket-transcripts", settings.ticket_encryption_key, s3={
         "endpoint_url": settings.ticket_s3_endpoint_url, "region": settings.ticket_s3_region, "bucket": settings.ticket_s3_bucket,
@@ -98,7 +105,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
     ticket_service = TicketService(ticket_repository, ticket_transcripts) if ticket_repository and ticket_transcripts else None
     reaction_role_repository = ReactionRoleRepository(settings.database_path) if settings is not None else None
     reaction_role_service = ReactionRoleService(reaction_role_repository, max_mappings=settings.reaction_role_max_mappings_per_message) if reaction_role_repository and settings else None
-    suggestion_repository = SuggestionRepository(storage.database_path)
+    suggestion_repository = SuggestionRepository(database_path)
 
     def token(request: Request) -> str:
         session_id = request.session.get("session_id")
@@ -228,7 +235,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
             value = repository.settings(guild_id) if repository else {'enabled': False, 'revision': 0}
             module = {'enabled': value['enabled'], 'revision': value['revision'], 'settings': value}
         else:
-            module = storage.get_module(guild_id, feature.id)
+            module = guild_settings_repository.get_module(guild_id, feature.id)
         missing = [] if bot_permissions & ADMINISTRATOR else [name for name in feature.required_bot_permissions if not bot_permissions & PERMISSION_BITS[name]]
         title, description = japanese_copy(feature.id)
         return {
@@ -246,7 +253,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         return {
             "guild_id": str(guild_id), "features": features,
             "resources": {"channels": channels, "roles": roles, "bot_permissions": str(permissions)},
-            "moderation": {"summary": storage.moderation_summary(guild_id), "events": storage.recent_moderation_events(guild_id, limit=10), "lockdown": storage.active_lockdown(guild_id)},
+            "moderation": {"summary": moderation_repository.moderation_summary(guild_id), "events": moderation_repository.recent_moderation_events(guild_id, limit=10), "lockdown": moderation_repository.active_lockdown(guild_id)},
         }
 
     @router.get("/guilds/{guild_id}/features")
@@ -288,7 +295,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
             missing = [] if permissions & ADMINISTRATOR else [name for name in required if not permissions & PERMISSION_BITS[name]]
             if enabled and missing:
                 raise SuggestionValidationError("permissions", f"Bot権限が不足しています: {', '.join(missing)}")
-            saved = storage.set_module(
+            saved = guild_settings_repository.set_module(
                 guild_id, "suggestions", enabled=enabled, settings=value,
                 expected_revision=int(body["revision"]) if body.get("revision") is not None else None,
             )
@@ -322,7 +329,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         }[provider]
 
     def social_payload(subscription: dict[str, Any]) -> dict[str, Any]:
-        target = storage.social_target(int(subscription["target_id"])) if subscription.get("target_id") else None
+        target = social_repository.social_target(int(subscription["target_id"])) if subscription.get("target_id") else None
         public_target = ({key: target.get(key) for key in ("id", "provider", "account_key", "external_id", "handle", "display_name", "avatar_url", "status", "last_error", "last_checked_at", "revision")} if target else None)
         return {
             **subscription,
@@ -335,8 +342,8 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
     @router.get("/guilds/{guild_id}/social")
     async def social_summary(request: Request, guild_id: int) -> dict[str, Any]:
         await manage(request, guild_id)
-        health = storage.social_worker_health()
-        subscriptions = storage.social_subscriptions(guild_id)
+        health = social_repository.social_worker_health()
+        subscriptions = social_repository.social_subscriptions(guild_id)
         return {"providers": [{"id": provider, "available": provider_available(provider), "events": list(PROVIDER_EVENTS[provider]),
             "count": sum(1 for item in subscriptions if item["provider"] == provider),
             "limit": int(getattr(settings, "social_max_subscriptions_per_provider", 10))} for provider in PROVIDERS],
@@ -347,7 +354,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         if provider not in PROVIDERS:
             raise HTTPException(404, detail={"code": "provider_not_found", "message": "通知サービスが見つかりません。"})
         await manage(request, guild_id)
-        return {"items": [social_payload(item) for item in storage.social_subscriptions(guild_id, provider)],
+        return {"items": [social_payload(item) for item in social_repository.social_subscriptions(guild_id, provider)],
                 "available": provider_available(provider), "events": list(PROVIDER_EVENTS[provider]),
                 "limit": int(getattr(settings, "social_max_subscriptions_per_provider", 10)),
                 "variables": list(TEMPLATE_VARIABLES), "defaults": default_templates(provider)}
@@ -374,8 +381,8 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         await manage(request, guild_id, live=True)
         try:
             value = await checked_social_body(request, guild_id, provider)
-            saved = storage.save_social_subscription_v2(guild_id, provider, max_count=int(getattr(settings, "social_max_subscriptions_per_provider", 10)), **value)
-            storage.set_module(guild_id, f"{provider}_updates", enabled=any(bool(item["enabled"]) for item in storage.social_subscriptions(guild_id, provider)))
+            saved = social_repository.save_social_subscription_v2(guild_id, provider, max_count=int(getattr(settings, "social_max_subscriptions_per_provider", 10)), **value)
+            guild_settings_repository.set_module(guild_id, f"{provider}_updates", enabled=any(bool(item["enabled"]) for item in social_repository.social_subscriptions(guild_id, provider)))
             return social_payload(saved)
         except OverflowError as exc:
             raise HTTPException(422, detail={"code": "social_limit", "message": "このサービスで登録できる上限に達しています。"}) from exc
@@ -386,7 +393,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
     async def update_social_subscription(request: Request, guild_id: int, provider: str, subscription_id: int) -> dict[str, Any]:
         csrf(request)
         await manage(request, guild_id, live=True)
-        current = storage.social_subscription(subscription_id)
+        current = social_repository.social_subscription(subscription_id)
         if not current or int(current["guild_id"]) != guild_id or current["provider"] != provider:
             raise HTTPException(404, detail={"code": "subscription_not_found", "message": "登録が見つかりません。"})
         try:
@@ -394,9 +401,9 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
             value = await checked_social_body(request, guild_id, provider, body)
             if value["account_key"] != normalize_account(provider, str(current["account_id"])):
                 raise ValueError("対象アカウントは変更できません。新しい登録を作成してください。")
-            saved = storage.save_social_subscription_v2(guild_id, provider, subscription_id=subscription_id,
+            saved = social_repository.save_social_subscription_v2(guild_id, provider, subscription_id=subscription_id,
                 expected_revision=int(body["revision"]) if body.get("revision") is not None else None, **value)
-            storage.set_module(guild_id, f"{provider}_updates", enabled=any(bool(item["enabled"]) for item in storage.social_subscriptions(guild_id, provider)))
+            guild_settings_repository.set_module(guild_id, f"{provider}_updates", enabled=any(bool(item["enabled"]) for item in social_repository.social_subscriptions(guild_id, provider)))
             return social_payload(saved)
         except RuntimeError as exc:
             raise HTTPException(409, detail={"code": "revision_conflict", "message": "別の管理者がこの登録を更新しました。再読み込みしてください。"}) from exc
@@ -407,22 +414,22 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
     async def delete_social_subscription(request: Request, guild_id: int, provider: str, subscription_id: int, if_match: str | None = Header(default=None)) -> None:
         csrf(request)
         await manage(request, guild_id, live=True)
-        current = storage.social_subscription(subscription_id)
+        current = social_repository.social_subscription(subscription_id)
         if not current or int(current["guild_id"]) != guild_id or current["provider"] != provider:
             raise HTTPException(404, detail={"code": "subscription_not_found", "message": "登録が見つかりません。"})
         if if_match is not None and int(if_match.strip('"')) != int(current.get("revision", 1)):
             raise HTTPException(409, detail={"code": "revision_conflict", "message": "別の管理者がこの登録を更新しました。"})
-        storage.delete_social_subscription(guild_id, subscription_id)
-        storage.set_module(guild_id, f"{provider}_updates", enabled=any(bool(item["enabled"]) for item in storage.social_subscriptions(guild_id, provider)))
+        social_repository.delete_social_subscription(guild_id, subscription_id)
+        guild_settings_repository.set_module(guild_id, f"{provider}_updates", enabled=any(bool(item["enabled"]) for item in social_repository.social_subscriptions(guild_id, provider)))
 
     @router.post("/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}/retry")
     async def retry_social_subscription(request: Request, guild_id: int, provider: str, subscription_id: int) -> dict[str, str]:
         csrf(request)
         await manage(request, guild_id, live=True)
-        current = storage.social_subscription(subscription_id)
+        current = social_repository.social_subscription(subscription_id)
         if not current or int(current["guild_id"]) != guild_id or current["provider"] != provider or not current.get("target_id"):
             raise HTTPException(404, detail={"code": "subscription_not_found", "message": "登録が見つかりません。"})
-        storage.request_social_target_retry(int(current["target_id"]))
+        social_repository.request_social_target_retry(int(current["target_id"]))
         return {"status": "pending"}
 
     @router.post("/guilds/{guild_id}/social/{provider}/preview")
@@ -1065,7 +1072,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
                                 raise ValueError('welcome_settings')
                 if not permissions & ADMINISTRATOR and any(not permissions & PERMISSION_BITS[name] for name in required):
                     raise ValueError('missing_permissions')
-            saved = storage.set_module(guild_id, module_id, enabled=bool(body.get("enabled")), settings=_normalize_resource_ids(values),
+            saved = guild_settings_repository.set_module(guild_id, module_id, enabled=bool(body.get("enabled")), settings=_normalize_resource_ids(values),
                                        expected_revision=int(body["revision"]) if body.get("revision") is not None else None)
             return {**saved, "settings": _serialize_resource_ids(saved["settings"])}
         except RuntimeError as exc:
@@ -1078,12 +1085,12 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         if family not in FAMILY_TRIGGERS:
             raise HTTPException(404, detail={"code": "family_not_found", "message": "ルール種別が見つかりません。"})
         await manage(request, guild_id)
-        return {"items": [_serialize_rule_resource_ids(item) for item in storage.moderation_rules(guild_id, family=family)], "trigger_types": FAMILY_TRIGGERS[family]}
+        return {"items": [_serialize_rule_resource_ids(item) for item in moderation_repository.moderation_rules(guild_id, family=family)], "trigger_types": FAMILY_TRIGGERS[family]}
 
     @router.get("/guilds/{guild_id}/moderation/{family}/rules/{rule_id}")
     async def rule(request: Request, guild_id: int, family: str, rule_id: int) -> dict[str, Any]:
         await manage(request, guild_id)
-        value = storage.moderation_rule(guild_id, rule_id)
+        value = moderation_repository.moderation_rule(guild_id, rule_id)
         if not value or value["family"] != family:
             raise HTTPException(404, detail={"code": "rule_not_found", "message": "ルールが見つかりません。"})
         return _serialize_rule_resource_ids(value)
@@ -1111,8 +1118,8 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         await manage(request, guild_id, live=True)
         try:
             value = normalized_rule(await request.json(), family)
-            value["priority"] = storage.next_moderation_rule_priority(guild_id, family)
-            return _serialize_rule_resource_ids(storage.save_moderation_rule(guild_id, value))
+            value["priority"] = moderation_repository.next_moderation_rule_priority(guild_id, family)
+            return _serialize_rule_resource_ids(moderation_repository.save_moderation_rule(guild_id, value))
         except (TypeError, ValueError) as exc:
             raise HTTPException(422, detail={"code": "rule_invalid", "message": str(exc) or "ルールを確認してください。"}) from exc
 
@@ -1127,7 +1134,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
             items = body.get("items")
             if not isinstance(items, list):
                 raise ValueError("items")
-            return {"items": [_serialize_rule_resource_ids(item) for item in storage.reorder_moderation_rules(guild_id, family, items)]}
+            return {"items": [_serialize_rule_resource_ids(item) for item in moderation_repository.reorder_moderation_rules(guild_id, family, items)]}
         except RuntimeError as exc:
             raise HTTPException(409, detail={"code": "revision_conflict", "message": "別の管理者がルール一覧を更新しました。再読み込みしてください。"}) from exc
         except (TypeError, ValueError) as exc:
@@ -1137,7 +1144,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
     async def update_rule(request: Request, guild_id: int, family: str, rule_id: int) -> dict[str, Any]:
         csrf(request)
         await manage(request, guild_id, live=True)
-        body, current = await request.json(), storage.moderation_rule(guild_id, rule_id)
+        body, current = await request.json(), moderation_repository.moderation_rule(guild_id, rule_id)
         if not current or current["family"] != family:
             raise HTTPException(404, detail={"code": "rule_not_found", "message": "ルールが見つかりません。"})
         if body.get("revision") is not None and int(body["revision"]) != int(current["revision"]):
@@ -1145,7 +1152,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         try:
             value = normalized_rule(body, family)
             value["priority"] = current["priority"]
-            return _serialize_rule_resource_ids(storage.save_moderation_rule(guild_id, value, rule_id))
+            return _serialize_rule_resource_ids(moderation_repository.save_moderation_rule(guild_id, value, rule_id))
         except (TypeError, ValueError) as exc:
             raise HTTPException(422, detail={"code": "rule_invalid", "message": str(exc) or "ルールを確認してください。"}) from exc
 
@@ -1153,23 +1160,23 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
     async def delete_rule(request: Request, guild_id: int, family: str, rule_id: int, if_match: str | None = Header(default=None)) -> None:
         csrf(request)
         await manage(request, guild_id, live=True)
-        current = storage.moderation_rule(guild_id, rule_id)
+        current = moderation_repository.moderation_rule(guild_id, rule_id)
         if not current or current["family"] != family:
             raise HTTPException(404, detail={"code": "rule_not_found", "message": "ルールが見つかりません。"})
         if if_match is not None and int(if_match.strip('"')) != int(current["revision"]):
             raise HTTPException(409, detail={"code": "revision_conflict", "message": "別の管理者がルールを更新しました。"})
-        storage.delete_moderation_rule(guild_id, rule_id)
+        moderation_repository.delete_moderation_rule(guild_id, rule_id)
 
     @router.post("/guilds/{guild_id}/moderation/{family}/rules/{rule_id}/duplicate", status_code=201)
     async def duplicate_rule(request: Request, guild_id: int, family: str, rule_id: int) -> dict[str, Any]:
         csrf(request)
         await manage(request, guild_id, live=True)
-        current = storage.moderation_rule(guild_id, rule_id)
+        current = moderation_repository.moderation_rule(guild_id, rule_id)
         if not current or current["family"] != family:
             raise HTTPException(404, detail={"code": "rule_not_found", "message": "ルールが見つかりません。"})
         copy = {key: value for key, value in current.items() if key not in {"id", "guild_id", "revision", "created_at", "updated_at"}}
-        copy.update({"name": f"{current['name']} (コピー)"[:100], "enabled": False, "priority": storage.next_moderation_rule_priority(guild_id, family)})
-        return _serialize_rule_resource_ids(storage.save_moderation_rule(guild_id, validate_rule(copy)))
+        copy.update({"name": f"{current['name']} (コピー)"[:100], "enabled": False, "priority": moderation_repository.next_moderation_rule_priority(guild_id, family)})
+        return _serialize_rule_resource_ids(moderation_repository.save_moderation_rule(guild_id, validate_rule(copy)))
 
     @router.post("/guilds/{guild_id}/moderation/{family}/preview")
     async def preview(request: Request, guild_id: int, family: str) -> dict[str, Any]:
@@ -1193,12 +1200,12 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
     @router.get("/guilds/{guild_id}/moderation/events")
     async def events(request: Request, guild_id: int, family: str | None = None, user_id: int | None = None, limit: int = 50) -> dict[str, Any]:
         await manage(request, guild_id)
-        return {"items": storage.recent_moderation_events(guild_id, family=family, user_id=user_id, limit=limit)}
+        return {"items": moderation_repository.recent_moderation_events(guild_id, family=family, user_id=user_id, limit=limit)}
 
     @router.get("/guilds/{guild_id}/moderation/infractions/{user_id}")
     async def infractions(request: Request, guild_id: int, user_id: int) -> dict[str, Any]:
         await manage(request, guild_id)
-        return {"user_id": str(user_id), "active_points": storage.active_points(guild_id, user_id), "cases": storage.recent_cases(guild_id, user_id, 100)}
+        return {"user_id": str(user_id), "active_points": moderation_repository.active_points(guild_id, user_id), "cases": moderation_repository.recent_cases(guild_id, user_id, 100)}
 
     @router.post("/guilds/{guild_id}/moderation/actions", status_code=202)
     async def action(request: Request, guild_id: int) -> dict[str, Any]:
@@ -1208,7 +1215,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
         action_name, reason = str(body.get("action", "")), str(body.get("reason", "")).strip()[:500]
         if action_name not in ALLOWED_ACTIONS or not reason or body.get("confirmed") is not True:
             raise HTTPException(422, detail={"code": "action_invalid", "message": "処置、理由、確認内容を確認してください。"})
-        if not storage.module_enabled(guild_id, "moderation"):
+        if not guild_settings_repository.module_enabled(guild_id, "moderation"):
             raise HTTPException(409, detail={"code": "moderation_disabled", "message": "Moderationを有効にしてから処置を実行してください。"})
         try:
             target_user_id = int(body["target_user_id"]) if body.get("target_user_id") else None
@@ -1239,7 +1246,7 @@ def create_api_router(storage: Any, discord: Any, settings: Any | None = None) -
                 raise PermissionError(f"missing {permission}")
         except (TypeError, ValueError, PermissionError) as exc:
             raise HTTPException(422, detail={"code": "action_invalid", "message": "対象、チャンネル、Bot権限、確認入力を確認してください。"}) from exc
-        request_id = storage.enqueue_moderation_action(guild_id, int(user["id"]), action_name,
+        request_id = moderation_repository.enqueue_moderation_action(guild_id, int(user["id"]), action_name,
             target_user_id=target_user_id, channel_id=channel_id, reason=reason,
             options={"duration_minutes": max(1, min(int(body.get("duration_minutes", 10)), 525600)), "count": max(1, min(int(body.get("count", 10)), 100))},
             dedupe_key=f"dashboard-v2:{guild_id}:{secrets.token_urlsafe(16)}")

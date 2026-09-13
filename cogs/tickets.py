@@ -248,10 +248,8 @@ class TicketsCog(commands.Cog):
                     raise ValueError("thread_parent")
                 container = await parent.create_thread(name=name, type=discord.ChannelType.private_thread, invitable=False, reason=f"Ticket #{ticket['ticket_number']}")
                 await container.add_user(member)
-                with self.repository._connection() as connection:
-                    on_call = connection.execute("SELECT user_id FROM ticket_on_call WHERE guild_id=? AND team_id=?", (guild.id, int(panel.get("team_id") or 0))).fetchall()
-                for row in on_call:
-                    staff = guild.get_member(int(row["user_id"]))
+                for user_id in self.repository.on_call_members(guild.id, int(panel.get("team_id") or 0)):
+                    staff = guild.get_member(user_id)
                     if staff:
                         try: await container.add_user(staff)
                         except discord.HTTPException: pass
@@ -628,8 +626,7 @@ class TicketsCog(commands.Cog):
         current = self.repository.panel(interaction.guild_id or 0, int(ticket["panel_id"])) if ticket else None
         if not ticket or not panel or panel["mode"] != ticket["mode"] or not isinstance(interaction.user, discord.Member) or not await self._staff(interaction.user, current):
             await interaction.response.send_message("同じModeの有効なPanelを指定してください。", ephemeral=True); return
-        with self.repository._connection() as connection:
-            connection.execute("UPDATE tickets_v2 SET panel_id=?,claimed_by=NULL,revision=revision+1 WHERE id=? AND status='open'", (panel_id, ticket["id"]))
+        self.repository.transfer_panel(ticket["id"], panel_id)
         await interaction.response.send_message(f"Panelを {panel['name']} へ変更しました。", ephemeral=True)
 
     @ticket.command(name="stats", description="Ticketの概要を表示します。")
@@ -648,8 +645,7 @@ class TicketsCog(commands.Cog):
     async def tag(self, interaction: discord.Interaction, name: str) -> None:
         if not interaction.guild:
             return
-        with self.repository._connection() as connection:
-            row = connection.execute("SELECT content FROM ticket_tags WHERE guild_id=? AND name=?", (interaction.guild.id, name.lower())).fetchone()
+        row = self.repository.tag(interaction.guild.id, name)
         if not row:
             await interaction.response.send_message("Tagが見つかりません。", ephemeral=True); return
         await interaction.response.send_message(str(row["content"]), allowed_mentions=discord.AllowedMentions.none())
@@ -718,8 +714,7 @@ class TicketsCog(commands.Cog):
                     self.repository.complete_outbox(item["id"], self.owner)
                     continue
                 if action == "exclude_auto_close":
-                    with self.repository._connection() as connection:
-                        connection.execute("UPDATE tickets_v2 SET auto_close_excluded=?,revision=revision+1 WHERE id=?", (int(bool(item["payload"].get("excluded", True))), ticket["id"]))
+                    self.repository.set_auto_close_excluded(ticket["id"], bool(item["payload"].get("excluded", True)))
                     self.service.schedule_ticket(self.repository.ticket(ticket["id"]) or ticket)
                     self.repository.complete_outbox(item["id"], self.owner)
                     continue
@@ -737,8 +732,7 @@ class TicketsCog(commands.Cog):
                 if action == "delete":
                     if isinstance(channel, (discord.TextChannel, discord.Thread)):
                         await channel.delete(reason="Ticket deleted from dashboard")
-                    with self.repository._connection() as connection:
-                        connection.execute("UPDATE tickets_v2 SET deleted_at=?,revision=revision+1 WHERE id=?", (int(discord.utils.utcnow().timestamp()), ticket["id"]))
+                    self.repository.mark_deleted(ticket["id"], int(discord.utils.utcnow().timestamp()))
                     self.repository.complete_outbox(item["id"], self.owner)
                     continue
                 if not isinstance(channel, (discord.TextChannel, discord.Thread)):

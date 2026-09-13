@@ -15,7 +15,7 @@ class SuggestionsCogTests(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self.temp.cleanup)
         self.bot = SimpleNamespace(settings=SimpleNamespace(database_path=prepare_database(Path(self.temp.name) / 'test.db')))
         self.cog = SuggestionsCog(self.bot)
-        self.cog.storage.set_module(1, 'suggestions', enabled=True, settings={'channel_id': 10, 'review_role_ids': [40]})
+        self.cog.guild_settings.set_module(1, 'suggestions', enabled=True, settings={'channel_id': 10, 'review_role_ids': [40]})
         self.channel = MagicMock(spec=discord.TextChannel)
         self.channel.id = 10
         self.channel.send = AsyncMock(return_value=SimpleNamespace(id=100))
@@ -47,7 +47,7 @@ class SuggestionsCogTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_disabled_blocks_submit_and_existing_buttons(self):
         item = self.item()
-        self.cog.storage.set_module(1, 'suggestions', enabled=False)
+        self.cog.guild_settings.set_module(1, 'suggestions', enabled=False)
         await self.cog.submit_modal(self.interaction(), {}, {'idea': 'Ignored'})
         await self.cog.on_interaction(self.interaction(f"tueka-suggestion:vote:{item['id']}:up"))
         self.channel.send.assert_not_awaited()
@@ -79,7 +79,7 @@ class SuggestionsCogTests(unittest.IsolatedAsyncioTestCase):
         interaction = self.interaction(f"tueka-suggestion:vote:{item['id']}:up")
         interaction.message.id = 101
         await self.cog.on_interaction(interaction)
-        self.cog.storage.set_module(2, 'suggestions', enabled=True, settings={'channel_id': 10})
+        self.cog.guild_settings.set_module(2, 'suggestions', enabled=True, settings={'channel_id': 10})
         interaction.guild = SimpleNamespace(id=2)
         interaction.message.id = 100
         await self.cog.on_interaction(interaction)

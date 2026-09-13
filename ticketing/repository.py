@@ -472,6 +472,31 @@ class TicketRepository:
         with self._connection() as connection:
             return connection.execute("UPDATE ticket_close_requests SET status='expired' WHERE status='pending' AND expires_at<=?", (now or int(time.time()),)).rowcount
 
+    def is_blacklisted(self, guild_id: int, user_id: int) -> bool:
+        with self._connection() as connection:
+            return connection.execute("SELECT 1 FROM ticket_blacklist WHERE guild_id=? AND user_id=?", (guild_id, user_id)).fetchone() is not None
+
+    def on_call_members(self, guild_id: int, team_id: int) -> list[int]:
+        with self._connection() as connection:
+            return [int(row["user_id"]) for row in connection.execute("SELECT user_id FROM ticket_on_call WHERE guild_id=? AND team_id=?", (guild_id, team_id))]
+
+    def transfer_panel(self, ticket_id: int, panel_id: int) -> bool:
+        with self._connection() as connection:
+            return connection.execute("UPDATE tickets_v2 SET panel_id=?,claimed_by=NULL,revision=revision+1 WHERE id=? AND status='open'", (panel_id, ticket_id)).rowcount == 1
+
+    def tag(self, guild_id: int, name: str) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute("SELECT content FROM ticket_tags WHERE guild_id=? AND name=?", (guild_id, name.lower())).fetchone()
+        return dict(row) if row else None
+
+    def set_auto_close_excluded(self, ticket_id: int, excluded: bool) -> None:
+        with self._connection() as connection:
+            connection.execute("UPDATE tickets_v2 SET auto_close_excluded=?,revision=revision+1 WHERE id=?", (int(excluded), ticket_id))
+
+    def mark_deleted(self, ticket_id: int, deleted_at: int) -> None:
+        with self._connection() as connection:
+            connection.execute("UPDATE tickets_v2 SET deleted_at=?,revision=revision+1 WHERE id=?", (deleted_at, ticket_id))
+
     def set_blacklist(self, guild_id: int, user_id: int, actor_id: int, reason: str | None) -> None:
         with self._connection() as connection:
             if reason is None:

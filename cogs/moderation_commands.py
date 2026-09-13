@@ -5,8 +5,9 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from automod.service import ActionContext, ModerationService
-from storage import GuildStorage
+from moderation.service import ActionContext, ModerationService
+from moderation import ModerationRepository
+from guild_settings import GuildSettingsRepository
 
 
 class ModerationCommandsCog(commands.Cog):
@@ -14,11 +15,12 @@ class ModerationCommandsCog(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.storage = GuildStorage(bot.settings.database_path)
-        self.service = ModerationService(bot, self.storage)
+        self.moderation_repository = ModerationRepository(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
+        self.service = ModerationService(bot, self.moderation_repository, self.guild_settings)
 
     async def _enabled(self, interaction: discord.Interaction) -> bool:
-        if interaction.guild is None or not self.storage.module_enabled(interaction.guild.id, "moderation"):
+        if interaction.guild is None or not self.guild_settings.module_enabled(interaction.guild.id, "moderation"):
             await interaction.response.send_message("Moderationは無効です。", ephemeral=True)
             return False
         return True
@@ -83,7 +85,7 @@ class ModerationCommandsCog(commands.Cog):
         try:
             target_id = int(user_id)
             await interaction.guild.unban(discord.Object(id=target_id), reason=reason)
-            case_id = self.storage.add_case(interaction.guild.id,target_id,"unban",reason,interaction.user.id,source="manual")
+            case_id = self.moderation_repository.add_case(interaction.guild.id,target_id,"unban",reason,interaction.user.id,source="manual")
         except (ValueError,discord.NotFound,discord.Forbidden,discord.HTTPException) as exc:
             await interaction.response.send_message(f"Banを解除できません: {exc}",ephemeral=True)
             return
@@ -94,7 +96,7 @@ class ModerationCommandsCog(commands.Cog):
         if not await self._enabled(interaction):
             return
         assert interaction.guild is not None
-        event_id = self.storage.create_moderation_event(interaction.guild.id,family="infraction",event_type="infraction_change",
+        event_id = self.moderation_repository.create_moderation_event(interaction.guild.id,family="infraction",event_type="infraction_change",
             source="manual",reason=reason or action,actor_id=interaction.user.id,target_user_id=None,
             channel_id=channel.id if channel else None,dedupe_key=f"interaction:{interaction.id}")
         if event_id is None:
@@ -105,7 +107,7 @@ class ModerationCommandsCog(commands.Cog):
         if action == "lockdown": value["duration_minutes"] = duration
         results = await self.service.execute_actions(ActionContext(interaction.guild,channel=channel,actor=interaction.user),
             {"family":"infraction","name":"Manual action","mode":"enforce","actions":[value]},reason or action,event_id,{})
-        self.storage.finish_moderation_event(event_id,results)
+        self.moderation_repository.finish_moderation_event(event_id,results)
         await interaction.response.send_message(f"処理結果: {results[0]['status']} · Event #{event_id}",ephemeral=True)
 
     @mod.command(name="purge", description="最近のメッセージを削除します。")

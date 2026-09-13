@@ -9,7 +9,8 @@ from typing import Any
 
 import discord
 
-from storage import GuildStorage
+from moderation import ModerationRepository
+from guild_settings import GuildSettingsRepository
 
 
 LOGGER = logging.getLogger(__name__)
@@ -27,8 +28,9 @@ class ActionContext:
 
 
 class ModerationService:
-    def __init__(self, bot: discord.Client, storage: GuildStorage) -> None:
-        self.bot, self.storage = bot, storage
+    def __init__(self, bot: discord.Client, repository: ModerationRepository, guild_settings: GuildSettingsRepository) -> None:
+        self.bot, self.repository = bot, repository
+        self.guild_settings = guild_settings
 
     @staticmethod
     def manageable(actor: discord.Member | None, target: discord.Member, action: str) -> str | None:
@@ -57,21 +59,21 @@ class ModerationService:
     def _log_channel(self, guild: discord.Guild, automod_settings: dict[str, Any] | None = None) -> discord.TextChannel | None:
         channel_id = (automod_settings or {}).get("log_channel_id")
         if not channel_id:
-            logs = self.storage.get_module(guild.id, "moderation_logs")
+            logs = self.guild_settings.get_module(guild.id, "moderation_logs")
             if logs["enabled"]:
                 channel_id = logs["settings"].get("log_channel_id")
         if not channel_id:
-            core = self.storage.get_module(guild.id, "moderation")
+            core = self.guild_settings.get_module(guild.id, "moderation")
             channel_id = core["settings"].get("default_log_channel_id")
         if not channel_id:
-            audit = self.storage.get_module(guild.id, "audit_log")
+            audit = self.guild_settings.get_module(guild.id, "audit_log")
             if audit["enabled"]:
                 channel_id = audit["settings"].get("management_channel_id")
         channel = guild.get_channel(int(channel_id)) if channel_id else None
         return channel if isinstance(channel, discord.TextChannel) else None
 
     async def log_manual(self, guild: discord.Guild, title: str, description: str, *, category: str = "admin") -> None:
-        logs = self.storage.get_module(guild.id, "moderation_logs")
+        logs = self.guild_settings.get_module(guild.id, "moderation_logs")
         if logs["enabled"] and not logs["settings"].get(f"log_{category}", False):
             return
         channel = self._log_channel(guild)
@@ -111,11 +113,11 @@ class ModerationService:
         else:
             raise ValueError("Unknown moderation action")
         dm_sent = await self.dm(member, f"{guild.name}で {action} が実行されました。理由: {reason or 'なし'}") if notify else False
-        case_id = self.storage.add_case(guild.id, member.id, action, reason, moderator_id, expires_at, dm_sent,
+        case_id = self.repository.add_case(guild.id, member.id, action, reason, moderator_id, expires_at, dm_sent,
             moderation_event_id=moderation_event_id,
             moderation_rule_id=moderation_rule_id, source=source)
         if action == "tempban" and expires_at:
-            self.storage.schedule_moderation_action(guild.id, member.id, "unban", expires_at, reason, case_id)
+            self.repository.schedule_moderation_action(guild.id, member.id, "unban", expires_at, reason, case_id)
         if source == "manual":
             await self.log_manual(guild, f"Moderation Case #{case_id}", f"`{action}`: {member} ({member.id})\n理由: {reason or 'なし'}",
                 category="timeout" if action in {"timeout", "untimeout"} else action if action in {"kick", "ban", "unban"} else "admin")
@@ -127,18 +129,18 @@ class ModerationService:
             error = self.manageable(actor, member, "timeout")
             if error:
                 raise PermissionError(error)
-        module = self.storage.get_module(guild.id, "moderation")["settings"]
+        module = self.guild_settings.get_module(guild.id, "moderation")["settings"]
         should_notify = bool(module.get("dm_notify")) if notify is None else notify
         dm_sent = await self.dm(member, f"{guild.name}で警告を受けました。理由: {reason or 'なし'}") if should_notify else False
-        _, before, after = self.storage.add_points(guild.id, member.id, 1, reason, expires_at=None)
-        case_id = self.storage.add_case(guild.id, member.id, "warn", reason, moderator_id, None, dm_sent, source="manual", points=1)
+        _, before, after = self.repository.add_points(guild.id, member.id, 1, reason, expires_at=None)
+        case_id = self.repository.add_case(guild.id, member.id, "warn", reason, moderator_id, None, dm_sent, source="manual", points=1)
         await self.log_manual(guild, f"Moderation Case #{case_id}", f"`warn` ({after}pt): {member} ({member.id})\n理由: {reason or 'なし'}", category="warning")
         await self._apply_threshold(guild, member, before, after, reason or "警告ポイント", None, None)
         return after
 
     async def _apply_threshold(self, guild: discord.Guild, member: discord.Member, before: int, after: int, reason: str,
                                event_id: int | None, rule_id: int | None) -> dict[str, Any] | None:
-        infraction_module = self.storage.get_module(guild.id, "infractions")
+        infraction_module = self.guild_settings.get_module(guild.id, "infractions")
         thresholds = infraction_module["settings"].get("point_thresholds", []) if infraction_module["enabled"] else []
         crossed = [item for item in thresholds if before < int(item.get("points", 0)) <= after]
         if not crossed:
@@ -182,7 +184,7 @@ class ModerationService:
         if me is None or not me.guild_permissions.manage_channels:
             raise PermissionError("Botにチャンネル管理権限がありません。")
         unlock_at = int(time.time()) + max(1, min(duration_minutes, 1440)) * 60
-        lockdown_id = self.storage.start_lockdown(guild.id, reason=reason, started_by=started_by, unlock_at=unlock_at, source_event_id=source_event_id)
+        lockdown_id = self.repository.start_lockdown(guild.id, reason=reason, started_by=started_by, unlock_at=unlock_at, source_event_id=source_event_id)
         selected = set(channel_ids or [])
         categories = set(category_ids or [])
         channels = [channel for channel in guild.channels if isinstance(channel, (discord.TextChannel, discord.ForumChannel))
@@ -194,16 +196,16 @@ class ModerationService:
             overwrite.send_messages = False
             overwrite.send_messages_in_threads = False
             await channel.set_permissions(role, overwrite=overwrite, reason=f"Moderation lockdown #{lockdown_id}: {reason}")
-            self.storage.save_lockdown_snapshot(lockdown_id, channel.id, role.id, before, {"send_messages": False, "send_messages_in_threads": False})
-        self.storage.set_raid_state(guild.id, True, lockdown_id=lockdown_id)
+            self.repository.save_lockdown_snapshot(lockdown_id, channel.id, role.id, before, {"send_messages": False, "send_messages_in_threads": False})
+        self.repository.set_raid_state(guild.id, True, lockdown_id=lockdown_id)
         return lockdown_id
 
     async def unlock_lockdown(self, guild: discord.Guild, lockdown_id: int | None = None) -> dict[str, int]:
-        active = self.storage.active_lockdown(guild.id)
+        active = self.repository.active_lockdown(guild.id)
         if not active or lockdown_id and int(active["id"]) != lockdown_id:
             return {"restored": 0, "conflicts": 0}
         restored = conflicts = 0
-        for snapshot in self.storage.lockdown_snapshots(int(active["id"])):
+        for snapshot in self.repository.lockdown_snapshots(int(active["id"])):
             channel = guild.get_channel(int(snapshot["channel_id"]))
             role = guild.get_role(int(snapshot["role_id"]))
             if channel is None or role is None or not hasattr(channel, "overwrites_for"):
@@ -218,8 +220,8 @@ class ModerationService:
             overwrite.send_messages_in_threads = snapshot["before"].get("send_messages_in_threads")
             await channel.set_permissions(role, overwrite=overwrite, reason=f"Moderation lockdown #{active['id']} ended")
             restored += 1
-        self.storage.finish_lockdown(int(active["id"]), error=f"{conflicts} overwrite conflicts" if conflicts else None)
-        self.storage.set_raid_state(guild.id, False)
+        self.repository.finish_lockdown(int(active["id"]), error=f"{conflicts} overwrite conflicts" if conflicts else None)
+        self.repository.set_raid_state(guild.id, False)
         return {"restored": restored, "conflicts": conflicts}
 
     async def execute_actions(self, context: ActionContext, rule: dict[str, Any], reason: str, event_id: int,
@@ -256,9 +258,9 @@ class ModerationService:
                         raise ValueError("対象メンバーが見つかりません")
                     expiry_days = int(action.get("expires_days", 30))
                     expires_at = int(time.time()) + expiry_days * 86400 if expiry_days else None
-                    _, before, after = self.storage.add_points(guild.id, member.id, int(action.get("points", 1)), reason,
+                    _, before, after = self.repository.add_points(guild.id, member.id, int(action.get("points", 1)), reason,
                         moderation_rule_id=rule.get("id"), moderation_event_id=event_id, expires_at=expires_at)
-                    case_id = self.storage.add_case(guild.id, member.id, "warn", reason, None, expires_at, False,
+                    case_id = self.repository.add_case(guild.id, member.id, "warn", reason, None, expires_at, False,
                         moderation_event_id=event_id, moderation_rule_id=rule.get("id"), source=rule.get("family", "automod"), points=int(action.get("points", 1)))
                     results.append({"type": action_type, "status": "success", "case_id": case_id, "before": before, "after": after})
                     threshold = await self._apply_threshold(guild, member, before, after, reason, event_id, rule.get("id"))
@@ -312,7 +314,7 @@ class ModerationService:
 
     async def log_event(self, context: ActionContext, rule: dict[str, Any], event_id: int, reason: str,
             results: list[dict[str, Any]], settings: dict[str, Any]) -> None:
-        logs = self.storage.get_module(context.guild.id, "moderation_logs")
+        logs = self.guild_settings.get_module(context.guild.id, "moderation_logs")
         family = str(rule.get("family", "automod"))
         category = family if family in {"automod", "anti_spam", "anti_raid"} else "admin"
         if not logs["enabled"] or not logs["settings"].get(f"log_{category}", False):

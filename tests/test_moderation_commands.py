@@ -1,3 +1,4 @@
+from guild_settings import GuildSettingsRepository
 from db_support import prepare_database
 import tempfile
 import unittest
@@ -6,15 +7,15 @@ from types import SimpleNamespace
 
 import discord
 from discord.ext import commands
-from storage import GuildStorage
+from moderation import ModerationRepository
 
 
 class ModerationCommandLoadTests(unittest.IsolatedAsyncioTestCase):
     async def test_automod_startup_preserves_data_without_csv_or_runtime_migration(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'moderation.sqlite3'
-            storage = GuildStorage(prepare_database(path))
-            storage.set_module(1, 'moderation', enabled=True, settings={'escalation_enabled': True})
+            storage = ModerationRepository(prepare_database(path))
+            GuildSettingsRepository(storage.database_path).set_module(1, 'moderation', enabled=True, settings={'escalation_enabled': True})
             with storage._connection() as connection:
                 connection.execute('INSERT INTO guild_users(guild_id,user_id,xp) VALUES(1,2,3)')
             def rows():

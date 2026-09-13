@@ -10,7 +10,7 @@ from pathlib import Path
 from cogs.safety import SafetyCog
 from migrate import apply
 from reaction_roles import ReactionRoleRepository, ReactionRoleService
-from storage import GuildStorage
+from guild_settings import GuildSettingsRepository
 from test_reaction_roles import message
 
 
@@ -36,7 +36,7 @@ class ReactionRoleRemovalTests(unittest.TestCase):
     def test_empty_database_and_restart(self):
         apply(self.db, self.backups)
         for _ in range(2):
-            GuildStorage(self.db)
+            GuildSettingsRepository(self.db)
             repository = ReactionRoleRepository(self.db)
             self.assertFalse(repository.settings(1)['enabled'])
             self.assertEqual(repository.messages(1), [])
@@ -54,7 +54,7 @@ class ReactionRoleRemovalTests(unittest.TestCase):
                 for name in ('0001_suggestions.sql', '0002_remove_legacy_tickets.sql'):
                     shutil.copyfile(Path('migrations') / name, previous / name)
                 prepare_database(self.db)
-                storage = GuildStorage(self.db)
+                storage = GuildSettingsRepository(self.db)
                 repository = ReactionRoleRepository(self.db)
                 service = ReactionRoleService(repository)
                 config = service.create(1, message(behavior='temp'))
@@ -76,7 +76,7 @@ class ReactionRoleRemovalTests(unittest.TestCase):
                 if mixed:
                     with closing(sqlite3.connect(result['snapshot'])) as snapshot:
                         self.assertEqual(snapshot.execute('SELECT role_ids_json FROM reaction_role_panels').fetchone()[0], '[900]')
-                GuildStorage(self.db)
+                GuildSettingsRepository(self.db)
                 repository = ReactionRoleRepository(self.db)
                 self.assertEqual(self.rows(), before)
                 self.assert_removed()

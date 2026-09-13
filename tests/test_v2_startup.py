@@ -1,3 +1,4 @@
+from community import CommunityRepository
 """Offline entry-point restart check; real Discord/provider I/O belongs to Stage."""
 import importlib.util
 import os
@@ -11,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 from bot import TuekaBot
 from config import Settings
 from migrate import apply
-from social_worker import SocialWorker
+from social.worker import SocialWorker
 from database import SchemaNotReady, readonly
 from db_support import set_fixture_version
 
@@ -65,9 +66,9 @@ class V2StartupTests(unittest.IsolatedAsyncioTestCase):
                     module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(module)
                     async with module.dashboard_lifespan(module.app):
-                        self.assertEqual(module.storage.get_user(1, 99), {'xp': 0})
+                        self.assertEqual(CommunityRepository(module.social_repository.database_path).get_user(1, 99), {'xp': 0})
                     worker = SocialWorker(settings)
-                    self.assertEqual(worker.storage.get_user(1, 99), {'xp': 0})
+                    self.assertEqual(CommunityRepository(worker.repository.database_path).get_user(1, 99), {'xp': 0})
                     with closing(sqlite3.connect(db)) as connection:
                         schema = connection.execute("SELECT name,sql FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()
                         names = {name for name, _ in schema}

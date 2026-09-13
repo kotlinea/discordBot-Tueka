@@ -8,7 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from storage import GuildStorage
+from guild_settings import GuildSettingsRepository
 from suggestions import SuggestionRepository, SuggestionService, normalize_settings
 
 
@@ -105,18 +105,18 @@ class SuggestionModal(discord.ui.Modal):
 class SuggestionsCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.storage = GuildStorage(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
         self.repository = SuggestionRepository(bot.settings.database_path)
         self.service = SuggestionService(self.repository)
 
     def _settings(self, guild_id: int) -> dict[str, Any]:
-        return normalize_settings(self.storage.get_module(guild_id, "suggestions")["settings"])
+        return normalize_settings(self.guild_settings.get_module(guild_id, "suggestions")["settings"])
 
     @app_commands.command(name="suggest", description="サーバーへアイデアや改善案を投稿します。")
     @app_commands.guild_only()
     async def suggest(self, interaction: discord.Interaction) -> None:
         assert interaction.guild is not None
-        module = self.storage.get_module(interaction.guild.id, "suggestions")
+        module = self.guild_settings.get_module(interaction.guild.id, "suggestions")
         if not module["enabled"]:
             await interaction.response.send_message("Suggestionsは現在無効です。", ephemeral=True)
             return
@@ -130,7 +130,7 @@ class SuggestionsCog(commands.Cog):
     async def submit_modal(self, interaction: discord.Interaction, settings: dict[str, Any], answers: dict[str, str]) -> None:
         if interaction.guild is None:
             return
-        current = self.storage.get_module(interaction.guild.id, "suggestions")
+        current = self.guild_settings.get_module(interaction.guild.id, "suggestions")
         if not current["enabled"]:
             await interaction.response.send_message("Suggestionsは現在無効です。", ephemeral=True)
             return
@@ -187,7 +187,7 @@ class SuggestionsCog(commands.Cog):
             suggestion_id = int(raw_id)
         except (TypeError, ValueError):
             return
-        module = self.storage.get_module(interaction.guild.id, "suggestions")
+        module = self.guild_settings.get_module(interaction.guild.id, "suggestions")
         if not module["enabled"]:
             await interaction.response.send_message("Suggestionsは現在無効です。", ephemeral=True)
             return

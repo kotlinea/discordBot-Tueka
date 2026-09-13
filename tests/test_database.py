@@ -8,12 +8,17 @@ from database import BUSY_TIMEOUT_MS, SchemaNotReady, readonly, transaction
 from db_support import set_fixture_version
 from migrate import apply
 from reaction_roles import ReactionRoleRepository
-from storage import GuildStorage
+from guild_settings import GuildSettingsRepository
 from suggestions import SuggestionRepository
 from ticketing import TicketRepository
+from dashboard.repository import DashboardRepository
+from community import CommunityRepository
+from moderation import ModerationRepository
+from social import SocialRepository
+from engagement import EngagementRepository
 
 
-REPOSITORIES = (GuildStorage, TicketRepository, ReactionRoleRepository, SuggestionRepository)
+REPOSITORIES = (ModerationRepository, SocialRepository, EngagementRepository, TicketRepository, ReactionRoleRepository, SuggestionRepository, DashboardRepository, GuildSettingsRepository, CommunityRepository)
 
 
 class DatabaseTests(unittest.TestCase):
@@ -94,7 +99,7 @@ class DatabaseTests(unittest.TestCase):
             connection.execute('ALTER TABLE tickets_v2 DROP COLUMN notes_thread_id')
         set_fixture_version(self.db, 6)
         with self.assertRaises(SchemaNotReady):
-            GuildStorage(self.db)
+            GuildSettingsRepository(self.db)
         result = apply(self.db, self.root / 'backups')
         self.assertEqual(result['applied'], ['0007_current_schema.sql'])
         with closing(readonly(self.db)) as connection:

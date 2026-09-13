@@ -16,7 +16,7 @@ from discord.ext import commands
 from cogs.community import CommunityCog
 from cogs.tickets import TicketsCog
 from migrate import apply
-from storage import GuildStorage
+from guild_settings import GuildSettingsRepository
 from ticketing import TicketRepository, TicketService, TranscriptStorage
 
 
@@ -43,7 +43,7 @@ class TicketRemovalTests(unittest.TestCase):
     def test_empty_database_and_runtime_restart_do_not_restore_legacy(self):
         apply(self.db, self.backups)
         for _ in range(2):
-            GuildStorage(self.db)
+            GuildSettingsRepository(self.db)
             repository = TicketRepository(self.db)
             self.assertFalse(repository.settings(1)['enabled'])
             self.assertEqual(repository.panels(1), [])
@@ -56,7 +56,7 @@ class TicketRemovalTests(unittest.TestCase):
         previous.mkdir()
         shutil.copyfile('migrations/0001_suggestions.sql', previous / '0001_suggestions.sql')
         prepare_database(self.db)
-        GuildStorage(self.db)
+        GuildSettingsRepository(self.db)
         repository = TicketRepository(self.db)
         blobs = TranscriptStorage(self.root / 'blobs', Fernet.generate_key().decode('ascii'))
         service = TicketService(repository, blobs)
@@ -97,7 +97,7 @@ class TicketRemovalTests(unittest.TestCase):
         with closing(sqlite3.connect(result['snapshot'])) as snapshot:
             self.assertIn('V1 only', snapshot.execute('SELECT transcript_json FROM support_tickets').fetchone()[0])
             self.assertEqual(snapshot.execute('SELECT COUNT(*) FROM ticket_migrations').fetchone()[0], 1)
-        GuildStorage(self.db)
+        GuildSettingsRepository(self.db)
         repository = TicketRepository(self.db)
         self.assert_no_legacy()
         self.assertEqual(self.contents(), before)

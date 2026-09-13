@@ -4,8 +4,8 @@ import time
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from automod.engine import AutoModEngine, MessageContext
-from automod.models import default_rule, validate_rule
+from moderation.engine import AutoModEngine, MessageContext
+from moderation.models import default_rule, validate_rule
 
 
 def rule(trigger_type: str, config: dict, **values):

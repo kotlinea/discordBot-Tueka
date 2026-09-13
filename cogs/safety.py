@@ -6,8 +6,9 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from storage import GuildStorage
-from automod.service import ModerationService
+from moderation import ModerationRepository
+from guild_settings import GuildSettingsRepository
+from moderation.service import ModerationService
 
 
 MAX_TIMEOUT = 28 * 24 * 60
@@ -16,11 +17,12 @@ LOGGER = logging.getLogger(__name__)
 
 class SafetyCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
-        self.bot, self.storage = bot, GuildStorage(bot.settings.database_path)
-        self.moderation = ModerationService(bot, self.storage)
+        self.bot, self.moderation_repository = bot, ModerationRepository(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
+        self.moderation = ModerationService(bot, self.moderation_repository, self.guild_settings)
 
     async def _enabled(self, interaction: discord.Interaction, module_id: str) -> bool:
-        if interaction.guild is None or not self.storage.module_enabled(interaction.guild.id, module_id):
+        if interaction.guild is None or not self.guild_settings.module_enabled(interaction.guild.id, module_id):
             await interaction.response.send_message("この機能は管理者により無効です。", ephemeral=True)
             return False
         return True
@@ -33,7 +35,7 @@ class SafetyCog(commands.Cog):
             return False
 
     async def _audit(self, guild: discord.Guild, text: str) -> None:
-        module = self.storage.get_module(guild.id, "audit_log")
+        module = self.guild_settings.get_module(guild.id, "audit_log")
         channel_id = module["settings"].get("management_channel_id")
         if not module["enabled"] or not channel_id:
             return

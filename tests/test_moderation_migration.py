@@ -1,3 +1,4 @@
+from community import CommunityRepository
 from db_support import prepare_database, set_fixture_version
 import shutil
 import sqlite3
@@ -6,9 +7,9 @@ import unittest
 from contextlib import closing
 from pathlib import Path
 
-from automod.models import default_rule, validate_rule
+from moderation.models import default_rule, validate_rule
 from migrate import apply
-from storage import GuildStorage
+from moderation import ModerationRepository
 
 
 OLD_TABLES = {'automod_rules', 'automod_events', 'automod_migrations', 'moderation_migrations'}
@@ -48,8 +49,8 @@ class ModerationRemovalTests(unittest.TestCase):
 
     def seed(self, mixed):
         prepare_database(self.db)
-        storage = GuildStorage(self.db)
-        storage.add_xp(1, 2, 999)
+        storage = ModerationRepository(self.db)
+        CommunityRepository(storage.database_path).add_xp(1, 2, 999)
         rule = storage.save_moderation_rule(1, validate_rule({**default_rule('keyword'), 'trigger_config': {'keywords': ['bad']}}))
         event = storage.create_moderation_event(1, family='automod', event_type='message_create', source='automod',
             reason='keep event', rule_id=rule['id'], target_user_id=2, dedupe_key='keep')
@@ -89,7 +90,7 @@ class ModerationRemovalTests(unittest.TestCase):
     def test_empty_database_and_restart(self):
         apply(self.db, self.backups)
         for _ in range(2):
-            GuildStorage(self.db)
+            ModerationRepository(self.db)
             self.assert_clean()
         self.assertEqual(apply(self.db, self.backups), {'applied': [], 'snapshot': None})
 
@@ -102,10 +103,10 @@ class ModerationRemovalTests(unittest.TestCase):
                 result = apply(self.db, self.backups)
                 self.assertEqual(result['applied'], ['0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql'])
                 self.assertEqual(self.retained(), before)
-                storage = GuildStorage(self.db)
+                storage = ModerationRepository(self.db)
                 self.assertEqual(self.retained(), before)
                 self.assert_clean()
-                self.assertEqual(storage.get_user(1, 2), {'xp': 999})
+                self.assertEqual(CommunityRepository(storage.database_path).get_user(1, 2), {'xp': 999})
                 self.assertEqual(storage.active_points(1, 2), 2)
                 self.assertEqual(storage.recent_cases(1, 2)[0]['moderation_event_id'], event)
                 self.assertEqual(storage.due_moderation_actions()[0]['case_id'], case)

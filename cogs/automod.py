@@ -12,9 +12,10 @@ import discord
 import httpx
 from discord.ext import commands, tasks
 
-from automod import AutoModEngine, MessageContext, validate_rule
-from automod.service import ActionContext, ModerationService
-from storage import GuildStorage
+from moderation import AutoModEngine, MessageContext, validate_rule
+from moderation.service import ActionContext, ModerationService
+from moderation import ModerationRepository
+from guild_settings import GuildSettingsRepository
 
 
 LOGGER = logging.getLogger(__name__)
@@ -23,9 +24,10 @@ LOGGER = logging.getLogger(__name__)
 class AutoModCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.storage = GuildStorage(bot.settings.database_path)
+        self.moderation_repository = ModerationRepository(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
         self.engine = AutoModEngine()
-        self.service = ModerationService(bot, self.storage)
+        self.service = ModerationService(bot, self.moderation_repository, self.guild_settings)
         self.http = httpx.AsyncClient(timeout=3)
         self.safe_browsing_limit = asyncio.Semaphore(4)
         self._cache: dict[int, tuple[int, list[dict[str, Any]]]] = {}
@@ -48,7 +50,7 @@ class AutoModCog(commands.Cog):
         if cached and cached[0] == revision:
             return cached[1]
         rules: list[dict[str, Any]] = []
-        for stored in self.storage.moderation_rules(guild_id, enabled_only=True):
+        for stored in self.moderation_repository.moderation_rules(guild_id, enabled_only=True):
             try:
                 normalized = validate_rule(stored)
                 normalized.update({key: stored[key] for key in ("id", "revision")})
@@ -65,7 +67,7 @@ class AutoModCog(commands.Cog):
         pending: list[tuple[str, str]] = []
         for url in dict.fromkeys(filter(None, (self._normalize_url(item) for item in urls[:5]))):
             digest = hashlib.sha256(url.encode("utf-8")).hexdigest()
-            cached = self.storage.cached_url_result(digest)
+            cached = self.moderation_repository.cached_url_result(digest)
             if cached is True:
                 return url
             if cached is None:
@@ -82,7 +84,7 @@ class AutoModCog(commands.Cog):
             unsafe_urls = {item.get("threat", {}).get("url") for item in response.json().get("matches", [])}
             for url, digest in pending:
                 unsafe = url in unsafe_urls
-                self.storage.cache_url_result(digest, unsafe)
+                self.moderation_repository.cache_url_result(digest, unsafe)
                 if unsafe:
                     return url
         except (httpx.HTTPError, ValueError):
@@ -124,7 +126,7 @@ class AutoModCog(commands.Cog):
     async def _process(self, message: discord.Message, *, edited: bool = False) -> None:
         if message.guild is None:
             return
-        module = self.storage.get_module(message.guild.id, "moderation")
+        module = self.guild_settings.get_module(message.guild.id, "moderation")
         if not module["enabled"] or isinstance(message.author, discord.Member) and message.author.guild_permissions.administrator:
             return
         context = self._context(message, edited=edited)
@@ -138,7 +140,7 @@ class AutoModCog(commands.Cog):
         async with lock:
             matches = await self.engine.evaluate(context, rules, edited=edited, unsafe_url_checker=self._unsafe_url)
             for match in matches:
-                family_module = self.storage.get_module(message.guild.id, match.rule["family"])
+                family_module = self.guild_settings.get_module(message.guild.id, match.rule["family"])
                 if not family_module["enabled"]:
                     continue
                 if self.engine.globally_exempt(context, family_module["settings"]):
@@ -146,7 +148,7 @@ class AutoModCog(commands.Cog):
                 excluded = message.channel.id in set(module["settings"].get("evidence_excluded_channel_ids", []))
                 evidence = None if excluded else (message.content or "")[:1000]
                 attachments = [] if excluded else [{"filename": item.filename[:255], "content_type": item.content_type, "size": item.size} for item in message.attachments[:10]]
-                event_id = self.storage.create_moderation_event(message.guild.id, family=match.rule["family"], event_type=context.event_type,
+                event_id = self.moderation_repository.create_moderation_event(message.guild.id, family=match.rule["family"], event_type=context.event_type,
                     source=match.rule["family"], reason=match.reason, rule_id=match.rule.get("id"), actor_id=message.author.id,
                     actor_kind=context.actor_kind, target_user_id=message.author.id, channel_id=message.channel.id, target_id=message.id,
                     evidence_text=evidence, evidence={"attachments": attachments, "details": match.details}, mode=match.rule["mode"],
@@ -156,14 +158,14 @@ class AutoModCog(commands.Cog):
                     continue
                 action_context = ActionContext(message.guild, message.author if isinstance(message.author, discord.Member) else None, message, message.channel, actor=message.author)
                 results = await self.service.execute_actions(action_context, match.rule, match.reason, event_id, family_module["settings"])
-                self.storage.finish_moderation_event(event_id, results)
+                self.moderation_repository.finish_moderation_event(event_id, results)
                 await self.service.log_event(action_context, match.rule, event_id, match.reason, results, family_module["settings"])
         if len(self._locks) > 5000:
             self._locks = {item_key: item for item_key, item in self._locks.items() if item.locked()}
 
     async def _process_signal(self, context: MessageContext, guild: discord.Guild, member: discord.Member | None,
             action_context: ActionContext, *, dedupe_target: str, evidence: dict[str, Any] | None = None) -> None:
-        core = self.storage.get_module(guild.id, "moderation")
+        core = self.guild_settings.get_module(guild.id, "moderation")
         if not core["enabled"] or member and member.guild_permissions.administrator or self.engine.globally_exempt(context, core["settings"]):
             return
         rules = self._rules(guild.id, core)
@@ -171,10 +173,10 @@ class AutoModCog(commands.Cog):
         async with self._locks.setdefault(key, asyncio.Lock()):
             matches = await self.engine.evaluate(context, rules)
             for match in matches:
-                family_module = self.storage.get_module(guild.id, match.rule["family"])
+                family_module = self.guild_settings.get_module(guild.id, match.rule["family"])
                 if not family_module["enabled"] or self.engine.globally_exempt(context, family_module["settings"]):
                     continue
-                event_id = self.storage.create_moderation_event(guild.id, family=match.rule["family"], event_type=context.event_type,
+                event_id = self.moderation_repository.create_moderation_event(guild.id, family=match.rule["family"], event_type=context.event_type,
                     source=match.rule["family"], reason=match.reason, rule_id=match.rule.get("id"), actor_id=context.user_id,
                     actor_kind=context.actor_kind, target_user_id=member.id if member else context.user_id,
                     channel_id=context.channel_id or None, target_id=context.target_id, evidence=evidence or {"details": match.details},
@@ -183,11 +185,11 @@ class AutoModCog(commands.Cog):
                 if event_id is None:
                     continue
                 results = await self.service.execute_actions(action_context, match.rule, match.reason, event_id, family_module["settings"])
-                self.storage.finish_moderation_event(event_id, results)
+                self.moderation_repository.finish_moderation_event(event_id, results)
                 await self.service.log_event(action_context, match.rule, event_id, match.reason, results, family_module["settings"])
                 if match.rule["family"] == "anti_raid":
                     lockdown_id = next((item.get("lockdown_id") for item in results if item.get("lockdown_id")), None)
-                    self.storage.set_raid_state(guild.id, True, source_rule_id=match.rule.get("id"), lockdown_id=lockdown_id)
+                    self.moderation_repository.set_raid_state(guild.id, True, source_rule_id=match.rule.get("id"), lockdown_id=lockdown_id)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -240,21 +242,21 @@ class AutoModCog(commands.Cog):
 
     @tasks.loop(seconds=60)
     async def maintenance(self) -> None:
-        self.storage.purge_moderation_evidence()
+        self.moderation_repository.purge_moderation_evidence()
         self.engine.prune()
-        for pending in self.storage.due_moderation_actions():
+        for pending in self.moderation_repository.due_moderation_actions():
             guild = self.bot.get_guild(int(pending["guild_id"]))
             if guild is None:
                 continue
             try:
                 if pending["action"] == "unban":
                     await guild.unban(discord.Object(id=int(pending["user_id"])), reason="一時Banの期限切れ")
-                self.storage.complete_moderation_action(int(pending["id"]))
+                self.moderation_repository.complete_moderation_action(int(pending["id"]))
             except discord.NotFound:
-                self.storage.complete_moderation_action(int(pending["id"]))
+                self.moderation_repository.complete_moderation_action(int(pending["id"]))
             except (discord.Forbidden, discord.HTTPException) as exc:
-                self.storage.complete_moderation_action(int(pending["id"]), str(exc))
-        for pending in self.storage.due_lockdowns():
+                self.moderation_repository.complete_moderation_action(int(pending["id"]), str(exc))
+        for pending in self.moderation_repository.due_lockdowns():
             guild = self.bot.get_guild(int(pending["guild_id"]))
             if guild is None:
                 continue
@@ -262,13 +264,13 @@ class AutoModCog(commands.Cog):
                 await self.service.unlock_lockdown(guild, int(pending["id"]))
             except (discord.Forbidden, discord.HTTPException) as exc:
                 LOGGER.warning("Lockdown restore failed for guild %s: %s", guild.id, exc)
-        for raid in self.storage.stale_raid_states(int(time.time()) - 300):
+        for raid in self.moderation_repository.stale_raid_states(int(time.time()) - 300):
             guild_id = int(raid["guild_id"])
-            self.storage.set_raid_state(guild_id, False)
-            self.storage.create_moderation_event(guild_id, family="anti_raid", event_type="member_join",
+            self.moderation_repository.set_raid_state(guild_id, False)
+            self.moderation_repository.create_moderation_event(guild_id, family="anti_raid", event_type="member_join",
                 source="raid_state", reason="5分間シグナルがなかったためRaid状態を自動解除しました", mode="monitor",
                 dedupe_key=f"raid-clear:{guild_id}:{raid['last_signal_at']}")
-        for request in self.storage.pending_moderation_actions():
+        for request in self.moderation_repository.pending_moderation_actions():
             await self._execute_requested_action(request)
 
     async def _execute_requested_action(self, request: dict[str, Any]) -> None:
@@ -280,14 +282,14 @@ class AutoModCog(commands.Cog):
         member = guild.get_member(int(request["target_user_id"])) if request.get("target_user_id") else None
         channel = guild.get_channel(int(request["channel_id"])) if request.get("channel_id") else None
         reason = str(request.get("reason") or "Dashboard moderation action")
-        event_id = self.storage.create_moderation_event(guild.id, family="infraction", event_type="infraction_change", source="dashboard",
+        event_id = self.moderation_repository.create_moderation_event(guild.id, family="infraction", event_type="infraction_change", source="dashboard",
             reason=reason, actor_id=request["moderator_id"], actor_kind="human", target_user_id=request.get("target_user_id"),
             channel_id=request.get("channel_id"), target_id=request["id"], dedupe_key=f"action-request:{request['id']}")
         if event_id is None:
-            self.storage.complete_moderation_request(int(request["id"]), result={"status": "duplicate"})
+            self.moderation_repository.complete_moderation_request(int(request["id"]), result={"status": "duplicate"})
             return
         try:
-            if not self.storage.module_enabled(guild.id, "moderation"):
+            if not self.guild_settings.module_enabled(guild.id, "moderation"):
                 raise PermissionError("Moderationが無効です")
             if moderator is None or not moderator.guild_permissions.administrator:
                 raise PermissionError("実行者のAdministrator権限を再確認できません")
@@ -321,13 +323,13 @@ class AutoModCog(commands.Cog):
                     action_value.update({"points": int(options.get("points",1)), "expires_days": int(options.get("expires_days",30))})
                 rule = {"id": None, "family": "infraction", "name": "Dashboard action", "mode": "enforce", "actions": [action_value]}
                 results = await self.service.execute_actions(ActionContext(guild, member, channel=channel, actor=moderator), rule, reason, event_id, {})
-            self.storage.finish_moderation_event(event_id, results)
+            self.moderation_repository.finish_moderation_event(event_id, results)
             failed = any(item.get("status") == "failed" for item in results)
-            self.storage.complete_moderation_request(int(request["id"]), result={"event_id": event_id, "actions": results}, failed=failed)
+            self.moderation_repository.complete_moderation_request(int(request["id"]), result={"event_id": event_id, "actions": results}, failed=failed)
         except (ValueError, PermissionError, discord.Forbidden, discord.HTTPException) as exc:
             results = [{"type": action, "status": "failed", "error": str(exc)[:300]}]
-            self.storage.finish_moderation_event(event_id, results)
-            self.storage.complete_moderation_request(int(request["id"]), result={"event_id": event_id, "actions": results}, failed=True)
+            self.moderation_repository.finish_moderation_event(event_id, results)
+            self.moderation_repository.complete_moderation_request(int(request["id"]), result={"event_id": event_id, "actions": results}, failed=True)
 
     @maintenance.before_loop
     async def before_maintenance(self) -> None:

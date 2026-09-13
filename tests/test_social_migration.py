@@ -1,3 +1,4 @@
+from guild_settings import GuildSettingsRepository
 from db_support import prepare_database, set_fixture_version
 import shutil
 import sqlite3
@@ -7,8 +8,8 @@ from contextlib import closing
 from pathlib import Path
 
 from migrate import apply
-from social_models import default_templates
-from storage import GuildStorage
+from social.models import default_templates
+from social import SocialRepository
 
 
 class SocialRemovalTests(unittest.TestCase):
@@ -26,10 +27,10 @@ class SocialRemovalTests(unittest.TestCase):
             if int(path.name[:4]) <= 5:
                 shutil.copy(path, directory)
         prepare_database(self.db)
-        store = GuildStorage(self.db)
+        store = SocialRepository(self.db)
         subscription = store.save_social_subscription_v2(1, 'youtube', 'UC1', 10, ['video'], {},
                                                         default_templates('youtube', ['video']))
-        store.set_module(1, 'youtube_updates', enabled=False)
+        GuildSettingsRepository(store.database_path).set_module(1, 'youtube_updates', enabled=False)
         store.enqueue_social_event_v2('youtube', 'event1', 'UC1', 'video', {'title': 'keep'})
         store.record_social_delivery(subscription['id'], 'youtube:video:event1', 10, 20, 'sent')
         store.set_social_live_message(subscription['id'], 'youtube', 'UC1', 10, 20)
@@ -64,15 +65,15 @@ class SocialRemovalTests(unittest.TestCase):
                 result = apply(self.db, self.backups)
                 self.assertEqual(result['applied'], ['0006_remove_legacy_social_template.sql', '0007_current_schema.sql'])
                 for _ in range(2):
-                    store = GuildStorage(self.db)
+                    store = SocialRepository(self.db)
                     self.assertEqual(self.retained(), before)
-                    self.assertFalse(store.module_enabled(1, 'youtube_updates'))
+                    self.assertFalse(GuildSettingsRepository(store.database_path).module_enabled(1, 'youtube_updates'))
                     self.assertEqual(store.social_target(subscription['target_id'])['cursor'], {'last_seen': 'keep'})
                     self.assertEqual(len(store.matching_social_subscriptions('youtube', 'UC1', 'video')), 1)
                     if mixed:
                         self.assertIsNone(store.social_subscription(99)['target_id'])
                         self.assertEqual(store.social_targets('twitch'), [])
-                        self.assertFalse(store.module_enabled(2, 'twitch_updates'))
+                        self.assertFalse(GuildSettingsRepository(store.database_path).module_enabled(2, 'twitch_updates'))
                         self.assertEqual(store.matching_social_subscriptions('twitch', 'old', 'live'), [])
                 with closing(sqlite3.connect(self.db)) as connection:
                     self.assertNotIn('template', {row[1] for row in connection.execute('PRAGMA table_info(social_subscriptions)')})

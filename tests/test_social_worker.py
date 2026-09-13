@@ -11,10 +11,10 @@ from unittest.mock import AsyncMock
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from social_models import default_templates, normalize_account, render_template, validate_subscription
-from social_providers import YouTubeAdapter, _entries_from_atom, _entries_from_rss, _youtube_channel_id_from_html
-from storage import GuildStorage
-from social_webhooks import verify_twitch_signature, verify_youtube_signature
+from social.models import default_templates, normalize_account, render_template, validate_subscription
+from social.providers import YouTubeAdapter, _entries_from_atom, _entries_from_rss, _youtube_channel_id_from_html
+from social import SocialRepository
+from social.webhooks import verify_twitch_signature, verify_youtube_signature
 
 
 class _YouTubeClient:
@@ -226,7 +226,7 @@ class YouTubeAdapterTests(unittest.IsolatedAsyncioTestCase):
 class SocialStorageV2Tests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.storage = GuildStorage(prepare_database(Path(self.temp.name) / "test.sqlite3"))
+        self.storage = SocialRepository(prepare_database(Path(self.temp.name) / "test.sqlite3"))
 
     def tearDown(self):
         self.temp.cleanup()
@@ -287,7 +287,7 @@ class SocialStorageV2Tests(unittest.TestCase):
             connection.close()
         from database import SchemaNotReady
         with self.assertRaises(SchemaNotReady):
-            GuildStorage(path)
+            SocialRepository(path)
         with closing(sqlite3.connect(path)) as connection:
             self.assertEqual(connection.execute('SELECT events_json FROM social_subscriptions').fetchone()[0], '["live"]')
             self.assertNotIn('target_id', {row[1] for row in connection.execute('PRAGMA table_info(social_subscriptions)')})

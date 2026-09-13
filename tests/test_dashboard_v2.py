@@ -5,13 +5,13 @@ import unittest
 from pathlib import Path
 
 from dashboard.api_v1 import _normalize_resource_ids, _serialize_resource_ids, _serialize_rule_resource_ids
-from storage import GuildStorage
+from guild_settings import GuildSettingsRepository
 
 
 class DashboardV2StorageTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.storage = GuildStorage(prepare_database(Path(self.temp.name) / "dashboard-v2.db"))
+        self.storage = GuildSettingsRepository(prepare_database(Path(self.temp.name) / "dashboard-v2.db"))
         self.dashboard_repository = DashboardRepository(self.storage.database_path)
 
     def tearDown(self):

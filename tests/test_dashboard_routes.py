@@ -1,3 +1,4 @@
+from guild_settings import GuildSettingsRepository
 from db_support import prepare_database
 import importlib.util
 import os
@@ -128,7 +129,7 @@ class DashboardRouteTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/v1/guilds/3/tickets').status_code, 403)
 
     def test_reaction_roles_uses_only_v2_settings_and_omits_legacy_contract(self):
-        self.module.storage.set_module(1, 'reaction_roles', enabled=True, settings={'reaction_role_ids': [123]})
+        GuildSettingsRepository(self.module.settings.database_path).set_module(1, 'reaction_roles', enabled=True, settings={'reaction_role_ids': [123]})
         url = '/api/v1/guilds/1/reaction-roles'
         self.assertEqual(self.client.get(url).status_code, 401)
         csrf = self.login()

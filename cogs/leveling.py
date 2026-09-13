@@ -6,7 +6,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from storage import GuildStorage
+from community import CommunityRepository
+from guild_settings import GuildSettingsRepository
 
 
 MAX_REWARDS = 25
@@ -27,7 +28,8 @@ def required_xp(level: int) -> int:
 class LevelingCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.storage = GuildStorage(bot.settings.database_path)
+        self.repository = CommunityRepository(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
         self.last_xp_time: dict[tuple[int, int], float] = {}
         self.voice_xp_tick.start()
 
@@ -68,28 +70,28 @@ class LevelingCog(commands.Cog):
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or message.guild is None or not isinstance(message.author, discord.Member):
             return
-        if not self.storage.module_enabled(message.guild.id, "leveling"):
+        if not self.guild_settings.module_enabled(message.guild.id, "leveling"):
             return
         key = (message.guild.id, message.author.id)
         now = time.monotonic()
         if now - self.last_xp_time.get(key, 0) < 60:
             return
-        old_user = self.storage.get_user(message.guild.id, message.author.id)
+        old_user = self.repository.get_user(message.guild.id, message.author.id)
         old_level, _ = calculate_level(old_user["xp"])
-        user = self.storage.add_xp(message.guild.id, message.author.id, random.randint(15, 25))
+        user = self.repository.add_xp(message.guild.id, message.author.id, random.randint(15, 25))
         new_level, _ = calculate_level(user["xp"])
         self.last_xp_time[key] = now
         if new_level > old_level:
-            settings = self.storage.get_module(message.guild.id, "leveling")["settings"]
+            settings = self.guild_settings.get_module(message.guild.id, "leveling")["settings"]
             await self._on_level_up(message.author, new_level, settings, "text")
 
     @tasks.loop(seconds=60)
     async def voice_xp_tick(self) -> None:
-        for guild_id in self.storage.enabled_module_guild_ids("leveling"):
+        for guild_id in self.guild_settings.enabled_module_guild_ids("leveling"):
             guild = self.bot.get_guild(guild_id)
             if guild is None:
                 continue
-            settings = self.storage.get_module(guild_id, "leveling")["settings"]
+            settings = self.guild_settings.get_module(guild_id, "leveling")["settings"]
             if not settings.get("voice_enabled"):
                 continue
             amount = max(1, min(int(settings.get("voice_xp_per_minute", 5)), 100))
@@ -105,8 +107,8 @@ class LevelingCog(commands.Cog):
                     state = member.voice
                     if state is None or (not allow_muted and (state.self_mute or state.mute or state.self_deaf or state.deaf)):
                         continue
-                    old_level, _ = calculate_level(self.storage.get_voice_user(guild.id, member.id)["xp"])
-                    current = self.storage.add_voice_xp(guild.id, member.id, amount)
+                    old_level, _ = calculate_level(self.repository.get_voice_user(guild.id, member.id)["xp"])
+                    current = self.repository.add_voice_xp(guild.id, member.id, amount)
                     new_level, _ = calculate_level(current["xp"])
                     if new_level > old_level:
                         await self._on_level_up(member, new_level, settings, "voice")
@@ -116,7 +118,7 @@ class LevelingCog(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def _require_enabled(self, interaction: discord.Interaction) -> bool:
-        if interaction.guild is None or not self.storage.module_enabled(interaction.guild.id, "leveling"):
+        if interaction.guild is None or not self.guild_settings.module_enabled(interaction.guild.id, "leveling"):
             await interaction.response.send_message("この機能は管理者により無効です。", ephemeral=True)
             return False
         return True
@@ -127,7 +129,7 @@ class LevelingCog(commands.Cog):
         if not await self._require_enabled(interaction):
             return
         assert interaction.guild is not None
-        xp = self.storage.get_user(interaction.guild.id, interaction.user.id)["xp"]
+        xp = self.repository.get_user(interaction.guild.id, interaction.user.id)["xp"]
         level, progress = calculate_level(xp)
         await interaction.response.send_message(f"📊 {interaction.user.mention} のテキストレベル: **Lv {level}**\n現在のXP: {progress} / {required_xp(level)}")
 
@@ -137,7 +139,7 @@ class LevelingCog(commands.Cog):
         if not await self._require_enabled(interaction):
             return
         assert interaction.guild is not None
-        ranked = self.storage.leaderboard(interaction.guild.id)
+        ranked = self.repository.leaderboard(interaction.guild.id)
         if not ranked:
             await interaction.response.send_message("まだテキストXPデータがありません。")
             return
@@ -150,7 +152,7 @@ class LevelingCog(commands.Cog):
         if not await self._require_enabled(interaction):
             return
         assert interaction.guild is not None
-        xp = self.storage.get_voice_user(interaction.guild.id, interaction.user.id)["xp"]
+        xp = self.repository.get_voice_user(interaction.guild.id, interaction.user.id)["xp"]
         level, progress = calculate_level(xp)
         await interaction.response.send_message(f"🎙️ {interaction.user.mention} のVCレベル: **Lv {level}**\n現在のXP: {progress} / {required_xp(level)}")
 
@@ -160,7 +162,7 @@ class LevelingCog(commands.Cog):
         if not await self._require_enabled(interaction):
             return
         assert interaction.guild is not None
-        ranked = self.storage.voice_leaderboard(interaction.guild.id)
+        ranked = self.repository.voice_leaderboard(interaction.guild.id)
         if not ranked:
             await interaction.response.send_message("まだVC XPデータがありません。")
             return

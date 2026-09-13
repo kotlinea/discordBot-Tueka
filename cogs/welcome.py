@@ -5,7 +5,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from storage import GuildStorage
+from guild_settings import GuildSettingsRepository
 
 
 TOKEN_RE = re.compile(r"\{([^{}]+)\}")
@@ -15,7 +15,7 @@ VARIABLE_HELP = "{user}, {username}, {displayname}, {server}, {membercount}"
 class WelcomeCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.storage = GuildStorage(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
 
     @staticmethod
     def render_content(template: str, member: discord.Member) -> str:
@@ -34,7 +34,7 @@ class WelcomeCog(commands.Cog):
         return TOKEN_RE.sub(replace, template)
 
     async def _send_configured_message(self, member: discord.Member, event: str) -> None:
-        module = self.storage.get_module(member.guild.id, "welcome")
+        module = self.guild_settings.get_module(member.guild.id, "welcome")
         settings = module["settings"]
         if not module["enabled"] or not settings.get(f"{event}_enabled"):
             return
@@ -54,7 +54,7 @@ class WelcomeCog(commands.Cog):
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
         await self._send_configured_message(member, "welcome")
-        autorole = self.storage.get_module(member.guild.id, "autorole")
+        autorole = self.guild_settings.get_module(member.guild.id, "autorole")
         role_id = autorole["settings"].get("default_role_id") if autorole["enabled"] else None
         role = member.guild.get_role(role_id) if role_id else None
         if role:
@@ -70,7 +70,7 @@ class WelcomeCog(commands.Cog):
     @app_commands.command(description="ウェルカムメッセージを送信します。")
     @app_commands.guild_only()
     async def welcome(self, interaction: discord.Interaction, member: discord.Member | None = None) -> None:
-        if interaction.guild and not self.storage.module_enabled(interaction.guild.id, "welcome"):
+        if interaction.guild and not self.guild_settings.module_enabled(interaction.guild.id, "welcome"):
             await interaction.response.send_message("この機能は管理者により無効です。", ephemeral=True)
             return
         member = member or interaction.user

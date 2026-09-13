@@ -1,3 +1,4 @@
+from community import CommunityRepository
 from db_support import prepare_database, set_fixture_version
 import json
 import shutil
@@ -8,7 +9,7 @@ from contextlib import closing
 from pathlib import Path
 
 from migrate import apply
-from storage import GuildStorage
+from guild_settings import GuildSettingsRepository
 
 
 class SharedSettingsRemovalTests(unittest.TestCase):
@@ -26,8 +27,8 @@ class SharedSettingsRemovalTests(unittest.TestCase):
             if int(path.name[:4]) <= 4:
                 shutil.copy(path, directory)
         prepare_database(self.db)
-        store = GuildStorage(self.db)
-        store.add_xp(1, 99, 42)
+        store = GuildSettingsRepository(self.db)
+        CommunityRepository(store.database_path).add_xp(1, 99, 42)
         with closing(sqlite3.connect(self.db)) as connection:
             connection.executescript("""
                 CREATE TABLE guild_settings(guild_id INTEGER PRIMARY KEY,
@@ -53,7 +54,7 @@ class SharedSettingsRemovalTests(unittest.TestCase):
         result = apply(self.db, self.backups)
         self.assertEqual(result['applied'], ['0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql'])
         for _ in range(2):
-            store = GuildStorage(self.db)
+            store = GuildSettingsRepository(self.db)
             for guild, channel in [(1, 10), (2, None), (3, 333)]:
                 value = store.get_module(guild, 'leveling')
                 self.assertEqual(value['settings']['text_notification_channel_id'], channel)
@@ -68,7 +69,7 @@ class SharedSettingsRemovalTests(unittest.TestCase):
             self.assertEqual(store.get_module(1, 'welcome')['settings']['welcome_channel_id'], 66)
             self.assertEqual(store.get_module(2, 'welcome')['settings']['welcome_channel_id'], 21)
             self.assertEqual(store.get_module(1, 'autorole')['settings']['default_role_id'], 12)
-            self.assertEqual(store.get_user(1, 99), {'xp': 42})
+            self.assertEqual(CommunityRepository(store.database_path).get_user(1, 99), {'xp': 42})
             with closing(sqlite3.connect(self.db)) as connection:
                 self.assertIsNone(connection.execute("SELECT name FROM sqlite_master WHERE name='guild_settings'").fetchone())
                 self.assertEqual(connection.execute('SELECT * FROM app_metadata').fetchall(), [('keep', 'value')])
@@ -99,8 +100,8 @@ class SharedSettingsRemovalTests(unittest.TestCase):
             with self.assertRaises(sqlite3.IntegrityError):
                 connection.execute("INSERT INTO guild_modules(guild_id,module_id,enabled) VALUES(1,'welcome',2)")
         for _ in range(2):
-            store = GuildStorage(self.db)
-            self.assertEqual(store.get_user(1, 99), {'xp': 0})
+            store = GuildSettingsRepository(self.db)
+            self.assertEqual(CommunityRepository(store.database_path).get_user(1, 99), {'xp': 0})
             self.assertIsNone(store.get_module(1, 'leveling')['settings']['text_notification_channel_id'])
             self.assertFalse(hasattr(store, 'migrate_json'))
             self.assertFalse(hasattr(store, 'migrated'))

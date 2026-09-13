@@ -29,9 +29,8 @@ class TicketService:
         required = set(int(item) for item in panel.get("required_role_ids", []))
         if required and not required.intersection(role_ids):
             raise TicketValidationError("panel_forbidden", "このチケットを作成する権限がありません。")
-        with self.repository._connection() as connection:
-            if connection.execute("SELECT 1 FROM ticket_blacklist WHERE guild_id=? AND user_id=?", (guild_id, opener_id)).fetchone():
-                raise TicketValidationError("blacklisted", "チケットの作成が制限されています。")
+        if self.repository.is_blacklisted(guild_id, opener_id):
+            raise TicketValidationError("blacklisted", "チケットの作成が制限されています。")
         access_rules = panel.get("access_rules") or []
         denied = {int(rule["role_id"]) for rule in access_rules if not rule.get("allow", True)}
         allowed = {int(rule["role_id"]) for rule in access_rules if rule.get("allow", True)}

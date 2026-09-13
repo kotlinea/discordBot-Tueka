@@ -6,7 +6,8 @@ from typing import Any
 import discord
 from discord.ext import commands
 
-from storage import GuildStorage
+from moderation import ModerationRepository
+from guild_settings import GuildSettingsRepository
 
 
 class AuditLogCog(commands.Cog):
@@ -14,7 +15,8 @@ class AuditLogCog(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.storage = GuildStorage(bot.settings.database_path)
+        self.moderation_repository = ModerationRepository(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
         self._recent_actions: dict[tuple[int, str, int], float] = {}
 
     @staticmethod
@@ -36,13 +38,13 @@ class AuditLogCog(commands.Cog):
         return None
 
     def _channel(self, guild: discord.Guild, category: str, event: str | None = None) -> discord.TextChannel | None:
-        modern = self.storage.get_module(guild.id, "moderation_logs")
+        modern = self.guild_settings.get_module(guild.id, "moderation_logs")
         if modern["enabled"] and event and modern["settings"].get(f"log_{event}"):
-            channel_id = modern["settings"].get("log_channel_id") or self.storage.get_module(guild.id, "moderation")["settings"].get("default_log_channel_id")
+            channel_id = modern["settings"].get("log_channel_id") or self.guild_settings.get_module(guild.id, "moderation")["settings"].get("default_log_channel_id")
             channel = guild.get_channel(int(channel_id)) if channel_id else None
             if isinstance(channel, discord.TextChannel):
                 return channel
-        module = self.storage.get_module(guild.id, "audit_log")
+        module = self.guild_settings.get_module(guild.id, "audit_log")
         if not module["enabled"] or not module["settings"].get(f"log_{category}"):
             return None
         channel_id = module["settings"].get("management_channel_id")
@@ -61,10 +63,10 @@ class AuditLogCog(commands.Cog):
             await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
         except (discord.Forbidden, discord.HTTPException):
             return
-        modern = self.storage.get_module(guild.id, "moderation_logs")
+        modern = self.guild_settings.get_module(guild.id, "moderation_logs")
         if event and modern["enabled"] and modern["settings"].get(f"log_{event}"):
             family = "anti_raid" if any(token in title for token in ("参加","退会")) else "infraction"
-            self.storage.create_moderation_event(guild.id,family=family,event_type="infraction_change",source="discord_audit",
+            self.moderation_repository.create_moderation_event(guild.id,family=family,event_type="infraction_change",source="discord_audit",
                 reason=title,channel_id=channel.id,evidence={"description":description,"fields":fields or []},mode="enforce")
 
     def _claim_action(self, guild_id: int, action: str, user_id: int) -> bool:
