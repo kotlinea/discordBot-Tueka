@@ -3,6 +3,8 @@ import os
 import re
 import socket
 
+from jobs import Outcome, run_batch
+
 import discord
 from discord.ext import commands, tasks
 
@@ -105,11 +107,12 @@ class SocialUpdatesCog(commands.Cog):
 
     @tasks.loop(seconds=5)
     async def deliver_events(self) -> None:
-        for event in self.social_repository.claim_social_events(self.owner, limit=10, lease_seconds=120):
-            if await self._deliver(event):
-                self.social_repository.mark_social_event_processed(event["id"])
-            else:
-                self.social_repository.retry_social_event(event["id"], "One or more Discord deliveries need retry")
+        await run_batch(self.social_repository.event_jobs, self.owner, self._deliver_event, limit=10, lease_seconds=120)
+
+    async def _deliver_event(self, event: dict) -> Outcome:
+        if await self._deliver(event):
+            return Outcome()
+        return Outcome('One or more Discord deliveries need retry', retry=True)
 
     @deliver_events.before_loop
     async def before_deliver_events(self) -> None:

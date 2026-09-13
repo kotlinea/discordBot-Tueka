@@ -72,7 +72,7 @@ class ReactionRoleRemovalTests(unittest.TestCase):
                 set_fixture_version(self.db, 2)
                 before = self.rows()
                 result = apply(self.db, self.backups)
-                self.assertEqual(result['applied'], ['0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql'])
+                self.assertEqual(result['applied'], ['0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql', '0008_job_leases.sql'])
                 if mixed:
                     with closing(sqlite3.connect(result['snapshot'])) as snapshot:
                         self.assertEqual(snapshot.execute('SELECT role_ids_json FROM reaction_role_panels').fetchone()[0], '[900]')
@@ -81,8 +81,8 @@ class ReactionRoleRemovalTests(unittest.TestCase):
                 self.assertEqual(self.rows(), before)
                 self.assert_removed()
                 self.assertEqual(repository.assignments(9, config_id=config['id'])[0]['role_id'], 20)
-                self.assertEqual(repository.due_schedules('restart')[0]['kind'], 'temp_role')
-                self.assertTrue(repository.claim_outbox('restart'))
+                self.assertEqual(repository.schedule_jobs.claim('restart').payload['kind'], 'temp_role')
+                self.assertTrue(repository.outbox_jobs.claim('restart'))
                 self.assertIsNotNone(repository.recovery(1, 100))
                 self.assertEqual(apply(self.db, self.backups), {'applied': [], 'snapshot': None})
 
@@ -93,7 +93,7 @@ class ReactionRoleRemovalTests(unittest.TestCase):
         directory.mkdir()
         for source in Path('migrations').glob('*.sql'):
             shutil.copyfile(source, directory / source.name)
-        (directory / '0008_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0009_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         with closing(sqlite3.connect(self.db)) as connection:

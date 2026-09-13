@@ -20,7 +20,7 @@ class DomainBoundaryTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         files = list(root.glob('*.py'))
         for folder in ('cogs', 'dashboard', 'community', 'engagement', 'social',
-                       'moderation', 'ticketing', 'suggestions', 'reaction_roles', 'guild_settings'):
+                       'jobs', 'moderation', 'ticketing', 'suggestions', 'reaction_roles', 'guild_settings'):
             files.extend((root / folder).glob('*.py'))
         for path in files:
             if path.name in {'database.py', 'migrate.py', 'repository.py'}:

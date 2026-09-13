@@ -300,3 +300,22 @@
 - 正式ArchitectureにDomain別の配置・Transaction所有・CLIの入口と実装の境界を記載。実行計画の現在地をP2-3へ更新し、過去の調査表は履歴として保持。`git diff --check` 成功。Commit/Stage/Resetは行っていない。
 - 判定：P2-2のローカル実装・テスト・正式Docsを完了。Phase 2全体とGoalは未完了。次はP2-3として4DomainのClaim/Lease/Retry/期限処理を比較し、共通Protocol/Runnerと所有者・失効・重複・Dead Letter・Retentionの契約を実装する。必要なSchema追加は0008以降。Discord操作分離はP2-4、Router/UIはP2-5/6へ順番に進む。
 - Stage実Discord/OAuth/Webhook、遠隔本番DB適用、実Transcript/S3復元は未実施のリリースゲートとして継続する。ローカルのP2-2完了をPhase 2全体・本番移行・Goal達成とは扱わない。
+
+## 2026-09-14 — P2-3 共通Outbox / Schedule基盤
+
+- P2-2がユーザー側でCommit `c5d9225` に取り込まれたことを確認。現在の作業ツリーを基準に、Ticket / Reaction Roles / Social / ModerationのClaim・Lease・完了・Retryを比較した。Commit/Stage/Resetは行っていない。
+- Ticketのprocessing行が再取得されない経路、Socialイベント完了の所有者検査欠落、Moderation要求/期限処理のLease未実装を特定。`jobs/models.py` にClaim・Outcome・JobStore Protocol、`jobs/repository.py` にTransactionと所有権検査、`jobs/runner.py` に共通実行順序を追加した。
+- 7 Queue（Ticket Outbox/Schedule、Reaction Roles Outbox/Schedule、Social Event、Moderation Request/Schedule）を同じRunnerへ接続。DomainのPayloadと既存テーブルを維持し、旧Claim/Finish実装を除去した。HandlerはDomain処理とOutcomeを返し、共通Runnerが取得・Lease更新・終了・失敗を担当する。
+- BEGIN IMMEDIATE内で1件取得し、所有者と毎回新しいTokenを保存。完了と更新はID・所有者・Token・未失効・processingを照合する。同じ所有者名で再取得しても前回Tokenを拒否。長時間処理中はLeaseの1/3間隔で更新し、Lease喪失時はHandlerをキャンセル・警告してBatchを終了する。次の定期実行は停止させない。
+- 試行数は取得時に加算し、最大8回。Retryは15×2^attempt秒、上限3600秒。最終試行のCrashも失効後failedへ移す。failed行をDead Letterとして保持し、自動的に再実行しない。終端日時から30日後にBatch開始時の保守処理で削除し、保留・実行中は対象外とした。
+- `0008_job_leases.sql` は不足するToken・Lease・試行数・終端日時を追加し、Claim/Retention用Indexを14件追加。0001〜0007は変更していない。旧Reaction Rolesの完了日時不明な行は、移行直後に削除されないよう移行時刻を補い30日保持する。
+- 既存Migration Fixtureの期待履歴を0008まで更新し、故意の失敗Migrationは0009へ変更。初回に先頭コメントが条件付き列追加注釈を隠す問題、続いて旧Schema Fixtureが新Indexを残したまま列削除する問題を検出して修正した。
+- 7 Queue共通の失効・同じ所有者の再取得・古い完了拒否・並行取得・Retry上限・Dead Letter・Retention、Runnerの更新・Cancel・Lease喪失、直前0007からPayload保持・再適用を検証した。完了時には元の期限を変更しない契約も確認した。
+- 旧Moderation実行イベントがある未完了要求を成功扱いにせず、照合を必要とするfailedにする。共通Queueの排他とDiscord副作用の一回性は区別し、配送記録・外部成功後DB失敗の補償はP2-4でさらに整理する。継続的なSocial Provider監視、Panel公開、Lockdown復元はDomainのライフサイクルとして残る。
+- `data/backups/p2-jobs-0914/verified.sqlite3` はP2-2保全DBから新規複製し、最終0008を適用。既存64表の全既存列・行を照合して一致、履歴込み65表105行、整合性成功・FK違反0、再適用なし。原DB・既存保全DBは変更していない。同ディレクトリの `final.sqlite3` は保持日時の調整前候補であり、以降はverifiedを使用する。
+- 保持日時調整後のWindows Migration回帰29件成功・8.805秒。途中のLinux回帰は実行中のMigration編集によるSchemaNotReadyを1件検出したため、コードとMigrationを固定して両環境の全回帰を再実行する。途中結果を最終成功とは扱わない。
+
+- 最終固定後の全Python回帰：Windows220件成功・66.597秒、固定Linuxコンテナ220件成功・138.175秒。ログ `.venv-p0/p2-jobs-frozen-windows.log` / `p2-jobs-frozen-linux.log`。途中の失敗ログとは区別する。最終Docs build成功・7.71秒、ログ `.venv-p0/p2-jobs-docs-final.log`。その後の変更は実行計画・進捗記録のみ。Frontendは変更せず、Frontend/Playwrightは本単位では再実行していない。
+- ArchitectureとMigration運用資料に共通Queueの対象、処理順序、再試行上限、保持期限、旧版復帰のSnapshot、外部API副作用との境界を反映。最終 `git diff --check` 成功。
+- 判定：P2-3のローカル計画・実装・Migration・テスト・正式Docsを完了。次はP2-4。ModerationServiceのDiscord操作をAdapterへ切り出す境界を定義し、Ticket / Reaction Roles / Social / SuggestionsのCog側操作へ順に進む。成功後DB失敗・権限喪失・補償失敗・孤立Resourceの照合と復旧を検証する。Schema追加は0009以降を使用する。
+- Phase 2全体・Stageリリース・Goal全体は未完了。実Discord/OAuth/Webhook、遠隔本番DB適用、実Transcript/S3復元は従来の未実施ゲートとして保持する。

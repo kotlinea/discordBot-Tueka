@@ -6,6 +6,7 @@ import re
 import sqlite3
 import time
 from pathlib import Path
+from jobs import QueueRepository, QueueSpec
 from database import require_current, transaction
 from typing import Any, Iterable
 
@@ -24,6 +25,8 @@ class TicketRepository:
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
         require_current(self.database_path)
+        self.outbox_jobs = QueueRepository(self.database_path, QueueSpec('ticket_outbox'))
+        self.schedule_jobs = QueueRepository(self.database_path, QueueSpec('ticket_schedules', due='due_at'))
         self.recover_incomplete_closes()
 
     def _connection(self):
@@ -630,31 +633,12 @@ class TicketRepository:
             row = connection.execute("SELECT * FROM ticket_outbox WHERE id=?", (outbox_id,)).fetchone()
         return self._item(row) or {}
 
-    def claim_outbox(self, owner: str, limit: int = 20, lease_seconds: int = 60) -> list[dict[str, Any]]:
-        now = int(time.time())
-        with self._connection() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            rows = connection.execute("SELECT * FROM ticket_outbox WHERE status IN ('pending','retry') AND available_at<=? AND (lease_until IS NULL OR lease_until<?) ORDER BY id LIMIT ?", (now, now, max(1, min(limit, 100)))).fetchall()
-            ids = [int(row["id"]) for row in rows]
-            if ids:
-                connection.execute(f"UPDATE ticket_outbox SET status='processing',lease_owner=?,lease_until=?,attempts=attempts+1 WHERE id IN ({','.join('?' for _ in ids)})", (owner, now + lease_seconds, *ids))
-        return [self._item(row) or {} for row in rows]
 
     def outbox(self, ticket_id: int, limit: int = 50) -> list[dict[str, Any]]:
         with self._connection() as connection:
             rows = connection.execute("SELECT id,action,actor_id,status,attempts,last_error,created_at,completed_at FROM ticket_outbox WHERE ticket_id=? ORDER BY id DESC LIMIT ?", (ticket_id, max(1, min(limit, 100)))).fetchall()
         return [dict(row) for row in rows]
 
-    def complete_outbox(self, outbox_id: int, owner: str, error: str | None = None, retry: bool = True) -> None:
-        now = int(time.time())
-        with self._connection() as connection:
-            if error:
-                row = connection.execute("SELECT attempts FROM ticket_outbox WHERE id=? AND lease_owner=?", (outbox_id, owner)).fetchone()
-                attempts = int(row["attempts"] if row else 1)
-                delay = min(3600, 15 * 2 ** min(attempts, 8)) if retry else 0
-                connection.execute("UPDATE ticket_outbox SET status=?,available_at=?,last_error=?,lease_owner=NULL,lease_until=NULL WHERE id=? AND lease_owner=?", ("retry" if retry else "failed", now + delay, error[:500], outbox_id, owner))
-            else:
-                connection.execute("UPDATE ticket_outbox SET status='completed',completed_at=?,last_error=NULL,lease_owner=NULL,lease_until=NULL WHERE id=? AND lease_owner=?", (now, outbox_id, owner))
 
     def set_schedule(self, ticket_id: int, kind: str, due_at: int | None) -> None:
         if kind not in {"no_user_reply", "inactivity"}:
@@ -664,17 +648,10 @@ class TicketRepository:
                 connection.execute("DELETE FROM ticket_schedules WHERE ticket_id=? AND kind=?", (ticket_id, kind))
             else:
                 connection.execute("""INSERT INTO ticket_schedules(ticket_id,kind,due_at,created_at) VALUES(?,?,?,?)
-                    ON CONFLICT(ticket_id,kind) DO UPDATE SET due_at=excluded.due_at,status='pending',attempts=0,last_error=NULL,completed_at=NULL""",
+                    ON CONFLICT(ticket_id,kind) DO UPDATE SET due_at=excluded.due_at,status='pending',attempts=0,last_error=NULL,completed_at=NULL,lease_owner=NULL,lease_until=NULL,lease_token=NULL""",
                     (ticket_id, kind, due_at, int(time.time())))
 
-    def due_schedules(self, now: int | None = None, limit: int = 100) -> list[dict[str, Any]]:
-        with self._connection() as connection:
-            rows = connection.execute("SELECT * FROM ticket_schedules WHERE status='pending' AND due_at<=? ORDER BY due_at,id LIMIT ?", (now or int(time.time()), max(1, min(limit, 200)))).fetchall()
-        return [self._item(row) or {} for row in rows]
 
-    def complete_schedule(self, schedule_id: int) -> None:
-        with self._connection() as connection:
-            connection.execute("UPDATE ticket_schedules SET status='completed',completed_at=? WHERE id=? AND status='pending'", (int(time.time()), schedule_id))
 
     def save_transcript(self, ticket_id: int, backend: str, object_key: str, content_hash: str, byte_size: int, expires_at: int) -> dict[str, Any]:
         now = int(time.time())

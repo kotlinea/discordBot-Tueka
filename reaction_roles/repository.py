@@ -5,6 +5,7 @@ import json
 import sqlite3
 import time
 from pathlib import Path
+from jobs import QueueRepository, QueueSpec
 from database import require_current, transaction
 from typing import Any
 
@@ -13,6 +14,8 @@ class ReactionRoleRepository:
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
         require_current(self.database_path)
+        self.outbox_jobs = QueueRepository(self.database_path, QueueSpec('reaction_role_outbox', state='state', due='next_attempt_at', done='done'))
+        self.schedule_jobs = QueueRepository(self.database_path, QueueSpec('reaction_role_schedules', state='state', due='due_at', done='done'))
 
     def connection(self):
         return transaction(self.database_path)
@@ -220,22 +223,7 @@ class ReactionRoleRepository:
     def queue_action(self,guild_id:int,config_id:int|None,action:str,payload:dict[str,Any]|None=None)->None:
         with self.connection() as c: self._queue(c,guild_id,config_id,action,payload or {})
 
-    def claim_outbox(self,owner:str,limit:int=20)->list[dict[str,Any]]:
-        now=int(time.time())
-        with self.connection() as c:
-            lease_until=now+30
-            c.execute("""UPDATE reaction_role_outbox SET lease_owner=?,lease_until=? WHERE id IN (
-                SELECT id FROM reaction_role_outbox WHERE state='pending' AND next_attempt_at<=?
-                AND (lease_until IS NULL OR lease_until<?) ORDER BY id LIMIT ?)""",(owner,lease_until,now,now,limit))
-            rows=c.execute("SELECT * FROM reaction_role_outbox WHERE state='pending' AND lease_owner=? AND lease_until=? ORDER BY id",(owner,lease_until)).fetchall()
-        return [{**dict(row),"payload":json.loads(row["payload_json"])} for row in rows]
 
-    def finish_outbox(self,item_id:int,owner:str,error:str|None=None,retry:bool=False)->None:
-        with self.connection() as c:
-            row=c.execute("SELECT attempts FROM reaction_role_outbox WHERE id=? AND lease_owner=?",(item_id,owner)).fetchone()
-            attempts=int(row["attempts"])+1 if row else 1
-            if error and retry: c.execute("UPDATE reaction_role_outbox SET attempts=?,last_error=?,lease_owner=NULL,lease_until=NULL,next_attempt_at=?,state='pending' WHERE id=? AND lease_owner=?",(attempts,error[:500],int(time.time())+min(300,2**min(8,attempts)),item_id,owner))
-            else: c.execute("UPDATE reaction_role_outbox SET attempts=attempts+1,last_error=?,lease_owner=NULL,lease_until=NULL,state=? WHERE id=? AND lease_owner=?",(error[:500] if error else None,"failed" if error else "done",item_id,owner))
 
     def set_discord_message(self,config_id:int,message_id:int,status:str="active",error:str|None=None)->None:
         with self.connection() as c: c.execute("UPDATE reaction_role_messages_v2 SET message_id=?,status=?,last_error=?,updated_at=? WHERE id=?",(message_id,status,error,int(time.time()),config_id))
@@ -253,17 +241,7 @@ class ReactionRoleRepository:
         self.audit(guild_id,config_id,"message_moved","success",actor_id=actor_id,details={"channel_id":channel_id,"message_id":message_id})
         return self.message(guild_id,config_id) or {}
 
-    def due_schedules(self,owner:str,limit:int=100)->list[dict[str,Any]]:
-        now=int(time.time())
-        with self.connection() as c:
-            rows=c.execute("SELECT * FROM reaction_role_schedules WHERE state='pending' AND due_at<=? AND (lease_until IS NULL OR lease_until<?) ORDER BY due_at LIMIT ?",(now,now,limit)).fetchall(); ids=[row["id"] for row in rows]
-            if ids:c.execute(f"UPDATE reaction_role_schedules SET lease_owner=?,lease_until=? WHERE id IN ({','.join('?' for _ in ids)})",(owner,now+60,*ids))
-        return [dict(row) for row in rows]
 
-    def finish_schedule(self,schedule_id:int,owner:str,error:str|None=None)->None:
-        with self.connection() as c:
-            if error:c.execute("UPDATE reaction_role_schedules SET attempts=attempts+1,last_error=?,lease_owner=NULL,lease_until=NULL,due_at=? WHERE id=? AND lease_owner=?",(error[:500],int(time.time())+60,schedule_id,owner))
-            else:c.execute("UPDATE reaction_role_schedules SET state='done',lease_owner=NULL,lease_until=NULL,last_error=NULL WHERE id=? AND lease_owner=?",(schedule_id,owner))
 
     def audit(self,guild_id:int,config_id:int|None,event_type:str,result:str,*,user_id:int|None=None,actor_id:int|None=None,emoji_key:str|None=None,role_id:int|None=None,reason:str|None=None,details:dict[str,Any]|None=None)->int:
         now=int(time.time())

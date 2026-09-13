@@ -10,14 +10,19 @@
 
 Windows/Linuxの全Python各211件、Docs build、保全DB複製の全Dump不変・整合性成功・FK違反0を確認した。各Domainの詳細と一時不具合の修正は進捗記録を参照する。
 
-次の開発単位は **P2-3：Outbox / ScheduleのProtocol・Runner共通化**。
+**P2-3：Outbox / ScheduleのProtocol・Runner共通化はローカル完了。** `jobs/` に共通契約・保存処理・Runnerを配置し、Ticket / Reaction RolesのOutbox/Schedule、Socialイベント、Moderation要求/期限処理の7 Queueへ適用した。0008でToken・不足列・検索Indexを追加。取得ごとのToken・失効検査、最大8回のRetry、Dead Letter、30日Retention、Cancel・Lease更新を共通化した。既存DomainのPayloadとテーブルは維持する。
 
-1. `ticketing/repository.py`、`reaction_roles/repository.py`、`social/repository.py`、`moderation/repository.py` と各Cog / `social/worker.py` のClaim・Lease・完了・Retry・期限処理を比較する。Domain固有Payloadと共通実行状態の境界を先に定義する。
-2. 共通ProtocolとRunnerを抽出し、Ticket / Reaction RolesからSocial / Moderationへ適用する。RepositoryにSQL、Runnerに処理順序と失敗分類、Domain Handlerに業務処理を置く。既存処理を包むだけで所有権検査が抜ける構成にしない。
-3. Lease所有者・失効・再取得、古い所有者による完了拒否、並行実行、再試行上限・Dead Letter、保持期限・重複処理を共通契約テストで確認する。Schema追加が必要なら0008以降を使い、既存Migrationを改変しない。
-4. Domain固有の配送・補償を維持し、全Python回帰と必要なMigration検証・正式Docsを揃えてP2-3を完了する。Discord操作の追加分離はP2-4、API RouterとUI構造はP2-5/6へ進む。
+最終コード固定後のWindows/Linux各220件、Docs build、直前0007からのMigration回帰、保全DB既存64表の全列・行保持を確認した。現在の検証用複製は `data/backups/p2-jobs-0914/verified.sqlite3`。同ディレクトリのfinalは開発途中候補なので次の検証に使用しない。
 
-各単位はコード・Migration・テスト・正式Docs・進捗記録までを一つのレビュー対象とする。`data/backups/p2-domains-0914/final.sqlite3` はP2-1最終保全DBと全Dump一致の検証用複製。原DB・既存保全DBは変更していない。StageのDiscord・OAuth・Webhook実動、遠隔本番DB適用、実S3復元の未検証をローカル成功で代替しない。
+次の開発単位は **P2-4：Discord操作をAdapterへ集約**。
+
+1. `moderation/service.py` のDiscord型・権限階層・DM・処置・ログ・Lockdown復元を棚卸しし、Serviceが受け取るID/値とAdapterの操作契約を先に定義する。既存 `moderation/adapter.py` のイベント入力変換と責務を明示する。
+2. Moderation→Ticket→Reaction Roles→Social/Suggestionsの順にDiscord操作と状態遷移を分ける。Ticket / Reaction Roles / SuggestionsのServiceには現在Discord API直接操作がなく、Cogにある配送・権限判定・Resource操作が対象となる。単なるメソッド移動で境界を曖昧にしない。
+3. 共通Outcomeに沿ってRetry可能・恒久失敗・競合・補償失敗を区別し、Discord成功後DB失敗、権限喪失、部分処理、孤立Resource、再起動を注入して検証する。P2-3のLease・Token・Dead Letterを迂回する完了経路を追加しない。
+4. Provider継続監視・Panel公開・Lockdown復元は有限ジョブQueueと異なるライフサイクルとして残っているため、所有権と補償をこの単位で確認する。失敗時に成功を記録せず、復旧対象を記録・照合できることを完了条件にする。
+5. 必要なSchema追加は0009以降を使い、0001〜0008を改変しない。コード・異常系テスト・全回帰・正式Docs・進捗まで揃え、その後にP2-5のAPI Router、P2-6のUI構造へ進む。
+
+原DB・既存保全DBは変更していない。StageのDiscord・OAuth・Webhook実動、遠隔本番DB適用、実S3復元の未検証をローカル成功で代替しない。Phase 2全体とGoalは継続する。
 
 ## 1. 判断と調査範囲
 
@@ -128,7 +133,7 @@ ROADMAPの順序を維持する。各機能をDBだけ・画面だけで公開�
 - SQLite競合、Outbox滞留、Worker停止、Discord側成功後のDB失敗を重点監視する。特にRetryは「最大回数」だけでなく冪等性と補償を検証する。
 - 本番DB InventoryとStage検証には、運用環境・テストGuild・OAuth/Provider設定へのアクセスが必要。アクセスがない期間も、コードInventory、Fixture、コンテナ、Contract testの整備は進められる。
 
-直近の着手はP2-3。P0-1〜P2-2のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
+直近の着手はP2-4。P0-1〜P2-3のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
 
 ## 8. 再調査に基づく具体的な実行単位（2026-09-12）
 

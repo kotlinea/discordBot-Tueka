@@ -93,7 +93,7 @@ class TicketRemovalTests(unittest.TestCase):
         blob_file = self.root / 'blobs' / transcript['object_key']
         encrypted = blob_file.read_bytes()
         result = apply(self.db, self.backups)
-        self.assertEqual(result['applied'], ['0002_remove_legacy_tickets.sql', '0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql'])
+        self.assertEqual(result['applied'], ['0002_remove_legacy_tickets.sql', '0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql', '0008_job_leases.sql'])
         with closing(sqlite3.connect(result['snapshot'])) as snapshot:
             self.assertIn('V1 only', snapshot.execute('SELECT transcript_json FROM support_tickets').fetchone()[0])
             self.assertEqual(snapshot.execute('SELECT COUNT(*) FROM ticket_migrations').fetchone()[0], 1)
@@ -105,8 +105,8 @@ class TicketRemovalTests(unittest.TestCase):
         payload = asyncio.run(blobs.load(transcript['backend'], transcript['object_key'], transcript['content_hash']))
         self.assertEqual(payload['messages'][0]['content'], 'retained private content')
         self.assertEqual(repository.ticket(active['id'])['status'], 'awaiting_user')
-        self.assertEqual(repository.claim_outbox('after-restart')[0]['ticket_id'], active['id'])
-        self.assertEqual(repository.due_schedules()[0]['ticket_id'], active['id'])
+        self.assertEqual(repository.outbox_jobs.claim('after-restart').payload['ticket_id'], active['id'])
+        self.assertEqual(repository.schedule_jobs.claim('after-restart').payload['ticket_id'], active['id'])
         self.assertEqual(apply(self.db, self.backups), {'applied': [], 'snapshot': None})
 
     def test_legacy_button_is_ignored_and_current_button_is_dispatched(self):
@@ -148,7 +148,7 @@ class TicketRemovalTests(unittest.TestCase):
         directory.mkdir()
         for source in Path('migrations').glob('*.sql'):
             shutil.copyfile(source, directory / source.name)
-        (directory / '0008_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0009_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         self.assertEqual(repository.settings(1), saved)

@@ -8,6 +8,8 @@ import time
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
+from jobs import Outcome, RetryJob, run_batch
+
 import discord
 import httpx
 from discord.ext import commands, tasks
@@ -24,6 +26,7 @@ LOGGER = logging.getLogger(__name__)
 class AutoModCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
+        self.owner = f"moderation:{id(self)}"
         self.moderation_repository = ModerationRepository(bot.settings.database_path)
         self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
         self.engine = AutoModEngine()
@@ -244,18 +247,7 @@ class AutoModCog(commands.Cog):
     async def maintenance(self) -> None:
         self.moderation_repository.purge_moderation_evidence()
         self.engine.prune()
-        for pending in self.moderation_repository.due_moderation_actions():
-            guild = self.bot.get_guild(int(pending["guild_id"]))
-            if guild is None:
-                continue
-            try:
-                if pending["action"] == "unban":
-                    await guild.unban(discord.Object(id=int(pending["user_id"])), reason="一時Banの期限切れ")
-                self.moderation_repository.complete_moderation_action(int(pending["id"]))
-            except discord.NotFound:
-                self.moderation_repository.complete_moderation_action(int(pending["id"]))
-            except (discord.Forbidden, discord.HTTPException) as exc:
-                self.moderation_repository.complete_moderation_action(int(pending["id"]), str(exc))
+        await run_batch(self.moderation_repository.schedule_jobs, self.owner, self._expire_moderation_action, limit=100)
         for pending in self.moderation_repository.due_lockdowns():
             guild = self.bot.get_guild(int(pending["guild_id"]))
             if guild is None:
@@ -270,13 +262,25 @@ class AutoModCog(commands.Cog):
             self.moderation_repository.create_moderation_event(guild_id, family="anti_raid", event_type="member_join",
                 source="raid_state", reason="5分間シグナルがなかったためRaid状態を自動解除しました", mode="monitor",
                 dedupe_key=f"raid-clear:{guild_id}:{raid['last_signal_at']}")
-        for request in self.moderation_repository.pending_moderation_actions():
-            await self._execute_requested_action(request)
+        await run_batch(self.moderation_repository.request_jobs, self.owner, self._execute_requested_action, limit=50)
 
-    async def _execute_requested_action(self, request: dict[str, Any]) -> None:
+    async def _expire_moderation_action(self, pending: dict) -> Outcome:
+        guild = self.bot.get_guild(int(pending['guild_id']))
+        if guild is None:
+            raise RetryJob('Guild unavailable')
+        try:
+            if pending['action'] == 'unban':
+                await guild.unban(discord.Object(id=int(pending['user_id'])), reason='一時Banの期限切れ')
+            return Outcome()
+        except discord.NotFound:
+            return Outcome()
+        except discord.Forbidden as exc:
+            return Outcome(str(exc))
+
+    async def _execute_requested_action(self, request: dict[str, Any]) -> Outcome:
         guild = self.bot.get_guild(int(request["guild_id"]))
         if guild is None:
-            return
+            raise RetryJob("Guild unavailable")
         action = str(request["action"])
         moderator = guild.get_member(int(request["moderator_id"]))
         member = guild.get_member(int(request["target_user_id"])) if request.get("target_user_id") else None
@@ -286,8 +290,7 @@ class AutoModCog(commands.Cog):
             reason=reason, actor_id=request["moderator_id"], actor_kind="human", target_user_id=request.get("target_user_id"),
             channel_id=request.get("channel_id"), target_id=request["id"], dedupe_key=f"action-request:{request['id']}")
         if event_id is None:
-            self.moderation_repository.complete_moderation_request(int(request["id"]), result={"status": "duplicate"})
-            return
+            return Outcome("Previous execution requires reconciliation", result={"status": "duplicate"})
         try:
             if not self.guild_settings.module_enabled(guild.id, "moderation"):
                 raise PermissionError("Moderationが無効です")
@@ -325,11 +328,11 @@ class AutoModCog(commands.Cog):
                 results = await self.service.execute_actions(ActionContext(guild, member, channel=channel, actor=moderator), rule, reason, event_id, {})
             self.moderation_repository.finish_moderation_event(event_id, results)
             failed = any(item.get("status") == "failed" for item in results)
-            self.moderation_repository.complete_moderation_request(int(request["id"]), result={"event_id": event_id, "actions": results}, failed=failed)
+            return Outcome("Action failed" if failed else None, result={"event_id": event_id, "actions": results})
         except (ValueError, PermissionError, discord.Forbidden, discord.HTTPException) as exc:
             results = [{"type": action, "status": "failed", "error": str(exc)[:300]}]
             self.moderation_repository.finish_moderation_event(event_id, results)
-            self.moderation_repository.complete_moderation_request(int(request["id"]), result={"event_id": event_id, "actions": results}, failed=True)
+            return Outcome(str(exc), result={"event_id": event_id, "actions": results})
 
     @maintenance.before_loop
     async def before_maintenance(self) -> None:

@@ -1,3 +1,4 @@
+from jobs import Outcome
 from guild_settings import GuildSettingsRepository
 from db_support import prepare_database
 import json
@@ -77,7 +78,7 @@ class AutoModStorageTests(unittest.TestCase):
     def test_scheduled_actions_are_durable_and_idempotently_completed(self):
         action_id = self.storage.schedule_moderation_action(1, 2, "unban", 1, "done", None)
         self.assertEqual(self.storage.due_moderation_actions(now=2)[0]["id"], action_id)
-        self.storage.complete_moderation_action(action_id)
+        self.storage.schedule_jobs.finish(self.storage.schedule_jobs.claim('test'), Outcome())
         self.assertEqual(self.storage.due_moderation_actions(now=2), [])
 
 

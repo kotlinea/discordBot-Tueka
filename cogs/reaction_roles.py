@@ -10,6 +10,8 @@ import unicodedata
 from collections import defaultdict
 from typing import Any
 
+from jobs import Outcome, run_batch
+
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -399,72 +401,76 @@ class ReactionRolesCog(commands.Cog):
 
     @tasks.loop(seconds=5)
     async def process_outbox(self)->None:
-        for item in self.repository.claim_outbox(self.owner):
-            try:
-                config=self.repository.message(int(item["guild_id"]),int(item["message_config_id"])) if item.get("message_config_id") else None
-                guild=self.bot.get_guild(int(item["guild_id"])); channel_id=config["channel_id"] if config else item["payload"].get("channel_id");channel=guild.get_channel(int(channel_id)) if guild and channel_id else None
-                if item["action"]=="delete":
-                    message_id=config.get("message_id") if config else item["payload"].get("message_id");source=config["source"] if config else item["payload"].get("source")
-                    if message_id and source=="bot" and isinstance(channel,(discord.TextChannel,discord.Thread)):
-                        try:message=await channel.fetch_message(int(message_id));await message.delete()
-                        except discord.NotFound:pass
-                    self.repository.finish_outbox(item["id"],self.owner);continue
-                if not config or not isinstance(channel,(discord.TextChannel,discord.Thread)):raise RuntimeError("message_unavailable")
-                if item["action"]=="move":
-                    target_channel=guild.get_channel(int(item["payload"].get("channel_id",0)))
-                    if not isinstance(target_channel,(discord.TextChannel,discord.Thread)):raise RuntimeError("move_channel_unavailable")
-                    target=await target_channel.fetch_message(int(item["payload"].get("message_id",0)))
-                    for mapping in config["mappings"]:await target.add_reaction(mapping["emoji"])
-                    old_channel=channel;old_message_id=config.get("message_id");old_source=config["source"]
-                    self.repository.move_message(guild.id,config["id"],target_channel.id,target.id,"bot" if self.bot.user and target.author.id==self.bot.user.id else "external",int(item["payload"].get("revision",config["revision"])))
-                    if old_source=="bot" and old_message_id:
-                        try:old=await old_channel.fetch_message(old_message_id);await old.delete()
-                        except discord.HTTPException:self.repository.audit(guild.id,config["id"],"move_cleanup","partial",reason="old_message_delete_failed")
-                    self.repository.finish_outbox(item["id"],self.owner);continue
-                embed=discord.Embed(title=config["embed"]["title"] or None,description=config["embed"]["description"] or None,color=int(config["embed"]["color"].lstrip("#"),16))
-                message=None
-                if config.get("message_id"):
-                    try:message=await channel.fetch_message(config["message_id"])
+        await run_batch(self.repository.outbox_jobs, self.owner, self._process_outbox_item)
+
+    async def _process_outbox_item(self, item: dict) -> Outcome:
+        try:
+            config=self.repository.message(int(item["guild_id"]),int(item["message_config_id"])) if item.get("message_config_id") else None
+            guild=self.bot.get_guild(int(item["guild_id"])); channel_id=config["channel_id"] if config else item["payload"].get("channel_id");channel=guild.get_channel(int(channel_id)) if guild and channel_id else None
+            if item["action"]=="delete":
+                message_id=config.get("message_id") if config else item["payload"].get("message_id");source=config["source"] if config else item["payload"].get("source")
+                if message_id and source=="bot" and isinstance(channel,(discord.TextChannel,discord.Thread)):
+                    try:message=await channel.fetch_message(int(message_id));await message.delete()
                     except discord.NotFound:pass
-                if config["source"]=="bot":
-                    if message:
-                        message=await message.edit(embed=embed,allowed_mentions=discord.AllowedMentions.none())
-                    else:
-                        message=await channel.send(embed=embed,allowed_mentions=discord.AllowedMentions.none())
-                        # Persist the Discord identity before adding reactions. If a
-                        # later reaction fails, the retry repairs this message instead
-                        # of publishing a new one every time the outbox is claimed.
-                        self.repository.set_discord_message(config["id"],message.id,status="publishing")
-                        config["message_id"]=message.id
-                elif not message:raise RuntimeError("external_message_missing")
-                for mapping in config["mappings"]:
-                    try:await message.add_reaction(mapping["emoji"])
-                    except discord.HTTPException:
-                        if not item["payload"].get("foreign"):raise
-                self.repository.set_discord_message(config["id"],message.id);self.repository.finish_outbox(item["id"],self.owner)
-            except (discord.Forbidden,discord.NotFound,RuntimeError) as exc:
-                if config:self.repository.set_delivery_status(config["id"],"failed",str(exc))
-                self.repository.finish_outbox(item["id"],self.owner,str(exc),retry=False)
-            except Exception as exc:
-                if config:self.repository.set_delivery_status(config["id"],"pending",type(exc).__name__)
-                self.repository.finish_outbox(item["id"],self.owner,type(exc).__name__,retry=True)
+                return Outcome()
+            if not config or not isinstance(channel,(discord.TextChannel,discord.Thread)):raise RuntimeError("message_unavailable")
+            if item["action"]=="move":
+                target_channel=guild.get_channel(int(item["payload"].get("channel_id",0)))
+                if not isinstance(target_channel,(discord.TextChannel,discord.Thread)):raise RuntimeError("move_channel_unavailable")
+                target=await target_channel.fetch_message(int(item["payload"].get("message_id",0)))
+                for mapping in config["mappings"]:await target.add_reaction(mapping["emoji"])
+                old_channel=channel;old_message_id=config.get("message_id");old_source=config["source"]
+                self.repository.move_message(guild.id,config["id"],target_channel.id,target.id,"bot" if self.bot.user and target.author.id==self.bot.user.id else "external",int(item["payload"].get("revision",config["revision"])))
+                if old_source=="bot" and old_message_id:
+                    try:old=await old_channel.fetch_message(old_message_id);await old.delete()
+                    except discord.HTTPException:self.repository.audit(guild.id,config["id"],"move_cleanup","partial",reason="old_message_delete_failed")
+                return Outcome()
+            embed=discord.Embed(title=config["embed"]["title"] or None,description=config["embed"]["description"] or None,color=int(config["embed"]["color"].lstrip("#"),16))
+            message=None
+            if config.get("message_id"):
+                try:message=await channel.fetch_message(config["message_id"])
+                except discord.NotFound:pass
+            if config["source"]=="bot":
+                if message:
+                    message=await message.edit(embed=embed,allowed_mentions=discord.AllowedMentions.none())
+                else:
+                    message=await channel.send(embed=embed,allowed_mentions=discord.AllowedMentions.none())
+                    # Persist the Discord identity before adding reactions. If a
+                    # later reaction fails, the retry repairs this message instead
+                    # of publishing a new one every time the outbox is claimed.
+                    self.repository.set_discord_message(config["id"],message.id,status="publishing")
+                    config["message_id"]=message.id
+            elif not message:raise RuntimeError("external_message_missing")
+            for mapping in config["mappings"]:
+                try:await message.add_reaction(mapping["emoji"])
+                except discord.HTTPException:
+                    if not item["payload"].get("foreign"):raise
+            self.repository.set_discord_message(config["id"],message.id);return Outcome()
+        except (discord.Forbidden,discord.NotFound,RuntimeError) as exc:
+            if config:self.repository.set_delivery_status(config["id"],"failed",str(exc))
+            return Outcome(str(exc), retry=False)
+        except Exception as exc:
+            if config:self.repository.set_delivery_status(config["id"],"pending",type(exc).__name__)
+            return Outcome(type(exc).__name__, retry=True)
 
     @tasks.loop(seconds=15)
     async def process_schedules(self)->None:
-        for item in self.repository.due_schedules(self.owner):
-            try:
-                config=self.repository.message(int(item["guild_id"]),int(item["message_config_id"])) if item.get("message_config_id") else None;guild=self.bot.get_guild(int(item["guild_id"]))
-                if item["kind"]=="self_destruct":
-                    if config and config["source"]=="bot":
-                        guild_id=int(item["guild_id"])
-                        self.repository.queue_action(guild_id,config["id"],"delete",{"channel_id":config["channel_id"],"message_id":config.get("message_id"),"source":config["source"]})
-                        self.repository.delete_message(guild_id,config["id"],recoverable=False)
-                elif item["kind"]=="temp_role" and config and guild:
-                    mapping=next((value for value in config["mappings"] if value["id"]==item["mapping_id"]),None);member=guild.get_member(int(item["user_id"]));role=guild.get_role(mapping["role_id"]) if mapping else None
-                    if member and role:await member.remove_roles(role,reason="Temporary Reaction Role expired")
-                    if mapping:self.repository.deactivate_assignment(config["id"],mapping["id"],int(item["user_id"]))
-                self.repository.finish_schedule(item["id"],self.owner)
-            except Exception as exc:self.repository.finish_schedule(item["id"],self.owner,type(exc).__name__)
+        await run_batch(self.repository.schedule_jobs, self.owner, self._process_schedule_item, limit=100)
+
+    async def _process_schedule_item(self, item: dict) -> Outcome:
+        try:
+            config=self.repository.message(int(item["guild_id"]),int(item["message_config_id"])) if item.get("message_config_id") else None;guild=self.bot.get_guild(int(item["guild_id"]))
+            if item["kind"]=="self_destruct":
+                if config and config["source"]=="bot":
+                    guild_id=int(item["guild_id"])
+                    self.repository.queue_action(guild_id,config["id"],"delete",{"channel_id":config["channel_id"],"message_id":config.get("message_id"),"source":config["source"]})
+                    self.repository.delete_message(guild_id,config["id"],recoverable=False)
+            elif item["kind"]=="temp_role" and config and guild:
+                mapping=next((value for value in config["mappings"] if value["id"]==item["mapping_id"]),None);member=guild.get_member(int(item["user_id"]));role=guild.get_role(mapping["role_id"]) if mapping else None
+                if member and role:await member.remove_roles(role,reason="Temporary Reaction Role expired")
+                if mapping:self.repository.deactivate_assignment(config["id"],mapping["id"],int(item["user_id"]))
+            return Outcome()
+        except Exception as exc:return Outcome(type(exc).__name__, retry=True)
 
     @tasks.loop(hours=1)
     async def maintenance(self)->None:

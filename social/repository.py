@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from jobs import QueueRepository, QueueSpec
 from database import require_current, transaction
 
 
@@ -12,6 +13,7 @@ class SocialRepository:
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
         require_current(self.database_path)
+        self.event_jobs = QueueRepository(self.database_path, QueueSpec('social_events', completed='processed_at'))
 
     def _connection(self):
         return transaction(self.database_path)
@@ -245,26 +247,8 @@ class SocialRepository:
             rows = connection.execute("SELECT * FROM social_events WHERE processed_at IS NULL AND available_at<=? ORDER BY id LIMIT 100", (int(time.time()),)).fetchall()
         return [{**dict(row), "payload": json.loads(row["payload_json"])} for row in rows]
 
-    def claim_social_events(self, owner: str, *, limit: int = 100, lease_seconds: int = 30) -> list[dict[str, Any]]:
-        now = int(time.time())
-        with self._connection() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            rows = connection.execute("""SELECT * FROM social_events WHERE processed_at IS NULL AND available_at<=?
-                AND (lease_until IS NULL OR lease_until<?) ORDER BY id LIMIT ?""", (now, now, max(1, min(limit, 200)))).fetchall()
-            ids = [int(row["id"]) for row in rows]
-            if ids:
-                placeholders = ",".join("?" for _ in ids)
-                connection.execute(f"UPDATE social_events SET lease_owner=?,lease_until=?,status='processing',attempts=attempts+1 WHERE id IN ({placeholders})", (owner, now + lease_seconds, *ids))
-        return [{**dict(row), "payload": json.loads(row["payload_json"])} for row in rows]
 
-    def mark_social_event_processed(self, event_id: int) -> None:
-        with self._connection() as connection:
-            connection.execute("UPDATE social_events SET processed_at=?,status='completed',lease_owner=NULL,lease_until=NULL WHERE id=?", (int(time.time()), event_id))
 
-    def retry_social_event(self, event_id: int, error: str, *, delay_seconds: int = 30) -> None:
-        with self._connection() as connection:
-            connection.execute("UPDATE social_events SET status='retry',available_at=?,last_error=?,lease_owner=NULL,lease_until=NULL WHERE id=?",
-                               (int(time.time()) + max(1, delay_seconds), error[:500], event_id))
 
     def record_social_delivery(self, subscription_id: int, event_key: str, channel_id: int, message_id: int | None, state: str = "sent") -> bool:
         now = int(time.time())

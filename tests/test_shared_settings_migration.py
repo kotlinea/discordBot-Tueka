@@ -52,7 +52,7 @@ class SharedSettingsRemovalTests(unittest.TestCase):
     def test_preserves_effective_settings_revision_and_unrelated_data(self):
         self.seed()
         result = apply(self.db, self.backups)
-        self.assertEqual(result['applied'], ['0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql'])
+        self.assertEqual(result['applied'], ['0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql', '0008_job_leases.sql'])
         for _ in range(2):
             store = GuildSettingsRepository(self.db)
             for guild, channel in [(1, 10), (2, None), (3, 333)]:
@@ -87,7 +87,7 @@ class SharedSettingsRemovalTests(unittest.TestCase):
             before = list(connection.iterdump())
         directory = self.root / 'failure'
         shutil.copytree('migrations', directory)
-        (directory / '0008_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0009_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         with closing(sqlite3.connect(self.db)) as connection:

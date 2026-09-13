@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from jobs import QueueRepository, QueueSpec
 from database import require_current, transaction
 from guild_settings.models import moderation_settings
 
@@ -13,6 +14,8 @@ class ModerationRepository:
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
         require_current(self.database_path)
+        self.request_jobs = QueueRepository(self.database_path, QueueSpec('moderation_action_requests', result='result_json'))
+        self.schedule_jobs = QueueRepository(self.database_path, QueueSpec('scheduled_moderation_actions', due='due_at'))
 
     def _connection(self):
         return transaction(self.database_path)
@@ -228,10 +231,6 @@ class ModerationRepository:
             rows = connection.execute("SELECT * FROM moderation_action_requests WHERE status='pending' ORDER BY id LIMIT ?", (max(1,min(limit,100)),)).fetchall()
         return [{**dict(row), "options": json.loads(row["options_json"])} for row in rows]
 
-    def complete_moderation_request(self, request_id: int, *, result: dict[str, Any], failed: bool = False) -> None:
-        with self._connection() as connection:
-            connection.execute("UPDATE moderation_action_requests SET status=?,completed_at=?,result_json=? WHERE id=? AND status='pending'",
-                ("failed" if failed else "completed",int(time.time()),json.dumps(result,ensure_ascii=False),request_id))
 
     def active_points(self, guild_id: int, user_id: int, now: int | None = None) -> int:
         current = int(time.time()) if now is None else now
@@ -274,12 +273,6 @@ class ModerationRepository:
             rows = connection.execute("SELECT * FROM scheduled_moderation_actions WHERE completed_at IS NULL AND due_at<=? ORDER BY due_at LIMIT ?", (current,max(1,min(limit,500)))).fetchall()
         return [dict(row) for row in rows]
 
-    def complete_moderation_action(self, action_id: int, error: str | None = None) -> None:
-        with self._connection() as connection:
-            if error:
-                connection.execute("UPDATE scheduled_moderation_actions SET attempts=attempts+1,last_error=? WHERE id=?", (error[:500],action_id))
-            else:
-                connection.execute("UPDATE scheduled_moderation_actions SET attempts=attempts+1,completed_at=?,last_error=NULL WHERE id=?", (int(time.time()),action_id))
 
     def purge_moderation_evidence(self, now: int | None = None) -> int:
         with self._connection() as connection:

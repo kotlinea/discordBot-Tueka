@@ -9,6 +9,8 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
+from jobs import Outcome, run_batch
+
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -680,91 +682,88 @@ class TicketsCog(commands.Cog):
 
     @tasks.loop(seconds=5)
     async def deliver_outbox(self) -> None:
-        for item in self.repository.claim_outbox(self.owner, limit=20, lease_seconds=60):
-            ticket = self.repository.ticket(int(item["ticket_id"]))
-            guild = self.bot.get_guild(int(ticket["guild_id"])) if ticket else None
-            channel = guild.get_channel_or_thread(int(ticket["discord_container_id"])) if guild and ticket else None
-            try:
-                action = str(item["action"])
-                if action in {"close", "auto_close"}:
-                    if not ticket or not guild or not isinstance(channel, (discord.TextChannel, discord.Thread)):
-                        raise RuntimeError("Ticket channel unavailable")
-                    await self._reconcile_history(ticket, channel)
-                    await self.service.close(ticket["id"], int(item["actor_id"]), str(item["payload"].get("reason") or "Close"))
-                    if isinstance(channel, discord.Thread):
-                        await channel.edit(archived=True, locked=True, reason="Ticket auto closed")
-                    else:
-                        await channel.delete(reason="Ticket auto closed")
-                    self.repository.complete_outbox(item["id"], self.owner)
-                    continue
-                if action in {"claim", "unclaim"}:
-                    panel = self.repository.panel(int(ticket["guild_id"]), int(ticket["panel_id"])) or {}
-                    claimant = guild.get_member(int(item["actor_id"])) if action == "claim" and guild else None
-                    if action == "claim" and claimant is None: raise RuntimeError("Claimant unavailable")
-                    await self._set_claim(ticket, panel, claimant, item["payload"].get("revision"))
-                    self.repository.complete_outbox(item["id"], self.owner)
-                    continue
-                if action == "reopen":
-                    reopened = self.repository.reopen_ticket(ticket["id"])
-                    if not isinstance(channel, discord.Thread):
-                        raise RuntimeError("Ticket thread unavailable")
-                    await channel.edit(archived=False, locked=False, reason="Ticket reopened from dashboard")
-                    self.service.schedule_ticket(reopened)
-                    self.repository.audit(reopened["guild_id"], "ticket_reopened", int(item["actor_id"]), reopened["id"])
-                    self.repository.complete_outbox(item["id"], self.owner)
-                    continue
-                if action == "exclude_auto_close":
-                    self.repository.set_auto_close_excluded(ticket["id"], bool(item["payload"].get("excluded", True)))
-                    self.service.schedule_ticket(self.repository.ticket(ticket["id"]) or ticket)
-                    self.repository.complete_outbox(item["id"], self.owner)
-                    continue
-                if action == "awaiting_user":
-                    panel = self.repository.panel(int(ticket["guild_id"]), int(ticket["panel_id"])) or {}
-                    category = guild.get_channel(int(panel.get("awaiting_category_id") or 0)) if guild else None
-                    if not isinstance(channel, discord.TextChannel) or not isinstance(category, discord.CategoryChannel):
-                        raise RuntimeError("Awaiting category unavailable")
-                    original_category = channel.category_id or int(panel.get("category_id") or 0)
-                    await channel.edit(category=category, reason="Ticket awaiting user")
-                    self.repository.set_awaiting_user(ticket["id"], original_category)
-                    self.repository.audit(int(ticket["guild_id"]), "ticket_awaiting_user", int(item["actor_id"]), ticket["id"])
-                    self.repository.complete_outbox(item["id"], self.owner)
-                    continue
-                if action == "delete":
-                    if isinstance(channel, (discord.TextChannel, discord.Thread)):
-                        await channel.delete(reason="Ticket deleted from dashboard")
-                    self.repository.mark_deleted(ticket["id"], int(discord.utils.utcnow().timestamp()))
-                    self.repository.complete_outbox(item["id"], self.owner)
-                    continue
-                if not isinstance(channel, (discord.TextChannel, discord.Thread)):
+        await run_batch(self.repository.outbox_jobs, self.owner, self._deliver_outbox_item)
+
+    async def _deliver_outbox_item(self, item: dict) -> Outcome:
+        ticket = self.repository.ticket(int(item["ticket_id"]))
+        guild = self.bot.get_guild(int(ticket["guild_id"])) if ticket else None
+        channel = guild.get_channel_or_thread(int(ticket["discord_container_id"])) if guild and ticket else None
+        try:
+            action = str(item["action"])
+            if action in {"close", "auto_close"}:
+                if not ticket or not guild or not isinstance(channel, (discord.TextChannel, discord.Thread)):
                     raise RuntimeError("Ticket channel unavailable")
-                payload, content = item["payload"], self.transcripts.decrypt_text(item["payload"].get("content_encrypted"))
-                if action == "note":
-                    await self._deliver_note(item, ticket, guild, channel)
-                    self.repository.complete_outbox(item["id"], self.owner)
-                    continue
-                if payload.get("anonymous"):
-                    content = f"**Support Staff**\n{content}"
+                await self._reconcile_history(ticket, channel)
+                await self.service.close(ticket["id"], int(item["actor_id"]), str(item["payload"].get("reason") or "Close"))
+                if isinstance(channel, discord.Thread):
+                    await channel.edit(archived=True, locked=True, reason="Ticket auto closed")
                 else:
-                    content = f"**{payload['actor_name']}**\n{content}"
-                message = await channel.send(content, allowed_mentions=discord.AllowedMentions.none())
-                self.service.record_message(ticket, message.id, int(item["actor_id"]), payload["actor_name"], self.transcripts.decrypt_text(payload.get("content_encrypted")), [], kind="staff_reply", created_at=int(message.created_at.timestamp()))
-                self.repository.complete_outbox(item["id"], self.owner)
-            except (discord.Forbidden, discord.NotFound) as exc:
-                self.repository.complete_outbox(item["id"], self.owner, str(exc), retry=False)
-            except (RuntimeError, ValueError) as exc:
-                retry = str(exc) not in {"revision_conflict", "ticket_not_open", "reopen_unavailable", "claim_unavailable"}
-                self.repository.complete_outbox(item["id"], self.owner, str(exc), retry=retry)
-            except Exception as exc:
-                self.repository.complete_outbox(item["id"], self.owner, str(exc), retry=True)
+                    await channel.delete(reason="Ticket auto closed")
+                return Outcome()
+            if action in {"claim", "unclaim"}:
+                panel = self.repository.panel(int(ticket["guild_id"]), int(ticket["panel_id"])) or {}
+                claimant = guild.get_member(int(item["actor_id"])) if action == "claim" and guild else None
+                if action == "claim" and claimant is None: raise RuntimeError("Claimant unavailable")
+                await self._set_claim(ticket, panel, claimant, item["payload"].get("revision"))
+                return Outcome()
+            if action == "reopen":
+                reopened = self.repository.reopen_ticket(ticket["id"])
+                if not isinstance(channel, discord.Thread):
+                    raise RuntimeError("Ticket thread unavailable")
+                await channel.edit(archived=False, locked=False, reason="Ticket reopened from dashboard")
+                self.service.schedule_ticket(reopened)
+                self.repository.audit(reopened["guild_id"], "ticket_reopened", int(item["actor_id"]), reopened["id"])
+                return Outcome()
+            if action == "exclude_auto_close":
+                self.repository.set_auto_close_excluded(ticket["id"], bool(item["payload"].get("excluded", True)))
+                self.service.schedule_ticket(self.repository.ticket(ticket["id"]) or ticket)
+                return Outcome()
+            if action == "awaiting_user":
+                panel = self.repository.panel(int(ticket["guild_id"]), int(ticket["panel_id"])) or {}
+                category = guild.get_channel(int(panel.get("awaiting_category_id") or 0)) if guild else None
+                if not isinstance(channel, discord.TextChannel) or not isinstance(category, discord.CategoryChannel):
+                    raise RuntimeError("Awaiting category unavailable")
+                original_category = channel.category_id or int(panel.get("category_id") or 0)
+                await channel.edit(category=category, reason="Ticket awaiting user")
+                self.repository.set_awaiting_user(ticket["id"], original_category)
+                self.repository.audit(int(ticket["guild_id"]), "ticket_awaiting_user", int(item["actor_id"]), ticket["id"])
+                return Outcome()
+            if action == "delete":
+                if isinstance(channel, (discord.TextChannel, discord.Thread)):
+                    await channel.delete(reason="Ticket deleted from dashboard")
+                self.repository.mark_deleted(ticket["id"], int(discord.utils.utcnow().timestamp()))
+                return Outcome()
+            if not isinstance(channel, (discord.TextChannel, discord.Thread)):
+                raise RuntimeError("Ticket channel unavailable")
+            payload, content = item["payload"], self.transcripts.decrypt_text(item["payload"].get("content_encrypted"))
+            if action == "note":
+                await self._deliver_note(item, ticket, guild, channel)
+                return Outcome()
+            if payload.get("anonymous"):
+                content = f"**Support Staff**\n{content}"
+            else:
+                content = f"**{payload['actor_name']}**\n{content}"
+            message = await channel.send(content, allowed_mentions=discord.AllowedMentions.none())
+            self.service.record_message(ticket, message.id, int(item["actor_id"]), payload["actor_name"], self.transcripts.decrypt_text(payload.get("content_encrypted")), [], kind="staff_reply", created_at=int(message.created_at.timestamp()))
+            return Outcome()
+        except (discord.Forbidden, discord.NotFound) as exc:
+            return Outcome(str(exc), retry=False)
+        except (RuntimeError, ValueError) as exc:
+            retry = str(exc) not in {"revision_conflict", "ticket_not_open", "reopen_unavailable", "claim_unavailable"}
+            return Outcome(str(exc), retry=retry)
+        except Exception as exc:
+            return Outcome(str(exc), retry=True)
 
     @tasks.loop(minutes=1)
     async def auto_close(self) -> None:
         self.repository.expire_close_requests()
-        for schedule in self.repository.due_schedules():
-            ticket = self.repository.ticket(int(schedule["ticket_id"]))
-            if ticket and ticket["status"] == "open" and not ticket.get("auto_close_excluded"):
-                self.repository.queue_outbox(ticket["id"], "auto_close", self.bot.user.id if self.bot.user else 0, {"reason": "Auto Close · " + str(schedule["kind"])})
-            self.repository.complete_schedule(int(schedule["id"]))
+        await run_batch(self.repository.schedule_jobs, self.owner, self._expire_ticket_schedule, limit=100)
+
+    async def _expire_ticket_schedule(self, schedule: dict) -> Outcome:
+        ticket = self.repository.ticket(int(schedule["ticket_id"]))
+        if ticket and ticket["status"] == "open" and not ticket.get("auto_close_excluded"):
+            self.repository.queue_outbox(ticket["id"], "auto_close", self.bot.user.id if self.bot.user else 0, {"reason": "Auto Close · " + str(schedule["kind"])})
+        return Outcome()
 
     @tasks.loop(seconds=10)
     async def publish_panels(self) -> None:

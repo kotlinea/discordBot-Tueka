@@ -24,6 +24,8 @@ python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrat
 
 異常終了後は、原DBを再開する前に適用履歴・整合性・ログを確認します。DBを自動的にSnapshotで上書きすることはありません。復元する場合は[バックアップと復元](./backup.md)の手順で、停止中に別DBへ復元して検証します。Snapshot以後の変更は復元先に含まれません。
 
+0008は7つのOutbox/Scheduleテーブルに取得Token・不足していたLease/試行数/終端日時と検索Indexを追加します。既存Payloadを維持し、完了済み行の終端日時だけを補います。BotとWorkerを停止して適用し、適用後は共通Runnerを使うコードで再起動してください。旧版への復帰は適用前Snapshotを伴う手順で行います。
+
 ## Migrationの追加
 
 連続する4桁番号と英小文字・数字・underscoreの名前を使い、各SQL文をセミコロンで終えます。適用済みファイルを編集せず、新しい番号を追加してください。

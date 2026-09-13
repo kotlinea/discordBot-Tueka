@@ -99,7 +99,7 @@ class ReactionRoleRepositoryTests(unittest.TestCase):
         self.assertEqual(updated["mappings"][0]["id"], mapping_id)
         with self.assertRaises(RuntimeError):
             self.service.update(1, saved["id"], saved, saved["revision"], actor_id=2)
-        claimed = self.repo.claim_outbox("test")
+        claimed = [self.repo.outbox_jobs.claim("test").payload for _ in range(2)]
         self.assertEqual([item["action"] for item in claimed], ["publish", "sync"])
 
     def test_explicit_disable_is_not_overwritten_by_new_configuration(self):
@@ -138,10 +138,10 @@ class ReactionRoleRepositoryTests(unittest.TestCase):
         saved = self.service.create(1, {**message(), "access_policy": "whitelist", "whitelist_role_ids": [30]})
         self.assertEqual(saved["access_policy"], "whitelist")
         self.assertEqual(saved["whitelist_role_ids"], [30])
-        first = self.repo.claim_outbox("worker-a")
-        second = self.repo.claim_outbox("worker-b")
-        self.assertEqual(len(first), 1)
-        self.assertEqual(second, [])
+        first = self.repo.outbox_jobs.claim("worker-a")
+        second = self.repo.outbox_jobs.claim("worker-b")
+        self.assertIsNotNone(first)
+        self.assertIsNone(second)
 
     def test_link_group_is_global_unique_and_rejects_incompatible_types(self):
         first = self.service.create(1, message(role_id=20))
@@ -161,7 +161,7 @@ class ReactionRoleRepositoryTests(unittest.TestCase):
         saved = self.service.create(1, message(behavior="temp"))
         mapping = saved["mappings"][0]
         self.repo.activate_assignment(1, saved["id"], mapping["id"], 7, 20, int(time.time()) - 1)
-        due = self.repo.due_schedules("worker")
+        due = [self.repo.schedule_jobs.claim("worker").payload]
         self.assertEqual(due[0]["kind"], "temp_role")
         self.repo.set_discord_message(saved["id"], 123)
         self.repo.delete_message(1, saved["id"], recoverable=True)
@@ -226,13 +226,11 @@ class ReactionRoleCogTests(unittest.IsolatedAsyncioTestCase):
         channel = FakeChannel()
 
         class FakeRepository:
-            def claim_outbox(self, _owner): return [item]
             def message(self, _guild_id, _config_id): return config
             def set_discord_message(self, _config_id, message_id, status="active", error=None):
                 config["message_id"] = message_id
                 config["status"] = status
             def set_delivery_status(self, _config_id, status, error=None): config["status"] = status
-            def finish_outbox(self, *_args, **_kwargs): pass
 
         guild = SimpleNamespace(id=1, get_channel=lambda _channel_id: channel)
         cog = object.__new__(ReactionRolesCog)
@@ -241,10 +239,10 @@ class ReactionRoleCogTests(unittest.IsolatedAsyncioTestCase):
         cog.owner = "test-worker"
 
         with patch("cogs.reaction_roles.discord.TextChannel", FakeChannel), patch("cogs.reaction_roles.discord.Thread", FakeChannel):
-            await ReactionRolesCog.process_outbox.coro(cog)
+            await ReactionRolesCog._process_outbox_item(cog, item)
             self.assertEqual(config["message_id"], 900)
             self.assertEqual(channel.send_count, 1)
-            await ReactionRolesCog.process_outbox.coro(cog)
+            await ReactionRolesCog._process_outbox_item(cog, item)
             self.assertEqual(channel.send_count, 1)
             self.assertEqual(config["status"], "active")
 

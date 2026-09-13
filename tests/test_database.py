@@ -94,6 +94,7 @@ class DatabaseTests(unittest.TestCase):
         apply(self.db, self.root / 'backups')
         with transaction(self.db) as connection:
             connection.execute("INSERT INTO social_events(provider,event_key,account_id,payload_json,received_at) VALUES('youtube','keep','UC1','{}',1)")
+            connection.execute('DROP INDEX idx_social_events_job_claim')
             connection.execute('ALTER TABLE social_events DROP COLUMN available_at')
             connection.execute('ALTER TABLE ticket_feedback DROP COLUMN answers_encrypted_json')
             connection.execute('ALTER TABLE tickets_v2 DROP COLUMN notes_thread_id')
@@ -101,7 +102,7 @@ class DatabaseTests(unittest.TestCase):
         with self.assertRaises(SchemaNotReady):
             GuildSettingsRepository(self.db)
         result = apply(self.db, self.root / 'backups')
-        self.assertEqual(result['applied'], ['0007_current_schema.sql'])
+        self.assertEqual(result['applied'], ['0007_current_schema.sql', '0008_job_leases.sql'])
         with closing(readonly(self.db)) as connection:
             self.assertEqual(connection.execute('SELECT event_key,available_at FROM social_events').fetchone(), ('keep', 0))
             self.assertIn('notes_thread_id', {row[1] for row in connection.execute('PRAGMA table_info(tickets_v2)')})

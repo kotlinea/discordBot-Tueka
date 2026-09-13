@@ -40,4 +40,16 @@ Schemaは番号付きMigration CLIだけが作成・変更します。Repository
 
 更新はrevisionで競合を検知します。長時間処理と配送はOutboxまたはScheduleへ保存し、Leaseを取得したProcessが実行します。期限切れLeaseは再取得でき、外部Event IDやInteraction IDの一意制約で重複処理を防ぎます。
 
+## Outbox・Schedule実行基盤
+
+`jobs/models.py` はClaim・Outcome・JobStore Protocol、`jobs/repository.py` はSQLと所有権検査、`jobs/runner.py` は取得・更新・実行・完了の順序を担当します。Domain RepositoryがQueueSpecを持ち、既存テーブルのPayloadを保持します。
+
+共通Runnerの対象はTicketのOutbox/自動Close Schedule、Reaction RolesのOutbox/期限Schedule、Socialイベント配送、ModerationのDashboard要求/期限付き処置です。継続監視するSocial ProviderのCursor/Polling、Panel公開、Lockdown復元はDomain側のライフサイクル処理であり、この有限ジョブQueueとは別です。
+
+- 1件ずつ取得し、処理中はLease期間の1/3ごとに更新します。SQLiteの書込みTransaction内で取得するため並行実行でも同じジョブを取得しません。
+- 完了・更新にはID、所有者、取得ごとのToken、有効期限、processing状態の一致が必要です。同じ所有者名で再取得しても古いTokenは拒否します。Lease喪失時はHandlerをキャンセルし、そのBatchを終了します。次の定期実行は継続できます。
+- 取得時に試行数を加算し、最大8回。再試行待ちは `min(3600, 15 × 2^attempt)` 秒。最終試行でProcessが停止した場合も、Lease失効後の取得処理でfailedへ終端化します。failed行がDead Letterで、勝手に再実行しません。
+- completed/done/failedは終端日時から30日保持し、Batch開始時に削除します。保留・実行中の行は保持期限の対象外です。Migration 0008でToken・不足列・検索Indexを追加します。
+- Queue内の重複実行防止と外部APIの副作用の一回性は区別します。Discord成功直後の停止はDomainの配送記録・補償で扱います。既にModeration実行イベントがある未完了要求は成功に丸めず、照合が必要なfailedとして残します。
+
 Actionの部分失敗は成功扱いに丸めず、各結果と復旧可能性を保存します。Discord Resource作成後にDB更新が失敗した場合は孤立Resourceとして記録します。

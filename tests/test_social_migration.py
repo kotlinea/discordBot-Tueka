@@ -63,7 +63,7 @@ class SocialRemovalTests(unittest.TestCase):
                 subscription = self.seed(mixed)
                 before = self.retained()
                 result = apply(self.db, self.backups)
-                self.assertEqual(result['applied'], ['0006_remove_legacy_social_template.sql', '0007_current_schema.sql'])
+                self.assertEqual(result['applied'], ['0006_remove_legacy_social_template.sql', '0007_current_schema.sql', '0008_job_leases.sql'])
                 for _ in range(2):
                     store = SocialRepository(self.db)
                     self.assertEqual(self.retained(), before)
@@ -82,7 +82,7 @@ class SocialRemovalTests(unittest.TestCase):
                 with closing(sqlite3.connect(result['snapshot'])) as snapshot:
                     self.assertIn('template', {row[1] for row in snapshot.execute('PRAGMA table_info(social_subscriptions)')})
                 self.assertEqual(apply(self.db, self.backups), {'applied': [], 'snapshot': None})
-                self.assertEqual(len(store.claim_social_events('worker')), 1)
+                self.assertIsNotNone(store.event_jobs.claim('worker'))
 
     def test_failure_restores_column_rows_and_history(self):
         self.seed()
@@ -90,7 +90,7 @@ class SocialRemovalTests(unittest.TestCase):
             before = list(connection.iterdump())
         directory = self.root / 'failure'
         shutil.copytree('migrations', directory)
-        (directory / '0008_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0009_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         with closing(sqlite3.connect(self.db)) as connection:
