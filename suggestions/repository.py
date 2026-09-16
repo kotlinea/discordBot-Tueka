@@ -6,13 +6,54 @@ import sqlite3
 import time
 from pathlib import Path
 from database import require_current, transaction
+from jobs import QueueRepository, QueueSpec, LostLease
 from typing import Any
+from discord_io import DiscordFailure
 
 
 class SuggestionRepository:
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
         require_current(self.database_path)
+        self.outbox_jobs = QueueRepository(self.database_path, QueueSpec('suggestion_outbox'))
+
+    @staticmethod
+    def _queue(connection, suggestion_id: int, action: str, payload: dict | None = None):
+        now = int(time.time())
+        connection.execute('INSERT INTO suggestion_outbox(suggestion_id,action,payload_json,available_at,created_at) VALUES(?,?,?,?,?)',
+                           (suggestion_id, action, json.dumps(payload or {}), now, now))
+
+    def delivery_state(self, item: dict, *, started: bool, failed: str | None = None):
+        with self._connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            changed = connection.execute("""UPDATE suggestion_outbox SET delivery_started=? WHERE id=? AND status='processing'
+                AND lease_owner=? AND lease_token=? AND lease_until>?""",
+                (int(started), item['id'], item['_lease']['owner'], item['_lease']['token'], int(time.time())))
+            if changed.rowcount != 1:
+                raise LostLease('Suggestion delivery ownership changed')
+            if failed is not None:
+                connection.execute("UPDATE suggestions SET status='delivery_failed',updated_at=?,revision=revision+1 WHERE id=? AND message_id IS NULL", (int(time.time()), item['suggestion_id']))
+                connection.execute("""INSERT INTO suggestion_events(suggestion_id,guild_id,actor_id,event_type,detail_json,created_at)
+                    SELECT id,guild_id,author_id,'delivery_failed',?,? FROM suggestions WHERE id=?""",
+                    (json.dumps({'error': failed[:300]}), int(time.time()), item['suggestion_id']))
+
+    def publication_delivered(self, item: dict, message_id: int):
+        with self._connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            owned = connection.execute("SELECT 1 FROM suggestion_outbox WHERE id=? AND status='processing' AND lease_owner=? AND lease_token=? AND lease_until>?",
+                (item['id'], item['_lease']['owner'], item['_lease']['token'], int(time.time()))).fetchone()
+            if not owned:
+                raise LostLease('Suggestion delivery ownership changed')
+            changed = connection.execute("UPDATE suggestions SET message_id=?,status=CASE WHEN status='delivery_failed' THEN 'pending' ELSE status END,updated_at=?,revision=revision+1 WHERE id=? AND (message_id IS NULL OR message_id=?)",
+                (message_id, int(time.time()), item['suggestion_id'], message_id))
+            if changed.rowcount != 1:
+                raise DiscordFailure('Suggestion publication reference changed; reconciliation required', partial=True)
+            self._queue(connection, item['suggestion_id'], 'sync')
+
+    def delivery_suggestion(self, suggestion_id: int) -> dict | None:
+        with self._connection() as connection:
+            row = connection.execute('SELECT guild_id FROM suggestions WHERE id=?', (suggestion_id,)).fetchone()
+        return self.get(row['guild_id'], suggestion_id) if row else None
 
     def _connection(self):
         return transaction(self.database_path)
@@ -36,6 +77,7 @@ class SuggestionRepository:
                 "INSERT INTO suggestion_events(suggestion_id,guild_id,actor_id,event_type,created_at) VALUES(?,?,?,?,?)",
                 (suggestion_id, guild_id, author_id, "created", now),
             )
+            self._queue(connection, suggestion_id, 'publish')
         item = self.get(guild_id, suggestion_id)
         assert item is not None
         return item
@@ -113,6 +155,7 @@ class SuggestionRepository:
                 "INSERT INTO suggestion_events(suggestion_id,guild_id,actor_id,event_type,detail_json,created_at) VALUES(?,?,?,?,?,?)",
                 (suggestion_id, guild_id, user_id, event_type, json.dumps({"value": value}), now),
             )
+            self._queue(connection, suggestion_id, 'sync')
         result = self.get(guild_id, suggestion_id)
         assert result is not None
         return result
@@ -135,6 +178,8 @@ class SuggestionRepository:
                 "INSERT INTO suggestion_events(suggestion_id,guild_id,actor_id,event_type,detail_json,created_at) VALUES(?,?,?,?,?,?)",
                 (suggestion_id, guild_id, reviewer_id, "status_changed", json.dumps({"status": status}), now),
             )
+            self._queue(connection, suggestion_id, 'sync')
+            self._queue(connection, suggestion_id, 'review_log', {'status': status, 'reviewer_id': reviewer_id})
         result = self.get(guild_id, suggestion_id)
         assert result is not None
         return result

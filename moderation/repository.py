@@ -143,6 +143,11 @@ class ModerationRepository:
             if case_id:
                 connection.execute("UPDATE moderation_events SET case_id=? WHERE id=?", (case_id,event_id))
 
+    def case_execution(self, guild_id: int, key: str) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute("SELECT * FROM moderation_events WHERE guild_id=? AND dedupe_key=? AND source='case_execution'", (guild_id, key)).fetchone()
+        return dict(row) if row else None
+
     def recent_moderation_events(self, guild_id: int, *, family: str | None = None, user_id: int | None = None, limit: int = 50) -> list[dict[str, Any]]:
         query, params = "SELECT * FROM moderation_events WHERE guild_id=?", [guild_id]
         if family:
@@ -165,8 +170,11 @@ class ModerationRepository:
         return {"rules": rules, "events_24h": int(events), "active_lockdowns": int(lockdowns), "sanctioned_users": int(sanctioned)}
 
     def start_lockdown(self, guild_id: int, *, reason: str | None, started_by: int | None,
-            unlock_at: int | None, source_event_id: int | None = None) -> int:
+            unlock_at: int | None, source_event_id: int | None = None, lease=None) -> int:
         with self._connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            if lease:
+                lease.guard(connection)
             existing = connection.execute("SELECT id FROM moderation_lockdowns WHERE guild_id=? AND status='active'", (guild_id,)).fetchone()
             if existing:
                 return int(existing["id"])
@@ -175,8 +183,11 @@ class ModerationRepository:
                 (guild_id,source_event_id,reason,started_by,int(time.time()),unlock_at))
         return int(cursor.lastrowid)
 
-    def save_lockdown_snapshot(self, lockdown_id: int, channel_id: int, role_id: int, before: dict[str, Any], applied: dict[str, Any]) -> None:
+    def save_lockdown_snapshot(self, lockdown_id: int, channel_id: int, role_id: int, before: dict[str, Any], applied: dict[str, Any], *, lease=None) -> None:
         with self._connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            if lease:
+                lease.guard(connection)
             connection.execute("""INSERT OR IGNORE INTO moderation_lockdown_snapshots
                 (lockdown_id,channel_id,role_id,before_json,applied_json) VALUES(?,?,?,?,?)""",
                 (lockdown_id,channel_id,role_id,json.dumps(before),json.dumps(applied)))
@@ -196,14 +207,23 @@ class ModerationRepository:
             rows = connection.execute("SELECT * FROM moderation_lockdown_snapshots WHERE lockdown_id=? ORDER BY channel_id", (lockdown_id,)).fetchall()
         return [{**dict(row), "before": json.loads(row["before_json"]), "applied": json.loads(row["applied_json"])} for row in rows]
 
-    def finish_lockdown(self, lockdown_id: int, *, error: str | None = None) -> None:
+    def finish_lockdown(self, lockdown_id: int, *, error: str | None = None, lease=None) -> None:
         with self._connection() as connection:
-            connection.execute("UPDATE moderation_lockdowns SET status=?,completed_at=?,last_error=? WHERE id=?",
-                ("failed" if error else "completed", int(time.time()), error[:500] if error else None, lockdown_id))
+            connection.execute('BEGIN IMMEDIATE')
+            if lease:
+                lease.guard(connection)
+            if error:
+                connection.execute("UPDATE moderation_lockdowns SET last_error=? WHERE id=? AND status='active'", (error[:500], lockdown_id))
+            else:
+                connection.execute("UPDATE moderation_lockdowns SET status='completed',completed_at=?,last_error=NULL WHERE id=? AND status='active'", (int(time.time()), lockdown_id))
+                connection.execute('UPDATE moderation_raid_state SET active=0 WHERE lockdown_id=?', (lockdown_id,))
 
-    def set_raid_state(self, guild_id: int, active: bool, *, source_rule_id: int | None = None, lockdown_id: int | None = None) -> None:
+    def set_raid_state(self, guild_id: int, active: bool, *, source_rule_id: int | None = None, lockdown_id: int | None = None, lease=None) -> None:
         now = int(time.time())
         with self._connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            if lease:
+                lease.guard(connection)
             connection.execute("""INSERT INTO moderation_raid_state(guild_id,active,started_at,last_signal_at,source_rule_id,lockdown_id)
                 VALUES(?,?,?,?,?,?) ON CONFLICT(guild_id) DO UPDATE SET active=excluded.active,
                 started_at=CASE WHEN excluded.active=1 AND moderation_raid_state.active=0 THEN excluded.started_at ELSE moderation_raid_state.started_at END,
@@ -217,6 +237,14 @@ class ModerationRepository:
                 (quiet_before,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def clear_stale_raid(self, guild_id: int, observed_signal: int) -> bool:
+        with self._connection() as connection:
+            changed = connection.execute("""UPDATE moderation_raid_state SET active=0
+                WHERE guild_id=? AND active=1 AND last_signal_at=?
+                AND NOT EXISTS(SELECT 1 FROM moderation_lockdowns WHERE guild_id=? AND status='active')""",
+                (guild_id, observed_signal, guild_id))
+            return changed.rowcount == 1
 
     def enqueue_moderation_action(self, guild_id: int, moderator_id: int, action: str, *, target_user_id: int | None = None,
             channel_id: int | None = None, reason: str | None = None, options: dict[str, Any] | None = None, dedupe_key: str) -> int | None:
@@ -276,21 +304,33 @@ class ModerationRepository:
 
     def purge_moderation_evidence(self, now: int | None = None) -> int:
         with self._connection() as connection:
-            cursor = connection.execute("UPDATE moderation_events SET evidence_text=NULL,evidence_json='{}',evidence_expires_at=NULL WHERE evidence_expires_at IS NOT NULL AND evidence_expires_at<=?", (int(time.time()) if now is None else now,))
+            cursor = connection.execute("UPDATE moderation_events SET evidence_text=NULL,evidence_json='{}',evidence_expires_at=NULL WHERE evidence_expires_at IS NOT NULL AND evidence_expires_at<=? AND NOT(source='case_execution' AND case_id IS NULL)", (int(time.time()) if now is None else now,))
         return cursor.rowcount
 
     def add_case(self, guild_id: int, user_id: int, action: str, reason: str | None, moderator_id: int | None = None,
                  expires_at: int | None = None, dm_sent: bool = False, *, moderation_event_id: int | None = None,
-                 moderation_rule_id: int | None = None, source: str = "manual", points: int = 0) -> int:
+                 moderation_rule_id: int | None = None, source: str = "manual", points: int = 0,
+                 execution_event_id: int | None = None) -> int:
         weights = {"warn": -10, "timeout": -20, "kick": -30, "ban": -40, "spam": -15, "anti_spam": -15, "chat_filter": -10, "phishing": -20}
         now = int(time.time())
         with self._connection() as c:
+            if execution_event_id is not None:
+                c.execute('BEGIN IMMEDIATE')
+                receipt = c.execute("SELECT case_id FROM moderation_events WHERE id=? AND guild_id=? AND source='case_execution'", (execution_event_id, guild_id)).fetchone()
+                if receipt is None:
+                    raise ValueError('Execution intent not found')
+                if receipt['case_id'] is not None:
+                    return int(receipt['case_id'])
             cursor = c.execute("""INSERT INTO moderation_cases
                 (guild_id,user_id,moderator_id,action,reason,expires_at,dm_sent,created_at,moderation_event_id,moderation_rule_id,source,points)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""", (guild_id,user_id,moderator_id,action,reason,expires_at,int(dm_sent),now,moderation_event_id,moderation_rule_id,source,points))
             trust_enabled = c.execute("SELECT enabled FROM guild_modules WHERE guild_id=? AND module_id='trust_score'", (guild_id,)).fetchone()
             if action in weights and trust_enabled and trust_enabled["enabled"]:
                 c.execute("INSERT INTO trust_events (guild_id,user_id,category,weight,reason,created_at) VALUES (?,?,?,?,?,?)", (guild_id, user_id, action, weights[action], reason, now))
+            if execution_event_id is not None:
+                c.execute('UPDATE moderation_events SET case_id=? WHERE id=?', (cursor.lastrowid, execution_event_id))
+                if action == 'tempban' and expires_at is not None:
+                    c.execute("INSERT INTO scheduled_moderation_actions(guild_id,user_id,action,due_at,reason,case_id) VALUES(?,?,'unban',?,?,?)", (guild_id, user_id, expires_at, reason, cursor.lastrowid))
         return int(cursor.lastrowid)
 
     def trust_score(self, guild_id: int, user_id: int, retention_days: int = 90) -> dict[str, Any]:

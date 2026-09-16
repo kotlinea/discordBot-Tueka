@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Callable
 
 from database import require_current, transaction
-from .models import Claim, Outcome
+from .models import Claim, Outcome, LostLease
 
 
 @dataclass(frozen=True)
@@ -49,6 +49,7 @@ class QueueRepository:
             token = uuid.uuid4().hex
             c.execute(f"UPDATE {s.table} SET {s.state}='processing',lease_owner=?,lease_token=?,lease_until=?,attempts=attempts+1 WHERE id=?", (owner, token, now + lease_seconds, row['id']))
             payload = dict(row)
+            payload['_lease'] = {'owner': owner, 'token': token}
             for column in ('payload_json', 'options_json'):
                 if column in payload:
                     payload[column.removesuffix('_json')] = json.loads(payload[column])
@@ -80,3 +81,43 @@ class QueueRepository:
         s = self.spec
         with transaction(self.database_path) as c:
             return c.execute(f"DELETE FROM {s.table} WHERE {s.state} IN (?, 'failed') AND {s.completed}<? AND lease_owner IS NULL", (s.done, int(self.clock()) - retention_seconds)).rowcount
+
+
+class ResourceLeaseRepository:
+    def __init__(self, database, namespace, key, *, seconds=60, clock=time.time):
+        if seconds < 3:
+            raise ValueError('Lease must last at least three seconds')
+        self.database, self.namespace, self.key = database, namespace, str(key)
+        self.seconds, self.clock, self.token = seconds, clock, uuid.uuid4().hex
+
+    def acquire(self):
+        with transaction(self.database) as c:
+            changed = c.execute('''INSERT INTO resource_leases VALUES(?,?,?,?)
+                ON CONFLICT(namespace,resource_key) DO UPDATE SET token=excluded.token,lease_until=excluded.lease_until
+                WHERE resource_leases.lease_until<=?''',
+                (self.namespace, self.key, self.token, int(self.clock()) + self.seconds, int(self.clock())))
+            if changed.rowcount != 1:
+                raise LostLease('Resource operation already owned')
+
+    def guard(self, connection):
+        owned = connection.execute('''SELECT 1 FROM resource_leases
+            WHERE namespace=? AND resource_key=? AND token=? AND lease_until>?''',
+            (self.namespace, self.key, self.token, int(self.clock()))).fetchone()
+        if not owned:
+            raise LostLease('Resource operation ownership expired or changed')
+
+    def renew(self):
+        with transaction(self.database) as c:
+            c.execute('BEGIN IMMEDIATE')
+            self.guard(c)
+            c.execute('UPDATE resource_leases SET lease_until=? WHERE namespace=? AND resource_key=? AND token=?',
+                (int(self.clock()) + self.seconds, self.namespace, self.key, self.token))
+
+    def release(self):
+        with transaction(self.database) as c:
+            c.execute('DELETE FROM resource_leases WHERE namespace=? AND resource_key=? AND token=?',
+                      (self.namespace, self.key, self.token))
+
+    def check(self):
+        with transaction(self.database) as c:
+            self.guard(c)

@@ -5,6 +5,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from moderation.discord_adapter import DiscordModerationAdapter, action_context, guild_ref, member_ref
+from moderation.contracts import ActionFailure, MemberRef
 from moderation.service import ActionContext, ModerationService
 from moderation import ModerationRepository
 from guild_settings import GuildSettingsRepository
@@ -17,7 +19,7 @@ class ModerationCommandsCog(commands.Cog):
         self.bot = bot
         self.moderation_repository = ModerationRepository(bot.settings.database_path)
         self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
-        self.service = ModerationService(bot, self.moderation_repository, self.guild_settings)
+        self.service = ModerationService(DiscordModerationAdapter(bot), self.moderation_repository, self.guild_settings)
 
     async def _enabled(self, interaction: discord.Interaction) -> bool:
         if interaction.guild is None or not self.guild_settings.module_enabled(interaction.guild.id, "moderation"):
@@ -31,9 +33,9 @@ class ModerationCommandsCog(commands.Cog):
             return
         assert interaction.guild is not None and isinstance(interaction.user, discord.Member)
         try:
-            case_id = await self.service.apply_case(interaction.guild, member, action, reason, interaction.user.id,
-                duration_minutes, True, source="manual", actor=interaction.user)
-        except (ValueError, PermissionError, discord.Forbidden, discord.HTTPException) as exc:
+            case_id = await self.service.apply_case(guild_ref(interaction.guild), member_ref(member), action, reason, interaction.user.id,
+                duration_minutes, True, source="manual", actor=member_ref(interaction.user), execution_key=str(interaction.id))
+        except (ValueError, PermissionError, ActionFailure, discord.Forbidden, discord.HTTPException) as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
         await interaction.response.send_message(f"{action}を実行しました。Case #{case_id}", ephemeral=True)
@@ -45,7 +47,7 @@ class ModerationCommandsCog(commands.Cog):
             return
         assert interaction.guild is not None and isinstance(interaction.user, discord.Member)
         try:
-            count = await self.service.warn(interaction.guild, member, reason, interaction.user.id, actor=interaction.user)
+            count = await self.service.warn(guild_ref(interaction.guild), member_ref(member), reason, interaction.user.id, actor=member_ref(interaction.user))
         except PermissionError as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
@@ -84,9 +86,9 @@ class ModerationCommandsCog(commands.Cog):
         assert interaction.guild is not None
         try:
             target_id = int(user_id)
-            await interaction.guild.unban(discord.Object(id=target_id), reason=reason)
-            case_id = self.moderation_repository.add_case(interaction.guild.id,target_id,"unban",reason,interaction.user.id,source="manual")
-        except (ValueError,discord.NotFound,discord.Forbidden,discord.HTTPException) as exc:
+            case_id = await self.service.apply_case(guild_ref(interaction.guild), MemberRef(target_id, interaction.guild.id, str(target_id)),
+                'unban', reason, interaction.user.id, notify=False, execution_key=str(interaction.id))
+        except (ValueError, PermissionError, ActionFailure) as exc:
             await interaction.response.send_message(f"Banを解除できません: {exc}",ephemeral=True)
             return
         await interaction.response.send_message(f"Banを解除しました。Case #{case_id}",ephemeral=True)
@@ -105,7 +107,7 @@ class ModerationCommandsCog(commands.Cog):
         value = {"type":action}
         if action == "purge": value["count"] = count
         if action == "lockdown": value["duration_minutes"] = duration
-        results = await self.service.execute_actions(ActionContext(interaction.guild,channel=channel,actor=interaction.user),
+        results = await self.service.execute_actions(action_context(interaction.guild,channel=channel,actor=interaction.user),
             {"family":"infraction","name":"Manual action","mode":"enforce","actions":[value]},reason or action,event_id,{})
         self.moderation_repository.finish_moderation_event(event_id,results)
         await interaction.response.send_message(f"処理結果: {results[0]['status']} · Event #{event_id}",ephemeral=True)

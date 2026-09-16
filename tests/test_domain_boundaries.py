@@ -16,6 +16,29 @@ from moderation import ModerationRepository
 
 
 class DomainBoundaryTests(unittest.TestCase):
+    def test_domain_services_have_no_discord_or_http_framework_dependency(self):
+        for folder in ('moderation', 'ticketing', 'reaction_roles', 'social', 'suggestions'):
+            for name in ('service.py', 'delivery.py', 'roles.py', 'panel_delivery.py', 'contracts.py'):
+                path = Path(folder) / name
+                if not path.exists():
+                    continue
+                for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
+                    modules = [item.name for item in node.names] if isinstance(node, ast.Import) else [node.module or ''] if isinstance(node, ast.ImportFrom) else []
+                    for module in modules:
+                        self.assertNotIn(module.split('.')[0], {'discord', 'fastapi', 'starlette'}, str(path))
+
+    def test_target_cogs_delegate_external_discord_io(self):
+        external = {'send', 'edit', 'delete', 'ban', 'unban', 'kick', 'timeout', 'purge', 'add_roles',
+                    'remove_roles', 'set_permissions', 'create_text_channel', 'create_thread', 'fetch_message'}
+        allowed = ('interaction.', 'self.service.', 'self.discord.', 'self.moderation.', 'self.transcripts.')
+        for name in ('automod', 'moderation_commands', 'safety', 'tickets', 'reaction_roles', 'social_updates', 'suggestions'):
+            path = Path('cogs') / (name + '.py')
+            for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
+                if isinstance(node, ast.Await) and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Attribute):
+                    call = node.value.func
+                    if call.attr in external:
+                        self.assertTrue(ast.unparse(call).startswith(allowed), f'{path}:{node.lineno}: {ast.unparse(call)}')
+
     def test_entrypoints_services_and_adapters_do_not_execute_sql(self):
         root = Path(__file__).resolve().parents[1]
         files = list(root.glob('*.py'))

@@ -15,6 +15,8 @@ import httpx
 from discord.ext import commands, tasks
 
 from moderation import AutoModEngine, MessageContext, validate_rule
+from moderation.discord_adapter import DiscordModerationAdapter, action_context, guild_ref, member_ref
+from moderation.contracts import ActionFailure
 from moderation.service import ActionContext, ModerationService
 from moderation import ModerationRepository
 from guild_settings import GuildSettingsRepository
@@ -30,7 +32,7 @@ class AutoModCog(commands.Cog):
         self.moderation_repository = ModerationRepository(bot.settings.database_path)
         self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
         self.engine = AutoModEngine()
-        self.service = ModerationService(bot, self.moderation_repository, self.guild_settings)
+        self.service = ModerationService(DiscordModerationAdapter(bot), self.moderation_repository, self.guild_settings)
         self.http = httpx.AsyncClient(timeout=3)
         self.safe_browsing_limit = asyncio.Semaphore(4)
         self._cache: dict[int, tuple[int, list[dict[str, Any]]]] = {}
@@ -159,10 +161,10 @@ class AutoModCog(commands.Cog):
                     dedupe_key=f"{context.event_type}:{message.id}:{match.rule.get('id')}")
                 if event_id is None:
                     continue
-                action_context = ActionContext(message.guild, message.author if isinstance(message.author, discord.Member) else None, message, message.channel, actor=message.author)
-                results = await self.service.execute_actions(action_context, match.rule, match.reason, event_id, family_module["settings"])
+                action_value = action_context(message.guild, message.author if isinstance(message.author, discord.Member) else None, message, message.channel, actor=message.author)
+                results = await self.service.execute_actions(action_value, match.rule, match.reason, event_id, family_module["settings"])
                 self.moderation_repository.finish_moderation_event(event_id, results)
-                await self.service.log_event(action_context, match.rule, event_id, match.reason, results, family_module["settings"])
+                await self.service.log_event(action_value, match.rule, event_id, match.reason, results, family_module["settings"])
         if len(self._locks) > 5000:
             self._locks = {item_key: item for item_key, item in self._locks.items() if item.locked()}
 
@@ -215,15 +217,15 @@ class AutoModCog(commands.Cog):
         if member is None:
             return
         try:
-            message = await channel.fetch_message(payload.message_id)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            message = await self.service.port.fetch_message(guild.id, channel.id, payload.message_id)
+        except ActionFailure:
             return
         reaction = next((item for item in message.reactions if str(item.emoji) == str(payload.emoji)), None)
         context = MessageContext(guild.id, member.id, channel.id, category_id=getattr(channel, "category_id", None),
             role_ids={role.id for role in member.roles}, reaction_count=1, target_id=message.id,
             actor_kind="bot" if member.bot else "human", event_type="reaction_add",
             account_created_at=member.created_at, joined_at=member.joined_at)
-        await self._process_signal(context, guild, member, ActionContext(guild, member, message, channel, reaction, member),
+        await self._process_signal(context, guild, member, action_context(guild, member, message, channel, reaction, member),
             dedupe_target=f"{message.id}:{member.id}:{payload.emoji}:{int(time.time() // 2)}")
 
     @commands.Cog.listener()
@@ -232,7 +234,7 @@ class AutoModCog(commands.Cog):
             actor_kind="bot" if member.bot else "human", event_type="member_join", target_id=member.id,
             account_created_at=member.created_at, joined_at=member.joined_at)
         joined_key = int(member.joined_at.timestamp()) if member.joined_at else int(time.time())
-        await self._process_signal(context, member.guild, member, ActionContext(member.guild, member, actor=member),
+        await self._process_signal(context, member.guild, member, action_context(member.guild, member, actor=member),
             dedupe_target=f"{member.id}:{joined_key}", evidence={"account_created_at": member.created_at.isoformat()})
 
     @commands.Cog.listener()
@@ -240,7 +242,7 @@ class AutoModCog(commands.Cog):
         context = MessageContext(member.guild.id, member.id, 0, role_ids={role.id for role in member.roles},
             actor_kind="bot" if member.bot else "human", event_type="member_remove", target_id=member.id,
             account_created_at=member.created_at, joined_at=member.joined_at)
-        await self._process_signal(context, member.guild, member, ActionContext(member.guild, member, actor=member),
+        await self._process_signal(context, member.guild, member, action_context(member.guild, member, actor=member),
             dedupe_target=f"{member.id}:{int(time.time() // 2)}")
 
     @tasks.loop(seconds=60)
@@ -253,12 +255,13 @@ class AutoModCog(commands.Cog):
             if guild is None:
                 continue
             try:
-                await self.service.unlock_lockdown(guild, int(pending["id"]))
-            except (discord.Forbidden, discord.HTTPException) as exc:
+                await self.service.unlock_lockdown(guild_ref(guild), int(pending["id"]))
+            except (ActionFailure, discord.Forbidden, discord.HTTPException) as exc:
                 LOGGER.warning("Lockdown restore failed for guild %s: %s", guild.id, exc)
         for raid in self.moderation_repository.stale_raid_states(int(time.time()) - 300):
             guild_id = int(raid["guild_id"])
-            self.moderation_repository.set_raid_state(guild_id, False)
+            if not self.moderation_repository.clear_stale_raid(guild_id, int(raid['last_signal_at'])):
+                continue
             self.moderation_repository.create_moderation_event(guild_id, family="anti_raid", event_type="member_join",
                 source="raid_state", reason="5分間シグナルがなかったためRaid状態を自動解除しました", mode="monitor",
                 dedupe_key=f"raid-clear:{guild_id}:{raid['last_signal_at']}")
@@ -270,12 +273,10 @@ class AutoModCog(commands.Cog):
             raise RetryJob('Guild unavailable')
         try:
             if pending['action'] == 'unban':
-                await guild.unban(discord.Object(id=int(pending['user_id'])), reason='一時Banの期限切れ')
+                await self.service.port.unban(guild.id, int(pending['user_id']), '一時Banの期限切れ')
             return Outcome()
-        except discord.NotFound:
-            return Outcome()
-        except discord.Forbidden as exc:
-            return Outcome(str(exc))
+        except ActionFailure as exc:
+            return Outcome(str(exc), retry=exc.retry)
 
     async def _execute_requested_action(self, request: dict[str, Any]) -> Outcome:
         guild = self.bot.get_guild(int(request["guild_id"]))
@@ -299,19 +300,19 @@ class AutoModCog(commands.Cog):
             if action == "warn":
                 if member is None:
                     raise ValueError("対象メンバーが見つかりません")
-                await self.service.warn(guild, member, reason, int(request["moderator_id"]), actor=moderator)
+                await self.service.warn(guild_ref(guild), member_ref(member), reason, int(request["moderator_id"]), actor=member_ref(moderator))
                 results = [{"type": action, "status": "success"}]
             elif action == "unban":
                 if not request.get("target_user_id"):
                     raise ValueError("対象ユーザーIDが必要です")
-                await guild.unban(discord.Object(id=int(request["target_user_id"])), reason=reason)
+                await self.service.port.unban(guild.id, int(request['target_user_id']), reason)
                 results = [{"type": action, "status": "success"}]
             else:
                 if action in {"timeout", "untimeout", "kick", "ban", "softban", "points"}:
                     if member is None:
                         raise ValueError("対象メンバーが見つかりません")
                     if action != "points":
-                        hierarchy_error = self.service.manageable(moderator, member, action)
+                        hierarchy_error = self.service.manageable(member_ref(moderator), member_ref(member), action)
                         if hierarchy_error:
                             raise PermissionError(hierarchy_error)
                 options = request["options"]
@@ -325,11 +326,11 @@ class AutoModCog(commands.Cog):
                 elif action == "points":
                     action_value.update({"points": int(options.get("points",1)), "expires_days": int(options.get("expires_days",30))})
                 rule = {"id": None, "family": "infraction", "name": "Dashboard action", "mode": "enforce", "actions": [action_value]}
-                results = await self.service.execute_actions(ActionContext(guild, member, channel=channel, actor=moderator), rule, reason, event_id, {})
+                results = await self.service.execute_actions(action_context(guild, member, channel=channel, actor=moderator), rule, reason, event_id, {})
             self.moderation_repository.finish_moderation_event(event_id, results)
             failed = any(item.get("status") == "failed" for item in results)
             return Outcome("Action failed" if failed else None, result={"event_id": event_id, "actions": results})
-        except (ValueError, PermissionError, discord.Forbidden, discord.HTTPException) as exc:
+        except (ValueError, PermissionError, ActionFailure, discord.Forbidden, discord.HTTPException) as exc:
             results = [{"type": action, "status": "failed", "error": str(exc)[:300]}]
             self.moderation_repository.finish_moderation_event(event_id, results)
             return Outcome(str(exc), result={"event_id": event_id, "actions": results})

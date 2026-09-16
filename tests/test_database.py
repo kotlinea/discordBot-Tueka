@@ -102,7 +102,7 @@ class DatabaseTests(unittest.TestCase):
         with self.assertRaises(SchemaNotReady):
             GuildSettingsRepository(self.db)
         result = apply(self.db, self.root / 'backups')
-        self.assertEqual(result['applied'], ['0007_current_schema.sql', '0008_job_leases.sql'])
+        self.assertEqual(result['applied'], ['0007_current_schema.sql', '0008_job_leases.sql', '0009_suggestion_outbox.sql', '0010_resource_leases.sql'])
         with closing(readonly(self.db)) as connection:
             self.assertEqual(connection.execute('SELECT event_key,available_at FROM social_events').fetchone(), ('keep', 0))
             self.assertIn('notes_thread_id', {row[1] for row in connection.execute('PRAGMA table_info(tickets_v2)')})

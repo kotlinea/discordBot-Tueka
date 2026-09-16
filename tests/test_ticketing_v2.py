@@ -6,11 +6,14 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
+from unittest.mock import patch, AsyncMock
 
 from cryptography.fernet import Fernet
 
 from ticketing import TicketRepository, TicketService, TicketValidationError, TranscriptStorage, validate_form, validate_panel
 from ticketing.models import support_is_open
+from ticketing.contracts import ContainerRef
+from discord_io import DiscordFailure
 
 
 class TicketV2Tests(unittest.TestCase):
@@ -26,6 +29,238 @@ class TicketV2Tests(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+    def test_welcome_recovers_after_receipt_save_failure_and_keeps_one_followup(self):
+        class Port:
+            created = 0
+            async def create_container(self, *args):
+                return ContainerRef(700, 100)
+            async def member_identity(self, ticket):
+                return {'id': 10, 'name': 'Member'}
+            async def notice(self, ticket, key, packet, *, recover):
+                if not recover:
+                    self.created += 1
+                return {'id': 900, 'created_at': 1000}
+        ticket, panel = self.service.reserve(1, self.panel['id'], 10, 'welcome-retry', set())
+        port = Port()
+        ticket, _ = asyncio.run(self.service.open_container(port, ticket, panel, 'ticket'))
+        item = self.repository.outbox_jobs.claim('worker').payload
+        self.assertEqual(item['action'], 'welcome')
+        with patch.object(self.repository, 'panel', return_value={**panel, 'remove_mentions': True}):
+            with patch.object(self.repository, 'finish_notice', side_effect=RuntimeError('database failed')):
+                with self.assertRaises(RuntimeError):
+                    asyncio.run(self.service.deliver_notice(port, ticket, item, ''))
+            asyncio.run(self.service.deliver_notice(port, ticket, item, ''))
+            asyncio.run(self.service.deliver_notice(port, ticket, item, ''))
+        self.assertEqual(port.created, 1)
+        self.assertEqual([row['action'] for row in self.repository.outbox(ticket['id'])].count('remove_open_mentions'), 1)
+        self.assertEqual(len(self.repository.messages(ticket['id'])), 1)
+
+    def test_repeated_open_reuses_container_and_unknown_creation_can_reconcile(self):
+        class Port:
+            created = 0
+            async def create_container(self, *args):
+                self.created += 1
+                return ContainerRef(700, 100)
+            async def find_container(self, *args):
+                return ContainerRef(700, 100)
+        ticket, panel = self.service.reserve(1, self.panel['id'], 10, 'creation-retry', set())
+        port = Port()
+        opened, _ = asyncio.run(self.service.open_container(port, ticket, panel, 'ticket'))
+        repeated, _ = asyncio.run(self.service.open_container(port, ticket, panel, 'ticket'))
+        self.assertEqual(port.created, 1)
+        self.assertEqual(repeated['discord_container_id'], opened['discord_container_id'])
+
+    def test_unknown_creation_result_is_recovered_from_durable_intent(self):
+        class Port:
+            async def create_container(self, *args):
+                raise DiscordFailure('response lost', partial=True)
+            async def find_container(self, *args):
+                return ContainerRef(701, 100)
+        ticket, panel = self.service.reserve(1, self.panel['id'], 10, 'creation-unknown', set())
+        port = Port()
+        with self.assertRaises(DiscordFailure):
+            asyncio.run(self.service.open_container(port, ticket, panel, 'ticket'))
+        pending = self.repository.pending_container_creations(1)
+        self.assertEqual(len(pending), 1)
+        saved = asyncio.run(self.service.recover_creation(port, pending[0]))
+        self.assertEqual(saved['discord_container_id'], 701)
+        self.assertEqual(saved['status'], 'open')
+        self.assertEqual(self.repository.pending_container_creations(1), [])
+
+    def test_category_retry_preserves_original_return_category(self):
+        class Port:
+            current = 100
+            async def category(self, ticket):
+                return self.current
+            async def move_category(self, ticket, target, *, expected):
+                if self.current not in {target, expected}:
+                    raise DiscordFailure('category conflict', partial=True)
+                self.current = target
+        panel = self.repository.save_panel(1, {'name': 'Waiting', 'mode': 'channel', 'category_id': 100,
+            'team_id': self.team['id'], 'awaiting_category_id': 200})
+        ticket, _ = self.service.reserve(1, panel['id'], 10, 'category-retry', set())
+        ticket = self.repository.activate_ticket(ticket['id'], 700, 100)
+        item = {'id': 40, 'created_at': 1000, 'action': 'awaiting_user'}
+        port = Port()
+        with patch.object(self.repository, 'set_awaiting_user', side_effect=RuntimeError('database failed')):
+            with self.assertRaises(RuntimeError):
+                asyncio.run(self.service.change_category(port, ticket, item))
+        self.assertEqual(port.current, 200)
+        asyncio.run(self.service.change_category(port, ticket, item))
+        saved = self.repository.ticket(ticket['id'])
+        self.assertEqual(saved['awaiting_return_category_id'], 100)
+        asyncio.run(self.service.change_category(port, saved, item))
+        asyncio.run(self.service.change_category(port, saved, {'id': 41, 'created_at': 1001, 'action': 'resume_awaiting'}))
+        self.assertEqual(port.current, 100)
+        self.assertEqual(self.repository.ticket(ticket['id'])['status'], 'open')
+
+    def test_reply_success_database_failure_recovers_receipt_without_resending(self):
+        class Port:
+            sent = 0
+            message = None
+            async def send_reply(self, ticket, outbox_id, content, *, recover):
+                if recover:
+                    return self.message
+                self.sent += 1
+                self.message = {'id': 900, 'created_at': 1000}
+                return self.message
+        ticket, _ = self.service.reserve(1, self.panel['id'], 10, 'reply-recovery', set())
+        ticket = self.repository.activate_ticket(ticket['id'], 700, 100)
+        item = {'id': 30, 'created_at': 1000, 'action': 'reply', 'actor_id': 20,
+                'payload': {'actor_name': 'Staff', 'content_encrypted': self.storage.encrypt_text('reply')}}
+        port = Port()
+        with patch.object(self.repository, 'record_message', side_effect=RuntimeError('database failed')):
+            with self.assertRaises(RuntimeError):
+                asyncio.run(self.service.deliver_message(port, ticket, item))
+        asyncio.run(self.service.deliver_message(port, ticket, item))
+        asyncio.run(self.service.deliver_message(port, ticket, item))
+        self.assertEqual(port.sent, 1)
+        self.assertEqual(len(self.repository.messages(ticket['id'])), 1)
+
+    def test_known_unsent_reply_can_retry_as_a_new_send(self):
+        class Port:
+            calls = []
+            async def send_reply(self, ticket, outbox_id, content, *, recover):
+                self.calls.append(recover)
+                if len(self.calls) == 1:
+                    raise DiscordFailure('rate limited', retry=True)
+                return {'id': 900, 'created_at': 1000}
+        ticket, _ = self.service.reserve(1, self.panel['id'], 10, 'reply-rate-limit', set())
+        ticket = self.repository.activate_ticket(ticket['id'], 700, 100)
+        item = {'id': 30, 'created_at': 1000, 'action': 'reply', 'actor_id': 20,
+                'payload': {'actor_name': 'Staff', 'content_encrypted': self.storage.encrypt_text('reply')}}
+        port = Port()
+        with self.assertRaises(DiscordFailure):
+            asyncio.run(self.service.deliver_message(port, ticket, item))
+        asyncio.run(self.service.deliver_message(port, ticket, item))
+        self.assertEqual(port.calls, [False, False])
+
+    def test_internal_note_retry_records_one_message(self):
+        ticket, _ = self.service.reserve(1, self.panel['id'], 10, 'internal-note', set())
+        ticket = self.repository.activate_ticket(ticket['id'], 700, 100)
+        ticket = {**ticket, 'mode': 'private_thread'}
+        item = {'id': 30, 'created_at': 1000, 'action': 'note', 'actor_id': 20,
+                'payload': {'actor_name': 'Staff', 'content_encrypted': self.storage.encrypt_text('private note')}}
+        asyncio.run(self.service.deliver_message(None, ticket, item))
+        asyncio.run(self.service.deliver_message(None, ticket, item))
+        rows = self.repository.messages(ticket['id'])
+        self.assertEqual(len(rows), 1)
+        self.assertIsNone(rows[0]['discord_message_id'])
+
+    def test_participant_database_failure_can_retry_without_false_completion(self):
+        class Port:
+            users = set()
+            async def participant(self, ticket, user_id, *, add):
+                self.users.add(user_id) if add else self.users.discard(user_id)
+        ticket, _ = self.service.reserve(1, self.panel['id'], 10, 'participant-retry', set())
+        ticket = self.repository.activate_ticket(ticket['id'], 700, 100)
+        port = Port()
+        with patch.object(self.repository, 'add_participant', side_effect=RuntimeError('database failed')):
+            with self.assertRaises(RuntimeError):
+                asyncio.run(self.service.change_participant(port, ticket, 20, 30, add=True))
+        self.assertEqual(port.users, {20})
+        asyncio.run(self.service.change_participant(port, ticket, 20, 30, add=True))
+        self.assertEqual(port.users, {20})
+        with self.assertRaisesRegex(ValueError, 'opener_removal_forbidden'):
+            asyncio.run(self.service.change_participant(port, ticket, 10, 30, add=False))
+
+    def test_close_resource_is_durable_and_old_revision_cannot_delete(self):
+        from cogs.tickets import TicketsCog
+        from types import SimpleNamespace
+        ticket, _ = self.service.reserve(1, self.panel['id'], 10, 'durable-close', set())
+        ticket = self.repository.activate_ticket(ticket['id'], 700, 100)
+        self.repository.begin_close(ticket['id'], 20, 'resolved')
+        closed = self.repository.close_ticket(ticket['id'], 20, 'resolved')
+        claim = self.repository.outbox_jobs.claim('worker')
+        self.assertEqual(claim.payload['action'], 'close_resource')
+        cog = object.__new__(TicketsCog)
+        cog.repository = self.repository
+        cog.bot = SimpleNamespace(get_guild=lambda _: None)
+        cog.discord = SimpleNamespace(set_closed=AsyncMock(side_effect=DiscordFailure('temporary failure', retry=True)))
+        with patch.object(self.repository, 'transcript_for_ticket', return_value={'id': 1}):
+            outcome = asyncio.run(cog._deliver_outbox_item(claim.payload))
+        self.assertTrue(outcome.retry)
+        self.assertEqual(self.repository.ticket(ticket['id'])['status'], 'closed')
+        cog.discord.set_closed.reset_mock()
+        stale = {**claim.payload, 'payload': {'revision': closed['revision'] - 1}}
+        outcome = asyncio.run(cog._deliver_outbox_item(stale))
+        self.assertEqual(outcome.error, 'revision_conflict')
+        cog.discord.set_closed.assert_not_awaited()
+
+    def test_claim_database_failure_and_failed_compensation_remain_recoverable(self):
+        class Port:
+            changed = False
+            fail_restore = True
+            async def claim_changes(self, *args):
+                return [{'id': 500, 'kind': 'role', 'before': {'send_messages': False}, 'after': {'send_messages': True}}]
+            async def permission(self, ticket, change, *, restore=False):
+                if restore and self.fail_restore:
+                    raise DiscordFailure('Forbidden')
+                self.changed = not restore
+        ticket, panel = self.service.reserve(1, self.panel['id'], 10, 'claim-recovery', set())
+        ticket = self.repository.activate_ticket(ticket['id'], 700, 100)
+        port = Port()
+        with patch.object(self.repository, 'set_claim', side_effect=RuntimeError('database failed')):
+            with self.assertRaises(RuntimeError):
+                asyncio.run(self.service.change_claim(port, ticket, panel, 20, ticket['revision']))
+        self.assertTrue(port.changed)
+        operation = self.repository.pending_claim_changes(1)[0]
+        with self.assertRaisesRegex(RuntimeError, 'claim_recovery_required'):
+            asyncio.run(self.service.change_claim(port, ticket, panel, 30, ticket['revision']))
+        port.fail_restore = False
+        asyncio.run(self.service.recover_claim(port, operation))
+        self.assertFalse(port.changed)
+        self.assertEqual(self.repository.pending_claim_changes(1), [])
+        saved = asyncio.run(self.service.change_claim(port, ticket, panel, 20, ticket['revision']))
+        self.assertEqual(saved['claimed_by'], 20)
+        self.assertEqual(self.repository.pending_claim_changes(1), [])
+
+    def test_container_success_database_failure_records_and_recovers_orphan(self):
+        class Port:
+            async def create_container(self, *args):
+                return ContainerRef(700, 100)
+            async def recover_container(self, *args):
+                return ContainerRef(700, 100)
+        ticket, panel = self.service.reserve(1, self.panel['id'], 10, 'orphan-case', set())
+        with patch.object(self.repository, 'activate_ticket', side_effect=RuntimeError('database unavailable')):
+            with self.assertRaises(RuntimeError):
+                asyncio.run(self.service.open_container(Port(), ticket, panel, 'ticket'))
+        orphan = self.repository.pending_orphans(1)[0]
+        self.assertEqual(orphan['container_id'], 700)
+        self.assertEqual(self.repository.pending_orphans(2), [])
+        saved = asyncio.run(self.service.recover_orphan(Port(), 1, orphan['id']))
+        self.assertEqual((saved['status'], saved['discord_container_id']), ('open', 700))
+        self.assertEqual(self.repository.pending_orphans(1), [])
+
+    def test_partial_container_failure_keeps_resource_identity(self):
+        class Port:
+            async def create_container(self, *args):
+                raise DiscordFailure('member permission lost', partial=True, resource_id=701)
+        ticket, panel = self.service.reserve(1, self.panel['id'], 10, 'partial-container', set())
+        with self.assertRaises(DiscordFailure):
+            asyncio.run(self.service.open_container(Port(), ticket, panel, 'ticket'))
+        self.assertEqual(self.repository.pending_orphans(1)[0]['container_id'], 701)
 
     def test_extracted_persistence_operations_preserve_scope_and_revision(self):
         repository = self.repository

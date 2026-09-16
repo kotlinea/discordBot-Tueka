@@ -2,6 +2,7 @@
 import json
 import sqlite3
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -140,21 +141,28 @@ class SocialRepository:
             rows = connection.execute("""SELECT * FROM social_targets WHERE next_check_at<=? AND (lease_until IS NULL OR lease_until<?)
                 AND (status='orphaned' OR EXISTS(SELECT 1 FROM social_subscriptions s WHERE s.target_id=social_targets.id AND s.enabled=1))
                 ORDER BY next_check_at,id LIMIT ?""", (now, now, max(1, min(limit, 100)))).fetchall()
-            ids = [int(row["id"]) for row in rows]
-            if ids:
-                placeholders = ",".join("?" for _ in ids)
-                connection.execute(f"UPDATE social_targets SET lease_owner=?,lease_until=? WHERE id IN ({placeholders})", (owner, now + lease_seconds, *ids))
-        return [self._social_target_row(row) for row in rows]
+            claimed = []
+            for row in rows:
+                claim_owner = f"{owner}:{uuid.uuid4().hex}"
+                connection.execute("UPDATE social_targets SET lease_owner=?,lease_until=? WHERE id=?",
+                                   (claim_owner, now + lease_seconds, row['id']))
+                claimed.append({**self._social_target_row(row), 'lease_owner': claim_owner,
+                                'lease_until': now + lease_seconds})
+        return claimed
 
     def complete_social_target(self, target_id: int, owner: str, *, status: str, cursor: dict[str, Any], next_check_at: int,
                                external_id: str | None = None, handle: str | None = None, display_name: str | None = None,
-                               avatar_url: str | None = None, error: str | None = None) -> bool:
+                               avatar_url: str | None = None, error: str | None = None,
+                               events: list[dict[str, Any]] | None = None) -> bool:
         now = int(time.time())
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            current = connection.execute("SELECT provider FROM social_targets WHERE id=? AND lease_owner=?", (target_id, owner)).fetchone()
+            current = connection.execute("SELECT provider FROM social_targets WHERE id=? AND lease_owner=? AND lease_until>?", (target_id, owner, now)).fetchone()
             if not current:
                 return False
+            for event in events or []:
+                self._enqueue_event(connection, current['provider'], event['external_id'], event['account_id'],
+                                    event['event_type'], event['payload'], occurred_at=event.get('occurred_at'))
             if external_id:
                 canonical = connection.execute(
                     "SELECT id,status,last_error FROM social_targets WHERE provider=? AND external_id=? AND id<>? ORDER BY id LIMIT 1",
@@ -195,7 +203,7 @@ class SocialRepository:
 
     def delete_social_target(self, target_id: int, owner: str) -> bool:
         with self._connection() as connection:
-            result = connection.execute("DELETE FROM social_targets WHERE id=? AND lease_owner=? AND NOT EXISTS(SELECT 1 FROM social_subscriptions WHERE target_id=?)", (target_id, owner, target_id))
+            result = connection.execute("DELETE FROM social_targets WHERE id=? AND lease_owner=? AND lease_until>? AND NOT EXISTS(SELECT 1 FROM social_subscriptions WHERE target_id=?)", (target_id, owner, int(time.time()), target_id))
         return result.rowcount == 1
 
     def social_connection(self, guild_id: int, provider: str, account_id: str) -> dict[str, Any] | None:
@@ -233,13 +241,18 @@ class SocialRepository:
 
     def enqueue_social_event_v2(self, provider: str, external_event_id: str, account_id: str, event_type: str,
                                 payload: dict[str, Any], *, occurred_at: int | None = None) -> bool:
-        event_key = f"{provider}:{event_type}:{external_event_id}"
-        now = int(time.time())
         with self._connection() as connection:
-            cursor = connection.execute("""INSERT OR IGNORE INTO social_events
-                (provider,event_key,account_id,payload_json,received_at,event_type,external_event_id,occurred_at,status,available_at)
-                VALUES(?,?,?,?,?,?,?,?, 'pending',?)""",
-                (provider, event_key, account_id, json.dumps(payload, ensure_ascii=False), now, event_type, external_event_id, occurred_at or now, now))
+            return self._enqueue_event(connection, provider, external_event_id, account_id, event_type, payload,
+                                       occurred_at=occurred_at)
+
+    @staticmethod
+    def _enqueue_event(connection, provider, external_event_id, account_id, event_type, payload, *, occurred_at=None):
+        now = int(time.time())
+        event_key = f"{provider}:{event_type}:{external_event_id}"
+        cursor = connection.execute("""INSERT OR IGNORE INTO social_events
+            (provider,event_key,account_id,payload_json,received_at,event_type,external_event_id,occurred_at,status,available_at)
+            VALUES(?,?,?,?,?,?,?,?, 'pending',?)""",
+            (provider, event_key, account_id, json.dumps(payload, ensure_ascii=False), now, event_type, external_event_id, occurred_at or now, now))
         return cursor.rowcount == 1
 
     def pending_social_events(self) -> list[dict[str, Any]]:
@@ -250,27 +263,32 @@ class SocialRepository:
 
 
 
+    def social_delivery(self, subscription_id: int, event_key: str) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute('SELECT * FROM social_deliveries WHERE subscription_id=? AND event_key=?', (subscription_id, event_key)).fetchone()
+        return dict(row) if row else None
+
     def record_social_delivery(self, subscription_id: int, event_key: str, channel_id: int, message_id: int | None, state: str = "sent") -> bool:
         now = int(time.time())
         with self._connection() as connection:
             cursor = connection.execute("INSERT OR IGNORE INTO social_deliveries(subscription_id,event_key,discord_channel_id,discord_message_id,state,created_at,updated_at) VALUES(?,?,?,?,?,?,?)", (subscription_id, event_key, channel_id, message_id, state, now, now))
             if cursor.rowcount == 0:
                 row = connection.execute("SELECT state,next_attempt_at FROM social_deliveries WHERE subscription_id=? AND event_key=?", (subscription_id, event_key)).fetchone()
-                return bool(row and row["state"] in {"pending", "retry"} and int(row["next_attempt_at"] or 0) <= now)
+                return bool(row and row["state"] in {"pending", "retry", "uncertain"} and int(row["next_attempt_at"] or 0) <= now)
         return True
 
     def update_social_delivery(self, subscription_id: int, event_key: str, message_id: int, state: str = "sent") -> None:
         with self._connection() as connection:
             connection.execute("UPDATE social_deliveries SET discord_message_id=?,state=?,updated_at=? WHERE subscription_id=? AND event_key=?", (message_id, state, int(time.time()), subscription_id, event_key))
 
-    def fail_social_delivery(self, subscription_id: int, event_key: str, error: str, *, retry: bool) -> None:
+    def fail_social_delivery(self, subscription_id: int, event_key: str, error: str, *, retry: bool, uncertain: bool = False) -> None:
         now = int(time.time())
         with self._connection() as connection:
             row = connection.execute("SELECT attempts FROM social_deliveries WHERE subscription_id=? AND event_key=?", (subscription_id, event_key)).fetchone()
             attempts = int(row["attempts"] if row else 0) + 1
             delay = min(3600, 15 * (2 ** min(attempts, 8))) if retry else 0
             connection.execute("""UPDATE social_deliveries SET state=?,attempts=?,next_attempt_at=?,last_error=?,updated_at=?
-                WHERE subscription_id=? AND event_key=?""", ("retry" if retry else "failed", attempts, now + delay, error[:500], now, subscription_id, event_key))
+                WHERE subscription_id=? AND event_key=?""", ("uncertain" if uncertain else "retry" if retry else "failed", attempts, now + delay, error[:500], now, subscription_id, event_key))
 
     def purge_social_history(self, *, retention_days: int = 30) -> int:
         cutoff = int(time.time()) - max(1, retention_days) * 86400

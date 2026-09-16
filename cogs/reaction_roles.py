@@ -11,6 +11,10 @@ from collections import defaultdict
 from typing import Any
 
 from jobs import Outcome, run_batch
+from discord_io import DiscordFailure
+from reaction_roles.discord_adapter import DiscordReactionRoleAdapter
+from reaction_roles.delivery import ReactionRoleDeliveryService
+from reaction_roles.roles import RoleChangeService
 
 import discord
 from discord import app_commands
@@ -75,6 +79,9 @@ class ReactionRolesCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.repository = ReactionRoleRepository(bot.settings.database_path)
+        self.discord = DiscordReactionRoleAdapter(bot)
+        self.delivery = ReactionRoleDeliveryService(self.repository, self.discord)
+        self.role_changes = RoleChangeService(self.repository, self.discord)
         self.service = ReactionRoleService(self.repository, max_mappings=bot.settings.reaction_role_max_mappings_per_message)
         self.owner = f"rr:{socket.gethostname()}:{os.getpid()}"
         self._locks: defaultdict[tuple[int, int, int], asyncio.Lock] = defaultdict(asyncio.Lock)
@@ -227,15 +234,12 @@ class ReactionRolesCog(commands.Cog):
     async def move_command(self,interaction:discord.Interaction,config_id:int,channel:discord.TextChannel,message_id:str)->None:
         config=self._config(interaction.guild_id,config_id)
         try:
-            target=await channel.fetch_message(int(message_id))
-            for mapping in config["mappings"]:await target.add_reaction(mapping["emoji"])
-            old_channel=interaction.guild.get_channel(config["channel_id"]);old_message_id=config.get("message_id")
-            self.repository.move_message(interaction.guild_id,config_id,channel.id,target.id,"bot" if self.bot.user and target.author.id==self.bot.user.id else "external",config["revision"],interaction.user.id)
-            if config["source"]=="bot" and old_message_id and isinstance(old_channel,(discord.TextChannel,discord.Thread)):
-                try:old=await old_channel.fetch_message(old_message_id);await old.delete()
-                except discord.HTTPException:self.repository.audit(interaction.guild_id,config_id,"move_cleanup","partial",actor_id=interaction.user.id,reason="old_message_delete_failed")
-            await interaction.response.send_message("設定を新しいメッセージへ移動しました。",ephemeral=True)
-        except (ValueError,discord.HTTPException):await interaction.response.send_message("移動先メッセージとBot権限を確認してください。",ephemeral=True)
+            target_id = int(message_id)
+            self.repository.queue_action(interaction.guild_id, config_id, 'move',
+                {'channel_id': channel.id, 'message_id': target_id, 'revision': config['revision']})
+            await interaction.response.send_message("メッセージ移動を予約しました。", ephemeral=True)
+        except ValueError:
+            await interaction.response.send_message("移動先メッセージIDを確認してください。", ephemeral=True)
     @manage.command(name="selfdestruct")
     async def selfdestruct_command(self,interaction:discord.Interaction,config_id:int,minutes:int)->None:
         config=self._config(interaction.guild_id,config_id)
@@ -250,8 +254,8 @@ class ReactionRolesCog(commands.Cog):
     async def channel_command(self,interaction:discord.Interaction,name:str="roles")->None:
         guild=interaction.guild;me=guild.me
         if not me or not me.guild_permissions.manage_channels:await interaction.response.send_message("BotにManage Channels権限が必要です。",ephemeral=True);return
-        overwrites={guild.default_role:discord.PermissionOverwrite(view_channel=True,read_message_history=True,add_reactions=True,send_messages=False),me:discord.PermissionOverwrite(view_channel=True,read_message_history=True,add_reactions=True,send_messages=True,manage_messages=True)}
-        channel=await guild.create_text_channel(name[:100],overwrites=overwrites,reason=f"Reaction Roles channel by {interaction.user}");await interaction.response.send_message(f"{channel.mention} を作成しました。",ephemeral=True)
+        channel_id = await self.discord.create_channel(guild.id, name, interaction.user.id)
+        await interaction.response.send_message(f"<#{channel_id}> を作成しました。", ephemeral=True)
 
     @reactionrole.command(name="aio",description="投稿とEmoji→Role対応を一括作成します")
     async def aio_command(self,interaction:discord.Interaction,channel:discord.TextChannel,emoji:str,role:discord.Role,behavior:str="normal",title:str="ロールを選択")->None:
@@ -309,13 +313,15 @@ class ReactionRolesCog(commands.Cog):
         config=self._config(interaction.guild_id,config_id);value=self._editable(config);value["behavior_type"]=behavior;await self._save_edit(interaction,config,value)
 
     async def _deny(self,member:discord.Member,message:discord.Message,emoji:discord.PartialEmoji|str,config:dict[str,Any],mapping:dict[str,Any],reason:str)->None:
-        try:await message.remove_reaction(emoji,member)
-        except discord.HTTPException:pass
+        try:await self.discord.remove_selection(member.guild.id, message.channel.id, message.id, str(emoji), member.id)
+        except DiscordFailure as exc:
+            self.repository.audit(member.guild.id, config['id'], 'denial_cleanup', 'partial', user_id=member.id, reason=str(exc))
         settings=self.repository.settings(member.guild.id);key=(member.id,config["id"],reason);now=time.monotonic()
         if settings.get("denial_dm") and now-self._dm_recent.get(key,0)>=int(settings.get("denial_dm_cooldown_seconds",300)):
             self._dm_recent[key]=now
-            try:await member.send(f"{config['name']}: {reason}")
-            except discord.HTTPException:pass
+            try:await self.discord.denial_notice(member.id, f"{config['name']}: {reason}")
+            except DiscordFailure as exc:
+                self.repository.audit(member.guild.id, config['id'], 'denial_dm', 'failed', user_id=member.id, reason=str(exc))
         self.repository.audit(member.guild.id,config["id"],"reaction_denied","denied",user_id=member.id,emoji_key=mapping["emoji_key"],role_id=mapping["role_id"],reason=reason)
         await self._send_log(member.guild,config,"denied",member.id,mapping,reason)
 
@@ -328,8 +334,9 @@ class ReactionRolesCog(commands.Cog):
         embed.add_field(name="対象",value=f"<@{user_id}>",inline=True)
         embed.add_field(name="対応",value=f"{mapping['emoji']} → <@&{mapping['role_id']}>",inline=True)
         if reason:embed.add_field(name="結果",value=reason[:1024],inline=False)
-        try:await channel.send(embed=embed,allowed_mentions=discord.AllowedMentions.none())
-        except discord.HTTPException:pass
+        try:await self.discord.log(guild.id, channel.id, embed.to_dict())
+        except DiscordFailure as exc:
+            self.repository.audit(guild.id, config['id'], 'log_delivery', 'failed', user_id=user_id, reason=str(exc))
 
     async def _handle_reaction(self,payload:discord.RawReactionActionEvent,event:str)->None:
         if not payload.guild_id or not payload.user_id or self.bot.user and payload.user_id==self.bot.user.id:return
@@ -345,10 +352,10 @@ class ReactionRolesCog(commands.Cog):
         if not member or member.bot:return
         channel=guild.get_channel(payload.channel_id)
         if not isinstance(channel,(discord.TextChannel,discord.Thread)):return
-        try:message=await channel.fetch_message(payload.message_id)
-        except discord.HTTPException:return
+        try:message=await self.discord.fetch_message(guild.id, channel.id, payload.message_id)
+        except DiscordFailure:return
         role=guild.get_role(mapping["role_id"]);me=guild.me
-        lock_key=(guild.id,member.id,int(config.get("link_group_id") or config["id"]))
+        lock_key=(guild.id,member.id,0)
         async with self._locks[lock_key]:
             decision=self.service.decide(config,mapping,event=event,user_id=member.id,member_role_ids={item.id for item in member.roles},role_member_count=len(role.members) if role else 0)
             if not decision.allowed:
@@ -357,35 +364,14 @@ class ReactionRolesCog(commands.Cog):
             if not role or role.is_default() or role.managed or not me or not me.guild_permissions.manage_roles or role>=me.top_role:
                 await self._deny(member,message,payload.emoji,config,mapping,"BotがこのRoleを管理できません。");return
             try:
-                if decision.operation=="remove":
-                    await member.remove_roles(role,reason="Reaction Role removed");self.repository.deactivate_assignment(config["id"],mapping["id"],member.id)
-                else:
-                    async with self._role_locks[(guild.id,role.id)]:
-                        if mapping.get("max_members") and role not in member.roles and len(role.members)>=mapping["max_members"]:
-                            await self._deny(member,message,payload.emoji,config,mapping,"このRoleは人数上限に達しています。");return
-                        await member.add_roles(role,reason="Reaction Role selected")
-                    removed=[]
-                    try:
-                        for assignment in decision.conflicting_assignments:
-                            old_config=self.repository.message(guild.id,int(assignment["message_config_id"]));old_role=guild.get_role(int(assignment["role_id"]))
-                            if old_role:await member.remove_roles(old_role,reason="Reaction Role exclusive selection")
-                            if old_config:
-                                old_mapping=next((item for item in old_config["mappings"] if item["id"]==assignment["mapping_id"]),None)
-                                old_channel=guild.get_channel(old_config["channel_id"])
-                                if old_mapping and old_config.get("message_id") and isinstance(old_channel,(discord.TextChannel,discord.Thread)):
-                                    try:old_message=await old_channel.fetch_message(old_config["message_id"]);await old_message.remove_reaction(old_mapping["emoji"],member)
-                                    except discord.HTTPException:pass
-                            self.repository.deactivate_assignment(int(assignment["message_config_id"]),int(assignment["mapping_id"]),member.id);removed.append(assignment)
-                    except discord.HTTPException:
-                        await member.remove_roles(role,reason="Reaction Role compensation");raise
-                    expires_at=int(time.time())+config["temp_duration_seconds"] if config["behavior_type"]=="temp" else None
-                    self.repository.activate_assignment(guild.id,config["id"],mapping["id"],member.id,role.id,expires_at,binding=config["behavior_type"]=="binding")
-                    if config["behavior_type"]=="verify":
-                        try:await message.remove_reaction(payload.emoji,member)
-                        except discord.HTTPException:pass
+                async with self._role_locks[(guild.id, role.id)]:
+                    if decision.operation == 'add' and mapping.get('max_members') and role not in member.roles and len(role.members) >= mapping['max_members']:
+                        await self._deny(member, message, payload.emoji, config, mapping, 'このRoleは人数上限に達しています。')
+                        return
+                    await self.role_changes.apply(config, mapping, member.id, decision)
                 self.repository.audit(guild.id,config["id"],f"reaction_{event}","success",user_id=member.id,emoji_key=mapping["emoji_key"],role_id=role.id)
                 await self._send_log(guild,config,"success",member.id,mapping)
-            except discord.HTTPException as exc:
+            except (discord.HTTPException, DiscordFailure, RuntimeError, ValueError) as exc:
                 self.repository.audit(guild.id,config["id"],f"reaction_{event}","failed",user_id=member.id,emoji_key=mapping["emoji_key"],role_id=role.id,reason=type(exc).__name__)
                 await self._send_log(guild,config,"failed",member.id,mapping,type(exc).__name__)
 
@@ -404,73 +390,27 @@ class ReactionRolesCog(commands.Cog):
         await run_batch(self.repository.outbox_jobs, self.owner, self._process_outbox_item)
 
     async def _process_outbox_item(self, item: dict) -> Outcome:
-        try:
-            config=self.repository.message(int(item["guild_id"]),int(item["message_config_id"])) if item.get("message_config_id") else None
-            guild=self.bot.get_guild(int(item["guild_id"])); channel_id=config["channel_id"] if config else item["payload"].get("channel_id");channel=guild.get_channel(int(channel_id)) if guild and channel_id else None
-            if item["action"]=="delete":
-                message_id=config.get("message_id") if config else item["payload"].get("message_id");source=config["source"] if config else item["payload"].get("source")
-                if message_id and source=="bot" and isinstance(channel,(discord.TextChannel,discord.Thread)):
-                    try:message=await channel.fetch_message(int(message_id));await message.delete()
-                    except discord.NotFound:pass
-                return Outcome()
-            if not config or not isinstance(channel,(discord.TextChannel,discord.Thread)):raise RuntimeError("message_unavailable")
-            if item["action"]=="move":
-                target_channel=guild.get_channel(int(item["payload"].get("channel_id",0)))
-                if not isinstance(target_channel,(discord.TextChannel,discord.Thread)):raise RuntimeError("move_channel_unavailable")
-                target=await target_channel.fetch_message(int(item["payload"].get("message_id",0)))
-                for mapping in config["mappings"]:await target.add_reaction(mapping["emoji"])
-                old_channel=channel;old_message_id=config.get("message_id");old_source=config["source"]
-                self.repository.move_message(guild.id,config["id"],target_channel.id,target.id,"bot" if self.bot.user and target.author.id==self.bot.user.id else "external",int(item["payload"].get("revision",config["revision"])))
-                if old_source=="bot" and old_message_id:
-                    try:old=await old_channel.fetch_message(old_message_id);await old.delete()
-                    except discord.HTTPException:self.repository.audit(guild.id,config["id"],"move_cleanup","partial",reason="old_message_delete_failed")
-                return Outcome()
-            embed=discord.Embed(title=config["embed"]["title"] or None,description=config["embed"]["description"] or None,color=int(config["embed"]["color"].lstrip("#"),16))
-            message=None
-            if config.get("message_id"):
-                try:message=await channel.fetch_message(config["message_id"])
-                except discord.NotFound:pass
-            if config["source"]=="bot":
-                if message:
-                    message=await message.edit(embed=embed,allowed_mentions=discord.AllowedMentions.none())
-                else:
-                    message=await channel.send(embed=embed,allowed_mentions=discord.AllowedMentions.none())
-                    # Persist the Discord identity before adding reactions. If a
-                    # later reaction fails, the retry repairs this message instead
-                    # of publishing a new one every time the outbox is claimed.
-                    self.repository.set_discord_message(config["id"],message.id,status="publishing")
-                    config["message_id"]=message.id
-            elif not message:raise RuntimeError("external_message_missing")
-            for mapping in config["mappings"]:
-                try:await message.add_reaction(mapping["emoji"])
-                except discord.HTTPException:
-                    if not item["payload"].get("foreign"):raise
-            self.repository.set_discord_message(config["id"],message.id);return Outcome()
-        except (discord.Forbidden,discord.NotFound,RuntimeError) as exc:
-            if config:self.repository.set_delivery_status(config["id"],"failed",str(exc))
-            return Outcome(str(exc), retry=False)
-        except Exception as exc:
-            if config:self.repository.set_delivery_status(config["id"],"pending",type(exc).__name__)
-            return Outcome(type(exc).__name__, retry=True)
+        return await self.delivery.outbox(item)
+
+    @process_outbox.before_loop
+    async def before_outbox(self):
+        await self.bot.wait_until_ready()
+        for guild in self.bot.guilds:
+            for operation in self.repository.pending_role_changes(guild.id):
+                try:
+                    await self.role_changes.recover(operation)
+                except Exception:
+                    LOGGER.exception('Role compensation recovery failed operation=%s', operation['id'])
 
     @tasks.loop(seconds=15)
     async def process_schedules(self)->None:
         await run_batch(self.repository.schedule_jobs, self.owner, self._process_schedule_item, limit=100)
 
     async def _process_schedule_item(self, item: dict) -> Outcome:
-        try:
-            config=self.repository.message(int(item["guild_id"]),int(item["message_config_id"])) if item.get("message_config_id") else None;guild=self.bot.get_guild(int(item["guild_id"]))
-            if item["kind"]=="self_destruct":
-                if config and config["source"]=="bot":
-                    guild_id=int(item["guild_id"])
-                    self.repository.queue_action(guild_id,config["id"],"delete",{"channel_id":config["channel_id"],"message_id":config.get("message_id"),"source":config["source"]})
-                    self.repository.delete_message(guild_id,config["id"],recoverable=False)
-            elif item["kind"]=="temp_role" and config and guild:
-                mapping=next((value for value in config["mappings"] if value["id"]==item["mapping_id"]),None);member=guild.get_member(int(item["user_id"]));role=guild.get_role(mapping["role_id"]) if mapping else None
-                if member and role:await member.remove_roles(role,reason="Temporary Reaction Role expired")
-                if mapping:self.repository.deactivate_assignment(config["id"],mapping["id"],int(item["user_id"]))
-            return Outcome()
-        except Exception as exc:return Outcome(type(exc).__name__, retry=True)
+        if item.get('user_id'):
+            async with self._locks[(item['guild_id'], item['user_id'], 0)]:
+                return await self.delivery.schedule(item)
+        return await self.delivery.schedule(item)
 
     @tasks.loop(hours=1)
     async def maintenance(self)->None:

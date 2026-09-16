@@ -11,6 +11,8 @@ import discord
 from cryptography.fernet import Fernet
 
 from cogs.social_updates import SocialUpdatesCog
+from social.service import SocialDeliveryService
+from social.discord_adapter import DiscordSocialAdapter
 from social.crypto import SocialTokenCipher
 from social.models import default_templates
 from social import SocialRepository
@@ -48,6 +50,7 @@ class SocialDeliveryTests(unittest.IsolatedAsyncioTestCase):
             cog.social_repository = storage
             cog.guild_settings = GuildSettingsRepository(storage.database_path)
             cog.bot = SimpleNamespace(get_guild=lambda _: guild)
+            cog.delivery = SocialDeliveryService(storage, cog.guild_settings, DiscordSocialAdapter(cog.bot))
             event = {'provider': 'twitch', 'account_id': 'creator', 'event_type': 'live_start',
                      'event_key': 'twitch:live_start:one', 'payload': {'account': 'creator', 'title': 'live'}}
             self.assertTrue(await cog._deliver(event))

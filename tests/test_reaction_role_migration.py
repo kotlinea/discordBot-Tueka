@@ -25,7 +25,7 @@ class ReactionRoleRemovalTests(unittest.TestCase):
     def rows(self):
         with closing(sqlite3.connect(self.db)) as connection:
             names = [row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT IN ('schema_migrations','reaction_role_panels')")]
-            return {name: connection.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall() for name in names}
+            return {'suggestion_outbox': [], **{name: connection.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall() for name in names}}
 
     def assert_removed(self):
         with closing(sqlite3.connect(self.db)) as connection:
@@ -71,8 +71,9 @@ class ReactionRoleRemovalTests(unittest.TestCase):
                         connection.executescript("CREATE TABLE reaction_role_panels(message_id INTEGER PRIMARY KEY,guild_id INTEGER,role_ids_json TEXT); INSERT INTO reaction_role_panels VALUES(200,2,'[900]');")
                 set_fixture_version(self.db, 2)
                 before = self.rows()
+                before['sqlite_sequence'].append(('suggestion_outbox', 0))
                 result = apply(self.db, self.backups)
-                self.assertEqual(result['applied'], ['0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql', '0008_job_leases.sql'])
+                self.assertEqual(result['applied'], ['0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql', '0008_job_leases.sql', '0009_suggestion_outbox.sql', '0010_resource_leases.sql'])
                 if mixed:
                     with closing(sqlite3.connect(result['snapshot'])) as snapshot:
                         self.assertEqual(snapshot.execute('SELECT role_ids_json FROM reaction_role_panels').fetchone()[0], '[900]')
@@ -93,7 +94,7 @@ class ReactionRoleRemovalTests(unittest.TestCase):
         directory.mkdir()
         for source in Path('migrations').glob('*.sql'):
             shutil.copyfile(source, directory / source.name)
-        (directory / '0009_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0011_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         with closing(sqlite3.connect(self.db)) as connection:

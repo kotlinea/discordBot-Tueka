@@ -2,7 +2,7 @@
 
 策定日：2026-09-10。方針と実施順序の正本は [ROADMAP.md](../ROADMAP.md)。本書は、その方針を現在のコードに対応付けた作業計画であり、新しい公開仕様ではない。
 
-## 現在地と次の実行順序（2026-09-14確認）
+## 現在地と次の実行順序（2026-09-16確認）
 
 初回調査表は策定時点の記録である。P0-1〜P1-5のローカル実装・検証、P2-1の共通DB層・明示Migrationへの統一を完了し、結果は `PROGRESS0910.md` に保存した。実Guild、遠隔本番DB、Stageのリリース判定は未完了であり、ローカル実装完了と区別する。
 
@@ -12,15 +12,17 @@ Windows/Linuxの全Python各211件、Docs build、保全DB複製の全Dump不変
 
 **P2-3：Outbox / ScheduleのProtocol・Runner共通化はローカル完了。** `jobs/` に共通契約・保存処理・Runnerを配置し、Ticket / Reaction RolesのOutbox/Schedule、Socialイベント、Moderation要求/期限処理の7 Queueへ適用した。0008でToken・不足列・検索Indexを追加。取得ごとのToken・失効検査、最大8回のRetry、Dead Letter、30日Retention、Cancel・Lease更新を共通化した。既存DomainのPayloadとテーブルは維持する。
 
-最終コード固定後のWindows/Linux各220件、Docs build、直前0007からのMigration回帰、保全DB既存64表の全列・行保持を確認した。現在の検証用複製は `data/backups/p2-jobs-0914/verified.sqlite3`。同ディレクトリのfinalは開発途中候補なので次の検証に使用しない。
+最終コード固定後のWindows/Linux各220件、Docs build、直前0007からのMigration回帰、保全DB既存64表の全列・行保持を確認した。P2-3時点の検証用複製は `data/backups/p2-jobs-0914/verified.sqlite3`。同ディレクトリのfinalは開発途中候補なので次の検証に使用しない。
 
-次の開発単位は **P2-4：Discord操作をAdapterへ集約**。
+**P2-4：Discord操作のAdapter集約はローカル完了。** Moderation、Ticket、Reaction Roles、Social、SuggestionsにService/Port/Discord Adapterの境界を設けた。CogのInteraction応答は入口に残し、外部Resourceの操作をAdapterへ集約した。単なる移設に留めず、以下を検証した。
 
-1. `moderation/service.py` のDiscord型・権限階層・DM・処置・ログ・Lockdown復元を棚卸しし、Serviceが受け取るID/値とAdapterの操作契約を先に定義する。既存 `moderation/adapter.py` のイベント入力変換と責務を明示する。
-2. Moderation→Ticket→Reaction Roles→Social/Suggestionsの順にDiscord操作と状態遷移を分ける。Ticket / Reaction Roles / SuggestionsのServiceには現在Discord API直接操作がなく、Cogにある配送・権限判定・Resource操作が対象となる。単なるメソッド移動で境界を曖昧にしない。
-3. 共通Outcomeに沿ってRetry可能・恒久失敗・競合・補償失敗を区別し、Discord成功後DB失敗、権限喪失、部分処理、孤立Resource、再起動を注入して検証する。P2-3のLease・Token・Dead Letterを迂回する完了経路を追加しない。
-4. Provider継続監視・Panel公開・Lockdown復元は有限ジョブQueueと異なるライフサイクルとして残っているため、所有権と補償をこの単位で確認する。失敗時に成功を記録せず、復旧対象を記録・照合できることを完了条件にする。
-5. 必要なSchema追加は0009以降を使い、0001〜0008を改変しない。コード・異常系テスト・全回帰・正式Docs・進捗まで揃え、その後にP2-5のAPI Router、P2-6のUI構造へ進む。
+1. ServiceのDiscord/FastAPI依存禁止、Cogの外部Discord操作委譲、SQLのRepository集約を構造テストで確認。`moderation/adapter.py` は将来のNative AutoMod同期契約として区別した。
+2. Ticketの作成・Panel公開・返信・通知のIntent/Receipt、Claim補償、Reaction RolesのRole補償、Social/Suggestionsの不明配送照合を実装。Discord成功後DB失敗、権限喪失、補償競合、再起動で成功を誤記録しないことを確認した。
+3. ProviderとPanelの所有権を検査し、Lockdown・Ticket Claim・Reaction Rolesの変更/復旧/期限処理に更新可能なResource Leaseを適用。Token・有効期限とDB確定を同じTransactionで検査する。Role補償では監査ログを照合し、人手変更と証拠不足を保留する。
+4. 0009でSuggestionsを8番目の共通Queueへ追加、0010でResource Lease表を追加。0001〜0008は変更していない。0009/0010も保全DBへ検証済みのため、以後のSchema追加は0011から行う。
+5. 固定コードのWindows/Linux各272件、正式Docs build、0008からの実Schema更新・保持・再適用、保全複製の既存66表98行の保持を確認した。最新の検証用複製は `data/backups/p2-adapters-0916/verified.sqlite3`。詳細な結果とログは `PROGRESS0910.md` を参照する。
+
+次の開発単位は **P2-5：Domain API Routerと共通Dependencyへの分割**。先に現行 `/api/v1` のURL・応答・認可・CSRF・Guild/Resource境界・revision競合のContract testを固定し、Domain単位でRouterを移す。OAuth/Session・Guild所属・Resource検証・競合応答を共通Dependencyへ整理し、API名のV1を旧Dashboard V1と混同しない。P2-5の検証・Docs完了後にP2-6の型生成とUI構造へ進む。
 
 原DB・既存保全DBは変更していない。StageのDiscord・OAuth・Webhook実動、遠隔本番DB適用、実S3復元の未検証をローカル成功で代替しない。Phase 2全体とGoalは継続する。
 
@@ -133,7 +135,7 @@ ROADMAPの順序を維持する。各機能をDBだけ・画面だけで公開�
 - SQLite競合、Outbox滞留、Worker停止、Discord側成功後のDB失敗を重点監視する。特にRetryは「最大回数」だけでなく冪等性と補償を検証する。
 - 本番DB InventoryとStage検証には、運用環境・テストGuild・OAuth/Provider設定へのアクセスが必要。アクセスがない期間も、コードInventory、Fixture、コンテナ、Contract testの整備は進められる。
 
-直近の着手はP2-4。P0-1〜P2-3のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
+直近の着手はP2-5。P0-1〜P2-4のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
 
 ## 8. 再調査に基づく具体的な実行単位（2026-09-12）
 

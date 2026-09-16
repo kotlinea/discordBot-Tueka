@@ -613,6 +613,10 @@ def create_api_router(database_path: str | Path, discord: Any, settings: Any | N
             saved = ticket_repository.save_panel_bundle(guild_id, body)
             ticket_repository.audit(guild_id, "panel_created", actor, detail={"panel_id": saved["panel"]["id"]})
             return ticket_bundle_payload(saved)
+        except RuntimeError as exc:
+            if str(exc) == 'panel_recovery_required':
+                raise HTTPException(409, detail={'code': 'panel_recovery_required', 'message': 'Panelの投稿または削除を確認中です。復旧後に移動してください。'}) from exc
+            raise HTTPException(409, detail={'code': 'revision_conflict', 'message': '設置メッセージが更新されています。再読込してください。'}) from exc
         except (KeyError, TypeError, ValueError) as exc:
             raise HTTPException(422, detail={"code": "ticket_panel_invalid", "message": str(exc) or "Ticket設定を確認してください。"}) from exc
 
@@ -629,6 +633,8 @@ def create_api_router(database_path: str | Path, discord: Any, settings: Any | N
             ticket_repository.audit(guild_id, "panel_updated", actor, detail={"panel_id": panel_id})
             return ticket_bundle_payload(saved)
         except RuntimeError as exc:
+            if str(exc) == 'panel_recovery_required':
+                raise HTTPException(409, detail={'code': 'panel_recovery_required', 'message': 'Panelの投稿または削除を確認中です。復旧後に移動してください。'}) from exc
             raise HTTPException(409, detail={"code": "revision_conflict", "message": "Panelまたは設置メッセージが別の管理者に更新されています。"}) from exc
         except (KeyError, TypeError, ValueError) as exc:
             raise HTTPException(422, detail={"code": "ticket_panel_invalid", "message": str(exc) or "Ticket設定を確認してください。"}) from exc

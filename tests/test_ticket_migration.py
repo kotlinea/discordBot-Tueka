@@ -31,8 +31,8 @@ class TicketRemovalTests(unittest.TestCase):
     def contents(self):
         with closing(sqlite3.connect(self.db)) as connection:
             names = [row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")]
-            return {name: connection.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall()
-                    for name in names if name not in {'schema_migrations', 'support_tickets', 'ticket_migrations'}}
+            return {'suggestion_outbox': [], **{name: connection.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall()
+                    for name in names if name not in {'schema_migrations', 'support_tickets', 'ticket_migrations'}}}
 
     def assert_no_legacy(self):
         with closing(sqlite3.connect(self.db)) as connection:
@@ -90,10 +90,11 @@ class TicketRemovalTests(unittest.TestCase):
         self.assertFalse(repository.settings(2)['enabled'])
         set_fixture_version(self.db, 1)
         before = self.contents()
+        before['sqlite_sequence'].append(('suggestion_outbox', 0))
         blob_file = self.root / 'blobs' / transcript['object_key']
         encrypted = blob_file.read_bytes()
         result = apply(self.db, self.backups)
-        self.assertEqual(result['applied'], ['0002_remove_legacy_tickets.sql', '0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql', '0008_job_leases.sql'])
+        self.assertEqual(result['applied'], ['0002_remove_legacy_tickets.sql', '0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql', '0008_job_leases.sql', '0009_suggestion_outbox.sql', '0010_resource_leases.sql'])
         with closing(sqlite3.connect(result['snapshot'])) as snapshot:
             self.assertIn('V1 only', snapshot.execute('SELECT transcript_json FROM support_tickets').fetchone()[0])
             self.assertEqual(snapshot.execute('SELECT COUNT(*) FROM ticket_migrations').fetchone()[0], 1)
@@ -105,6 +106,13 @@ class TicketRemovalTests(unittest.TestCase):
         payload = asyncio.run(blobs.load(transcript['backend'], transcript['object_key'], transcript['content_hash']))
         self.assertEqual(payload['messages'][0]['content'], 'retained private content')
         self.assertEqual(repository.ticket(active['id'])['status'], 'awaiting_user')
+        cleanup = repository.outbox_jobs.claim('after-restart').payload
+        self.assertEqual(cleanup['action'], 'close_resource')
+        self.assertEqual(cleanup['ticket_id'], transcript['ticket_id'])
+        for action in ('close_dm', 'close_log'):
+            notice = repository.outbox_jobs.claim('after-restart').payload
+            self.assertEqual(notice['action'], action)
+            self.assertEqual(notice['payload']['transcript_id'], transcript['id'])
         self.assertEqual(repository.outbox_jobs.claim('after-restart').payload['ticket_id'], active['id'])
         self.assertEqual(repository.schedule_jobs.claim('after-restart').payload['ticket_id'], active['id'])
         self.assertEqual(apply(self.db, self.backups), {'applied': [], 'snapshot': None})
@@ -148,7 +156,7 @@ class TicketRemovalTests(unittest.TestCase):
         directory.mkdir()
         for source in Path('migrations').glob('*.sql'):
             shutil.copyfile(source, directory / source.name)
-        (directory / '0009_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0011_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         self.assertEqual(repository.settings(1), saved)

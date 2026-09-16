@@ -2,9 +2,13 @@
 <module type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/.venv-p0/pythons/cpython-3.13.7-windows-x86_64-none" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/.venv-p0/pythons/cpython-3.13.7-windows-x86_64-none/DLLs" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/.venv-p0/pythons/cpython-3.13.7-windows-x86_64-none/Lib" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv-p013" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.13 (discordBot-Tueka)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.13 (discordBot-Tueka) (2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">

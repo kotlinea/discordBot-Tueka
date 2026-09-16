@@ -20,6 +20,8 @@ class SuggestionsCogTests(unittest.IsolatedAsyncioTestCase):
         self.channel.id = 10
         self.channel.send = AsyncMock(return_value=SimpleNamespace(id=100))
         self.guild = SimpleNamespace(id=1, get_channel=lambda _: self.channel)
+        self.bot.get_guild = lambda _: self.guild
+        self.bot.user = SimpleNamespace(id=999)
 
     def interaction(self, custom_id=''):
         user = MagicMock(spec=discord.Member)

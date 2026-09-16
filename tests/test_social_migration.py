@@ -48,7 +48,7 @@ class SocialRemovalTests(unittest.TestCase):
     def retained(self):
         with closing(sqlite3.connect(self.db)) as connection:
             names = [row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name!='schema_migrations'")]
-            values = {}
+            values = {'suggestion_outbox': []}  # Must remain empty for this domain fixture.
             for name in names:
                 columns = [row[1] for row in connection.execute(f'PRAGMA table_info("{name}")')
                            if not (name == 'social_subscriptions' and row[1] == 'template')]
@@ -62,8 +62,9 @@ class SocialRemovalTests(unittest.TestCase):
                 self.db = self.root / f'{mixed}.db'
                 subscription = self.seed(mixed)
                 before = self.retained()
+                before['sqlite_sequence'].append(('suggestion_outbox', 0))
                 result = apply(self.db, self.backups)
-                self.assertEqual(result['applied'], ['0006_remove_legacy_social_template.sql', '0007_current_schema.sql', '0008_job_leases.sql'])
+                self.assertEqual(result['applied'], ['0006_remove_legacy_social_template.sql', '0007_current_schema.sql', '0008_job_leases.sql', '0009_suggestion_outbox.sql', '0010_resource_leases.sql'])
                 for _ in range(2):
                     store = SocialRepository(self.db)
                     self.assertEqual(self.retained(), before)
@@ -90,7 +91,7 @@ class SocialRemovalTests(unittest.TestCase):
             before = list(connection.iterdump())
         directory = self.root / 'failure'
         shutil.copytree('migrations', directory)
-        (directory / '0009_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0011_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         with closing(sqlite3.connect(self.db)) as connection:

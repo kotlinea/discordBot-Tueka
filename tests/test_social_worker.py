@@ -7,7 +7,7 @@ import hmac
 import sqlite3
 from contextlib import closing
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -240,11 +240,26 @@ class SocialStorageV2Tests(unittest.TestCase):
         self.assertEqual([item["id"] for item in claimed], [first["target_id"]])
         self.assertEqual(self.storage.claim_social_targets("worker-b"), [])
 
+    def test_expired_same_worker_claim_cannot_commit_cursor_or_events(self):
+        templates = default_templates('x', ['post'])
+        self.storage.save_social_subscription_v2(1, 'x', 'creator', 10, ['post'], {}, templates)
+        with patch('social.repository.time.time', return_value=1000):
+            first = self.storage.claim_social_targets('worker', lease_seconds=1)[0]
+        with patch('social.repository.time.time', return_value=1002):
+            second = self.storage.claim_social_targets('worker')[0]
+            self.assertNotEqual(first['lease_owner'], second['lease_owner'])
+            changes = dict(status='active', cursor={'since_id': '2'}, next_check_at=1100,
+                events=[{'external_id': '2', 'account_id': 'creator', 'event_type': 'post', 'payload': {}}])
+            self.assertFalse(self.storage.complete_social_target(first['id'], first['lease_owner'], **changes))
+            self.assertEqual(self.storage.pending_social_events(), [])
+            self.assertTrue(self.storage.complete_social_target(second['id'], second['lease_owner'], **changes))
+            self.assertEqual(len(self.storage.pending_social_events()), 1)
+
     def test_initial_cursor_and_event_deduplication(self):
         templates = default_templates("x", ["post"])
         saved = self.storage.save_social_subscription_v2(1, "x", "openai", 10, ["post"], {}, templates)
         target = self.storage.claim_social_targets("worker")[0]
-        self.assertTrue(self.storage.complete_social_target(target["id"], "worker", status="active", cursor={"since_id": "1"}, next_check_at=int(time.time()) + 60, external_id="42"))
+        self.assertTrue(self.storage.complete_social_target(target["id"], target["lease_owner"], status="active", cursor={"since_id": "1"}, next_check_at=int(time.time()) + 60, external_id="42"))
         self.assertTrue(self.storage.enqueue_social_event_v2("x", "2", "42", "post", {"event": "post"}))
         self.assertFalse(self.storage.enqueue_social_event_v2("x", "2", "42", "post", {"event": "post"}))
         self.assertEqual(self.storage.social_subscription(saved["id"])["status"], "active")
@@ -253,10 +268,10 @@ class SocialStorageV2Tests(unittest.TestCase):
         templates = default_templates("youtube", ["video"])
         first = self.storage.save_social_subscription_v2(1, "youtube", "nobamangames", 10, ["video"], {}, templates)
         first_target = self.storage.claim_social_targets("worker-a")[0]
-        self.assertTrue(self.storage.complete_social_target(first_target["id"], "worker-a", status="active", cursor={"seen": ["v1"]}, next_check_at=int(time.time()) + 60, external_id="UCTW2tw0Mhho72MojB1L48IQ"))
+        self.assertTrue(self.storage.complete_social_target(first_target["id"], first_target["lease_owner"], status="active", cursor={"seen": ["v1"]}, next_check_at=int(time.time()) + 60, external_id="UCTW2tw0Mhho72MojB1L48IQ"))
         second = self.storage.save_social_subscription_v2(2, "youtube", "のばまんゲームス", 20, ["video"], {}, templates)
         second_target = next(item for item in self.storage.claim_social_targets("worker-b") if item["id"] == second["target_id"])
-        self.assertTrue(self.storage.complete_social_target(second_target["id"], "worker-b", status="active", cursor={"seen": ["v1"]}, next_check_at=int(time.time()) + 60, external_id="UCTW2tw0Mhho72MojB1L48IQ"))
+        self.assertTrue(self.storage.complete_social_target(second_target["id"], second_target["lease_owner"], status="active", cursor={"seen": ["v1"]}, next_check_at=int(time.time()) + 60, external_id="UCTW2tw0Mhho72MojB1L48IQ"))
         self.assertEqual(len(self.storage.social_targets("youtube")), 1)
         self.assertEqual(self.storage.social_subscription(second["id"])["target_id"], first["target_id"])
 
@@ -274,7 +289,7 @@ class SocialStorageV2Tests(unittest.TestCase):
         self.storage.delete_social_subscription(1, saved["id"])
         claimed = self.storage.claim_social_targets("cleanup-worker")
         self.assertEqual(claimed[0]["status"], "orphaned")
-        self.assertTrue(self.storage.delete_social_target(claimed[0]["id"], "cleanup-worker"))
+        self.assertTrue(self.storage.delete_social_target(claimed[0]["id"], claimed[0]["lease_owner"]))
 
     def test_old_subscription_is_not_imported_or_enabled_at_startup(self):
         path = Path(self.temp.name) / "legacy.sqlite3"

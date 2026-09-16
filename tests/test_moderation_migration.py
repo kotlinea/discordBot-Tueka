@@ -28,7 +28,7 @@ class ModerationRemovalTests(unittest.TestCase):
     def retained(self):
         with closing(sqlite3.connect(self.db)) as connection:
             names = [row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")]
-            result = {}
+            result = {'suggestion_outbox': []}  # Introduced after this fixture's version.
             for name in names:
                 if name in OLD_TABLES | {'schema_migrations'}:
                     continue
@@ -100,8 +100,9 @@ class ModerationRemovalTests(unittest.TestCase):
                 self.db = self.root / f'{mixed}.db'
                 storage, rule, event, case = self.seed(mixed)
                 before = self.retained()
+                before['sqlite_sequence'].append(('suggestion_outbox', 0))
                 result = apply(self.db, self.backups)
-                self.assertEqual(result['applied'], ['0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql', '0008_job_leases.sql'])
+                self.assertEqual(result['applied'], ['0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql', '0008_job_leases.sql', '0009_suggestion_outbox.sql', '0010_resource_leases.sql'])
                 self.assertEqual(self.retained(), before)
                 storage = ModerationRepository(self.db)
                 self.assertEqual(self.retained(), before)
@@ -125,7 +126,7 @@ class ModerationRemovalTests(unittest.TestCase):
             before = list(connection.iterdump())
         directory = self.root / 'failure'
         shutil.copytree('migrations', directory)
-        (directory / '0009_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
+        (directory / '0011_fail.sql').write_text('INSERT INTO missing_table VALUES(1);')
         with self.assertRaises(sqlite3.OperationalError):
             apply(self.db, self.backups, directory)
         with closing(sqlite3.connect(self.db)) as connection:

@@ -195,10 +195,11 @@ class ReactionRoleCogTests(unittest.IsolatedAsyncioTestCase):
             ReactionRolesCog._validate_guild_emojis(interaction, {"mappings": [{"emoji": "<:other:223456789012345678>"}]})
 
     async def test_publish_retry_reuses_the_message_created_before_reaction_failure(self):
-        config = {**message(), "id": 7, "guild_id": 1, "message_id": None, "mappings": [{"emoji": "✅", "role_id": 20}]}
+        config = {**message(), "id": 7, "created_at": 1000, "guild_id": 1, "message_id": None, "mappings": [{"emoji": "✅", "role_id": 20}]}
         item = {"id": 8, "guild_id": 1, "message_config_id": 7, "action": "publish", "payload": {}}
 
         class FakeMessage:
+            author = SimpleNamespace(id=999)
             id = 900
             failures = 1
 
@@ -208,7 +209,7 @@ class ReactionRoleCogTests(unittest.IsolatedAsyncioTestCase):
             async def add_reaction(self, _emoji):
                 if self.failures:
                     self.failures -= 1
-                    raise Exception("reaction failed")
+                    raise discord.HTTPException(SimpleNamespace(status=503, reason="Unavailable"), "reaction failed")
 
         fake_message = FakeMessage()
 
@@ -232,19 +233,60 @@ class ReactionRoleCogTests(unittest.IsolatedAsyncioTestCase):
                 config["status"] = status
             def set_delivery_status(self, _config_id, status, error=None): config["status"] = status
 
-        guild = SimpleNamespace(id=1, get_channel=lambda _channel_id: channel)
+        guild = SimpleNamespace(id=1, get_channel=lambda _channel_id: channel, get_channel_or_thread=lambda _channel_id: channel)
         cog = object.__new__(ReactionRolesCog)
         cog.bot = SimpleNamespace(get_guild=lambda _guild_id: guild)
         cog.repository = FakeRepository()
+        from reaction_roles.discord_adapter import DiscordReactionRoleAdapter
+        from reaction_roles.delivery import ReactionRoleDeliveryService
+        cog.bot.user = SimpleNamespace(id=999)
+        cog.delivery = ReactionRoleDeliveryService(cog.repository, DiscordReactionRoleAdapter(cog.bot))
         cog.owner = "test-worker"
 
         with patch("cogs.reaction_roles.discord.TextChannel", FakeChannel), patch("cogs.reaction_roles.discord.Thread", FakeChannel):
-            await ReactionRolesCog._process_outbox_item(cog, item)
+            outcome = await ReactionRolesCog._process_outbox_item(cog, item)
+            self.assertTrue(outcome.retry)
             self.assertEqual(config["message_id"], 900)
             self.assertEqual(channel.send_count, 1)
             await ReactionRolesCog._process_outbox_item(cog, item)
             self.assertEqual(channel.send_count, 1)
             self.assertEqual(config["status"], "active")
+
+    async def test_move_commit_persists_cleanup_and_replay_does_not_repeat_move(self):
+        from reaction_roles.delivery import ReactionRoleDeliveryService
+        from jobs import Outcome
+        from unittest.mock import AsyncMock
+        with tempfile.TemporaryDirectory() as directory:
+            repo = ReactionRoleRepository(prepare_database(Path(directory) / 'move.db'))
+            config = ReactionRoleService(repo).create(1, message())
+            repo.set_discord_message(config['id'], 900)
+            publication = repo.outbox_jobs.claim('worker')
+            repo.outbox_jobs.finish(publication, Outcome())
+            port = SimpleNamespace(add_reactions=AsyncMock(return_value='external'), delete=AsyncMock())
+            delivery = ReactionRoleDeliveryService(repo, port)
+            item = {'guild_id': 1, 'message_config_id': config['id'], 'action': 'move',
+                    'payload': {'revision': config['revision'], 'channel_id': 11, 'message_id': 901}}
+            self.assertIsNone((await delivery.outbox(item)).error)
+            self.assertIsNone((await delivery.outbox(item)).error)
+            port.add_reactions.assert_awaited_once()
+            cleanup = repo.outbox_jobs.claim('restarted')
+            self.assertEqual(cleanup.payload['action'], 'delete')
+            self.assertIsNone(cleanup.payload['message_config_id'])
+            self.assertEqual(cleanup.payload['payload']['message_id'], 900)
+            await delivery.outbox(cleanup.payload)
+            port.delete.assert_awaited_once_with(1, 10, 900)
+
+    async def test_expiry_fetch_failure_does_not_confirm_member_absence(self):
+        from reaction_roles.discord_adapter import DiscordReactionRoleAdapter
+        from discord_io import DiscordFailure
+        from unittest.mock import AsyncMock
+        guild = SimpleNamespace(get_member=lambda _: None, get_role=lambda _: object(),
+            fetch_member=AsyncMock(side_effect=discord.HTTPException(
+                SimpleNamespace(status=503, reason='Unavailable'), 'fetch failed')))
+        adapter = DiscordReactionRoleAdapter(SimpleNamespace(get_guild=lambda _: guild))
+        with self.assertRaises(DiscordFailure) as failed:
+            await adapter.role(1, 2, 3, add=False, reason='expired')
+        self.assertTrue(failed.exception.retry)
 
     async def test_command_groups_load_without_discord_connection(self):
         with tempfile.TemporaryDirectory() as directory:

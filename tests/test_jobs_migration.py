@@ -28,7 +28,7 @@ class JobMigrationTests(unittest.TestCase):
                 for spec, _, _ in QUEUES:
                     columns = [row[1] for row in c.execute(f'PRAGMA table_info({spec.table})')]
                     before[spec.table] = (columns, [tuple(row) for row in c.execute(f'SELECT * FROM {spec.table}')])
-            self.assertEqual(apply(database, root / 'backups')['applied'], ['0008_job_leases.sql'])
+            self.assertEqual(apply(database, root / 'backups')['applied'], ['0008_job_leases.sql', '0009_suggestion_outbox.sql', '0010_resource_leases.sql'])
             with transaction(database) as c:
                 for table, (columns, rows) in before.items():
                     self.assertEqual([tuple(row) for row in c.execute(f'SELECT {",".join(columns)} FROM {table}')], rows)

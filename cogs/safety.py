@@ -1,6 +1,5 @@
 """Guild-scoped safety modules: moderation, filtering and spam."""
 import logging
-from datetime import timedelta
 
 import discord
 from discord import app_commands
@@ -8,6 +7,8 @@ from discord.ext import commands
 
 from moderation import ModerationRepository
 from guild_settings import GuildSettingsRepository
+from moderation.discord_adapter import DiscordModerationAdapter, action_context, guild_ref, member_ref
+from moderation.contracts import ActionFailure
 from moderation.service import ModerationService
 
 
@@ -19,7 +20,7 @@ class SafetyCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot, self.moderation_repository = bot, ModerationRepository(bot.settings.database_path)
         self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
-        self.moderation = ModerationService(bot, self.moderation_repository, self.guild_settings)
+        self.moderation = ModerationService(DiscordModerationAdapter(bot), self.moderation_repository, self.guild_settings)
 
     async def _enabled(self, interaction: discord.Interaction, module_id: str) -> bool:
         if interaction.guild is None or not self.guild_settings.module_enabled(interaction.guild.id, module_id):
@@ -27,34 +28,14 @@ class SafetyCog(commands.Cog):
             return False
         return True
 
-    async def _dm(self, member: discord.Member, text: str) -> bool:
-        try:
-            await member.send(text)
-            return True
-        except discord.HTTPException:
-            return False
-
-    async def _audit(self, guild: discord.Guild, text: str) -> None:
-        module = self.guild_settings.get_module(guild.id, "audit_log")
-        channel_id = module["settings"].get("management_channel_id")
-        if not module["enabled"] or not channel_id:
-            return
-        channel = guild.get_channel(int(channel_id))
-        if isinstance(channel, discord.TextChannel):
-            try:
-                await channel.send(text, allowed_mentions=discord.AllowedMentions.none())
-            except discord.HTTPException:
-                LOGGER.warning("Could not write moderation audit log", exc_info=True)
-
-    @staticmethod
-    def _manageable(actor: discord.Member, target: discord.Member, action: str) -> str | None:
-        return ModerationService.manageable(actor, target, action)
+    def _manageable(self, actor: discord.Member, target: discord.Member, action: str) -> str | None:
+        return self.moderation.manageable(member_ref(actor), member_ref(target), action)
 
     async def _apply_case(self, guild: discord.Guild, member: discord.Member, action: str, reason: str | None, moderator_id: int | None, minutes: int = 0, notify: bool = True) -> None:
-        await self.moderation.apply_case(guild, member, action, reason, moderator_id, minutes, notify)
+        await self.moderation.apply_case(guild_ref(guild), member_ref(member), action, reason, moderator_id, minutes, notify)
 
     async def _warn(self, guild: discord.Guild, member: discord.Member, reason: str | None, moderator_id: int | None) -> int:
-        return await self.moderation.warn(guild, member, reason, moderator_id)
+        return await self.moderation.warn(guild_ref(guild), member_ref(member), reason, moderator_id)
 
     @app_commands.command(description="メンバーに警告を与えます。")
     @app_commands.checks.has_permissions(moderate_members=True)

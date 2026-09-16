@@ -33,29 +33,29 @@ class SocialWorker:
         if target["status"] == "orphaned":
             try:
                 await adapter.unsubscribe(target)
-                self.repository.delete_social_target(target["id"], self.owner)
+                self.repository.delete_social_target(target["id"], target["lease_owner"])
             except Exception as exc:
-                self.repository.complete_social_target(target["id"], self.owner, status="orphaned", cursor=target.get("cursor", {}),
+                self.repository.complete_social_target(target["id"], target["lease_owner"], status="orphaned", cursor=target.get("cursor", {}),
                     next_check_at=int(time.time()) + 3600, error=str(exc)[:500])
             return
         initialize = target["status"] == "pending" or not target.get("cursor")
         try:
             result: PollResult = await adapter.poll(target, initialize=initialize)
             account_id = result.external_id or target["account_key"]
-            for event in result.events:
-                self.repository.enqueue_social_event_v2(provider, event.external_id, account_id, event.event_type, event.payload, occurred_at=event.occurred_at)
             self.failures[provider] = 0
             interval = self.settings.social_poll_interval_seconds if provider in {"tiktok", "instagram"} and result.interval_seconds >= 120 else result.interval_seconds
             jitter = random.randint(0, max(1, interval // 10))
-            self.repository.complete_social_target(target["id"], self.owner, status=result.status, cursor=result.cursor,
+            self.repository.complete_social_target(target["id"], target["lease_owner"], status=result.status, cursor=result.cursor,
                 next_check_at=int(time.time()) + interval + jitter, external_id=result.external_id, handle=result.handle,
-                display_name=result.display_name, avatar_url=result.avatar_url, error=result.error)
+                display_name=result.display_name, avatar_url=result.avatar_url, error=result.error,
+                events=[{'external_id': event.external_id, 'account_id': account_id, 'event_type': event.event_type,
+                         'payload': event.payload, 'occurred_at': event.occurred_at} for event in result.events])
         except Exception as exc:
             failures = self.failures.get(provider, 0) + 1
             self.failures[provider] = failures
             delay = min(3600, 30 * (2 ** min(failures, 7))) + random.randint(0, 15)
             status = "error" if initialize else "degraded"
-            self.repository.complete_social_target(target["id"], self.owner, status=status, cursor=target.get("cursor", {}),
+            self.repository.complete_social_target(target["id"], target["lease_owner"], status=status, cursor=target.get("cursor", {}),
                 next_check_at=int(time.time()) + delay, error=str(exc)[:500])
             log.warning("social target check failed provider=%s target_id=%s error=%s", provider, target["id"], type(exc).__name__)
 

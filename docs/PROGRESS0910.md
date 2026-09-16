@@ -319,3 +319,64 @@
 - ArchitectureとMigration運用資料に共通Queueの対象、処理順序、再試行上限、保持期限、旧版復帰のSnapshot、外部API副作用との境界を反映。最終 `git diff --check` 成功。
 - 判定：P2-3のローカル計画・実装・Migration・テスト・正式Docsを完了。次はP2-4。ModerationServiceのDiscord操作をAdapterへ切り出す境界を定義し、Ticket / Reaction Roles / Social / SuggestionsのCog側操作へ順に進む。成功後DB失敗・権限喪失・補償失敗・孤立Resourceの照合と復旧を検証する。Schema追加は0009以降を使用する。
 - Phase 2全体・Stageリリース・Goal全体は未完了。実Discord/OAuth/Webhook、遠隔本番DB適用、実Transcript/S3復元は従来の未実施ゲートとして保持する。
+
+
+### 2026-09-14 P2-4 異常系と途中回帰の検証記録
+
+- P2-4は未完了。P2-5以降へは進んでいない。Moderationの値/Port境界と処置Intent、Ticket作成の孤立Resource記録・復旧、Social配送のReceipt照合、Reaction Roles配送Service/Adapterを実装中。
+- Reaction Rolesの移動確定と旧Botメッセージ削除Outboxを同一トランザクションにした。Cogの移動コマンドもOutboxへ予約する。移動後・ACK前の再実行は対象IDとrevisionで照合する。メンバーのキャッシュ欠落時はRESTで確認し、取得失敗を退出済みとして扱わない。
+- この時点のコードでWindows全230件（102.952秒）、Linuxコンテナ全230件（149.483秒）、Docs build（12.64秒）が成功。ログ: `.venv-p0/p2-adapter-checkpoint-windows.log` / `p2-adapter-checkpoint-linux.log` / `p2-adapter-checkpoint-docs.log`。承認済みのLinux/Docs再実行は完了した。これはP2-4完了判定ではない。
+- その後Provider継続監視を修正。取得ごとに一意な所有者値を発行し、期限切れ/旧取得による完了・削除を拒否する。配送Event追加とCursor更新も所有権確認後の同じトランザクションにまとめた。Schema変更なし。専用20件成功（1.692秒、`.venv-p0/p2-provider-ownership.log`）。この後の差分を先の全230件成功に含めない。
+- 残作業: Ticketの作成以外のResource操作とPanel公開の所有権・部分失敗、Reaction RolesのRole変更補償、Suggestions配送と復旧、Lockdown復元の所有権、各Adapter異常系、正式Docs統合、最終コード固定後の全回帰。実Discord/Stage・遠隔本番DB・実S3復元の未検証は維持する。
+
+
+### 2026-09-14 P2-4 TicketのPanel・Claim・Close復旧
+
+- `ticketing/panel_delivery.py` に公開状態遷移、`ticketing/discord_adapter.py` にPanelの投稿・編集・削除を分離。Cogは1件ずつ取得してServiceへ渡す。取得ごとに一意なLease所有者値を発行し、完了は期限・所有者・revisionを検査する。
+- Panel投稿IDを旧投稿削除前に保存し、削除失敗時も旧新両方のIDを保持する。不明な投稿結果はBotの識別印で直近200件を照合し、見つからなければ重複投稿せず保留する。不明状態での同じ投稿先への編集は照合状態を保持し、別投稿先への移動は復旧が済むまで拒否する。
+- Claim権限変更をPortへ移設。変更前後を `claim_started` として記録してからAPIを実行する。DBのClaim確定と `claim_finished` は同じTransaction。補償失敗は成功扱いせず残し、起動時に再試行する。人手変更と競合する権限は上書きしない。
+- Close確定と `close_resource` Outboxを同じTransactionにした。Transcript存在・closed状態・revision一致時のみResourceを削除/Archiveする。Thread再開はOutboxへ予約し、Discord成功後にDBを更新する。再開コマンドで他GuildのTicketを変更しないよう先にGuildを検証する。履歴取得失敗時はCloseへ進まない。
+- 途中のTicket関連26件ではMigrationテストが1件失敗した。新たなClose削除ジョブが先に取得されることが原因で、保持される削除ジョブと既存auto_closeの両方を確認する期待値に修正した。
+- 最終固定コードのWindows全237件成功（114.878秒、`.venv-p0/p2-ticket-checkpoint-windows.log`）、Architecture更新後のDocs build成功（11.39秒、`p2-ticket-checkpoint-docs.log`）。Linux結果は同名の `p2-ticket-checkpoint-linux.log` で別途確定する。Schema追加・0001〜0008改変なし。
+- P2-4はまだ未完了。残作業はTicket返信/Note/参加者/その他Resource操作、Panel削除時に未確定投稿IDを照合する処理、Claim開始時の状態検査と復旧判定の最終監査、Panel復旧待ちのAPIエラー表示、Reaction RolesのRole変更補償、Suggestions配送、Lockdown所有権、横断異常系・最終全回帰。P2-5以降やPhase完了へ進めない。
+
+
+### 2026-09-15 P2-4 Ticket配送の追加分離
+
+- 前記Windows237件と同じ固定コードでLinux237件成功（167.407秒、`.venv-p0/p2-ticket-checkpoint-linux.log`）。その後の変更はこの結果に含めない。
+- Panelの不明な投稿結果を削除要求後も `delete_uncertain` として保持する。照合した投稿IDを保存してから削除する。復旧待ちの移動はAPIの `panel_recovery_required` / 409で返し、保存TransactionをRollbackする。専用HTTPテスト1件成功（0.880秒）。
+- Ticket参加者の追加・削除・Staff参加をOutboxへ統一。Discord操作をAdapter、DB反映をServiceへ移した。RenameもAdapterへ移設。InteractionのGuildとTicketのGuildを操作前に照合する。
+- 返信・Staff Noteの投稿処理をService/Adapterへ分離。送信Intentと識別印で結果不明時を照合し、内部Noteは配送Keyで二重記録を防ぐ。配送KeyはOutbox IDとcreated_atで、保持期限後の数値ID再使用も区別する。確実な未送信失敗は再送可能、照合失敗は不明状態を維持する。
+- 回答待ちCategoryと復帰をOutboxへ移し、移動前後をAPI前に永続化する。Discord成功後のDB失敗で復帰先Categoryが壊れないことを検証した。
+- Ticket作成の再入は既存Resourceを返す。開始Intentが残る場合は再作成せず照合する。結果不明でResource IDを保存できなかった場合も、TopicまたはThread識別名・親・Bot所有者による復旧経路を追加。activate_ticketの状態不一致を成功扱いしない。
+- この追加差分のTicket関連35件成功（19.474秒、`.venv-p0/p2-ticket-creation-recovery.log`）。全Python回帰は `p2-ticket-delivery-windows.log` / `p2-ticket-delivery-linux.log` で別途確定する。Linuxの初回起動はDocker daemon停止で失敗し、Docker Desktopを起動した。テスト成功とは数えない。
+- P2-4の残作業: TicketのWelcome/Close通知とResource削除の残るCog操作、復旧後のWelcome整備、Adapterの実SDK境界テスト、Reaction RolesのRole補償、Suggestions配送、Lockdown所有権、正式Docsと最終全回帰。Phase 2・Goal全体の完了判定は行わない。
+
+- 追加検証確定: Windows全246件成功（53.316秒、`.venv-p0/p2-ticket-delivery-windows.log`）、Docker起動後のLinux全246件成功（72.851秒、`p2-ticket-delivery-linux-ready.log`）、Docs build成功（9.34秒、`p2-ticket-delivery-docs.log`）。初回daemon接続失敗のログは `p2-ticket-delivery-linux.log` に残す。コード固定後の同じ差分で両OSを検証した。
+
+### 2026-09-15 承認済みLinuxテスト・Docs build再実行
+
+- ユーザーの再実行承認に基づき、現在の作業ツリーで2件を実行した。制限環境ではDocker接続とVite設定一時ファイルの生成が拒否されたが、昇格実行は承認され、両コマンドが完走した。
+- Docs build成功（9.34秒、`.venv-p0/approved-recheck-docs.log`）。この結果は本節追記前の文書に対するもの。
+- Linux Pythonは256件実行、73.926秒、失敗1件・エラー12件（`.venv-p0/approved-recheck-linux.log`）。全件成功ではない。
+- エラー12件は全て `suggestion_outbox` の再作成。現行SchemaからMigration履歴だけを過去へ戻すテストFixtureが、0009で追加したテーブルを残している。失敗1件はMigration件数の期待値8に対し実際9。直前のWindowsログと同じ不整合を確認した。
+- この再実行ではソースやMigrationを修正していない。次の検証作業は過去Schema FixtureとMigration件数の期待値を整備し、データ保持の検証を維持したうえで両OSを再確認すること。P2-4・Phase 2・全体の完了とは判定しない。
+
+### 2026-09-16 P2-4 Discord Adapter集約・ローカル完了
+
+- 完了範囲はP2-4。Moderation、Ticket、Reaction Roles、Social、SuggestionsのService/Port/Discord Adapterを分離し、Interaction応答はCogに維持した。ServiceのSDK/HTTP Framework依存、Cogの外部Discord操作、Repository外SQLを検出する構造テストを追加した。
+- TicketのWelcome/Staff通知/Close DM・Log/Open Mention除去をOutboxへ移した。Resource有効化とWelcome予約、CloseとResource削除・通知予約は同じTransaction。通知はTranscript ID・理由・配送Keyを保持する。Panelの不明な投稿結果は削除後も照合し、`delete_uncertain` 中の編集は409で拒否する。
+- Ticket Claimは変更前後の権限と開始Intentを保存し、Claim確定と完了Receiptを同じTransactionにした。復旧はrevisionや担当者の偶然の一致で成功と判定せずReceiptを確認する。実行中処理と起動時補償は同じLeaseを共有する。
+- Reaction RolesはRole変更のIntent、Assignment/Binding/期限/リアクション除去予約/完了記録を整理した。失敗時は補償し、補償失敗を保持する。通常変更・起動時復旧・期限解除はGuild/Member単位のLeaseを共有する。復元対象の最新監査ログが当該Bot Operationでない場合や証拠不足時は、人手変更を上書きしない。
+- Suggestionsは0009の専用Outboxを共通Runnerへ接続した。作成・投票・審査と予約を同じTransactionにし、送信Intent/投稿ID保存はQueue Tokenと期限を検査する。投稿後DB失敗は識別印で照合し、参照競合は成功扱いしない。復旧後の表示更新も予約する。共通Queueは計8種類。
+- Social/Reaction Rolesでは投稿照合中の403も結果不明として保持する。SocialのChannel取得不能は再試行対象にし、既存の不明配送を未送信に戻さない。投稿識別印はBot作者と照合し、Reaction Rolesでは設定IDと作成日時を組にする。
+- 0010にResource Lease表を追加。SQLと所有権検査は `jobs/repository.py`、非同期更新・中断・解放は `jobs/leases.py`。取得ごとのToken、有効期限、Heartbeat失敗時の中断、旧所有者による確定・更新・後継Lease削除の拒否を検証した。
+- Lockdownは全復元情報をAPI前に保存し、開始/手動復元/期限復元をGuild単位で排他する。競合・権限喪失・DB失敗はactiveとエラーを残す。完了と対応Raid解除は同じTransaction。別のRaid無信号処理も、未復元Lockdownや更新済みシグナルを無視して解除しない。
+- ModerationのUnban・反応対象Message取得をAdapterへ移し、UnbanのCase記録もServiceへ統一した。Safetyの権限確認呼出しと、AutoModの入力変換関数を同名ローカル変数で隠す不具合を修正し、実行経路をテストした。
+- 旧版Migration Fixtureは0009の新設表も除去してから履歴を戻す形へ修正した。空の新設表と採番情報を明示的に期待し、既存データ比較を維持した。別テストでは0001〜0008だけを適用した実Schemaから0009/0010へ更新し、全既存行・提案・投票・履歴、照合専用Backfill、再適用を検証した。
+- 途中回帰: 256件の失敗1/エラー12を修正。その後264件でRepository外SQLが1件失敗し配置を修正。270件では両OSでテスト用Reaction Role設定のcreated_at欠落が1件失敗し、現行設定と同じFixtureへ修正した。これらの失敗を成功件数には含めない。
+- 最終固定コードのWindows全272件成功（68.022秒、`.venv-p0/p2-adapter-verified-windows.log`）、Linuxコンテナ全272件成功（128.386秒、`p2-adapter-verified-linux.log`）。正式Architecture/Migration資料のDocs build成功（6.64秒、`p2-adapter-docs.log`）。その後のPython変更は末尾空行の除去のみ。Frontend変更なし。
+- 実行計画の現在地と本節の引継ぎを含めたDocs最終buildも成功（5.26秒、`.venv-p0/p2-adapter-docs-final.log`）。build後の追記はこの結果記録のみ。
+- 保全検証: 0009適用済み `data/backups/p2-adapters-0915/verified.sqlite3` を新規複製し、`data/backups/p2-adapters-0916/verified.sqlite3` に0010を適用した。既存66表98行の全値保持、原複製不変、integrity_check=ok、FK違反0、再適用差分なしを確認。原運用DBを変更していない。0001〜0008の差分なし。0009/0010も以後改変せず、次のSchema番号は0011。
+- 次はP2-5。`dashboard/api_v1.py` の公開Contract/認可境界を固定してDomain Routerへ分割する。P2-6、Phase 3〜5は未着手。Phase 2全体・Goal全体・Stageリリースは未完了。
+- 実Discord/OAuth/Webhook、遠隔本番DB適用、実Transcript/S3復元は未実施ゲートとして維持する。不明な投稿や補償の証拠不足は監査記録とResourceの人手照合が必要であり、ローカルテスト成功を実機運用の完了とは扱わない。

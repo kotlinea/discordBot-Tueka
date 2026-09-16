@@ -26,6 +26,10 @@ python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrat
 
 0008は7つのOutbox/Scheduleテーブルに取得Token・不足していたLease/試行数/終端日時と検索Indexを追加します。既存Payloadを維持し、完了済み行の終端日時だけを補います。BotとWorkerを停止して適用し、適用後は共通Runnerを使うコードで再起動してください。旧版への復帰は適用前Snapshotを伴う手順で行います。
 
+0009はSuggestions専用Outboxを追加します。既存の提案・投票・審査履歴を変更せず、投稿IDがなくpending/reviewingの提案だけを「既存投稿の照合」として登録します。旧投稿に識別印がない場合は自動再投稿せず、管理者による照合が必要です。配送IDはAUTOINCREMENTで、保持期限後も以前の通知識別印を再使用しません。
+
+0010は有限Queue以外のResource操作を排他する `resource_leases` を追加します。Lockdownの開始と復元は同じGuildのLeaseを共有します。TicketのClaim変更/補償とReaction RolesのRole変更/補償/期限処理も、それぞれ同じResourceのLeaseを共有します。所有権はTokenと有効期限で照合し、期限切れの処理は状態を確定できません。期限切れのLeaseは次回の操作で取得し直せるため、復旧時に履歴やLeaseを手動で削除する必要はありません。
+
 ## Migrationの追加
 
 連続する4桁番号と英小文字・数字・underscoreの名前を使い、各SQL文をセミコロンで終えます。適用済みファイルを編集せず、新しい番号を追加してください。
