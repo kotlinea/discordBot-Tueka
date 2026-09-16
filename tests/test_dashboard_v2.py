@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from dashboard.api_v1 import _normalize_resource_ids, _serialize_resource_ids, _serialize_rule_resource_ids
+from dashboard.api.serialization import _normalize_resource_ids, _serialize_resource_ids, _serialize_rule_resource_ids
 from guild_settings import GuildSettingsRepository
 
 

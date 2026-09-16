@@ -22,7 +22,9 @@ Windows/Linuxの全Python各211件、Docs build、保全DB複製の全Dump不変
 4. 0009でSuggestionsを8番目の共通Queueへ追加、0010でResource Lease表を追加。0001〜0008は変更していない。0009/0010も保全DBへ検証済みのため、以後のSchema追加は0011から行う。
 5. 固定コードのWindows/Linux各272件、正式Docs build、0008からの実Schema更新・保持・再適用、保全複製の既存66表98行の保持を確認した。最新の検証用複製は `data/backups/p2-adapters-0916/verified.sqlite3`。詳細な結果とログは `PROGRESS0910.md` を参照する。
 
-次の開発単位は **P2-5：Domain API Routerと共通Dependencyへの分割**。先に現行 `/api/v1` のURL・応答・認可・CSRF・Guild/Resource境界・revision競合のContract testを固定し、Domain単位でRouterを移す。OAuth/Session・Guild所属・Resource検証・競合応答を共通Dependencyへ整理し、API名のV1を旧Dashboard V1と混同しない。P2-5の検証・Docs完了後にP2-6の型生成とUI構造へ進む。
+**P2-5：Domain API Routerと共通Dependencyへの分割はローカル完了。** `dashboard/api_v1.py` はContext生成と9 Routerの合成だけを担当し、DomainのHTTP処理は `dashboard/api/` に配置した。OAuth/Session・CSRF・Guild認可・Ticket担当Team・Resource Index・revision競合を共通化。分割前のOpenAPI 59パスと認証/認可/CSRF 199ケースを固定して互換性を検証した。Guildを退出した明示Teamメンバーを拒否し、不正なrevision Headerは422で返す。Windows/Linux全各288件、Frontend型検査、正式Docs build（11.22秒）が成功。詳細は進捗記録を参照する。
+
+次の開発単位は **P2-6：型生成・入力Schema共有・UI構造の整理**。現行APIの辞書応答、Domain間のID・日時・Pagination・エラー形式の差はP2-5では維持した。OpenAPIの型と入力制約を整え、呼出し側と同時に統一する。Save Bar・Resource Picker・Access Policy等を共通化し、`App.tsx` をShell/Routerへ縮小、Route遅延読込・翻訳Namespaceを整備する。型生成差分・保存往復・競合/権限・4画面幅・日英/テーマ/キーボード検証までをP2-6の完了条件とする。
 
 原DB・既存保全DBは変更していない。StageのDiscord・OAuth・Webhook実動、遠隔本番DB適用、実S3復元の未検証をローカル成功で代替しない。Phase 2全体とGoalは継続する。
 
@@ -135,7 +137,7 @@ ROADMAPの順序を維持する。各機能をDBだけ・画面だけで公開�
 - SQLite競合、Outbox滞留、Worker停止、Discord側成功後のDB失敗を重点監視する。特にRetryは「最大回数」だけでなく冪等性と補償を検証する。
 - 本番DB InventoryとStage検証には、運用環境・テストGuild・OAuth/Provider設定へのアクセスが必要。アクセスがない期間も、コードInventory、Fixture、コンテナ、Contract testの整備は進められる。
 
-直近の着手はP2-5。P0-1〜P2-4のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
+直近の着手はP2-6。P0-1〜P2-5のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
 
 ## 8. 再調査に基づく具体的な実行単位（2026-09-12）
 

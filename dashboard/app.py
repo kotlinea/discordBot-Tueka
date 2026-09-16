@@ -25,6 +25,7 @@ from social import SocialRepository
 from social.crypto import SocialTokenCipher
 from social.webhooks import verify_twitch_signature, verify_youtube_signature
 from dashboard.api_v1 import create_api_router
+from dashboard.api.dependencies import ApiDependencies
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -39,6 +40,7 @@ if not all((client_id, client_secret, redirect_uri, session_secret)):
 social_repository = SocialRepository(settings.database_path)
 dashboard_repository = DashboardRepository(settings.database_path)
 api = DiscordAPI(settings.discord_token, client_id, client_secret, redirect_uri)
+access_dependencies = ApiDependencies(dashboard_repository, api)
 social_cipher = SocialTokenCipher(settings.social_token_encryption_key)
 
 
@@ -155,18 +157,18 @@ def render_page(request: Request, name: str, context: dict, status_code: int = 2
 
 
 def session_token(request: Request) -> str:
-    session_id = request.session.get("session_id")
-    token = dashboard_repository.dashboard_session_token(session_id) if session_id else None
-    if not token:
-        raise HTTPException(status_code=401, detail="ログインが必要です")
-    return token
+    try:
+        return access_dependencies.token(request)
+    except HTTPException as exc:
+        raise HTTPException(status_code=401, detail="ログインが必要です") from exc
 
 
 async def authorized(request: Request, guild_id: int, *, live: bool = False) -> str:
-    token = session_token(request)
-    if not await api.can_manage(token, guild_id, use_cache=not live):
-        raise HTTPException(status_code=403, detail="このサーバーを管理する権限がありません")
-    return token
+    try:
+        return await access_dependencies.manage(request, guild_id, live=live)
+    except HTTPException as exc:
+        message = "ログインが必要です" if exc.status_code == 401 else "このサーバーを管理する権限がありません"
+        raise HTTPException(status_code=exc.status_code, detail=message) from exc
 
 
 def avatar_url(user: dict) -> str:
@@ -195,8 +197,7 @@ async def home(request: Request):
 
 
 def session_token_or_none(request: Request) -> str | None:
-    session_id = request.session.get("session_id")
-    return dashboard_repository.dashboard_session_token(session_id) if session_id else None
+    return access_dependencies.token_or_none(request)
 
 
 @app.get("/login")
@@ -247,7 +248,7 @@ async def not_found(request: Request, exc):
 async def begin_social_connection(request: Request, guild_id: int, provider: str):
     form = await request.form()
     target = f"/servers/{guild_id}/social/{provider}" if provider in {"tiktok", "instagram"} else f"/servers/{guild_id}"
-    if not form.get("csrf_token") or not request.session.get("csrf_token") or not secrets.compare_digest(str(form["csrf_token"]), request.session["csrf_token"]):
+    if not access_dependencies.valid_csrf(request, form.get("csrf_token")):
         return RedirectResponse(f"{target}?error=csrf", status_code=303)
     await authorized(request, guild_id, live=True)
     if not social_cipher.available:

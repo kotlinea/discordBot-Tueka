@@ -42,6 +42,7 @@ class DomainBoundaryTests(unittest.TestCase):
     def test_entrypoints_services_and_adapters_do_not_execute_sql(self):
         root = Path(__file__).resolve().parents[1]
         files = list(root.glob('*.py'))
+        files.extend((root / 'dashboard' / 'api').glob('*.py'))
         for folder in ('cogs', 'dashboard', 'community', 'engagement', 'social',
                        'jobs', 'moderation', 'ticketing', 'suggestions', 'reaction_roles', 'guild_settings'):
             files.extend((root / folder).glob('*.py'))

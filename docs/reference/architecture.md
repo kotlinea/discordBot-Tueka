@@ -16,7 +16,8 @@ Guild Moduleの汎用CRUD・有効Guild一覧は `guild_settings/repository.py`�
 
 | ディレクトリ | 責務 |
 | --- | --- |
-| `dashboard/` | Session、Discord OAuth state、個人設定、HTTP/APIの入口 |
+| `dashboard/` | Session、Discord OAuth state、個人設定、公開HTTPの入口 |
+| `dashboard/api/` | Domain別Router、共通Dependency、Resource検証、API応答 |
 | `guild_settings/` | Moduleの有効化、設定の正規化、保存・revision |
 | `community/` | 一時VC、テキストXP・音声XP、ランキングの保存 |
 | `engagement/` | Pollと投票、期限切れの保存処理 |
@@ -28,7 +29,7 @@ Guild Moduleの汎用CRUD・有効Guild一覧は `guild_settings/repository.py`�
 
 Moderationのルール更新と設定のrules_revision更新、CaseとTrustイベントの記録は同じTransactionを維持するため `moderation/repository.py` がまとめて扱います。一般的な設定保存をこの経路へ集約しません。TicketのBlacklist・当番・Tag・Panel移動・自動Close除外・削除記録もRepositoryが扱い、ServiceやCogから直接SQLを実行しません。
 
-`social_worker.py` は従来の起動コマンドを保つ薄い入口で、処理本体は `social/worker.py` です。APIの内部生成関数はDBパスを受け取り、DomainごとのRepositoryを生成します。HTTP URLと認可の契約は維持します。共通Outbox/Runnerは `jobs/` にあります。Discord操作のAdapterへの分離はP2-4で進めており、API Routerの分割は後続の実行単位です。
+`social_worker.py` は従来の起動コマンドを保つ薄い入口で、処理本体は `social/worker.py` です。APIの内部生成関数はDBパスを受け取り、DomainごとのRepositoryを生成します。HTTP URLと認可の契約は維持します。共通Outbox/Runnerは `jobs/` にあります。Discord操作はDomainのAdapterへ分離済みです。API Routerは `dashboard/api/` に配置し、`dashboard/api_v1.py` はContextの生成とRouterの合成だけを担当します。
 
 SQLite接続・Transaction・WAL・busy timeout・Backup・Schema適用済み検査は `database.py` に集約しています。全DomainのRepositoryはこの接続を使います。書込み待ちは共通で10秒です。更新処理の必要に応じてRepositoryが `BEGIN IMMEDIATE` を選択します。
 
@@ -55,9 +56,9 @@ Schemaは番号付きMigration CLIだけが作成・変更します。Repository
 Actionの部分失敗は成功扱いに丸めず、各結果と復旧可能性を保存します。Discord Resource作成後にDB更新が失敗した場合は孤立Resourceとして記録します。
 
 
-## Discord操作の分離（P2-4実装中）
+## Discord操作の分離
 
-`discord_io/` は再試行可否・部分失敗・Resource不在を表す共通例外を定義します。Domainごとの `discord_adapter.py` がSDK操作を実装し、ServiceはID・値・Portを使って状態遷移を決めます。CogにはInteractionの応答と、まだ移設していない操作が残っています。
+`discord_io/` は再試行可否・部分失敗・Resource不在を表す共通例外を定義します。Domainごとの `discord_adapter.py` がSDK操作を実装し、ServiceはID・値・Portを使って状態遷移を決めます。CogはInteraction応答とEventの受付を担当し、対象Domainの外部Resource操作はServiceとAdapterへ委譲します。
 
 - `moderation/contracts.py` は処置の値とPort、`moderation/discord_adapter.py` はDiscord型からの変換と実操作です。既存 `moderation/adapter.py` は将来のDiscord AutoMod同期向け契約で、イベント入力変換ではありません。
 - `ticketing/panel_delivery.py` はPanelの公開・投稿ID保存・旧投稿削除・完了の順序を担当します。Lease所有者は取得ごとに一意で、完了時に期限とrevisionも照合します。投稿結果が不明な場合はAdapterがBot自身の識別印を履歴から探し、照合できなければ重複投稿せず `publishing` を保持します。履歴照合は直近200件です。投稿IDが未確定のまま削除要求を受けた場合は `delete_uncertain` を保持し、投稿IDを照合・保存してから削除します。
@@ -99,3 +100,25 @@ Reaction Rolesは変更前後のRole一覧を保存してから操作し、Assig
 Lockdownは全対象の復元情報を保存してから権限を変更します。復元時は現在値が変更前なら復元済み、適用値なら復元可能、それ以外は競合です。すべての復元が確定した時だけLockdown完了と対応するRaid状態解除を同じTransactionに保存します。失敗・競合ではactiveとlast_errorを維持します。
 
 復旧が保留された場合は、機能別の監査記録、対象Resource、Botの権限、投稿の識別印を照合してください。直近200件の投稿に証拠がない場合や権限不足の場合、結果不明の投稿を自動的に作り直すことはありません。現在の復旧機能と実Discordでの運用検証は区別し、Stageの未検証をローカルの契約テスト成功で代替しません。
+
+
+## Domain API Router
+
+`dashboard/api/context.py` はアプリごとのRepository・Service・Discord API参照を生成します。RouterはContextを引数で受け取り、`dashboard/app.py` のGlobalや環境変数を参照しません。ModuleのImport時にはDB接続やTranscriptディレクトリを作りません。
+
+| ファイル（`dashboard/api/`） | 責務 |
+| --- | --- |
+| `session.py` / `guilds.py` | Session・個人設定・利用可能Guild、Guild概要・機能・Resource一覧 |
+| `modules.py` / `suggestions.py` | 汎用ModuleとSuggestions専用API |
+| `social.py` / `moderation.py` / `reaction_roles.py` | 各DomainのHTTP入力・応答・Repository/Service呼出し |
+| `ticket_configuration.py` | Ticket設定・Form・Team・Panel・Tag・統計 |
+| `tickets.py` | Ticket Inbox・操作・返信・Transcript・添付・Feedback |
+| `dependencies.py` | サーバー側Session、Guild管理権限、CSRF。公開OAuth開始も同じ検証を利用 |
+| `ticket_dependencies.py` | Ticket Staff、担当Team、Guild所属の認可 |
+| `resources.py` / `ticket_resources.py` | Guild Resourceの共通Indexと所属・権限検査、Ticket固有制約 |
+| `errors.py` | HTTPエラー・revision競合・If-Matchの検査 |
+| `serialization.py` / `ticket_presentation.py` / `features.py` | 公開ID・Ticket・Featureの表示用変換 |
+
+FastAPI `Depends` はSession、管理権限、Ticket Staff、CSRFの入口を表します。既存のエラー優先順が必要なRouteは同じDependencyのメソッドを明示呼出しします。更新時のGuild管理権限とResourceはキャッシュを使わず取得します。Ticket操作では担当Teamの所属も再確認します。明示的なTeam user IDが残っていても、Guild所属を取得できないユーザーにはStaff権限を与えません。Transcript/添付の申請者本人の閲覧権限は別経路として維持します。
+
+分割前に固定したOpenAPI（59パス）と認証・認可・CSRF応答（199ケース）を `tests/fixtures/api_v1_contract.json` で比較します。Schemaの一般的な辞書応答やDomainごとに異なるID/エラー形式は現行契約のままです。P2-6で呼出し側と同時に型・入力制約を整理します。

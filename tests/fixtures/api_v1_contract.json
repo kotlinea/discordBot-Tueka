@@ -1,0 +1,6038 @@
+{
+  "boundaries": [
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/features",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/moderation/actions",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/moderation/events",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/moderation/infractions/{user_id}",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/preview",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/order",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}/duplicate",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/modules/{module_id}",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/modules/{module_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/overview",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/events",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/link-groups",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/link-groups",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/link-groups/{group_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}/fix",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}/move",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/preview",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/recoveries/{deleted_message_id}/restore",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/settings",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/resources",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/social",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/preview",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}/retry",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/suggestions/items",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/suggestions/settings",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/suggestions/settings",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/forms",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/forms",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/forms/{form_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/items",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/items/{ticket_id}",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/items/{ticket_id}/action",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/items/{ticket_id}/reply",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panel-messages",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panel-messages",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/bundles",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/import",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/preview",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/bundle",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/detach",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/duplicate",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/editor",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/export",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/settings",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/settings",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/stats",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/tags",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/tags",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/tags/{tag_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/teams",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/teams",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "anonymous",
+      "path": "/api/v1/guilds/{guild_id}/tickets/teams/{team_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "anonymous",
+      "path": "/api/v1/preferences",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "authentication_required",
+          "message": "ログインが必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/session",
+      "status": 401
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "attachment_not_found",
+          "message": "添付ファイルが見つかりません。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/tickets/attachments/{attachment_id}",
+      "status": 404
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "transcript_not_found",
+          "message": "Transcriptが見つかりません。"
+        }
+      },
+      "method": "GET",
+      "mode": "anonymous",
+      "path": "/api/v1/tickets/transcripts/{transcript_id}",
+      "status": 404
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "anonymous",
+      "path": "/api/v1/tickets/{ticket_id}/feedback",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/moderation/actions",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/preview",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/order",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}/duplicate",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/modules/{module_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/link-groups",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/link-groups/{group_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}/fix",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}/move",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/preview",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/recoveries/{deleted_message_id}/restore",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/settings",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/preview",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}/retry",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/suggestions/settings",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/forms",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/forms/{form_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/items/{ticket_id}/action",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/items/{ticket_id}/reply",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panel-messages",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/bundles",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/import",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "ticket_panel_preview_invalid",
+          "message": "team_id"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/preview",
+      "status": 422
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/bundle",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/detach",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/duplicate",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/settings",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/tags",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/tags/{tag_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/teams",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "csrf",
+      "path": "/api/v1/guilds/{guild_id}/tickets/teams/{team_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "PUT",
+      "mode": "csrf",
+      "path": "/api/v1/preferences",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "csrf_invalid",
+          "message": "画面を再読み込みして、もう一度保存してください。"
+        }
+      },
+      "method": "POST",
+      "mode": "csrf",
+      "path": "/api/v1/tickets/{ticket_id}/feedback",
+      "status": 403
+    },
+    {
+      "body": {
+        "items": [
+          {
+            "access": "admin",
+            "icon": null,
+            "id": "1",
+            "name": "Guild"
+          }
+        ]
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds",
+      "status": 200
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/features",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/moderation/actions",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/moderation/events",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/moderation/infractions/{user_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/preview",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "PUT",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/order",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "PUT",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}/duplicate",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/modules/{module_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "PUT",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/modules/{module_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/overview",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/events",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/link-groups",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/link-groups",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/link-groups/{group_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "PUT",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}/fix",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}/move",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/preview",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/recoveries/{deleted_message_id}/restore",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "PUT",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/reaction-roles/settings",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/resources",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/social",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/preview",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "PUT",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}/retry",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/suggestions/items",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/suggestions/settings",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "このサーバーを管理する権限がありません。"
+        }
+      },
+      "method": "PUT",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/suggestions/settings",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "ticket_staff_forbidden",
+          "message": "Ticket Staff権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/forms",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/forms",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "PUT",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/forms/{form_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "ticket_staff_forbidden",
+          "message": "Ticket Staff権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/items",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "ticket_staff_forbidden",
+          "message": "Ticket Staff権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/items/{ticket_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "ticket_staff_forbidden",
+          "message": "Ticket Staff権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/items/{ticket_id}/action",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "ticket_staff_forbidden",
+          "message": "Ticket Staff権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/items/{ticket_id}/reply",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panel-messages",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panel-messages",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/bundles",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/import",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/preview",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "PUT",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "PUT",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/bundle",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/detach",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/duplicate",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/editor",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/export",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/settings",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "PUT",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/settings",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/stats",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "ticket_staff_forbidden",
+          "message": "Ticket Staff権限がありません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/tags",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "ticket_staff_forbidden",
+          "message": "Ticket Staff権限がありません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/tags",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "DELETE",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/tags/{tag_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/teams",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/teams",
+      "status": 403
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "guild_forbidden",
+          "message": "管理者権限が必要です。"
+        }
+      },
+      "method": "PUT",
+      "mode": "forbidden",
+      "path": "/api/v1/guilds/{guild_id}/tickets/teams/{team_id}",
+      "status": 403
+    },
+    {
+      "body": {
+        "appearance": "precision",
+        "color_scheme": "system",
+        "locale": "ja",
+        "navigation_collapsed": false,
+        "revision": 1
+      },
+      "method": "PUT",
+      "mode": "forbidden",
+      "path": "/api/v1/preferences",
+      "status": 200
+    },
+    {
+      "body": {
+        "csrf_token": "csrf",
+        "preferences": {
+          "appearance": "precision",
+          "color_scheme": "system",
+          "locale": "ja",
+          "navigation_collapsed": false,
+          "revision": 0
+        },
+        "user": {
+          "avatar_url": "https://cdn.discordapp.com/embed/avatars/0.png",
+          "id": "20",
+          "name": "Member"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/session",
+      "status": 200
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "attachment_not_found",
+          "message": "添付ファイルが見つかりません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/tickets/attachments/{attachment_id}",
+      "status": 404
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "transcript_not_found",
+          "message": "Transcriptが見つかりません。"
+        }
+      },
+      "method": "GET",
+      "mode": "forbidden",
+      "path": "/api/v1/tickets/transcripts/{transcript_id}",
+      "status": 404
+    },
+    {
+      "body": {
+        "detail": {
+          "code": "ticket_not_found",
+          "message": "Ticketが見つかりません。"
+        }
+      },
+      "method": "POST",
+      "mode": "forbidden",
+      "path": "/api/v1/tickets/{ticket_id}/feedback",
+      "status": 404
+    }
+  ],
+  "openapi": {
+    "components": {
+      "schemas": {
+        "HTTPValidationError": {
+          "properties": {
+            "detail": {
+              "items": {
+                "$ref": "#/components/schemas/ValidationError"
+              },
+              "title": "Detail",
+              "type": "array"
+            }
+          },
+          "title": "HTTPValidationError",
+          "type": "object"
+        },
+        "ValidationError": {
+          "properties": {
+            "ctx": {
+              "title": "Context",
+              "type": "object"
+            },
+            "input": {
+              "title": "Input"
+            },
+            "loc": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "title": "Location",
+              "type": "array"
+            },
+            "msg": {
+              "title": "Message",
+              "type": "string"
+            },
+            "type": {
+              "title": "Error Type",
+              "type": "string"
+            }
+          },
+          "required": [
+            "loc",
+            "msg",
+            "type"
+          ],
+          "title": "ValidationError",
+          "type": "object"
+        }
+      }
+    },
+    "info": {
+      "title": "FastAPI",
+      "version": "0.1.0"
+    },
+    "openapi": "3.1.0",
+    "paths": {
+      "/api/v1/guilds": {
+        "get": {
+          "operationId": "guilds_api_v1_guilds_get",
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Guilds Api V1 Guilds Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            }
+          },
+          "summary": "Guilds"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/features": {
+        "get": {
+          "operationId": "features_api_v1_guilds__guild_id__features_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Features Api V1 Guilds  Guild Id  Features Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Features"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/moderation/actions": {
+        "post": {
+          "operationId": "action_api_v1_guilds__guild_id__moderation_actions_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "202": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Action Api V1 Guilds  Guild Id  Moderation Actions Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Action"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/moderation/events": {
+        "get": {
+          "operationId": "events_api_v1_guilds__guild_id__moderation_events_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "query",
+              "name": "family",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Family"
+              }
+            },
+            {
+              "in": "query",
+              "name": "user_id",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "User Id"
+              }
+            },
+            {
+              "in": "query",
+              "name": "limit",
+              "required": false,
+              "schema": {
+                "default": 50,
+                "title": "Limit",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Events Api V1 Guilds  Guild Id  Moderation Events Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Events"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/moderation/infractions/{user_id}": {
+        "get": {
+          "operationId": "infractions_api_v1_guilds__guild_id__moderation_infractions__user_id__get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "user_id",
+              "required": true,
+              "schema": {
+                "title": "User Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Infractions Api V1 Guilds  Guild Id  Moderation Infractions  User Id  Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Infractions"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/moderation/{family}/preview": {
+        "post": {
+          "operationId": "preview_api_v1_guilds__guild_id__moderation__family__preview_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "family",
+              "required": true,
+              "schema": {
+                "title": "Family",
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Preview Api V1 Guilds  Guild Id  Moderation  Family  Preview Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Preview"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/moderation/{family}/rules": {
+        "get": {
+          "operationId": "rules_api_v1_guilds__guild_id__moderation__family__rules_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "family",
+              "required": true,
+              "schema": {
+                "title": "Family",
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Rules Api V1 Guilds  Guild Id  Moderation  Family  Rules Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Rules"
+        },
+        "post": {
+          "operationId": "create_rule_api_v1_guilds__guild_id__moderation__family__rules_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "family",
+              "required": true,
+              "schema": {
+                "title": "Family",
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Create Rule Api V1 Guilds  Guild Id  Moderation  Family  Rules Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Create Rule"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/moderation/{family}/rules/order": {
+        "put": {
+          "operationId": "reorder_rules_api_v1_guilds__guild_id__moderation__family__rules_order_put",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "family",
+              "required": true,
+              "schema": {
+                "title": "Family",
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Reorder Rules Api V1 Guilds  Guild Id  Moderation  Family  Rules Order Put",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Reorder Rules"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}": {
+        "delete": {
+          "operationId": "delete_rule_api_v1_guilds__guild_id__moderation__family__rules__rule_id__delete",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "family",
+              "required": true,
+              "schema": {
+                "title": "Family",
+                "type": "string"
+              }
+            },
+            {
+              "in": "path",
+              "name": "rule_id",
+              "required": true,
+              "schema": {
+                "title": "Rule Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "header",
+              "name": "if-match",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "If-Match"
+              }
+            }
+          ],
+          "responses": {
+            "204": {
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Delete Rule"
+        },
+        "get": {
+          "operationId": "rule_api_v1_guilds__guild_id__moderation__family__rules__rule_id__get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "family",
+              "required": true,
+              "schema": {
+                "title": "Family",
+                "type": "string"
+              }
+            },
+            {
+              "in": "path",
+              "name": "rule_id",
+              "required": true,
+              "schema": {
+                "title": "Rule Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Rule Api V1 Guilds  Guild Id  Moderation  Family  Rules  Rule Id  Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Rule"
+        },
+        "put": {
+          "operationId": "update_rule_api_v1_guilds__guild_id__moderation__family__rules__rule_id__put",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "family",
+              "required": true,
+              "schema": {
+                "title": "Family",
+                "type": "string"
+              }
+            },
+            {
+              "in": "path",
+              "name": "rule_id",
+              "required": true,
+              "schema": {
+                "title": "Rule Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Update Rule Api V1 Guilds  Guild Id  Moderation  Family  Rules  Rule Id  Put",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Update Rule"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}/duplicate": {
+        "post": {
+          "operationId": "duplicate_rule_api_v1_guilds__guild_id__moderation__family__rules__rule_id__duplicate_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "family",
+              "required": true,
+              "schema": {
+                "title": "Family",
+                "type": "string"
+              }
+            },
+            {
+              "in": "path",
+              "name": "rule_id",
+              "required": true,
+              "schema": {
+                "title": "Rule Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Duplicate Rule Api V1 Guilds  Guild Id  Moderation  Family  Rules  Rule Id  Duplicate Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Duplicate Rule"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/modules/{module_id}": {
+        "get": {
+          "operationId": "module_api_v1_guilds__guild_id__modules__module_id__get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "module_id",
+              "required": true,
+              "schema": {
+                "title": "Module Id",
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Module Api V1 Guilds  Guild Id  Modules  Module Id  Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Module"
+        },
+        "put": {
+          "operationId": "save_module_api_v1_guilds__guild_id__modules__module_id__put",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "module_id",
+              "required": true,
+              "schema": {
+                "title": "Module Id",
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Save Module Api V1 Guilds  Guild Id  Modules  Module Id  Put",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Save Module"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/overview": {
+        "get": {
+          "operationId": "overview_api_v1_guilds__guild_id__overview_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Overview Api V1 Guilds  Guild Id  Overview Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Overview"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/reaction-roles": {
+        "get": {
+          "operationId": "reaction_roles_overview_api_v1_guilds__guild_id__reaction_roles_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Reaction Roles Overview Api V1 Guilds  Guild Id  Reaction Roles Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Reaction Roles Overview"
+        },
+        "post": {
+          "operationId": "create_reaction_role_api_v1_guilds__guild_id__reaction_roles_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Create Reaction Role Api V1 Guilds  Guild Id  Reaction Roles Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Create Reaction Role"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/reaction-roles/events": {
+        "get": {
+          "operationId": "reaction_role_events_api_v1_guilds__guild_id__reaction_roles_events_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "query",
+              "name": "limit",
+              "required": false,
+              "schema": {
+                "default": 100,
+                "title": "Limit",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Reaction Role Events Api V1 Guilds  Guild Id  Reaction Roles Events Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Reaction Role Events"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/reaction-roles/link-groups": {
+        "get": {
+          "operationId": "reaction_role_link_groups_api_v1_guilds__guild_id__reaction_roles_link_groups_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Reaction Role Link Groups Api V1 Guilds  Guild Id  Reaction Roles Link Groups Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Reaction Role Link Groups"
+        },
+        "post": {
+          "operationId": "create_reaction_role_link_group_api_v1_guilds__guild_id__reaction_roles_link_groups_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Create Reaction Role Link Group Api V1 Guilds  Guild Id  Reaction Roles Link Groups Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Create Reaction Role Link Group"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/reaction-roles/link-groups/{group_id}": {
+        "delete": {
+          "operationId": "delete_reaction_role_link_group_api_v1_guilds__guild_id__reaction_roles_link_groups__group_id__delete",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "group_id",
+              "required": true,
+              "schema": {
+                "title": "Group Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "204": {
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Delete Reaction Role Link Group"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}": {
+        "delete": {
+          "operationId": "delete_reaction_role_api_v1_guilds__guild_id__reaction_roles_messages__config_id__delete",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "config_id",
+              "required": true,
+              "schema": {
+                "title": "Config Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "header",
+              "name": "if-match",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "If-Match"
+              }
+            }
+          ],
+          "responses": {
+            "204": {
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Delete Reaction Role"
+        },
+        "get": {
+          "operationId": "reaction_role_detail_api_v1_guilds__guild_id__reaction_roles_messages__config_id__get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "config_id",
+              "required": true,
+              "schema": {
+                "title": "Config Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Reaction Role Detail Api V1 Guilds  Guild Id  Reaction Roles Messages  Config Id  Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Reaction Role Detail"
+        },
+        "put": {
+          "operationId": "update_reaction_role_api_v1_guilds__guild_id__reaction_roles_messages__config_id__put",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "config_id",
+              "required": true,
+              "schema": {
+                "title": "Config Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Update Reaction Role Api V1 Guilds  Guild Id  Reaction Roles Messages  Config Id  Put",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Update Reaction Role"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}/fix": {
+        "post": {
+          "operationId": "fix_reaction_role_api_v1_guilds__guild_id__reaction_roles_messages__config_id__fix_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "config_id",
+              "required": true,
+              "schema": {
+                "title": "Config Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "202": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Fix Reaction Role Api V1 Guilds  Guild Id  Reaction Roles Messages  Config Id  Fix Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Fix Reaction Role"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/reaction-roles/messages/{config_id}/move": {
+        "post": {
+          "operationId": "move_reaction_role_api_v1_guilds__guild_id__reaction_roles_messages__config_id__move_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "config_id",
+              "required": true,
+              "schema": {
+                "title": "Config Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "202": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Move Reaction Role Api V1 Guilds  Guild Id  Reaction Roles Messages  Config Id  Move Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Move Reaction Role"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/reaction-roles/preview": {
+        "post": {
+          "operationId": "preview_reaction_role_api_v1_guilds__guild_id__reaction_roles_preview_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Preview Reaction Role Api V1 Guilds  Guild Id  Reaction Roles Preview Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Preview Reaction Role"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/reaction-roles/recoveries/{deleted_message_id}/restore": {
+        "post": {
+          "operationId": "restore_reaction_role_api_v1_guilds__guild_id__reaction_roles_recoveries__deleted_message_id__restore_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "deleted_message_id",
+              "required": true,
+              "schema": {
+                "title": "Deleted Message Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Restore Reaction Role Api V1 Guilds  Guild Id  Reaction Roles Recoveries  Deleted Message Id  Restore Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Restore Reaction Role"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/reaction-roles/settings": {
+        "put": {
+          "operationId": "save_reaction_role_settings_api_v1_guilds__guild_id__reaction_roles_settings_put",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Save Reaction Role Settings Api V1 Guilds  Guild Id  Reaction Roles Settings Put",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Save Reaction Role Settings"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/resources": {
+        "get": {
+          "operationId": "guild_resources_api_v1_guilds__guild_id__resources_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Guild Resources Api V1 Guilds  Guild Id  Resources Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Guild Resources"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/social": {
+        "get": {
+          "operationId": "social_summary_api_v1_guilds__guild_id__social_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Social Summary Api V1 Guilds  Guild Id  Social Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Social Summary"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/social/{provider}/preview": {
+        "post": {
+          "operationId": "preview_social_template_api_v1_guilds__guild_id__social__provider__preview_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "provider",
+              "required": true,
+              "schema": {
+                "title": "Provider",
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Preview Social Template Api V1 Guilds  Guild Id  Social  Provider  Preview Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Preview Social Template"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions": {
+        "get": {
+          "operationId": "social_subscriptions_api_v1_guilds__guild_id__social__provider__subscriptions_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "provider",
+              "required": true,
+              "schema": {
+                "title": "Provider",
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Social Subscriptions Api V1 Guilds  Guild Id  Social  Provider  Subscriptions Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Social Subscriptions"
+        },
+        "post": {
+          "operationId": "create_social_subscription_api_v1_guilds__guild_id__social__provider__subscriptions_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "provider",
+              "required": true,
+              "schema": {
+                "title": "Provider",
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Create Social Subscription Api V1 Guilds  Guild Id  Social  Provider  Subscriptions Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Create Social Subscription"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}": {
+        "delete": {
+          "operationId": "delete_social_subscription_api_v1_guilds__guild_id__social__provider__subscriptions__subscription_id__delete",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "provider",
+              "required": true,
+              "schema": {
+                "title": "Provider",
+                "type": "string"
+              }
+            },
+            {
+              "in": "path",
+              "name": "subscription_id",
+              "required": true,
+              "schema": {
+                "title": "Subscription Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "header",
+              "name": "if-match",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "If-Match"
+              }
+            }
+          ],
+          "responses": {
+            "204": {
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Delete Social Subscription"
+        },
+        "put": {
+          "operationId": "update_social_subscription_api_v1_guilds__guild_id__social__provider__subscriptions__subscription_id__put",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "provider",
+              "required": true,
+              "schema": {
+                "title": "Provider",
+                "type": "string"
+              }
+            },
+            {
+              "in": "path",
+              "name": "subscription_id",
+              "required": true,
+              "schema": {
+                "title": "Subscription Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Update Social Subscription Api V1 Guilds  Guild Id  Social  Provider  Subscriptions  Subscription Id  Put",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Update Social Subscription"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}/retry": {
+        "post": {
+          "operationId": "retry_social_subscription_api_v1_guilds__guild_id__social__provider__subscriptions__subscription_id__retry_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "provider",
+              "required": true,
+              "schema": {
+                "title": "Provider",
+                "type": "string"
+              }
+            },
+            {
+              "in": "path",
+              "name": "subscription_id",
+              "required": true,
+              "schema": {
+                "title": "Subscription Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "title": "Response Retry Social Subscription Api V1 Guilds  Guild Id  Social  Provider  Subscriptions  Subscription Id  Retry Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Retry Social Subscription"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/suggestions/items": {
+        "get": {
+          "operationId": "suggestion_items_api_v1_guilds__guild_id__suggestions_items_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "query",
+              "name": "before",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Before"
+              }
+            },
+            {
+              "in": "query",
+              "name": "limit",
+              "required": false,
+              "schema": {
+                "default": 50,
+                "title": "Limit",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Suggestion Items Api V1 Guilds  Guild Id  Suggestions Items Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Suggestion Items"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/suggestions/settings": {
+        "get": {
+          "operationId": "suggestion_settings_api_v1_guilds__guild_id__suggestions_settings_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Suggestion Settings Api V1 Guilds  Guild Id  Suggestions Settings Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Suggestion Settings"
+        },
+        "put": {
+          "operationId": "save_suggestion_settings_api_v1_guilds__guild_id__suggestions_settings_put",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Save Suggestion Settings Api V1 Guilds  Guild Id  Suggestions Settings Put",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Save Suggestion Settings"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets": {
+        "get": {
+          "operationId": "ticket_overview_api_v1_guilds__guild_id__tickets_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Overview Api V1 Guilds  Guild Id  Tickets Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Overview"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/forms": {
+        "get": {
+          "operationId": "ticket_forms_api_v1_guilds__guild_id__tickets_forms_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Forms Api V1 Guilds  Guild Id  Tickets Forms Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Forms"
+        },
+        "post": {
+          "operationId": "create_ticket_form_api_v1_guilds__guild_id__tickets_forms_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Create Ticket Form Api V1 Guilds  Guild Id  Tickets Forms Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Create Ticket Form"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/forms/{form_id}": {
+        "put": {
+          "operationId": "update_ticket_form_api_v1_guilds__guild_id__tickets_forms__form_id__put",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "form_id",
+              "required": true,
+              "schema": {
+                "title": "Form Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Update Ticket Form Api V1 Guilds  Guild Id  Tickets Forms  Form Id  Put",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Update Ticket Form"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/items": {
+        "get": {
+          "operationId": "ticket_items_api_v1_guilds__guild_id__tickets_items_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "query",
+              "name": "status",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Status"
+              }
+            },
+            {
+              "in": "query",
+              "name": "before",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Before"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Items Api V1 Guilds  Guild Id  Tickets Items Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Items"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/items/{ticket_id}": {
+        "get": {
+          "operationId": "ticket_detail_api_v1_guilds__guild_id__tickets_items__ticket_id__get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "ticket_id",
+              "required": true,
+              "schema": {
+                "title": "Ticket Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "query",
+              "name": "after",
+              "required": false,
+              "schema": {
+                "default": 0,
+                "title": "After",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Detail Api V1 Guilds  Guild Id  Tickets Items  Ticket Id  Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Detail"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/items/{ticket_id}/action": {
+        "post": {
+          "operationId": "ticket_action_api_v1_guilds__guild_id__tickets_items__ticket_id__action_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "ticket_id",
+              "required": true,
+              "schema": {
+                "title": "Ticket Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "202": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Action Api V1 Guilds  Guild Id  Tickets Items  Ticket Id  Action Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Action"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/items/{ticket_id}/reply": {
+        "post": {
+          "operationId": "ticket_reply_api_v1_guilds__guild_id__tickets_items__ticket_id__reply_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "ticket_id",
+              "required": true,
+              "schema": {
+                "title": "Ticket Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "202": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Reply Api V1 Guilds  Guild Id  Tickets Items  Ticket Id  Reply Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Reply"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/panel-messages": {
+        "get": {
+          "operationId": "ticket_panel_messages_api_v1_guilds__guild_id__tickets_panel_messages_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Panel Messages Api V1 Guilds  Guild Id  Tickets Panel Messages Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Panel Messages"
+        },
+        "post": {
+          "operationId": "create_ticket_panel_message_api_v1_guilds__guild_id__tickets_panel_messages_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Create Ticket Panel Message Api V1 Guilds  Guild Id  Tickets Panel Messages Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Create Ticket Panel Message"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/panels": {
+        "get": {
+          "operationId": "ticket_panels_api_v1_guilds__guild_id__tickets_panels_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Panels Api V1 Guilds  Guild Id  Tickets Panels Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Panels"
+        },
+        "post": {
+          "operationId": "create_ticket_panel_api_v1_guilds__guild_id__tickets_panels_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Create Ticket Panel Api V1 Guilds  Guild Id  Tickets Panels Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Create Ticket Panel"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/panels/bundles": {
+        "post": {
+          "operationId": "create_ticket_panel_bundle_api_v1_guilds__guild_id__tickets_panels_bundles_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Create Ticket Panel Bundle Api V1 Guilds  Guild Id  Tickets Panels Bundles Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Create Ticket Panel Bundle"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/panels/import": {
+        "post": {
+          "operationId": "import_ticket_panel_api_v1_guilds__guild_id__tickets_panels_import_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Import Ticket Panel Api V1 Guilds  Guild Id  Tickets Panels Import Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Import Ticket Panel"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/panels/preview": {
+        "post": {
+          "operationId": "preview_ticket_panel_api_v1_guilds__guild_id__tickets_panels_preview_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Preview Ticket Panel Api V1 Guilds  Guild Id  Tickets Panels Preview Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Preview Ticket Panel"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}": {
+        "delete": {
+          "operationId": "archive_ticket_panel_api_v1_guilds__guild_id__tickets_panels__panel_id__delete",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "panel_id",
+              "required": true,
+              "schema": {
+                "title": "Panel Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "204": {
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Archive Ticket Panel"
+        },
+        "put": {
+          "operationId": "update_ticket_panel_api_v1_guilds__guild_id__tickets_panels__panel_id__put",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "panel_id",
+              "required": true,
+              "schema": {
+                "title": "Panel Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Update Ticket Panel Api V1 Guilds  Guild Id  Tickets Panels  Panel Id  Put",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Update Ticket Panel"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/bundle": {
+        "put": {
+          "operationId": "update_ticket_panel_bundle_api_v1_guilds__guild_id__tickets_panels__panel_id__bundle_put",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "panel_id",
+              "required": true,
+              "schema": {
+                "title": "Panel Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Update Ticket Panel Bundle Api V1 Guilds  Guild Id  Tickets Panels  Panel Id  Bundle Put",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Update Ticket Panel Bundle"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/detach": {
+        "post": {
+          "operationId": "detach_ticket_panel_api_v1_guilds__guild_id__tickets_panels__panel_id__detach_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "panel_id",
+              "required": true,
+              "schema": {
+                "title": "Panel Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "202": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Detach Ticket Panel Api V1 Guilds  Guild Id  Tickets Panels  Panel Id  Detach Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Detach Ticket Panel"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/duplicate": {
+        "post": {
+          "operationId": "duplicate_ticket_panel_api_v1_guilds__guild_id__tickets_panels__panel_id__duplicate_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "panel_id",
+              "required": true,
+              "schema": {
+                "title": "Panel Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Duplicate Ticket Panel Api V1 Guilds  Guild Id  Tickets Panels  Panel Id  Duplicate Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Duplicate Ticket Panel"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/editor": {
+        "get": {
+          "operationId": "ticket_panel_editor_api_v1_guilds__guild_id__tickets_panels__panel_id__editor_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "panel_id",
+              "required": true,
+              "schema": {
+                "title": "Panel Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Panel Editor Api V1 Guilds  Guild Id  Tickets Panels  Panel Id  Editor Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Panel Editor"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/panels/{panel_id}/export": {
+        "get": {
+          "operationId": "export_ticket_panel_api_v1_guilds__guild_id__tickets_panels__panel_id__export_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "panel_id",
+              "required": true,
+              "schema": {
+                "title": "Panel Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Export Ticket Panel Api V1 Guilds  Guild Id  Tickets Panels  Panel Id  Export Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Export Ticket Panel"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/settings": {
+        "get": {
+          "operationId": "ticket_settings_api_v1_guilds__guild_id__tickets_settings_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Settings Api V1 Guilds  Guild Id  Tickets Settings Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Settings"
+        },
+        "put": {
+          "operationId": "save_ticket_settings_api_v1_guilds__guild_id__tickets_settings_put",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Save Ticket Settings Api V1 Guilds  Guild Id  Tickets Settings Put",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Save Ticket Settings"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/stats": {
+        "get": {
+          "operationId": "ticket_stats_api_v1_guilds__guild_id__tickets_stats_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Stats Api V1 Guilds  Guild Id  Tickets Stats Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Stats"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/tags": {
+        "get": {
+          "operationId": "ticket_tags_api_v1_guilds__guild_id__tickets_tags_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Tags Api V1 Guilds  Guild Id  Tickets Tags Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Tags"
+        },
+        "post": {
+          "operationId": "save_ticket_tag_api_v1_guilds__guild_id__tickets_tags_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Save Ticket Tag Api V1 Guilds  Guild Id  Tickets Tags Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Save Ticket Tag"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/tags/{tag_id}": {
+        "delete": {
+          "operationId": "delete_ticket_tag_api_v1_guilds__guild_id__tickets_tags__tag_id__delete",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "tag_id",
+              "required": true,
+              "schema": {
+                "title": "Tag Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "204": {
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Delete Ticket Tag"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/teams": {
+        "get": {
+          "operationId": "ticket_teams_api_v1_guilds__guild_id__tickets_teams_get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Teams Api V1 Guilds  Guild Id  Tickets Teams Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Teams"
+        },
+        "post": {
+          "operationId": "create_ticket_team_api_v1_guilds__guild_id__tickets_teams_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Create Ticket Team Api V1 Guilds  Guild Id  Tickets Teams Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Create Ticket Team"
+        }
+      },
+      "/api/v1/guilds/{guild_id}/tickets/teams/{team_id}": {
+        "put": {
+          "operationId": "update_ticket_team_api_v1_guilds__guild_id__tickets_teams__team_id__put",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "guild_id",
+              "required": true,
+              "schema": {
+                "title": "Guild Id",
+                "type": "integer"
+              }
+            },
+            {
+              "in": "path",
+              "name": "team_id",
+              "required": true,
+              "schema": {
+                "title": "Team Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Update Ticket Team Api V1 Guilds  Guild Id  Tickets Teams  Team Id  Put",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Update Ticket Team"
+        }
+      },
+      "/api/v1/preferences": {
+        "put": {
+          "operationId": "save_preferences_api_v1_preferences_put",
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Save Preferences Api V1 Preferences Put",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            }
+          },
+          "summary": "Save Preferences"
+        }
+      },
+      "/api/v1/session": {
+        "get": {
+          "operationId": "session_api_v1_session_get",
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Session Api V1 Session Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            }
+          },
+          "summary": "Session"
+        }
+      },
+      "/api/v1/tickets/attachments/{attachment_id}": {
+        "get": {
+          "operationId": "ticket_attachment_api_v1_tickets_attachments__attachment_id__get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "attachment_id",
+              "required": true,
+              "schema": {
+                "title": "Attachment Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {}
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Attachment"
+        }
+      },
+      "/api/v1/tickets/transcripts/{transcript_id}": {
+        "get": {
+          "operationId": "ticket_transcript_api_v1_tickets_transcripts__transcript_id__get",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "transcript_id",
+              "required": true,
+              "schema": {
+                "title": "Transcript Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Transcript Api V1 Tickets Transcripts  Transcript Id  Get",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Transcript"
+        }
+      },
+      "/api/v1/tickets/{ticket_id}/feedback": {
+        "post": {
+          "operationId": "ticket_feedback_api_v1_tickets__ticket_id__feedback_post",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "ticket_id",
+              "required": true,
+              "schema": {
+                "title": "Ticket Id",
+                "type": "integer"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": true,
+                    "title": "Response Ticket Feedback Api V1 Tickets  Ticket Id  Feedback Post",
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Successful Response"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              },
+              "description": "Validation Error"
+            }
+          },
+          "summary": "Ticket Feedback"
+        }
+      }
+    }
+  }
+}

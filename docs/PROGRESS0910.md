@@ -380,3 +380,28 @@
 - 保全検証: 0009適用済み `data/backups/p2-adapters-0915/verified.sqlite3` を新規複製し、`data/backups/p2-adapters-0916/verified.sqlite3` に0010を適用した。既存66表98行の全値保持、原複製不変、integrity_check=ok、FK違反0、再適用差分なしを確認。原運用DBを変更していない。0001〜0008の差分なし。0009/0010も以後改変せず、次のSchema番号は0011。
 - 次はP2-5。`dashboard/api_v1.py` の公開Contract/認可境界を固定してDomain Routerへ分割する。P2-6、Phase 3〜5は未着手。Phase 2全体・Goal全体・Stageリリースは未完了。
 - 実Discord/OAuth/Webhook、遠隔本番DB適用、実Transcript/S3復元は未実施ゲートとして維持する。不明な投稿や補償の証拠不足は監査記録とResourceの人手照合が必要であり、ローカルテスト成功を実機運用の完了とは扱わない。
+
+### 2026-09-16 承認済みLinuxテスト・Docs build再実行
+
+- 使用量上限解消後の再実行承認に基づき、P2-5作業中の現在の作業ツリーを検証した。検証中のソース変更は行っていない。
+- LinuxコンテナのPython全277件成功（100.666秒）。ネットワーク無効・作業ツリーの読み取り専用Mountで実行。ログ: `.venv-p0/approved-recheck-0916-linux.log`。
+- Docs build成功（9.29秒）。ログ: `.venv-p0/approved-recheck-0916-docs.log`。本節の結果追記前の文書を検証した。
+- この再実行ではソース・Migrationを変更していない。P2-5の途中検証であり、P2-5・Phase 2・全体・Stageの完了とは判定しない。
+
+
+### 2026-09-16 P2-5 Domain API Router・共通Dependency
+
+- 分割前のOpenAPI 59パス、認証・認可・CSRF応答199ケースを `tests/fixtures/api_v1_contract.json` へ固定した。分割前5件成功を確認し、分割後も同一Fixtureで公開URL・パラメータ・HTTP応答を比較した。Fixtureを分割後実装に合わせて更新していない。
+- `dashboard/api_v1.py` をContext生成と9 Routerの合成へ縮小。`dashboard/api/` にSession、Guild、Modules、Suggestions、Social、Moderation、Reaction Roles、Ticket設定、Ticket操作のHTTP処理を配置した。Ticket設定とInbox/Transcript操作は異なる責務として分離した。
+- `context.py` でRepository・Service・Discord APIをアプリごとに生成し、各Routerへ明示的に渡す。API ModuleのImport時のDB/設定生成や `dashboard.app` への依存を禁止する構造テストを追加。新ディレクトリもRepository外SQL禁止テストの対象に加えた。
+- `dependencies.py` にサーバー側Session、Guild管理権限、CSRFを集約し、FastAPI Dependsへ接続。既存エラー順序が必要な箇所は共通メソッドを明示呼出しする。公開Social OAuth開始・公開画面のSession判定も同じ検証を利用し、HTMLエラー/Redirectは維持した。
+- `resources.py` のGuild Resource IndexをModules/Suggestions/Social/Reaction Roles/Ticketで利用。Ticket固有のChannel種別・Role・Bot権限・Emoji検査は `ticket_resources.py`。表示変換はserialization、Ticket presentation、Feature presentationへ分離した。
+- `ticket_dependencies.py` にStaff/担当Teamの認可を集約。更新時はGuild管理権限とTeam所属をキャッシュなしで再確認する。明示Team user IDが残っていてもGuild所属不在なら拒否し、Guild一覧にも同じ判定を適用。申請者本人のTranscript/添付閲覧権限は維持した。
+- `errors.py` にHTTPエラーとrevision競合検査を集約。不正なIf-Matchは500ではなく422 `revision_invalid`、古いrevisionは409。Reaction Roles削除のHeader必須条件を維持し、引用符付き整数も受理する。失敗時に保存/削除されないことをHTTPで検証した。
+- 追加検証はSocial/Moderation/Reaction Rolesの保存・再読込・競合・別Guild、Domainの異GuildResource/Bot権限不足、Ticket担当Team・所属喪失・操作直前の権限変更、暗号化Transcript/添付の本人/Staff/他ユーザー/未認証/期限切れ、Session失効、複数アプリのDB/Discord依存分離。専用Contract/構造16件成功（8.386秒、`.venv-p0/p2-api-final-focused.log`）。その後のGuild一覧共通化も以下の全回帰に含む。
+- 最終コード固定後のWindows全288件成功（95.262秒、`.venv-p0/p2-api-verified-windows.log`）、Linuxコンテナ全288件成功（140.963秒、`p2-api-verified-linux.log`）。テスト実行中はPythonコードを変更せず、Docsのみ更新した。
+- Frontend型検査成功（`.venv-p0/p2-api-frontend-typecheck-approved.log`）。初回はtsbuildinfo書込みのsandbox制限で停止し、承認された昇格実行で成功した。Frontendソース変更なし。今回はFrontend build/Playwrightの再実行を行っていない。
+- 正式API資料のエラー例を実応答に合わせ、Architectureへファイルと責務の対応表を追加。現行の辞書SchemaやDomain別ID・日時・Pagination・fields/errorsの差は保持し、P2-6でFrontendと同時に型/制約を統一する。
+- Schema/Migration追加・既存0001〜0010の改変・運用DB/保全DBへの書込みなし。最新保全複製は `data/backups/p2-adapters-0916/verified.sqlite3`、次のSchema番号0011を維持する。
+- 次はP2-6。型生成・共通入力制約・共通UI・App Shell/Router・Route遅延読込・翻訳Namespace・保存/権限/競合と視覚/キーボード回帰までを一単位として進める。P2-5のDocs build結果を以下に確定する。Phase 2全体、Phase 3〜5、実Discord/OAuth/Webhook、遠隔本番DB、実Transcript/S3復元とStage判定は未完了。
+- 正式Docs build成功（11.22秒、`.venv-p0/p2-api-docs-final.log`）。実行計画・API資料・Architecture・本節を含めて検証した。build後の変更は成功結果とローカル完了表示の追記のみ。P2-5はローカル完了、全体Goalは継続する。
