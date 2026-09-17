@@ -16,8 +16,12 @@
 2. **削除を分離より先に行う。** V1を残したままV2を整理すると、不要な互換境界まで新構造へ持ち込むため、先にV1を除去する。
 3. **Docker化を二段階で行う。** 最初にテスト用コンテナで環境を固定し、構造整理後にDev、Stage、本番の運用構成を完成させる。
 4. **機能より共通能力を先に作る。** Access Policy、Resource Picker、Embed、Form、Outbox、Schedule、Auditを機能ごとに再実装しない。
-5. **SQLiteの限界を推測で決めない。** 単一Host、単一Replicaを維持し、競合や遅延の実測値が移行条件を超えた場合だけPostgreSQLへ移行する。
+5. **PostgreSQLへ移行してから運用構成を固める。** P2-6の構造整理後、P2-7で保存層をPostgreSQLへ移行する。性能閾値の超過は着手条件にしない。現行の原DBは破棄可能な開発データとして空DBから切り替え、旧データ移送やSQLiteとの二重運用を必須にしない。
 6. **新機能は縦に完成させる。** DBだけ、Botだけ、画面だけの未完成状態を公開しない。
+
+## 開発データの扱い（2026-09-18更新）
+
+現行の原DBは開発段階のデータであり、PostgreSQL移行時に破棄・再作成できる。既存SQLiteのデータ保持・ETL・無停止移行は移行の受入条件に含めない。既に記録したBackup/保持検証は過去の実施記録として残す。今後作成するStage/本番データの保護、PostgreSQLのBackup/Restore、Migration失敗時の復旧と監査は引き続き必要とする。破棄の対象は現行開発DBに限定し、秘密情報・暗号鍵・外部Discord Resourceの削除へ範囲を拡張しない。
 
 ## 実施順序
 
@@ -68,9 +72,17 @@ V1は開発段階で終了しており、本番互換要件として保持しま
 #### 保存とMigration
 
 - `storage.py`からDomain固有SQLをModeration、Social、Community、Engagement、Dashboard用Repositoryへ移す。
-- 共通DB層はConnection、Transaction、WAL、`busy_timeout`、Migration、Backupだけを担当する。
+- 共通DB層はConnection、Transaction、Migration、Backupを担当する。P2-1のSQLite接続集約を足場にし、P2-7でPostgreSQLの接続・Pool・Transaction管理へ置き換える。
 - 各Repositoryのコンストラクタで`CREATE TABLE`や`ALTER TABLE`を実行せず、明示的なMigration CLIへ統一する。
 - Revision、冪等Key、Retention、監査日時の型と命名を統一する。
+
+#### PostgreSQL移行（P2-7）
+
+- P2-6完了後、Phase 3の本番Image/Composeより先に実施する。現在のDomain/Repository分離と公開API契約を維持する。
+- PostgreSQL用の初期Schemaと番号付きMigrationを用意し、空DBから全Domainを初期化する。旧SQLite MigrationをPostgreSQL上で再実行しない。原DBからのデータ移送は実装必須としない。
+- 接続設定、全Repository、Outbox/Schedule/Resource Lease、起動時Schema検査、テストFixture、型生成用一時DBをPostgreSQLへ揃える。SQLiteを本番Fallbackやテストの代替として残さない。
+- SQL方言、ID採番、UPSERT、JSON、日時・真偽値、外部キー、同時更新・ロックを実DBのContract testで検証する。Discord成功後のDB失敗と冪等性・補償の契約を維持する。
+- 開発DBを再作成できる正式コマンドと、PostgreSQLのBackup/Restoreの最小手順を用意する。Phase 3では環境別Volume・秘密情報・運用監視を完成させる。
 
 #### 非同期処理
 
@@ -92,7 +104,7 @@ V1は開発段階で終了しており、本番互換要件として保持しま
 - Route単位のcode splittingを導入し、翻訳辞書をNamespace単位に分割する。
 - UI上の検証とServer検証を同じSchemaから生成し、保存後に「未設定」へ戻る種類の変換差異をなくす。
 
-完了条件：新機能追加時に既存の巨大ファイルへSQL、API、画面を直接追記せず、Domain単位で実装できること。既存機能の公開動作とAPI応答をContract testで維持すること。
+完了条件：新機能追加時に既存の巨大ファイルへSQL、API、画面を直接追記せず、Domain単位で実装できること。既存機能の公開動作とAPI応答をContract testで維持すること。PostgreSQLの空DBから全Domainが起動し、Migration・同時更新・Queue/Lease・APIを実PostgreSQLで検証できること。
 
 ### Phase 3 — Dockerによる環境統一
 
@@ -115,11 +127,11 @@ Phase 0のテスト用コンテナを、本番運用可能な構成へ発展さ�
 
 #### 永続データと起動
 
-- SQLite、WAL／SHM、Ticket Transcriptを`/var/lib/tueka`のnamed volumeへ保存する。
-- Windowsのbind mount、NFS、複数Docker Host間でSQLiteを共有しない。
-- `migrate`が正常完了した後だけ3Serviceを起動する。
+- PostgreSQL専用Serviceと専用named volumeを用意し、Ticket Transcriptのアプリ用volumeと分離する。DBの接続情報は環境別に注入する。
+- PostgreSQLの永続データディレクトリをWindows Source bind mountへ置かない。DBポートは既定で内部Networkだけに公開し、アプリServiceは当初各1 Replicaで運用する。
+- PostgreSQLの準備完了後に`migrate`を実行し、Migrationが正常完了した後だけ3Serviceを起動する。
 - DashboardへLiveness／Readiness、BotとWorkerへHeartbeat検査を追加する。
-- SQLite Backup APIを使用するBackup／Restore用one-shot serviceを用意する。
+- PostgreSQLの論理Backup/RestoreとTranscript・暗号鍵世代の対応を扱うone-shot serviceを用意し、別DB/Volumeへ復元して検証する。
 - 最初の本番移行ではNginxとTLSをHost側に残し、Dashboardだけを`127.0.0.1:8000`へ公開する。
 
 完了条件：同じImage digestがStageと本番で動き、空環境への導入、Upgrade、Backup、Restore、Rollbackを運用手順だけで完遂できること。
@@ -174,15 +186,16 @@ Phase 0のテスト用コンテナを、本番運用可能な構成へ発展さ�
 - Migrationを空DB、直前Version、再適用の3経路で検証している。
 - StageでOAuth、Discord command、Webhook、Outbox、Scheduleを実動確認している。
 - Backupから別VolumeへRestoreできる。
-- Error rate、Outbox滞留、SQLite lock時間、Worker heartbeatを確認できる。
+- Error rate、Outbox滞留、PostgreSQL接続待ち・lock待ち・deadlock、Worker heartbeatを確認できる。
 - README、`.env.example`、公式Docsが実装と一致している。
 - Rollback方法と、Rollbackで失われるデータが明記されている。
 
-## 次に着手する作業
+## 次に着手する作業（2026-09-18更新）
 
-1. 現在のSuggestions差分を完成させてCommit可能な単位へ整理する。
-2. Python 3.13のテスト用Dockerfileと`.dockerignore`を追加する。
-3. コンテナ内で全Test／BuildのBaselineを取得する。
-4. V1削除Inventoryを確定し、Dashboard、Ticket、Reaction Roles、Moderationの順で削除する。
-5. V1削除後の小さくなったコードを基準にMigration基盤とRepository分割を開始する。
+P0-1〜P2-6はローカル実装・検証を完了した。詳細は `docs/EXECUTION_PLAN.md` と `docs/PROGRESS0910.md` を参照する。Stageの実機受入と全体の完了は別に判定する。
 
+1. P2-7として、SQLite依存を棚卸しし、実PostgreSQLの隔離テスト基盤・接続/Pool・初期Migrationを作る。
+2. 全Domain Repository、Queue/Lease、Runtime、テスト/型生成をPostgreSQLへ揃える。開発データは移送せず空DBから切り替える。
+3. PostgreSQLで全回帰・同時更新・Migration・Backup/Restoreを検証し、Phase 2のローカル出口を満たす。
+4. P3-1〜4で同一Image、PostgreSQLを含む環境別Compose、監視、運用Backup/Restoreを完成させる。
+5. Phase 4の既存機能受入を経て、Phase 5の新機能へ記載順に進む。

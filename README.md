@@ -41,6 +41,12 @@ npm run build
 
 導入、必要権限、全機能、運用、障害対応は[公式ドキュメント](docs/index.md)を参照してください。公開環境では`/docs/`、APIのSwagger UIは`/api/docs`です。V2完全移行、リファクタリング、Docker化、機能開発の実施順序は[開発ロードマップ](ROADMAP.md)を正本とします。
 
+## API契約の更新
+
+Python 3.13環境で `python scripts/generate_api.py` を実行すると、実RouterからOpenAPIとFrontendの型・入力制約を生成します。生成物は直接編集せず、変更と一緒に管理します。CIと同じ差分検査は `python scripts/generate_api.py --check` です。Frontendディレクトリの `npm run api:generate` / `npm run api:check` も同じ処理を呼びますが、PATH上のpythonに依存導入済みの3.13を使ってください。
+
+Frontendの `npm run test:a11y` はビルド済みSPAで4画面幅の画面検証を実行します。Docsをbuildした後の `npm run test:docs-a11y` はDocsの表示とAccessibilityを検証します。詳細は[API契約](docs/reference/api.md)と[アーキテクチャ](docs/reference/architecture.md)を参照してください。
+
 ## セキュリティ
 
 `.env`、SQLite DB、Transcript、バックアップを公開ディレクトリへ置かないでください。Discord Token、OAuth Secret、暗号鍵、SNS API Keyは環境変数だけで管理し、漏えい時は直ちに再発行します。

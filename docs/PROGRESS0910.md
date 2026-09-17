@@ -405,3 +405,43 @@
 - Schema/Migration追加・既存0001〜0010の改変・運用DB/保全DBへの書込みなし。最新保全複製は `data/backups/p2-adapters-0916/verified.sqlite3`、次のSchema番号0011を維持する。
 - 次はP2-6。型生成・共通入力制約・共通UI・App Shell/Router・Route遅延読込・翻訳Namespace・保存/権限/競合と視覚/キーボード回帰までを一単位として進める。P2-5のDocs build結果を以下に確定する。Phase 2全体、Phase 3〜5、実Discord/OAuth/Webhook、遠隔本番DB、実Transcript/S3復元とStage判定は未完了。
 - 正式Docs build成功（11.22秒、`.venv-p0/p2-api-docs-final.log`）。実行計画・API資料・Architecture・本節を含めて検証した。build後の変更は成功結果とローカル完了表示の追記のみ。P2-5はローカル完了、全体Goalは継続する。
+
+### 2026-09-17 承認済みLinuxテスト・Docs buildの再実行
+
+- 使用量上限解消後の再実行承認を受け、現在のP2-6作業ツリーを変更せず検証した。
+- Linux固定コンテナの全Pythonテスト294件成功（150.232秒）。`docker run --rm --network none --mount type=bind,source=D:\Desktop\dev\discordBot-Tueka,target=/app,readonly tueka-test:p0 python -m unittest discover -s tests -p 'test_*.py'`。ログ: `.venv-p0/approved-recheck-0917-linux.log`。
+- Docsの `npm run build` 成功（9.96秒）。ログ: `.venv-p0/approved-recheck-0917-docs.log`。最初の試行はログ出力先の相対パス誤りで起動前に失敗し、パス修正後の実行で成功した。本節追記前の文書を検証した。
+- 既存ログも確認：Windows全294件成功（127.441秒、`p2-6-windows-full.log`）。画面検証は47件成功・1件失敗（`p2-ui-expanded-a11y.log`）。mobile-320の概要見出しが5秒以内に表示されなかった失敗は未解決であり、今回再実行していない。
+- 本再実行ではソース・Migration・運用DB・保全DBを変更せず、Gitのステージ操作も行っていない。P2-6、Phase 2、全体、Stageの完了とは判定しない。
+- 次の着手点：画面検証の失敗原因調査と修正、P2-6の残るFrontend検証・正式API/Architecture資料更新・完了条件の照合。実Discord/OAuth/Webhook、遠隔本番DB、実Transcript/S3復元の未検証ゲートは維持する。
+
+### 2026-09-18 P2-6 型生成・共通UI・画面構造の整理
+
+- 公開HTTP Schemaを `dashboard/api/schemas/` のDomain別Modelへ分離。`body.py` で同じ入力ModelからOpenAPIのrequestBodyと実行時検証を構築する。部分入力で省略された項目は省略のままDomainへ渡し、既定値・組合せ・Resource検証を維持した。
+- `scripts/generate_api.py` は一時DBにMigrationを適用して実Routerを構築し、`dashboard/api/openapi.json` と `dashboard/frontend/src/generated/api.ts` を生成する。操作別の入力・応答型、文字数/件数/値の制約を出力。`--check` とWindows/Linux CIで生成差分を検査する。運用DB・外部接続・環境変数を生成に必要としない。
+- Frontendの手書きDTOを生成型へ置換し、`request` / `encodeBody` で操作別の入出力を参照。204、Session/CSRF、項目エラー、409を共通Clientで処理する。添付はOpenAPIでoctet-stream、ClientでBlobとし、取得したバイト内容までテストした。
+- APIの認証・認可・Domain・JSON/パス/Query入力エラーを `detail: {code,message,errors}` へ統一。元の59パス・199ケースのFixtureは保持し、意図した応答変換をContract比較側で明示した。公開HTML/OAuth RedirectはこのJSON契約と区別する。
+- DiscordのSnowflakeは文字列、内部DB ID/revisionは整数へ統一。TicketのForm/Team/Panel/Panel Message参照とReaction RolesのLink Groupを整数にした。Moderation Case/Lockdown/イベントのDiscord IDも明示的に型付けした。日時はUnix秒、週次Scheduleはtimezoneと曜日別HH:mm、Items一覧はnextを常に返し終端/全件はnullとする。
+- 最終監査でCase未作成のModerationイベントのnullがResponseValidationErrorになることをHTTPテストで再現した。case_idとReaction Roles監査の任意対象/Emoji/理由をnullableに修正し、イベント一覧と概要の両経路、19桁IDを検証した。修正前8件中1件失敗（`p2-schema-null-before.log`）、修正後8件成功・9.207秒（`p2-schema-null-after.log`）。
+- `App.tsx` はSessionと最上位Routeへ縮小。appにShell/Navigation/Account/Preferences、featuresにDomain別Router・画面、routing/catalogとDomain catalogにメタデータを配置。Reaction Rolesも一覧・編集・設定・Link Groupへ分離した。RootとDomain画面をlazy/Suspenseで遅延読込みする。
+- SaveBar、ResourcePicker、AccessPolicy、Field/Toggle/FormFieldsEditor、EmbedEditor、WeeklyScheduleEditor、PermissionDiagnostics、状態/項目エラー表示をcomponentsへ抽出。EmbedのTicket変数とSchedule見出しは呼出し側から渡す。保存中の破棄防止とHTML formの必須検証を維持する。
+- 翻訳は日英それぞれcommon/moderation/tickets/reactionRoles/social/suggestionsへ分割。複数Namespaceのfallbackを設定し、抽出後に未翻訳キーが表示される問題を修正した。翻訳ファイルは初期登録、画面モジュールは遅延読込みとして区別する。
+- 初回の画面検証失敗は、開発サーバーの遅延モジュール配信に約3秒を要し、5秒の見出し待ちを超えたTraceを確認。Playwrightを専用一時出力先にbuildしたSPAのpreviewへ変更した。本番/UIのbuild先を上書きしない。変更後48件成功を確認し、共通Embed/週次Scheduleの編集保存と320px長文表示の検証を追加した。
+- Screenshotの目視で長い機能名と状態表示の重なりを確認し、既存Grid内の文字列折返しを修正。design.mdとtokens.cssは変更せず、視覚の再設計はしていない。概要・履歴空状態・Docs案内の固定日本語をcommon Namespaceへ移した。
+- 途中検証のWindows/Linux各295件成功（225.241秒/412.096秒）はnull修正前の結果。最終296件・Frontend/Docsの結果は後続箇条書きで確定し、途中結果で完了判定しない。
+- READMEと正式API/Architecture資料に生成手順、契約変更、ファイルと責務、共通UI・翻訳・遅延読込を反映。Schema/Migration追加・0001〜0010改変・運用DB/保全DBへの書込みなし。保全複製は `data/backups/p2-adapters-0916/verified.sqlite3`、次のMigration番号0011を維持する。
+- 最終固定コードのWindows全296件成功（244.929秒、`.venv-p0/p2-6-complete-windows.log`）、Linux固定コンテナ全296件成功（242.970秒、`p2-6-complete-linux.log`）。nullイベント・実IDの追加回帰を含む。テスト中はPython/Migrationを変更していない。
+- 型生成差分検査成功（`python scripts/generate_api.py --check`）。FrontendのTypeScript型検査を含む本番build成功（10.97秒、`p2-6-complete-frontend-build.log`）、Vitest14件成功（5.16秒、`p2-6-complete-vitest.log`）。Blob.textを持たないjsdomに合わせ、テストはFileReaderで実際の内容を検証した。
+- 画面回帰48件成功（2.1分、`p2-6-complete-ui.log`）。320/375/768/1440px、日英、3外観×light/dark、保存/再読込・409/403時の入力保持・無効化・19桁ID・Keyboard・Axeを検証。TicketのEmbed/週次Schedule編集を保存Payloadまで確認した。途中の追加テストは誤ったwelcome_messageキーを参照して失敗し、実契約のwelcome_embedへ訂正した。
+- 最終Screenshotを目視し、320px英語の長い機能名の折返しと768px日本語の配置を確認。画像8点は `.venv-p0/p2-6-dashboard-screenshots.zip` へ保存。画面回帰後は余分な末尾空白だけを除去し、`git diff HEAD --check` 成功。Gitのステージ/Commit操作は行っていない。
+- 正式Docs build成功（11.78秒、`p2-6-docs-build.log`）、Docsの5画面幅10件成功（22.4秒、`p2-6-docs-a11y.log`）。Docsテストの対象は日本語トップとTicket長文ページ、メニュー/外観/検索入口/Accessibility。Dashboardの日英・全外観の検証と区別する。
+- 判定：P2-6の計画・実装・ローカル回帰・正式資料を完了。次は下記の計画変更で追加したP2-7。Phase 2全体はP2-7が残るため未完了。Phase 3〜5、実Discord/OAuth/Webhook、PostgreSQL運用確認、実Transcript/S3復元とStageリリース判定は未完了のまま保持する。
+
+### 2026-09-18 計画変更：PostgreSQL移行と開発DBの扱い
+
+- ユーザー指示によりPostgreSQL移行を必須のP2-7として追加した。順序はP2-6→P2-7→既存P3-1〜4。PostgreSQL移行をSQLiteの性能閾値超過まで待つ旧方針を撤回し、ROADMAPとEXECUTION_PLANを同時更新した。
+- 原DBは破棄してよい開発段階のデータ。空PostgreSQLへの切替を採用し、SQLiteからのETL・Dual Write・無停止移行・現行開発データ保持を必須条件から外した。過去の保全検証は実施記録として保持する。今回の計画変更ではDB/Backup/Transcript/秘密情報/外部Discord Resourceを削除していない。
+- P2-7の具体的な作業順：SQLite依存棚卸しと実PostgreSQLテスト基盤→接続/Pool/Migration→全Domain Repository→Queue/Lease/同時revision→Runtime/CI/型生成→開発DB切替と別DB Restore→全回帰とDocs。PostgreSQL専用初期MigrationはSQLite 0001〜0010と別履歴にする。
+- Phase 3もPostgreSQL前提へ変更。DB専用Service/Volume、readiness→migrate→3Serviceの起動順、環境別接続秘密、接続待ち/lock/deadlock監視、DB論理BackupとTranscript・鍵世代を組み合わせたRestoreを計画した。当初のアプリService各1 Replicaは維持する。
+- 開発DB破棄の許可は将来のStage/本番データへ拡張しない。PostgreSQLはまだ未実装であり、現Runtimeと今回のP2-6テストはSQLiteである。次の実装担当はEXECUTION_PLAN第9節を起点に、テスト用PostgreSQLと接続/Migration境界から着手する。
+- 計画変更・P2-6完了記録を反映した最終Docs build成功（7.44秒、`.venv-p0/p2-6-plan-final-docs.log`）。初回は公開対象外のEXECUTION_PLANへのリンクで停止し、Repository内パスの説明へ修正して成功した。最終build後の変更はこの結果追記のみ。

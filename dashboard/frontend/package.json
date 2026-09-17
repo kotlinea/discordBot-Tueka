@@ -9,7 +9,9 @@
     "test": "vitest run",
     "test:a11y": "playwright test",
     "test:docs-a11y": "playwright test --config playwright.docs.config.ts",
-    "typecheck": "tsc -b --pretty false"
+    "typecheck": "tsc -b --pretty false",
+    "api:generate": "python ../../scripts/generate_api.py",
+    "api:check": "python ../../scripts/generate_api.py --check"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.2.6",

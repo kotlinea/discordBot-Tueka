@@ -10,12 +10,16 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from ticketing import TicketValidationError
 from .context import ApiContext
+from .route import ApiRoute, ERROR_RESPONSES
+from . import schemas
+from .schemas import inputs
+from .body import read_body, request_schema
 from .dependencies import ApiDependencies
 from .ticket_dependencies import TicketDependencies
 from .ticket_presentation import ticket_ids
 
 def create_router(context: ApiContext) -> APIRouter:
-    router = APIRouter()
+    router = APIRouter(route_class=ApiRoute, responses=ERROR_RESPONSES)
     auth = ApiDependencies(context.dashboard_repository, context.discord)
     discord = context.discord
     settings = context.settings
@@ -27,7 +31,7 @@ def create_router(context: ApiContext) -> APIRouter:
     ticket_actor = ticket_access.ticket_actor
     ticket_subject_access = ticket_access.ticket_subject_access
 
-    @router.get('/guilds/{guild_id}/tickets')
+    @router.get('/guilds/{guild_id}/tickets', response_model=schemas.TicketOverview, response_model_exclude_unset=True)
     async def ticket_overview(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.staff)) -> dict[str, Any]:
         actor, administrator = _ticket_actor
         recent = []
@@ -40,7 +44,7 @@ def create_router(context: ApiContext) -> APIRouter:
                     raise
         return {'settings': ticket_ids(ticket_repository.settings(guild_id)), 'summary': ticket_repository.summary(guild_id), 'recent': recent, 'transcript_storage': {'available': ticket_transcripts.available, 's3_configured': bool(settings.ticket_s3_bucket)}, 'can_manage': administrator}
 
-    @router.get('/guilds/{guild_id}/tickets/items')
+    @router.get('/guilds/{guild_id}/tickets/items', response_model=schemas.Items[schemas.TicketItem], response_model_exclude_unset=True)
     async def ticket_items(request: Request, guild_id: int, status: str | None=None, before: int | None=None, _ticket_actor: tuple[int, bool]=Depends(ticket_access.staff)) -> dict[str, Any]:
         actor, administrator = _ticket_actor
         visible = []
@@ -53,7 +57,7 @@ def create_router(context: ApiContext) -> APIRouter:
                     raise
         return {'items': visible, 'next': int(visible[-1]['id']) if visible else None}
 
-    @router.get('/guilds/{guild_id}/tickets/items/{ticket_id}')
+    @router.get('/guilds/{guild_id}/tickets/items/{ticket_id}', response_model=schemas.TicketDetail, response_model_exclude_unset=True)
     async def ticket_detail(request: Request, guild_id: int, ticket_id: int, after: int=0, _ticket_actor: tuple[int, bool]=Depends(ticket_access.staff)) -> dict[str, Any]:
         actor, administrator = _ticket_actor
         ticket = ticket_repository.ticket(ticket_id)
@@ -65,10 +69,10 @@ def create_router(context: ApiContext) -> APIRouter:
         safe_ticket['form_answers'] = {key: ticket_transcripts.decrypt_text(value) for key, value in dict(ticket.get('form_answers') or {}).items()}
         return {'ticket': safe_ticket, 'panel': ticket_ids(ticket_repository.panel(guild_id, int(ticket['panel_id'])) or {}), 'messages': [{**ticket_ids(item), 'content': ticket_transcripts.decrypt_text(item.get('encrypted_content'))} for item in messages], 'transcript': ticket_ids(ticket_repository.transcript_for_ticket(ticket_id) or {}), 'outbox': ticket_repository.outbox(ticket_id)}
 
-    @router.post('/guilds/{guild_id}/tickets/items/{ticket_id}/reply', status_code=202, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/tickets/items/{ticket_id}/reply', status_code=202, dependencies=[Depends(auth.csrf)], response_model=schemas.QueuedResponse, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketReplyInput))
     async def ticket_reply(request: Request, guild_id: int, ticket_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_staff)) -> dict[str, Any]:
         actor, administrator = _ticket_actor
-        body = await request.json()
+        body = await read_body(request, inputs.TicketReplyInput)
         ticket = ticket_repository.ticket(ticket_id)
         if not ticket or int(ticket['guild_id']) != guild_id:
             raise api_error(404, 'ticket_not_found', 'Ticketが見つかりません。')
@@ -81,10 +85,10 @@ def create_router(context: ApiContext) -> APIRouter:
         except TicketValidationError as exc:
             raise api_error(422, exc.code, str(exc)) from exc
 
-    @router.post('/guilds/{guild_id}/tickets/items/{ticket_id}/action', status_code=202, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/tickets/items/{ticket_id}/action', status_code=202, dependencies=[Depends(auth.csrf)], response_model=schemas.QueuedResponse, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketActionInput))
     async def ticket_action(request: Request, guild_id: int, ticket_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_staff)) -> dict[str, Any]:
         actor, administrator = _ticket_actor
-        body = await request.json()
+        body = await read_body(request, inputs.TicketActionInput)
         ticket = ticket_repository.ticket(ticket_id)
         if not ticket or int(ticket['guild_id']) != guild_id:
             raise api_error(404, 'ticket_not_found', 'Ticketが見つかりません。')
@@ -95,7 +99,7 @@ def create_router(context: ApiContext) -> APIRouter:
         item = ticket_repository.queue_outbox(ticket_id, action, actor, {'reason': str(body.get('reason', ''))[:1000], 'revision': body.get('revision'), 'excluded': body.get('excluded', True)})
         return {'id': item['id'], 'status': item['status']}
 
-    @router.get('/tickets/transcripts/{transcript_id}')
+    @router.get('/tickets/transcripts/{transcript_id}', response_model=schemas.Transcript, response_model_exclude_unset=True)
     async def ticket_transcript(request: Request, transcript_id: int) -> dict[str, Any]:
         if not ticket_repository or not ticket_transcripts:
             raise HTTPException(404)
@@ -117,7 +121,7 @@ def create_router(context: ApiContext) -> APIRouter:
         payload['feedback_form'] = ticket_repository.form(int(transcript['guild_id']), int(panel['exit_form_id'])) if panel and panel.get('exit_form_id') else None
         return payload
 
-    @router.get('/tickets/attachments/{attachment_id}')
+    @router.get('/tickets/attachments/{attachment_id}', response_class=Response, responses={200: {'content': {'application/octet-stream': {'schema': {'type': 'string', 'format': 'binary'}}}}})
     async def ticket_attachment(request: Request, attachment_id: int) -> Response:
         if not ticket_repository or not ticket_transcripts:
             raise HTTPException(404)
@@ -137,7 +141,7 @@ def create_router(context: ApiContext) -> APIRouter:
         filename = quote(str(attachment['filename']), safe='')
         return Response(content, media_type='application/octet-stream', headers={'Content-Disposition': f"attachment; filename*=UTF-8''{filename}", 'X-Content-Type-Options': 'nosniff'})
 
-    @router.post('/tickets/{ticket_id}/feedback', status_code=201, dependencies=[Depends(auth.csrf)])
+    @router.post('/tickets/{ticket_id}/feedback', status_code=201, dependencies=[Depends(auth.csrf)], response_model=schemas.TicketFeedback, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.FeedbackInput))
     async def ticket_feedback(request: Request, ticket_id: int) -> dict[str, Any]:
         if not ticket_repository or not ticket_transcripts:
             raise HTTPException(404)
@@ -149,7 +153,7 @@ def create_router(context: ApiContext) -> APIRouter:
             raise api_error(403, 'feedback_disabled', 'このTicketでは評価を受け付けていません。')
         user = await discord.current_user(token(request))
         user_id = int(user['id'])
-        body = await request.json()
+        body = await read_body(request, inputs.FeedbackInput)
         comment = str(body.get('comment') or '').strip()
         if len(comment) > 1000:
             raise api_error(422, 'feedback_invalid', 'コメントは1000文字以内で入力してください。')

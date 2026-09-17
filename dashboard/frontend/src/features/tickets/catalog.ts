@@ -1,0 +1,1 @@
+export const ticketSections = [['inbox','Inbox'],['panels','Panels'],['panel-messages','Panel Messages'],['forms','Forms'],['teams','Staff Teams'],['transcripts','Transcripts'],['tags','Tags'],['settings','Settings'],['stats','Stats']] as const

@@ -7,6 +7,10 @@ from fastapi import APIRouter, Request
 from dashboard.discord_api import ADMINISTRATOR, PERMISSION_BITS
 from feature_registry import get_feature
 from .context import ApiContext
+from .route import ApiRoute, ERROR_RESPONSES
+from . import schemas
+from .schemas import inputs
+from .body import read_body, request_schema
 from .resources import GuildResources
 from .dependencies import ApiDependencies
 from .features import FeaturePresenter
@@ -15,13 +19,13 @@ from .serialization import _normalize_resource_ids
 from .resources import validate_resource_ids
 
 def create_router(context: ApiContext) -> APIRouter:
-    router = APIRouter()
+    router = APIRouter(route_class=ApiRoute, responses=ERROR_RESPONSES)
     auth = ApiDependencies(context.dashboard_repository, context.discord)
     discord = context.discord
     guild_settings_repository = context.guild_settings_repository
     feature_payload = FeaturePresenter(context).feature_payload
 
-    @router.get('/guilds/{guild_id}/modules/{module_id}')
+    @router.get('/guilds/{guild_id}/modules/{module_id}', response_model=schemas.Feature, response_model_exclude_unset=True)
     async def module(request: Request, guild_id: int, module_id: str, _access: str=Depends(auth.read)) -> dict[str, Any]:
         try:
             feature = get_feature(module_id)
@@ -30,13 +34,13 @@ def create_router(context: ApiContext) -> APIRouter:
         _, _, permissions = await discord.guild_resources(guild_id)
         return feature_payload(guild_id, feature, permissions)
 
-    @router.put('/guilds/{guild_id}/modules/{module_id}', dependencies=[Depends(auth.csrf)])
+    @router.put('/guilds/{guild_id}/modules/{module_id}', dependencies=[Depends(auth.csrf)], response_model=schemas.ModuleValue, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.ModuleInput))
     async def save_module(request: Request, guild_id: int, module_id: str, _access: str=Depends(auth.write)) -> dict[str, Any]:
         if module_id in {'tickets', 'reaction_roles'}:
             raise api_error(404, 'module_not_found', '機能専用の設定APIを使用してください。')
         try:
             feature = get_feature(module_id)
-            body = await request.json()
+            body = await read_body(request, inputs.ModuleInput)
             snapshot = await GuildResources.fetch(discord, guild_id)
             permissions = snapshot.permissions
             values = body.get('settings', {})

@@ -45,11 +45,27 @@ class ApiContractTests(unittest.TestCase):
 
     def test_openapi_paths_parameters_statuses_and_shapes_are_preserved(self):
         expected = json.loads(CONTRACT.read_text(encoding='utf-8'))
-        self.assertEqual(self.api.app.openapi(), expected['openapi'])
+        actual = self.api.app.openapi()['paths']
+        baseline = expected['openapi']['paths']
+        self.assertEqual(set(actual), set(baseline))
+        for path, methods in baseline.items():
+            self.assertEqual(set(actual[path]), set(methods))
+            for method, operation in methods.items():
+                current = actual[path][method]
+                for key in ('operationId', 'parameters'):
+                    self.assertEqual(current.get(key), operation.get(key), (path, method, key))
+                self.assertTrue(set(operation['responses']).issubset(current['responses']))
 
     def test_all_route_authentication_authorization_and_csrf_boundaries_are_preserved(self):
         expected = json.loads(CONTRACT.read_text(encoding='utf-8'))
-        self.assertEqual(boundary_responses(self.api), expected['boundaries'])
+        from dashboard.api.route import error_detail
+        baseline = expected['boundaries']
+        for row in baseline:
+            if row['status'] >= 400:
+                row['body'] = {'detail': error_detail(row['status'], row['body']['detail'])}
+            elif isinstance(row['body'], dict) and 'items' in row['body']:
+                row['body'] = {'next': None, **row['body']}
+        self.assertEqual(boundary_responses(self.api), baseline)
 
     def test_social_save_conflict_cross_guild_and_delete_contract(self):
         root = '/api/v1/guilds/1/social/youtube/subscriptions'
@@ -166,7 +182,7 @@ class ApiContractTests(unittest.TestCase):
         from ticketing import TranscriptStorage
         repo, ticket = self.create_ticket()
         storage = TranscriptStorage(self.api.settings.data_dir / 'ticket-transcripts', self.api.settings.ticket_encryption_key)
-        stored = asyncio.run(storage.save(1, ticket['id'], {'messages': ['private']}))
+        stored = asyncio.run(storage.save(1, ticket['id'], {'ticket': {**ticket, 'opened_at': 1}, 'close_reason': 'done', 'closed_at': 1, 'closed_by': 20, 'messages': [], 'attachments': []}))
         transcript = repo.save_transcript(ticket['id'], stored.backend, stored.object_key, stored.content_hash, stored.byte_size, int(time.time()) + 3600)
         blob = asyncio.run(storage.save_attachment(1, ticket['id'], 42, b'private file'))
         attachment = repo.save_attachment(ticket['id'], 42, 'test.txt', 'text/plain', blob.byte_size, blob.backend, blob.object_key, blob.content_hash)

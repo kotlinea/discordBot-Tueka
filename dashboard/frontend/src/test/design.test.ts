@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import ja from '../locales/ja'
-import en from '../locales/en'
+import ja from "../locales/ja"
+import en from "../locales/en"
 
 const tokens = readFileSync(new URL('../../../../tokens.css', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../styles/App.module.css', import.meta.url), 'utf8')
@@ -34,17 +34,17 @@ describe('dashboard design system', () => {
   it('translates every moderation trigger shown by the API', () => {
     const triggers = ['keyword','regex','safe_browsing','phishing_link','discord_invite','domain','caps','emoji_sticker_rate','media_only','honeypot','message_rate','duplicate','mention_rate','link_rate','attachment_rate','reaction_rate','reaction_burst','join_rate','leave_rate','new_account_ratio','new_member_activity'] as const
     for (const trigger of triggers) {
-      expect(ja.translation.trigger[trigger]).toBeTruthy()
-      expect(ja.translation.trigger[trigger]).not.toBe(trigger)
-      expect(en.translation.trigger[trigger]).toBeTruthy()
+      expect(ja.moderation.trigger[trigger]).toBeTruthy()
+      expect(ja.moderation.trigger[trigger]).not.toBe(trigger)
+      expect(en.moderation.trigger[trigger]).toBeTruthy()
     }
   })
 
   it('explains every template variable in both languages', () => {
     const variables = ['user','username','displayname','server','membercount','members','humans','bots','roles','member'] as const
     for (const variable of variables) {
-      expect(ja.translation.template.variables[variable]).toBeTruthy()
-      expect(en.translation.template.variables[variable]).toBeTruthy()
+      expect(ja.common.template.variables[variable]).toBeTruthy()
+      expect(en.common.template.variables[variable]).toBeTruthy()
     }
   })
 })

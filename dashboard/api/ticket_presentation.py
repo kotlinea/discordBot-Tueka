@@ -7,8 +7,8 @@ def ticket_ids(value: dict[str, Any]) -> dict[str, Any]:
     result.pop('encrypted_content', None)
     result.pop('form_answers_json', None)
     result.pop('payload_json', None)
-    singular = ('guild_id', 'channel_id', 'message_id', 'form_id', 'team_id', 'category_id', 'thread_parent_channel_id', 'staff_notification_channel_id', 'log_channel_id', 'transcript_channel_id', 'discord_container_id', 'parent_channel_id', 'opener_id', 'claimed_by', 'closed_by', 'panel_id', 'notification_channel_id', 'awaiting_category_id', 'exit_form_id', 'panel_message_id', 'previous_channel_id', 'previous_message_id', 'awaiting_return_category_id')
-    plural = ('role_ids', 'user_ids', 'admin_user_ids', 'required_role_ids', 'mention_role_ids', 'mention_user_ids', 'panel_ids')
+    singular = ('guild_id', 'channel_id', 'message_id', 'category_id', 'thread_parent_channel_id', 'staff_notification_channel_id', 'log_channel_id', 'transcript_channel_id', 'discord_container_id', 'parent_channel_id', 'opener_id', 'claimed_by', 'closed_by', 'notification_channel_id', 'awaiting_category_id', 'previous_channel_id', 'previous_message_id', 'awaiting_return_category_id')
+    plural = ('role_ids', 'user_ids', 'admin_user_ids', 'required_role_ids', 'mention_role_ids', 'mention_user_ids')
     for key in singular:
         if key in result:
             result[key] = str(result[key]) if result[key] not in (None, '') else None

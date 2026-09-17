@@ -7,6 +7,10 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from ticketing import default_deployment, validate_form, validate_panel, validate_panel_bundle, validate_settings
 from .context import ApiContext
+from .route import ApiRoute, ERROR_RESPONSES
+from . import schemas
+from .schemas import inputs
+from .body import read_body, request_schema
 from .dependencies import ApiDependencies
 from .ticket_dependencies import TicketDependencies
 from .ticket_resources import TicketResources
@@ -14,7 +18,7 @@ from .ticket_presentation import ticket_ids
 from .ticket_presentation import ticket_bundle_payload
 
 def create_router(context: ApiContext) -> APIRouter:
-    router = APIRouter()
+    router = APIRouter(route_class=ApiRoute, responses=ERROR_RESPONSES)
     auth = ApiDependencies(context.dashboard_repository, context.discord)
     ticket_repository = context.ticket_repository
     ticket_transcripts = context.ticket_transcripts
@@ -24,15 +28,15 @@ def create_router(context: ApiContext) -> APIRouter:
     validate_ticket_resources = ticket_resources.validate_ticket_resources
     validate_ticket_bundle_resources = ticket_resources.validate_ticket_bundle_resources
 
-    @router.get('/guilds/{guild_id}/tickets/settings')
+    @router.get('/guilds/{guild_id}/tickets/settings', response_model=schemas.TicketSettings, response_model_exclude_unset=True)
     async def ticket_settings(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.manager)) -> dict[str, Any]:
         return ticket_ids(ticket_repository.settings(guild_id))
 
-    @router.put('/guilds/{guild_id}/tickets/settings', dependencies=[Depends(auth.csrf)])
+    @router.put('/guilds/{guild_id}/tickets/settings', dependencies=[Depends(auth.csrf)], response_model=schemas.TicketSettings, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketSettingsInput))
     async def save_ticket_settings(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_manager)) -> dict[str, Any]:
         actor, _ = _ticket_actor
         try:
-            body = await request.json()
+            body = await read_body(request, inputs.TicketSettingsInput)
             value = validate_settings(body)
             await validate_ticket_resources(guild_id, value)
             if value['enabled'] and (not ticket_transcripts.available):
@@ -49,20 +53,20 @@ def create_router(context: ApiContext) -> APIRouter:
         except (TypeError, ValueError) as exc:
             raise api_error(422, 'ticket_settings_invalid', str(exc) or 'Ticket設定を確認してください。') from exc
 
-    @router.get('/guilds/{guild_id}/tickets/forms')
+    @router.get('/guilds/{guild_id}/tickets/forms', response_model=schemas.Items[schemas.TicketForm], response_model_exclude_unset=True)
     async def ticket_forms(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.manager)) -> dict[str, Any]:
         return {'items': ticket_repository.forms(guild_id)}
 
-    @router.post('/guilds/{guild_id}/tickets/forms', status_code=201, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/tickets/forms', status_code=201, dependencies=[Depends(auth.csrf)], response_model=schemas.TicketForm, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketFormInput))
     async def create_ticket_form(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_manager)) -> dict[str, Any]:
         try:
-            return ticket_repository.save_form(guild_id, validate_form(await request.json()))
+            return ticket_repository.save_form(guild_id, validate_form(await read_body(request, inputs.TicketFormInput)))
         except (TypeError, ValueError) as exc:
             raise api_error(422, 'ticket_form_invalid', str(exc)) from exc
 
-    @router.put('/guilds/{guild_id}/tickets/forms/{form_id}', dependencies=[Depends(auth.csrf)])
+    @router.put('/guilds/{guild_id}/tickets/forms/{form_id}', dependencies=[Depends(auth.csrf)], response_model=schemas.TicketForm, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketFormInput))
     async def update_ticket_form(request: Request, guild_id: int, form_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_manager)) -> dict[str, Any]:
-        body = await request.json()
+        body = await read_body(request, inputs.TicketFormInput)
         try:
             return ticket_repository.save_form(guild_id, validate_form(body), form_id, int(body['revision']) if body.get('revision') else None)
         except RuntimeError as exc:
@@ -70,22 +74,22 @@ def create_router(context: ApiContext) -> APIRouter:
         except (KeyError, TypeError, ValueError) as exc:
             raise api_error(422, 'ticket_form_invalid', str(exc)) from exc
 
-    @router.get('/guilds/{guild_id}/tickets/teams')
+    @router.get('/guilds/{guild_id}/tickets/teams', response_model=schemas.Items[schemas.TicketTeam], response_model_exclude_unset=True)
     async def ticket_teams(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.manager)) -> dict[str, Any]:
         return {'items': [ticket_ids(item) for item in ticket_repository.teams(guild_id)]}
 
-    @router.post('/guilds/{guild_id}/tickets/teams', status_code=201, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/tickets/teams', status_code=201, dependencies=[Depends(auth.csrf)], response_model=schemas.TicketTeam, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketTeamInput))
     async def create_ticket_team(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_manager)) -> dict[str, Any]:
-        body = await request.json()
+        body = await read_body(request, inputs.TicketTeamInput)
         try:
             await validate_ticket_resources(guild_id, body)
             return ticket_ids(ticket_repository.save_team(guild_id, body))
         except (TypeError, ValueError) as exc:
             raise api_error(422, 'ticket_team_invalid', str(exc)) from exc
 
-    @router.put('/guilds/{guild_id}/tickets/teams/{team_id}', dependencies=[Depends(auth.csrf)])
+    @router.put('/guilds/{guild_id}/tickets/teams/{team_id}', dependencies=[Depends(auth.csrf)], response_model=schemas.TicketTeam, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketTeamInput))
     async def update_ticket_team(request: Request, guild_id: int, team_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_manager)) -> dict[str, Any]:
-        body = await request.json()
+        body = await read_body(request, inputs.TicketTeamInput)
         try:
             await validate_ticket_resources(guild_id, body)
             return ticket_ids(ticket_repository.save_team(guild_id, body, team_id, int(body['revision']) if body.get('revision') else None))
@@ -94,22 +98,22 @@ def create_router(context: ApiContext) -> APIRouter:
         except (KeyError, TypeError, ValueError) as exc:
             raise api_error(422, 'ticket_team_invalid', str(exc)) from exc
 
-    @router.get('/guilds/{guild_id}/tickets/panels')
+    @router.get('/guilds/{guild_id}/tickets/panels', response_model=schemas.Items[schemas.TicketPanel], response_model_exclude_unset=True)
     async def ticket_panels(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.manager)) -> dict[str, Any]:
         return {'items': [ticket_ids(item) for item in ticket_repository.panels(guild_id)]}
 
-    @router.get('/guilds/{guild_id}/tickets/panels/{panel_id}/editor')
+    @router.get('/guilds/{guild_id}/tickets/panels/{panel_id}/editor', response_model=schemas.TicketPanelBundle, response_model_exclude_unset=True)
     async def ticket_panel_editor(request: Request, guild_id: int, panel_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.manager)) -> dict[str, Any]:
         bundle = ticket_repository.panel_bundle(guild_id, panel_id)
         if not bundle:
             raise api_error(404, 'ticket_panel_not_found', 'Panelが見つかりません。')
         return ticket_bundle_payload(bundle)
 
-    @router.post('/guilds/{guild_id}/tickets/panels/bundles', status_code=201, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/tickets/panels/bundles', status_code=201, dependencies=[Depends(auth.csrf)], response_model=schemas.TicketPanelBundle, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketPanelBundleInput))
     async def create_ticket_panel_bundle(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_manager)) -> dict[str, Any]:
         actor, _ = _ticket_actor
         try:
-            body = await request.json()
+            body = await read_body(request, inputs.TicketPanelBundleInput)
             value = validate_panel_bundle(body)
             await validate_ticket_bundle_resources(guild_id, value)
             saved = ticket_repository.save_panel_bundle(guild_id, body)
@@ -122,11 +126,11 @@ def create_router(context: ApiContext) -> APIRouter:
         except (KeyError, TypeError, ValueError) as exc:
             raise api_error(422, 'ticket_panel_invalid', str(exc) or 'Ticket設定を確認してください。') from exc
 
-    @router.put('/guilds/{guild_id}/tickets/panels/{panel_id}/bundle', dependencies=[Depends(auth.csrf)])
+    @router.put('/guilds/{guild_id}/tickets/panels/{panel_id}/bundle', dependencies=[Depends(auth.csrf)], response_model=schemas.TicketPanelBundle, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketPanelBundleInput))
     async def update_ticket_panel_bundle(request: Request, guild_id: int, panel_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_manager)) -> dict[str, Any]:
         actor, _ = _ticket_actor
         try:
-            body = await request.json()
+            body = await read_body(request, inputs.TicketPanelBundleInput)
             value = validate_panel_bundle(body)
             await validate_ticket_bundle_resources(guild_id, value)
             saved = ticket_repository.save_panel_bundle(guild_id, body, panel_id)
@@ -142,10 +146,10 @@ def create_router(context: ApiContext) -> APIRouter:
         except (KeyError, TypeError, ValueError) as exc:
             raise api_error(422, 'ticket_panel_invalid', str(exc) or 'Ticket設定を確認してください。') from exc
 
-    @router.post('/guilds/{guild_id}/tickets/panels/preview')
+    @router.post('/guilds/{guild_id}/tickets/panels/preview', response_model=schemas.TicketPanelPreview, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketPanelBundleInput))
     async def preview_ticket_panel(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.manager)) -> dict[str, Any]:
         try:
-            value = validate_panel_bundle(await request.json())
+            value = validate_panel_bundle(await read_body(request, inputs.TicketPanelBundleInput))
             sample = {'ticket_number': '42', 'user': '@member', 'username': 'member', 'user_id': '123456789', 'panel': value['panel']['name'], 'team': 'Support'}
 
             def render(text: str) -> str:
@@ -158,7 +162,7 @@ def create_router(context: ApiContext) -> APIRouter:
         except (TypeError, ValueError) as exc:
             raise api_error(422, 'ticket_panel_preview_invalid', str(exc)) from exc
 
-    @router.post('/guilds/{guild_id}/tickets/panels/{panel_id}/duplicate', status_code=201, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/tickets/panels/{panel_id}/duplicate', status_code=201, dependencies=[Depends(auth.csrf)], response_model=schemas.TicketPanelBundle, response_model_exclude_unset=True)
     async def duplicate_ticket_panel(request: Request, guild_id: int, panel_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_manager)) -> dict[str, Any]:
         actor, _ = _ticket_actor
         bundle = ticket_repository.panel_bundle(guild_id, panel_id)
@@ -172,10 +176,10 @@ def create_router(context: ApiContext) -> APIRouter:
         ticket_repository.audit(guild_id, 'panel_duplicated', actor, detail={'source_panel_id': panel_id, 'panel_id': saved['panel']['id']})
         return ticket_bundle_payload(saved)
 
-    @router.post('/guilds/{guild_id}/tickets/panels/{panel_id}/detach', status_code=202, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/tickets/panels/{panel_id}/detach', status_code=202, dependencies=[Depends(auth.csrf)], response_model=schemas.StatusResponse, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.DetachInput))
     async def detach_ticket_panel(request: Request, guild_id: int, panel_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_manager)) -> dict[str, Any]:
         actor, _ = _ticket_actor
-        body = await request.json()
+        body = await read_body(request, inputs.DetachInput)
         if not ticket_repository.detach_panel(guild_id, panel_id, int(body.get('panel_message_id', 0))):
             raise api_error(404, 'ticket_panel_message_not_found', '設置済みPanelが見つかりません。')
         ticket_repository.audit(guild_id, 'panel_detach_queued', actor, detail={'panel_id': panel_id})
@@ -189,7 +193,7 @@ def create_router(context: ApiContext) -> APIRouter:
         ticket_repository.audit(guild_id, 'panel_archived', actor, detail={'panel_id': panel_id})
         return Response(status_code=204)
 
-    @router.get('/guilds/{guild_id}/tickets/panels/{panel_id}/export')
+    @router.get('/guilds/{guild_id}/tickets/panels/{panel_id}/export', response_model=schemas.TicketExport, response_model_exclude_unset=True)
     async def export_ticket_panel(request: Request, guild_id: int, panel_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.manager)) -> dict[str, Any]:
         bundle = ticket_repository.panel_bundle(guild_id, panel_id)
         if not bundle:
@@ -200,10 +204,10 @@ def create_router(context: ApiContext) -> APIRouter:
         forms = [ticket_repository.form(guild_id, int(form_id)) for form_id in {panel.get('form_id'), panel.get('exit_form_id')} if form_id]
         return {'schema': 'tueka.ticket-panel.v1', 'panel': panel, 'team': team, 'forms': [item for item in forms if item], 'deployment': default_deployment()}
 
-    @router.post('/guilds/{guild_id}/tickets/panels/import', status_code=201, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/tickets/panels/import', status_code=201, dependencies=[Depends(auth.csrf)], response_model=schemas.TicketPanelBundle, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketImportInput))
     async def import_ticket_panel(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_manager)) -> dict[str, Any]:
         actor, _ = _ticket_actor
-        body = await request.json()
+        body = await read_body(request, inputs.TicketImportInput)
         if body.get('schema') != 'tueka.ticket-panel.v1':
             raise api_error(422, 'ticket_import_version', '対応していないExport形式です。')
         try:
@@ -216,9 +220,9 @@ def create_router(context: ApiContext) -> APIRouter:
         except (KeyError, TypeError, ValueError) as exc:
             raise api_error(422, 'ticket_import_mapping_required', str(exc), fields=['team_id', 'category_id', 'form_id', 'exit_form_id']) from exc
 
-    @router.post('/guilds/{guild_id}/tickets/panels', status_code=201, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/tickets/panels', status_code=201, dependencies=[Depends(auth.csrf)], response_model=schemas.TicketPanel, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketPanelInput))
     async def create_ticket_panel(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_manager)) -> dict[str, Any]:
-        body = await request.json()
+        body = await read_body(request, inputs.TicketPanelInput)
         try:
             value = validate_panel(body)
             await validate_ticket_resources(guild_id, value)
@@ -226,9 +230,9 @@ def create_router(context: ApiContext) -> APIRouter:
         except (TypeError, ValueError) as exc:
             raise api_error(422, 'ticket_panel_invalid', str(exc)) from exc
 
-    @router.put('/guilds/{guild_id}/tickets/panels/{panel_id}', dependencies=[Depends(auth.csrf)])
+    @router.put('/guilds/{guild_id}/tickets/panels/{panel_id}', dependencies=[Depends(auth.csrf)], response_model=schemas.TicketPanel, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketPanelInput))
     async def update_ticket_panel(request: Request, guild_id: int, panel_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_manager)) -> dict[str, Any]:
-        body = await request.json()
+        body = await read_body(request, inputs.TicketPanelInput)
         try:
             value = validate_panel(body)
             await validate_ticket_resources(guild_id, value)
@@ -242,27 +246,27 @@ def create_router(context: ApiContext) -> APIRouter:
         except (KeyError, TypeError, ValueError) as exc:
             raise api_error(422, 'ticket_panel_invalid', str(exc)) from exc
 
-    @router.get('/guilds/{guild_id}/tickets/panel-messages')
+    @router.get('/guilds/{guild_id}/tickets/panel-messages', response_model=schemas.Items[schemas.TicketPanelMessage], response_model_exclude_unset=True)
     async def ticket_panel_messages(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.manager)) -> dict[str, Any]:
         return {'items': [ticket_ids(item) for item in ticket_repository.panel_messages(guild_id)]}
 
-    @router.post('/guilds/{guild_id}/tickets/panel-messages', status_code=201, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/tickets/panel-messages', status_code=201, dependencies=[Depends(auth.csrf)], response_model=schemas.TicketPanelMessage, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketPanelMessageInput))
     async def create_ticket_panel_message(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_manager)) -> dict[str, Any]:
-        body = await request.json()
+        body = await read_body(request, inputs.TicketPanelMessageInput)
         try:
             await validate_ticket_resources(guild_id, body)
             return ticket_ids(ticket_repository.save_panel_message(guild_id, body))
         except (TypeError, ValueError) as exc:
             raise api_error(422, 'ticket_panel_message_invalid', str(exc)) from exc
 
-    @router.get('/guilds/{guild_id}/tickets/tags')
+    @router.get('/guilds/{guild_id}/tickets/tags', response_model=schemas.Items[schemas.TicketTag], response_model_exclude_unset=True)
     async def ticket_tags(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.staff)) -> dict[str, Any]:
         return {'items': ticket_repository.tags(guild_id)}
 
-    @router.post('/guilds/{guild_id}/tickets/tags', status_code=201, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/tickets/tags', status_code=201, dependencies=[Depends(auth.csrf)], response_model=schemas.TicketTag, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.TicketTagInput))
     async def save_ticket_tag(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.write_staff)) -> dict[str, Any]:
         actor, _ = _ticket_actor
-        body = await request.json()
+        body = await read_body(request, inputs.TicketTagInput)
         try:
             return ticket_repository.save_tag(guild_id, str(body.get('name', '')), str(body.get('content', '')), actor)
         except ValueError as exc:
@@ -274,7 +278,7 @@ def create_router(context: ApiContext) -> APIRouter:
             raise api_error(404, 'ticket_tag_not_found', 'Tagが見つかりません。')
         return Response(status_code=204)
 
-    @router.get('/guilds/{guild_id}/tickets/stats')
+    @router.get('/guilds/{guild_id}/tickets/stats', response_model=schemas.TicketStats, response_model_exclude_unset=True)
     async def ticket_stats(request: Request, guild_id: int, _ticket_actor: tuple[int, bool]=Depends(ticket_access.manager)) -> dict[str, Any]:
         return ticket_repository.statistics(guild_id)
     return router

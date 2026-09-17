@@ -8,12 +8,16 @@ from dashboard.discord_api import ADMINISTRATOR, PERMISSION_BITS
 from feature_registry import get_feature
 from suggestions import SuggestionValidationError, normalize_settings as normalize_suggestion_settings
 from .context import ApiContext
+from .route import ApiRoute, ERROR_RESPONSES
+from . import schemas
+from .schemas import inputs
+from .body import read_body, request_schema
 from .resources import GuildResources
 from .dependencies import ApiDependencies
 from .features import FeaturePresenter
 
 def create_router(context: ApiContext) -> APIRouter:
-    router = APIRouter()
+    router = APIRouter(route_class=ApiRoute, responses=ERROR_RESPONSES)
     auth = ApiDependencies(context.dashboard_repository, context.discord)
     discord = context.discord
     guild_settings_repository = context.guild_settings_repository
@@ -21,14 +25,14 @@ def create_router(context: ApiContext) -> APIRouter:
     resources = auth.resources
     feature_payload = FeaturePresenter(context).feature_payload
 
-    @router.get('/guilds/{guild_id}/suggestions/settings')
+    @router.get('/guilds/{guild_id}/suggestions/settings', response_model=schemas.SuggestionFeature, response_model_exclude_unset=True)
     async def suggestion_settings(request: Request, guild_id: int) -> dict[str, Any]:
         _, _, permissions = await resources(request, guild_id)
         return feature_payload(guild_id, get_feature('suggestions'), permissions)
 
-    @router.put('/guilds/{guild_id}/suggestions/settings', dependencies=[Depends(auth.csrf)])
+    @router.put('/guilds/{guild_id}/suggestions/settings', dependencies=[Depends(auth.csrf)], response_model=schemas.SuggestionFeature, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.SuggestionInput))
     async def save_suggestion_settings(request: Request, guild_id: int, _access: str=Depends(auth.write)) -> dict[str, Any]:
-        body = await request.json()
+        body = await read_body(request, inputs.SuggestionInput)
         try:
             value = normalize_suggestion_settings(dict(body.get('settings') or {}))
             enabled = bool(body.get('enabled', False))
@@ -57,7 +61,7 @@ def create_router(context: ApiContext) -> APIRouter:
             raise api_error(422, 'suggestions_invalid', 'Suggestions設定を確認してください。') from exc
         return feature_payload(guild_id, get_feature('suggestions'), permissions)
 
-    @router.get('/guilds/{guild_id}/suggestions/items')
+    @router.get('/guilds/{guild_id}/suggestions/items', response_model=schemas.Items[schemas.SuggestionItem], response_model_exclude_unset=True)
     async def suggestion_items(request: Request, guild_id: int, before: int | None=None, limit: int=50, _access: str=Depends(auth.read)) -> dict[str, Any]:
         items = suggestion_repository.list(guild_id, before=before, limit=limit)
         for item in items:

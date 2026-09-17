@@ -2,7 +2,7 @@
 
 策定日：2026-09-10。方針と実施順序の正本は [ROADMAP.md](../ROADMAP.md)。本書は、その方針を現在のコードに対応付けた作業計画であり、新しい公開仕様ではない。
 
-## 現在地と次の実行順序（2026-09-16確認）
+## 現在地と次の実行順序（2026-09-18確認）
 
 初回調査表は策定時点の記録である。P0-1〜P1-5のローカル実装・検証、P2-1の共通DB層・明示Migrationへの統一を完了し、結果は `PROGRESS0910.md` に保存した。実Guild、遠隔本番DB、Stageのリリース判定は未完了であり、ローカル実装完了と区別する。
 
@@ -24,9 +24,11 @@ Windows/Linuxの全Python各211件、Docs build、保全DB複製の全Dump不変
 
 **P2-5：Domain API Routerと共通Dependencyへの分割はローカル完了。** `dashboard/api_v1.py` はContext生成と9 Routerの合成だけを担当し、DomainのHTTP処理は `dashboard/api/` に配置した。OAuth/Session・CSRF・Guild認可・Ticket担当Team・Resource Index・revision競合を共通化。分割前のOpenAPI 59パスと認証/認可/CSRF 199ケースを固定して互換性を検証した。Guildを退出した明示Teamメンバーを拒否し、不正なrevision Headerは422で返す。Windows/Linux全各288件、Frontend型検査、正式Docs build（11.22秒）が成功。詳細は進捗記録を参照する。
 
-次の開発単位は **P2-6：型生成・入力Schema共有・UI構造の整理**。現行APIの辞書応答、Domain間のID・日時・Pagination・エラー形式の差はP2-5では維持した。OpenAPIの型と入力制約を整え、呼出し側と同時に統一する。Save Bar・Resource Picker・Access Policy等を共通化し、`App.tsx` をShell/Routerへ縮小、Route遅延読込・翻訳Namespaceを整備する。型生成差分・保存往復・競合/権限・4画面幅・日英/テーマ/キーボード検証までをP2-6の完了条件とする。
+**P2-6：型生成・入力Schema共有・UI構造の整理はローカル完了。** Domain別公開Schemaと共通入力検証、OpenAPI/TypeScript/制約生成、共通UI、Shell/Domain Router、画面遅延読込、日英Namespaceを実装した。最終Windows/Linux全各296件、Frontend型検査/build、Vitest14件、4画面幅の画面検証48件、Docs表示/Accessibility10件が成功。イベントのnullable項目と19桁ID、保存・再読込・競合・権限喪失・無効化、Embed/Schedule編集、日英・全外観/light/dark・キーボードを検証した。詳細とログは進捗記録を参照する。
 
-原DB・既存保全DBは変更していない。StageのDiscord・OAuth・Webhook実動、遠隔本番DB適用、実S3復元の未検証をローカル成功で代替しない。Phase 2全体とGoalは継続する。
+**次はP2-7：PostgreSQL移行。** 2026-09-18の指示により、PostgreSQLを必須の移行先として計画へ追加する。原DBは破棄可能な開発データであり、空のPostgreSQLから切り替える。旧データ移送・SQLite二重運用・性能閾値超過を前提にしない。P2-7を終えてから既存のP3-1〜4へ進み、番号は変更しない。
+
+今回の計画変更では原DB・保全DBを削除していない。旧データ保持を今後の開発DB切替の必須ゲートから外すが、StageのDiscord・OAuth・Webhook実動、PostgreSQLの導入・更新・Restore、実Transcript/S3復元は別途検証する。P2-7追加によりPhase 2全体とGoalは継続する。
 
 ## 1. 判断と調査範囲
 
@@ -81,7 +83,9 @@ BaselineのPythonコマンドは現行CIに合わせて `python -m unittest disc
 5. **APIをDomain Routerへ分割する。** OAuth、CSRF、Guild所属、Resource検証、revisionを共通Dependencyへ移す。現行応答のContract testを先に用意し、URLは維持する。エラー・Pagination・ID・日時の統一は呼出し側との対応を同一変更で行う。
 6. **画面とSchemaを整理する。** OpenAPIからTypeScript型を生成し、入力制約も共通Schemaへ接続する。まずSave Bar・Resource Picker・Access Policy、次に既存実装からForm・Embed・Schedule・Permission Diagnosticsを抽出する。`App.tsx` はShellとRouterへ縮小し、Route単位で遅延読込、翻訳をNamespace化する。
 
-完了判定は、新しい小規模なDomain変更が巨大ファイルへのSQL・Route・画面追記を必要としないこと。見た目の再設計は行わず、`design.md` と `tokens.css` を維持する。保存・再読込の往復、認可、409競合、無効化のContract testを必須とする。
+7. **PostgreSQLへ移行する。** P2-6の公開契約と責務分離を維持し、全Repository・Queue/Lease・Migration・起動設定・テスト基盤をPostgreSQLへ移す。原開発DBのデータ移送は不要。具体的な実行順と受入条件は第9節に定める。
+
+完了判定は、新しい小規模なDomain変更が巨大ファイルへのSQL・Route・画面追記を必要としないこと。見た目の再設計は行わず、`design.md` と `tokens.css` を維持する。保存・再読込の往復、認可、409競合、無効化のContract testを必須とする。P2-7後は実PostgreSQLの空DB・同時更新・Migration・Queue/Lease回帰をPhase 2の出口に追加する。
 
 ## 4. Phase 3 — 同一Imageで運用する
 
@@ -89,11 +93,11 @@ BaselineのPythonコマンドは現行CIに合わせて `python -m unittest disc
 | --- | --- | --- |
 | Image | Node stageでSPA / Docs、Python builderで依存を構築。Runtimeは非root・read-only・権限昇格禁止。 | 同じImageのCommandを切り替えてbot / dashboard / social-worker / migrate / testを起動できる。testの依存・資材の配置も明示する。 |
 | Compose | 共通設定とdev / stage / prodの差分を分離。DevだけSource mount・Vite・reloadを使う。 | Token、OAuth callback、project名、Network、Volumeが環境間で混ざらない。Stage / 本番は同一digestを使用する。 |
-| 永続化・起動 | `/var/lib/tueka` のnamed volumeへDB、WAL/SHM、Transcriptを集約。Migration成功後に3Serviceを起動。 | 空Volume導入と旧Versionからの更新を検証。SQLiteは単一Host、各Service単一Replicaで運用する。 |
-| 監視・公開 | Dashboard liveness/readiness、Bot / Worker heartbeat、エラー率、Outbox最古滞留時間、SQLite lock待ちを観測。 | 異常を注入して検出可能か確認。初回はHostのNginx / TLSを維持し、Dashboardを127.0.0.1:8000だけに公開する。 |
+| 永続化・起動 | PostgreSQL Serviceのnamed volumeとアプリのTranscript volumeを分離。DB readiness→Migration成功→3Service起動の順にする。 | 空Volume導入とPostgreSQL Schema更新を検証。アプリは当初各Service単一Replica、DBポートは内部Networkに限定。 |
+| 監視・公開 | Dashboard liveness/readiness、Bot / Worker heartbeat、エラー率、Outbox最古滞留時間、PostgreSQLの接続待ち・lock待ち・deadlockを観測。 | 異常を注入して検出可能か確認。初回はHostのNginx / TLSを維持し、Dashboardを127.0.0.1:8000だけに公開する。 |
 | 復旧 | Backup / Restore one-shot service、固定digest、ログ制限、Resource上限、Backup jobを追加。 | 別Volumeへの復元と旧ImageへのRollbackを手順書だけで実行。Transcript復号と保留処理の再開も確認する。 |
 
-PostgreSQL移行はこのPhaseの前提にしない。Stageでピーク相当の処理量を計測し、lock待ち・配送遅延・許容エラー率の閾値を運用要件から決めて記録する。閾値超過が継続し、Transaction短縮・Index・Batch調整で解消しない場合に移行案を評価する。
+P2-7のPostgreSQL移行完了をこのPhaseの前提とする。Stageでは接続Pool待ち、Transaction/lock時間、deadlock、配送遅延、エラー率を計測し、運用閾値を決める。DB移行の着手可否ではなく、容量・Index・Transaction・Pool設定の調整に測定結果を使う。
 
 ## 5. Phase 4 — 既存機能を管理画面から運用可能にする
 
@@ -130,14 +134,14 @@ ROADMAPの順序を維持する。各機能をDBだけ・画面だけで公開�
 
 ## 7. リリース判定・リスク・着手条件
 
-- 各Phaseのリリースは全テスト・Build成功、空DB・直前Version・再適用のMigration検証を条件とする。破壊的Migrationでは途中失敗・Rollback・V2データ保持も検証する。
+- 各Phaseのリリースは全テスト・Build成功、空DB・直前Version・再適用のMigration検証を条件とする。破壊的Migrationでは途中失敗・Rollback・必要なデータ保持も検証する。今回の原開発DBは破棄可能という例外を明記し、PostgreSQL導入後のStage/本番データへこの例外を拡張しない。
 - StageでOAuth、Discord command、Webhook、Outbox、Scheduleを実動確認する。Frontendのmockやローカルテストだけで代替しない。
 - Backupを別VolumeへRestoreし、DBとTranscript・鍵世代の整合を確認する。V1削除後は旧Imageへの切替だけで復旧できるとは限らない。必要なSnapshot復元と、Snapshot以後に失われるデータ範囲をリリースごとに明記する。
 - README、環境変数、起動・更新・復旧Docsを実装と同期する。旧文書を消す前にリンクと内容の移管を確認する。
-- SQLite競合、Outbox滞留、Worker停止、Discord側成功後のDB失敗を重点監視する。特にRetryは「最大回数」だけでなく冪等性と補償を検証する。
-- 本番DB InventoryとStage検証には、運用環境・テストGuild・OAuth/Provider設定へのアクセスが必要。アクセスがない期間も、コードInventory、Fixture、コンテナ、Contract testの整備は進められる。
+- PostgreSQLの接続枯渇・lock競合・deadlock、Outbox滞留、Worker停止、Discord側成功後のDB失敗を重点監視する。特にRetryは「最大回数」だけでなく冪等性と補償を検証する。
+- Stage検証と将来の本番PostgreSQL運用確認には、対象環境・テストGuild・OAuth/Provider設定へのアクセスが必要。原開発DBのInventory/移送はP2-7の着手条件にしない。アクセスがない期間も、コードInventory、Fixture、コンテナ、Contract testの整備は進められる。
 
-直近の着手はP2-6。P0-1〜P2-5のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
+直近の着手はP2-7。P0-1〜P2-6のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
 
 ## 8. 再調査に基づく具体的な実行単位（2026-09-12）
 
@@ -163,9 +167,10 @@ ROADMAPの順序を維持する。各機能をDBだけ・画面だけで公開�
 | P2-4 | ServiceのDiscord操作をAdapterへ移し、失敗分類と補償・孤立Resourceの復旧を統一する。 | 対象Repositoryの分離。Discord成功後DB失敗、権限喪失、再起動の異常系を検証。 |
 | P2-5 | `dashboard/api_v1.py` をDomain Routerへ分割し、認証・CSRF・Guild認可・revisionを共通化する。 | 応答Contract testを先に追加。現行 `/api/v1` URLと認可境界を維持。 |
 | P2-6 | OpenAPI型生成、入力制約の共有、共通UI抽出、`App.tsx` 分割、Route遅延読込み、翻訳Namespace分割。 | P2-5。型生成の差分検査、保存往復、競合・権限・4画面幅・日英・テーマ・キーボード操作を検証。 |
+| P2-7 | PostgreSQL用Schema・接続・全Repository・Queue/Lease・起動設定・テスト/型生成基盤を移行する。 | P2-6。空の実PostgreSQLで全回帰・同時更新・Migration・Backup/Restoreが成功。原開発DBの移送は不要。 |
 | P3-1 | SPA / Docsを含む本番Imageとコマンド別entrypointを作る。 | Phase 2出口。非root・read-onlyでBot / Dashboard / Worker / Migrationが起動する。 |
 | P3-2 | dev / stage / prodのCompose、永続Volume、Migration後の起動順、秘密情報の注入を整える。 | P3-1。空Volume導入・更新・環境分離・Stageと本番の同一digestを確認。 |
-| P3-3 | Readiness、Heartbeat、Outbox滞留・SQLite競合の監視、ログ/Resource制限を追加する。 | P3-2。Worker停止や配送失敗を注入し検出可能。閾値はStage実測から決める。 |
+| P3-3 | Readiness、Heartbeat、Outbox滞留・PostgreSQL接続/lock競合の監視、ログ/Resource制限を追加する。 | P3-2。Worker停止や配送失敗を注入し検出可能。閾値はStage実測から決める。 |
 | P3-4 | Backup / Restoreコマンドと運用手順を完成させる。 | P3-2。別Volume復元、Transcript復号、保留処理再開、Snapshotを伴うRollbackを実演。 |
 | P4-1 | 全機能の実装・テスト・実機検証を対応付け、安定/改善中/利用不可をRegistry・UI・Docsへ反映する。 | Phase 3出口。未検証の機能を安定と表示しない。 |
 | P4-2〜6 | Moderation→Ticket→Reaction Roles→Social→Suggestionsを第5節のシナリオで完成させる。 | P4-1。各機能の正常系・部分失敗・復旧までDashboardから運用可能。 |
@@ -173,3 +178,18 @@ ROADMAPの順序を維持する。各機能をDBだけ・画面だけで公開�
 | P5-1〜7 | 第6節の7機能を記載順に、一機能ずつDBからBot・API・UI・運用まで完成させる。 | Phase 4出口。共通基盤を再利用し、各機能のMigration・権限・無効化・Retention・復旧・Docsを含めて受入する。 |
 
 実装担当は変更・テスト・Docs、レビュー担当はデータ保持と公開契約、運用担当はStage・Backup復元を確認する。担当者名は未定。各単位の着手時に担当・見積り・依存を確定し、完了時にコマンド、結果、未検証事項、次の着手点を進捗へ残す。外部環境が未準備でもローカルの設計・検証整備は進められるが、リリース判定は第7節の条件を満たすまで保留する。
+
+
+## 9. P2-7 PostgreSQL移行の実行計画（2026-09-18追加）
+
+目的は保存先のPostgreSQL一本化であり、公開機能の再設計や既存開発データの救済は含めない。P2-6の完了を前提とする一つの作業単位として、以下の順に実装・検証・Docs更新まで完遂する。
+
+1. **境界とテスト基盤を固定する。** `database.py`、`migrate.py`、全Domainのrepository、`jobs/repository.py`、`jobs/leases.py`、起動設定、DB Inventory/型生成/テストFixtureを棚卸しする。SQLite固有のプレースホルダー、PRAGMA、INSERT OR IGNORE/REPLACE、lastrowid、JSON・集計・採番・rowcountの依存を分類する。専用PostgreSQLコンテナと隔離テストDBを用意し、Python 3.13用Driver/PoolとDB ImageをLockする。テストは稼働中アプリDBを再利用しない。
+2. **接続とMigrationを作る。** `DATABASE_URL`を入口に、Connection/Pool・Transaction・例外分類・Schema適用済み検査を共通化する。現行V2 SchemaからPostgreSQL専用の初期Migrationを作り、別の履歴として管理する（例：`migrations/postgresql/0001_initial.sql`）。SQLite 0001〜0010は過去の履歴として保持し、PostgreSQLへ流用しない。空DB、再適用、Checksum不一致、途中失敗Rollback、同時Migration拒否を検証する。
+3. **RepositoryをDomain順に切り替える。** Dashboard/Guild設定→Community/Engagement→Social/Moderation→Ticket/Reaction Roles/Suggestions→共通Jobsの順に移す。内部ID採番、Discord IDの容量、JSON、bool、UTC時刻、外部キー、Unique/Index、UPSERTとRETURNINGを明示する。公開ID/日時/エラー契約はP2-6のまま維持する。単なるSQL文字列置換で済ませず、Repositoryの保存・更新・削除・revision競合を実PostgreSQLで確認する。
+4. **並行処理と失敗時の契約を確認する。** Outbox/Scheduleの取得をTransactionと行ロックで実装し、複数取得者の重複Claim、Lease更新/失効/旧所有者ACK、Resource Lease、Cancel/Dead Letter/Retentionを実DBで検証する。DB時刻・Transaction境界を明確化し、deadlock/接続断/タイムアウトの再試行はDB処理の冪等性を確認する。Discord副作用を含む処理全体の無条件再実行はしない。APIの同時revision更新も競合テストする。
+5. **Runtime・開発コマンド・CIを一本化する。** Bot/Dashboard/Worker/Migration/型生成を同じ接続契約へ揃える。SQLiteのRuntime fallback、不要なDBファイル設定/Backup処理を除去し、全テストFixtureを専用PostgreSQLへ変更する。WindowsクライアントとLinuxコンテナの両方から実PostgreSQLに対してテストする。型生成の一時DB/schemaにも隔離と確実な後始末を設け、秘密値を生成物へ含めない。
+6. **開発DBを切り替え、復旧手順を検証する。** 原DBは破棄・再作成可能なのでETL・Dual Write・旧SQLiteへの新データ逆移送を作らない。対象の開発接続先/Volumeを明示した初期化手順を用意する。DBの再作成とDiscord上の既存Panel/Role/Channelの扱いを分離し、孤立Resourceを誤って再操作しないことを確認する。新しいPostgreSQLのBackupを別DBへRestoreし、設定・Queue・Transcript参照の復元を検証する。暗号鍵とTranscript/S3オブジェクトはDBリセットとは別管理とする。
+7. **出口を判定する。** 空PostgreSQLから全起動入口が成立し、全Repository/API/Service/Queue回帰、型生成差分、Frontend/Docs build、画面回帰が成功していること。SQLiteがRuntimeに必要ないこと、データ未移送が意図した動作であること、開発DB再初期化・接続設定・Migration・Backup/Restoreを正式Docsへ反映したことを記録する。Stageの実Discord/OAuth/Webhookは別ゲートとして残す。
+
+P3-1はこの接続/Migration契約を本番Imageへ載せ、P3-2で環境別PostgreSQL Service・Volume・秘密情報・起動順を構成する。P3-3の監視対象はSQLiteのWAL/lockではなくPostgreSQLの接続/Transaction/lock/deadlockとQueue指標へ変更する。P3-4ではDB論理BackupとTranscript・鍵を組み合わせた運用Restore/Rollbackを完成させる。

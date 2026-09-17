@@ -1,0 +1,15 @@
+import { useEffect, useState } from 'react'
+import * as Switch from '@radix-ui/react-switch'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Save } from 'lucide-react'
+import { useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { api, request, encodeBody } from "../../api"
+import type { Resource, TicketSettings } from "../../types"
+import s from "../../styles/App.module.css"
+import { Loading, SectionHead, Failure } from "../../components/Feedback"
+import { ResourceSelect } from "../../components/ResourcePicker"
+
+
+
+export function TicketSettingsPage(){const {guildId=''}=useParams();const {t}=useTranslation(['tickets', 'common']);const qc=useQueryClient();const query=useQuery({queryKey:['ticketSettings',guildId],queryFn:()=>request("GET /api/v1/guilds/{guild_id}/tickets/settings", `/guilds/${guildId}/tickets/settings`)});const resources=useQuery({queryKey:['resources',guildId],queryFn:()=>request("GET /api/v1/guilds/{guild_id}/resources", `/guilds/${guildId}/resources`)});const [draft,setDraft]=useState<TicketSettings|null>(null);useEffect(()=>{if(query.data)setDraft(query.data)},[query.data]);const save=useMutation({mutationFn:(value:TicketSettings)=>request("PUT /api/v1/guilds/{guild_id}/tickets/settings", `/guilds/${guildId}/tickets/settings`, {method:'PUT',body:encodeBody("PUT /api/v1/guilds/{guild_id}/tickets/settings", value)}),onSuccess:value=>{setDraft(value);qc.setQueryData(['ticketSettings',guildId],value)}});if(!draft||resources.isLoading)return <Loading/>;const channels=(resources.data?.channels||[]).filter(item=>item.type===0);return <main className={s.page}><SectionHead title={t('tickets.settings')} description={t('tickets.settingsBody')}/><form className={s.moduleForm} onSubmit={e=>{e.preventDefault();save.mutate(draft)}}><section><label className={s.switchRow}><span><strong>{t('tickets.enabled')}</strong></span><Switch.Root checked={draft.enabled} onCheckedChange={enabled=>setDraft({...draft,enabled})} className={s.switch}><Switch.Thumb/></Switch.Root></label><div className={s.formGrid}><label className={s.field}><span>{t('tickets.openLimit')}</span><input type="number" min={1} max={25} value={draft.open_limit} onChange={e=>setDraft({...draft,open_limit:Number(e.target.value)})}/></label><label className={s.field}><span>{t('tickets.retention')}</span><input type="number" min={1} max={3650} value={draft.transcript_retention_days} onChange={e=>setDraft({...draft,transcript_retention_days:Number(e.target.value)})}/></label><ResourceSelect label={t('tickets.logChannel')} value={draft.log_channel_id} items={channels} onChange={value=>setDraft({...draft,log_channel_id:value?String(value):null})}/><ResourceSelect label={t('tickets.transcriptChannel')} value={draft.transcript_channel_id} items={channels} onChange={value=>setDraft({...draft,transcript_channel_id:value?String(value):null})}/></div></section>{save.error&&<Failure error={save.error}/>}<button className={s.primaryButton} disabled={save.isPending}><Save/>{t('common.save')}</button></form></main>}

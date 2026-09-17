@@ -1,5 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
+import ja from '../src/locales/ja'
+import en from '../src/locales/en'
 
 const session = { user: { id: '1', name: 'Moderator', avatar_url: 'https://cdn.discordapp.com/embed/avatars/0.png' }, csrf_token: 'csrf', preferences: { locale: 'ja', appearance: 'precision', color_scheme: 'light', navigation_collapsed: false, revision: 1 } }
 const feature = (id: string, category: string, parent: string | null = null) => ({ id, category, parent, title: id, description: `${id} settings`, fields: [], required_fields: [], required_bot_permissions: [], enabled: true, settings: {}, revision: 1, missing_permissions: [] })
@@ -92,6 +94,8 @@ test('overview is responsive and accessible', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '概要' })).toBeVisible()
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
   expect(overflow).toBe(false)
+  const textFits = await page.locator('main a > div:has(> strong)').evaluateAll(nodes => nodes.every(node => node.scrollWidth <= node.clientWidth))
+  expect(textFits).toBe(true)
   const results = await new AxeBuilder({ page }).analyze()
   expect(results.violations.filter(item => ['critical','serious'].includes(item.impact || ''))).toEqual([])
 })
@@ -123,7 +127,7 @@ test('rule order and stop behavior are saved from the list', async ({ page }) =>
   await page.goto('/servers/1/moderation/automod')
   await page.getByRole('button', { name: 'firstを下へ' }).click()
   await page.getByRole('switch').first().click()
-  await page.getByRole('region', { name: 'Unsaved changes' }).getByRole('button', { name: '変更を保存' }).click()
+  await page.getByRole('region', { name: '未保存の変更があります' }).getByRole('button', { name: '変更を保存' }).click()
   await expect.poll(() => saved).toBeTruthy()
   expect(saved?.items.map((item: Record<string, unknown>) => item.id)).toEqual([2, 1])
   expect(saved?.items[0].stop_on_match).toBe(true)
@@ -178,15 +182,118 @@ test('ticket panel editor keeps one draft across six responsive tabs', async ({ 
   await page.getByLabel('設置名').fill('問い合わせ窓口')
   await page.getByLabel('パネルチャンネル').selectOption('123456789012345678')
   await expect(page.getByRole('region', { name: '未保存の変更があります' })).toContainText('2タブ変更')
+  if (await mobileTabs.isVisible()) await mobileTabs.selectOption('welcome')
+  else await page.getByRole('tab', { name: 'ようこそメッセージ', exact: true }).click()
+  await page.getByLabel('タイトル', { exact: true }).fill('Support welcome')
+  await expect(page.getByLabel('タイトル', { exact: true })).toHaveAttribute('maxlength', '256')
+  if (await mobileTabs.isVisible()) await mobileTabs.selectOption('hours')
+  else await page.getByRole('tab', { name: 'サポート時間', exact: true }).click()
+  await page.getByRole('switch', { name: '24時間365日' }).click()
+  await page.getByLabel('月曜日 開始', { exact: true }).fill('10:00')
+  await page.getByLabel('月曜日 終了', { exact: true }).fill('18:00')
+  await expect(page.getByRole('region', { name: '未保存の変更があります' })).toContainText('4タブ変更')
+
   await page.getByRole('region', { name: '未保存の変更があります' }).getByRole('button', { name: 'プレビュー' }).click()
   await expect(page.getByRole('dialog')).toContainText('サポートチケット')
   await page.getByRole('dialog').getByRole('button').first().click()
   await page.getByRole('region', { name: '未保存の変更があります' }).getByRole('button', { name: '保存' }).click()
   await expect.poll(() => saved).toBeTruthy()
   expect(saved?.panel.name).toBe('請求サポート')
+  expect(saved?.panel.welcome_embed.title).toBe('Support welcome')
+  expect(saved?.panel.support_hours.weekdays['0']).toEqual({ start: '10:00', end: '18:00' })
   expect(saved?.panel.category_id).toBe('123456789012345681')
   expect(saved?.deployment.channel_id).toBe('123456789012345678')
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false)
   const results = await new AxeBuilder({ page }).analyze()
   expect(results.violations.filter(item => ['critical','serious'].includes(item.impact || ''))).toEqual([])
 })
+
+for (const locale of ['ja', 'en'] as const) {
+  test(`shared form keeps edits on conflict and permission loss with keyboard input (${locale})`, async ({ page }) => {
+    const copy = locale === 'ja' ? ja : en
+    let saved = { ...feature('suggestions', 'engagement'), settings: {
+      channel_id: '123456789012345678', log_channel_id: null, review_role_ids: [], allow_voting: true, show_author: true,
+      form_title: 'Ideas', form_fields: [{ key: 'idea', label: 'Idea', placeholder: '', style: 'paragraph', required: true, min_length: 1, max_length: 100 }],
+    } }
+    let result = 409
+    await page.route('**/api/v1/session', route => route.fulfill({ json: { ...session, preferences: { ...session.preferences, locale } } }))
+    await page.route('**/api/v1/guilds/1/suggestions/items*', route => route.fulfill({ json: { items: [], next: null } }))
+    await page.route('**/api/v1/guilds/1/suggestions/settings', async route => {
+      if (route.request().method() === 'PUT') {
+        if (result !== 200) return route.fulfill({ status: result, json: { detail: {
+          code: result === 409 ? 'revision_conflict' : 'guild_forbidden',
+          message: result === 409 ? 'Concurrent change' : 'Permission revoked', errors: [],
+        } } })
+        saved = { ...route.request().postDataJSON(), revision: saved.revision + 1 }
+      }
+      return route.fulfill({ json: saved })
+    })
+    await page.goto('/servers/1/suggestions')
+    await expect(page.getByRole('heading', { name: copy.suggestions.suggestions.title, exact: true })).toBeVisible()
+    const label = page.getByLabel(copy.common.form.label, { exact: true })
+    await expect(label).toHaveAttribute('maxlength', '45')
+    await label.focus()
+    await page.keyboard.press('ControlOrMeta+A')
+    await page.keyboard.type('Keyboard edit')
+    await page.keyboard.press('Tab')
+    await expect(page.getByLabel(copy.common.form.placeholder, { exact: true })).toBeFocused()
+    const bar = page.getByRole('region', { name: copy.suggestions.suggestions.unsaved })
+    const save = bar.getByRole('button', { name: copy.common.common.save, exact: true })
+    await save.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('alert')).toContainText('Concurrent change')
+    await expect(label).toHaveValue('Keyboard edit')
+    result = 403
+    await save.click()
+    await expect(page.getByRole('alert')).toContainText('Permission revoked')
+    await expect(label).toHaveValue('Keyboard edit')
+    result = 200
+    await save.click()
+    await expect(bar).toHaveCount(0)
+    const enabled = page.getByRole('switch').first()
+    await enabled.focus()
+    await page.keyboard.press('Space')
+    await save.click()
+    await expect.poll(() => saved.enabled).toBe(false)
+    await page.reload()
+    await expect(label).toHaveValue('Keyboard edit')
+    await expect(page.getByRole('switch').first()).not.toBeChecked()
+    expect(saved.settings.channel_id).toBe('123456789012345678')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
+  })
+
+  test(`preferences preserve namespaces and all appearances and themes (${locale})`, async ({ page }, info) => {
+    const copy = locale === 'ja' ? ja : en
+    let preferences = { ...session.preferences, locale }
+    await page.route('**/api/v1/session', route => route.fulfill({ json: { ...session, preferences } }))
+    await page.route('**/api/v1/preferences', async route => {
+      preferences = { ...route.request().postDataJSON(), revision: preferences.revision + 1 }
+      return route.fulfill({ json: preferences })
+    })
+    await page.goto('/servers/1')
+    const trigger = page.getByRole('button', { name: copy.common.prefs.title, exact: true })
+    for (const appearance of ['precision', 'community', 'atmosphere'] as const) {
+      for (const scheme of ['light', 'dark'] as const) {
+        await trigger.click()
+        const dialog = page.getByRole('dialog')
+        await dialog.getByRole('button', { name: copy.common.prefs[appearance], exact: true }).click()
+        await dialog.getByRole('button', { name: copy.common.prefs[scheme], exact: true }).click()
+        await dialog.getByRole('button', { name: copy.common.common.save, exact: true }).click()
+        await expect(dialog).toHaveCount(0)
+        await expect(page.locator('html')).toHaveAttribute('lang', locale)
+        await expect(page.locator('html')).toHaveAttribute('data-appearance', appearance)
+        await expect(page.locator('html')).toHaveAttribute('data-color-scheme', scheme)
+        expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
+      }
+    }
+    await trigger.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(trigger).toBeFocused()
+    const audit = await new AxeBuilder({ page }).analyze()
+    expect(audit.violations.filter(item => ['critical', 'serious'].includes(item.impact || ''))).toEqual([])
+    await page.screenshot({ path: info.outputPath(`preferences-${locale}.png`), fullPage: true })
+  })
+}

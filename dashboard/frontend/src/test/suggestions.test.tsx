@@ -4,12 +4,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { I18nextProvider } from 'react-i18next'
 import { createInstance } from 'i18next'
-import en from '../locales/en'
-import ja from '../locales/ja'
-import Suggestions from '../Suggestions'
-import { api } from '../api'
+import en from "../locales/en"
+import ja from "../locales/ja"
+import Suggestions from "../features/suggestions/Settings"
+import { api } from "../api"
 
-vi.mock('../api', () => ({ api: vi.fn() }))
+vi.mock('../api', async importOriginal => { const original = await importOriginal<typeof import('../api')>(); const api = vi.fn(); return { ...original, api, request: (_operation: string, path: string, init?: RequestInit) => api(path, init), encodeBody: (_operation: string, body: unknown) => JSON.stringify(body) } })
 const request = vi.mocked(api)
 const initial = () => ({ enabled: true, revision: 1, missing_permissions: [], docs_path: '', settings: {
   channel_id: '10', log_channel_id: null, review_role_ids: [], allow_voting: true, show_author: true,
@@ -42,7 +42,7 @@ describe('Suggestions settings', () => {
   it.each([['en', 'Move up', 'Additional information'], ['ja', '上へ', '追加情報']])('localizes field controls in %s', async (locale, label, fieldLabel) => {
     await mount(locale)
     expect(await screen.findByRole('button', { name: label })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: (locale === 'en' ? en : ja).translation.suggestions.addField }))
+    fireEvent.click(screen.getByRole('button', { name: (locale === 'en' ? en : ja).suggestions.suggestions.addField }))
     expect(screen.getByDisplayValue(fieldLabel)).toBeInTheDocument()
   })
   it('saves disabling without a channel and restores the server response', async () => {

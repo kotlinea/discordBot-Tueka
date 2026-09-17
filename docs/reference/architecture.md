@@ -31,6 +31,8 @@ Moderationのルール更新と設定のrules_revision更新、CaseとTrustイ�
 
 `social_worker.py` は従来の起動コマンドを保つ薄い入口で、処理本体は `social/worker.py` です。APIの内部生成関数はDBパスを受け取り、DomainごとのRepositoryを生成します。HTTP URLと認可の契約は維持します。共通Outbox/Runnerは `jobs/` にあります。Discord操作はDomainのAdapterへ分離済みです。API Routerは `dashboard/api/` に配置し、`dashboard/api_v1.py` はContextの生成とRouterの合成だけを担当します。
 
+2026-09-18時点の実装はSQLiteです。次のP2-7でPostgreSQLへ移行する計画をRepository内の `docs/EXECUTION_PLAN.md` に追加しました。以下は未移行の現行実装を説明しています。
+
 SQLite接続・Transaction・WAL・busy timeout・Backup・Schema適用済み検査は `database.py` に集約しています。全DomainのRepositoryはこの接続を使います。書込み待ちは共通で10秒です。更新処理の必要に応じてRepositoryが `BEGIN IMMEDIATE` を選択します。
 
 Schemaは番号付きMigration CLIだけが作成・変更します。RepositoryのコンストラクタはDDLを実行せず、未適用・不一致の履歴を検出すると `SchemaNotReady` で失敗します。BotはDiscord接続前、Dashboard / Workerは保存層の作成時に確認します。現行Ticketの未完了Close復旧やReaction Rolesの不足設定修復は、Schema変更とは別のDomain処理として保持しています。
@@ -121,4 +123,28 @@ Lockdownは全対象の復元情報を保存してから権限を変更します
 
 FastAPI `Depends` はSession、管理権限、Ticket Staff、CSRFの入口を表します。既存のエラー優先順が必要なRouteは同じDependencyのメソッドを明示呼出しします。更新時のGuild管理権限とResourceはキャッシュを使わず取得します。Ticket操作では担当Teamの所属も再確認します。明示的なTeam user IDが残っていても、Guild所属を取得できないユーザーにはStaff権限を与えません。Transcript/添付の申請者本人の閲覧権限は別経路として維持します。
 
-分割前に固定したOpenAPI（59パス）と認証・認可・CSRF応答（199ケース）を `tests/fixtures/api_v1_contract.json` で比較します。Schemaの一般的な辞書応答やDomainごとに異なるID/エラー形式は現行契約のままです。P2-6で呼出し側と同時に型・入力制約を整理します。
+分割前に固定したOpenAPI（59パス）と認証・認可・CSRF応答（199ケース）を `tests/fixtures/api_v1_contract.json` で比較します。P2-6で公開Schemaと入力制約を追加し、エラーEnvelope・Discord ID文字列・内部ID整数・一覧のnextをFrontendと同時に統一しました。元のFixtureは保持し、意図した契約変更を比較側で明示しています。
+
+
+## API SchemaとUIの構造
+
+| 配置 | 責務 |
+| --- | --- |
+| `dashboard/api/schemas/` | Domain別の公開DTOと入力制約。Domain自体はHTTP Modelに依存しない |
+| `dashboard/api/body.py` / `route.py` | JSON入力検証とOpenAPI記述、共通エラーEnvelope |
+| `scripts/generate_api.py` | 実RouterからOpenAPI、操作別TypeScript型、入力制約を再現可能に生成 |
+| `dashboard/frontend/src/generated/api.ts` | 自動生成物。手書きのDTOを重複管理しない |
+| `dashboard/frontend/src/api.ts` | Session/CSRF、型付きHTTP操作、項目エラー、204/添付Blobの処理 |
+| `dashboard/frontend/src/App.tsx` | Session取得と最上位Route |
+| `dashboard/frontend/src/app/` | Shell、Navigation、Account、個人表示設定 |
+| `dashboard/frontend/src/routing/catalog.ts` | RouteとNavigationで共有する機能メタデータ |
+| `dashboard/frontend/src/features/<domain>/` | Domain Routeと画面。TicketのInbox・Panel・設定、ModerationのRule・履歴、Reaction Rolesの一覧・編集等を分離 |
+| `dashboard/frontend/src/components/` | SaveBar、ResourcePicker、AccessPolicy、PermissionDiagnostics、Embed、Schedule、状態表示 |
+| `dashboard/frontend/src/components/forms/` | 入力Field・Toggle・FormFieldsEditor、生成制約からHTML属性への変換 |
+| `dashboard/frontend/src/locales/{ja,en}/` | common・moderation・tickets・reactionRoles・social・suggestionsの翻訳Namespace |
+
+RootとDomain Routerは `React.lazy` / `Suspense` で画面を遅延読込みします。画面からメタデータだけをImportして依存DomainのUIまで読み込まないよう、catalogを分離しています。翻訳はNamespaceごとにファイルを分け、現時点では初期化時に全Namespaceを登録します。Namespaceのネットワーク遅延取得は行いません。
+
+共通UIは値・変更コールバック・見出し等を受け取り、Domainの保存処理を持ちません。例えばEmbedのTicket変数案内とScheduleの見出しはTicket画面から渡します。SaveBarは通常の保存CallbackとHTML form属性によるsubmitの両方に対応し、必須入力のブラウザー検証を維持します。409や権限喪失で編集内容を破棄せず、再試行・再読込を利用者が判断できます。
+
+視覚仕様は `design.md` と既存Tokenを維持します。Playwrightは別の一時出力先へbuildしたSPAをpreviewで配信し、開発サーバーの初回変換時間と画面の動作を切り分けます。本番の `/ui/` buildとは出力先を分け、4画面幅、日英、3外観×light/dark、保存・再読込・競合・権限・キーボード・Accessibilityを検証します。

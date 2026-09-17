@@ -9,12 +9,16 @@ from fastapi.responses import Response
 from dashboard.discord_api import ADMINISTRATOR, PERMISSION_BITS
 from reaction_roles import ReactionRoleRepository, ReactionRoleService, ReactionRoleValidationError
 from .context import ApiContext
+from .route import ApiRoute, ERROR_RESPONSES
+from . import schemas
+from .schemas import inputs
+from .body import read_body, request_schema
 from .resources import GuildResources
 from .dependencies import ApiDependencies
 REACTION_ROLE_PERMISSION_NAMES = {'manage_roles': 'ロールの管理', 'view_channel': 'チャンネルを見る', 'add_reactions': 'リアクションの追加', 'read_message_history': 'メッセージ履歴を読む', 'manage_messages': 'メッセージの管理', 'send_messages': 'メッセージを送信', 'embed_links': '埋め込みリンク'}
 
 def create_router(context: ApiContext) -> APIRouter:
-    router = APIRouter()
+    router = APIRouter(route_class=ApiRoute, responses=ERROR_RESPONSES)
     auth = ApiDependencies(context.dashboard_repository, context.discord)
     discord = context.discord
     reaction_role_repository = context.reaction_role_repository
@@ -77,16 +81,16 @@ def create_router(context: ApiContext) -> APIRouter:
     def rr_error(exc: ReactionRoleValidationError) -> HTTPException:
         return api_error(422, exc.code, exc.message, errors=[{'path': exc.path, 'message': exc.message}])
 
-    @router.get('/guilds/{guild_id}/reaction-roles')
+    @router.get('/guilds/{guild_id}/reaction-roles', response_model=schemas.ReactionRoleOverview, response_model_exclude_unset=True)
     async def reaction_roles_overview(request: Request, guild_id: int, _access: str=Depends(auth.read)) -> dict[str, Any]:
         repository, _ = reaction_roles_available()
         items = repository.messages(guild_id)
         return {'settings': rr_payload(repository.settings(guild_id)), 'items': [rr_payload(item) for item in items], 'summary': {'active': sum((1 for item in items if item['enabled'] and item['status'] == 'active')), 'pending': sum((1 for item in items if item['status'] == 'pending')), 'failed': sum((1 for item in items if item['status'] == 'failed')), 'scheduled': sum((1 for item in items if item.get('self_destruct_at')))}, 'recoveries': [{**item, 'deleted_message_id': str(item['deleted_message_id'])} for item in repository.recoveries(guild_id)]}
 
-    @router.put('/guilds/{guild_id}/reaction-roles/settings', dependencies=[Depends(auth.csrf)])
+    @router.put('/guilds/{guild_id}/reaction-roles/settings', dependencies=[Depends(auth.csrf)], response_model=schemas.ReactionRoleSettings, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.ReactionRoleSettingsInput))
     async def save_reaction_role_settings(request: Request, guild_id: int, _access: str=Depends(auth.write)) -> dict[str, Any]:
         repository, _ = reaction_roles_available()
-        body = await request.json()
+        body = await read_body(request, inputs.ReactionRoleSettingsInput)
         try:
             snapshot = await GuildResources.fetch(discord, guild_id)
             text_ids = snapshot.channel_ids(0)
@@ -100,20 +104,20 @@ def create_router(context: ApiContext) -> APIRouter:
         except (TypeError, ValueError) as exc:
             raise api_error(422, 'settings_invalid', 'ログ先と通知設定を確認してください。') from exc
 
-    @router.get('/guilds/{guild_id}/reaction-roles/events')
+    @router.get('/guilds/{guild_id}/reaction-roles/events', response_model=schemas.Items[schemas.ReactionRoleEvent], response_model_exclude_unset=True)
     async def reaction_role_events(request: Request, guild_id: int, limit: int=100, _access: str=Depends(auth.read)) -> dict[str, Any]:
         repository, _ = reaction_roles_available()
         return {'items': repository.events(guild_id, limit)}
 
-    @router.get('/guilds/{guild_id}/reaction-roles/link-groups')
+    @router.get('/guilds/{guild_id}/reaction-roles/link-groups', response_model=schemas.Items[schemas.ReactionRoleLinkGroup], response_model_exclude_unset=True)
     async def reaction_role_link_groups(request: Request, guild_id: int, _access: str=Depends(auth.read)) -> dict[str, Any]:
         repository, _ = reaction_roles_available()
         return {'items': repository.link_groups(guild_id)}
 
-    @router.post('/guilds/{guild_id}/reaction-roles/link-groups', status_code=201, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/reaction-roles/link-groups', status_code=201, dependencies=[Depends(auth.csrf)], response_model=schemas.ReactionRoleLinkGroup, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.LinkGroupInput))
     async def create_reaction_role_link_group(request: Request, guild_id: int, _access: str=Depends(auth.write)) -> dict[str, Any]:
         repository, _ = reaction_roles_available()
-        body = await request.json()
+        body = await read_body(request, inputs.LinkGroupInput)
         try:
             return repository.create_link_group(guild_id, str(body.get('name') or 'Link Group'), [int(item) for item in body.get('message_ids', [])])
         except (TypeError, ValueError) as exc:
@@ -125,9 +129,9 @@ def create_router(context: ApiContext) -> APIRouter:
         repository.dissolve_link_group(guild_id, group_id)
         return Response(status_code=204)
 
-    @router.post('/guilds/{guild_id}/reaction-roles/preview', dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/reaction-roles/preview', dependencies=[Depends(auth.csrf)], response_model=schemas.PreviewResponse, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.ReactionRoleInput))
     async def preview_reaction_role(request: Request, guild_id: int) -> dict[str, Any]:
-        body = await request.json()
+        body = await read_body(request, inputs.ReactionRoleInput)
         repository, service = reaction_roles_available()
         try:
             value, _ = await checked_reaction_role(request, guild_id, body)
@@ -140,9 +144,9 @@ def create_router(context: ApiContext) -> APIRouter:
         except ReactionRoleValidationError as exc:
             raise rr_error(exc) from exc
 
-    @router.post('/guilds/{guild_id}/reaction-roles', status_code=201, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/reaction-roles', status_code=201, dependencies=[Depends(auth.csrf)], response_model=schemas.ReactionRoleMessage, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.ReactionRoleInput))
     async def create_reaction_role(request: Request, guild_id: int) -> dict[str, Any]:
-        body = await request.json()
+        body = await read_body(request, inputs.ReactionRoleInput)
         repository, service = reaction_roles_available()
         try:
             value, actor_id = await checked_reaction_role(request, guild_id, body)
@@ -152,7 +156,7 @@ def create_router(context: ApiContext) -> APIRouter:
         except sqlite3.IntegrityError as exc:
             raise api_error(409, 'message_exists', 'このDiscordメッセージはすでに登録されています。') from exc
 
-    @router.get('/guilds/{guild_id}/reaction-roles/messages/{config_id}')
+    @router.get('/guilds/{guild_id}/reaction-roles/messages/{config_id}', response_model=schemas.ReactionRoleMessage, response_model_exclude_unset=True)
     async def reaction_role_detail(request: Request, guild_id: int, config_id: int, _access: str=Depends(auth.read)) -> dict[str, Any]:
         repository, _ = reaction_roles_available()
         value = repository.message(guild_id, config_id)
@@ -160,9 +164,9 @@ def create_router(context: ApiContext) -> APIRouter:
             raise api_error(404, 'reaction_role_not_found', 'Reaction Role設定が見つかりません。')
         return rr_payload(value)
 
-    @router.put('/guilds/{guild_id}/reaction-roles/messages/{config_id}', dependencies=[Depends(auth.csrf)])
+    @router.put('/guilds/{guild_id}/reaction-roles/messages/{config_id}', dependencies=[Depends(auth.csrf)], response_model=schemas.ReactionRoleMessage, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.ReactionRoleInput))
     async def update_reaction_role(request: Request, guild_id: int, config_id: int) -> dict[str, Any]:
-        body = await request.json()
+        body = await read_body(request, inputs.ReactionRoleInput)
         repository, _ = reaction_roles_available()
         try:
             value, actor_id = await checked_reaction_role(request, guild_id, body)
@@ -187,7 +191,7 @@ def create_router(context: ApiContext) -> APIRouter:
         repository.delete_message(guild_id, config_id, recoverable=False, actor_id=int(actor['id']))
         return Response(status_code=204)
 
-    @router.post('/guilds/{guild_id}/reaction-roles/messages/{config_id}/fix', status_code=202, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/reaction-roles/messages/{config_id}/fix', status_code=202, dependencies=[Depends(auth.csrf)], response_model=schemas.StatusResponse, response_model_exclude_unset=True)
     async def fix_reaction_role(request: Request, guild_id: int, config_id: int, _access: str=Depends(auth.write)) -> dict[str, Any]:
         repository, _ = reaction_roles_available()
         if not repository.message(guild_id, config_id):
@@ -195,10 +199,10 @@ def create_router(context: ApiContext) -> APIRouter:
         repository.queue_action(guild_id, config_id, 'fix', {})
         return {'status': 'queued'}
 
-    @router.post('/guilds/{guild_id}/reaction-roles/messages/{config_id}/move', status_code=202, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/reaction-roles/messages/{config_id}/move', status_code=202, dependencies=[Depends(auth.csrf)], response_model=schemas.StatusResponse, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.MoveInput))
     async def move_reaction_role(request: Request, guild_id: int, config_id: int, _access: str=Depends(auth.write)) -> dict[str, Any]:
         repository, _ = reaction_roles_available()
-        body = await request.json()
+        body = await read_body(request, inputs.MoveInput)
         config = repository.message(guild_id, config_id)
         if not config:
             raise api_error(404, 'reaction_role_not_found', 'Reaction Role設定が見つかりません。')
@@ -210,13 +214,13 @@ def create_router(context: ApiContext) -> APIRouter:
         repository.queue_action(guild_id, config_id, 'move', {'channel_id': channel_id, 'message_id': message_id, 'revision': config['revision']})
         return {'status': 'queued'}
 
-    @router.post('/guilds/{guild_id}/reaction-roles/recoveries/{deleted_message_id}/restore', status_code=201, dependencies=[Depends(auth.csrf)])
+    @router.post('/guilds/{guild_id}/reaction-roles/recoveries/{deleted_message_id}/restore', status_code=201, dependencies=[Depends(auth.csrf)], response_model=schemas.ReactionRoleMessage, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.MoveInput))
     async def restore_reaction_role(request: Request, guild_id: int, deleted_message_id: int, _access: str=Depends(auth.write)) -> dict[str, Any]:
         repository, _ = reaction_roles_available()
         snapshot = repository.recovery(guild_id, deleted_message_id)
         if not snapshot:
             raise api_error(404, 'recovery_not_found', '復旧データが見つかりません。')
-        body = await request.json()
+        body = await read_body(request, inputs.MoveInput)
         snapshot.update({'source': 'external', 'channel_id': body.get('channel_id'), 'message_id': body.get('message_id'), 'self_destruct_at': None, 'link_group_id': None})
         try:
             value, actor_id = await checked_reaction_role(request, guild_id, {'message': snapshot})

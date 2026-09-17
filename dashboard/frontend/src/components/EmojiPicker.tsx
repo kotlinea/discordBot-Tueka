@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Search, SmilePlus, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { Resource } from './types'
-import { STANDARD_EMOJI_CATEGORIES } from './emojiCatalog'
-import s from './styles/App.module.css'
+import type { Resource } from "../types"
+import { STANDARD_EMOJI_CATEGORIES } from "./emojiCatalog"
+import s from "../styles/App.module.css"
 
 interface EmojiPickerProps {
   value: string
@@ -15,7 +15,7 @@ interface EmojiPickerProps {
 const customValue = (emoji: Resource) => `<${emoji.animated ? 'a' : ''}:${emoji.name}:${emoji.id}>`
 
 export default function EmojiPicker({ value, guildEmojis, onChange }: EmojiPickerProps) {
-  const { t } = useTranslation()
+  const { t } = useTranslation(['common'])
   const [open, setOpen] = useState(false)
   const [source, setSource] = useState<'standard'|'server'>('standard')
   const [category, setCategory] = useState(STANDARD_EMOJI_CATEGORIES[0].id)
