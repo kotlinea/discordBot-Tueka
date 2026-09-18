@@ -2,7 +2,7 @@
 
 策定日：2026-09-10。方針と実施順序の正本は [ROADMAP.md](../ROADMAP.md)。本書は、その方針を現在のコードに対応付けた作業計画であり、新しい公開仕様ではない。
 
-## 現在地と次の実行順序（2026-09-18確認）
+## 現在地と次の実行順序（2026-09-19確認）
 
 初回調査表は策定時点の記録である。P0-1〜P1-5のローカル実装・検証、P2-1の共通DB層・明示Migrationへの統一を完了し、結果は `PROGRESS0910.md` に保存した。実Guild、遠隔本番DB、Stageのリリース判定は未完了であり、ローカル実装完了と区別する。
 
@@ -30,11 +30,13 @@ Windows/Linuxの全Python各211件、Docs build、保全DB複製の全Dump不変
 
 開発用Composeを空Volumeから起動し、localhost:55433の`tueka_dev`へ初期Migrationを適用した。アプリの`.env`もDATABASE_URLへ切替済み。元SQLite・保全DB・暗号鍵・Transcript・Discord Resourceは変更せず、データは移送していない。Bot・Dashboard・Workerの外部接続は起動していない。
 
-**Phase 2のローカル出口を完了し、次はP3-1：同一の本番Imageとコマンド別entrypoint。** StageのDiscord・OAuth・Webhook実動、運用環境の同一digest、実Transcript/S3を含むRestoreは別ゲートとして保持する。CIは接続先を整備したが、Remote Workflowは未実行。Goal全体とPhase 3〜5は未完了。詳細・コマンド・ログは`docs/PROGRESS0910.md`のP2-7完了記録を参照する。
+**P3-1：同一の本番Imageとコマンド別entrypointはローカル完了。** NodeでSPA/Docs、Python builderでhash付きLock依存を構築し、非rootの同じImageでbot/dashboard/social-worker/migrate/testを実行する。read-only・権限昇格禁止・Capability除去でPython全302件、空SchemaのMigration/再適用、実HTTPでのSPA/Docs/assets配信、Worker Heartbeat、正常終了を検証した。Botの全Cog起動/再起動はオフライン回帰で確認。PID 1のSIGTERM問題を共通Lifecycleで修正した。
+
+**次はP3-2：環境別Compose・Volume・秘密情報・起動順。** StageのDiscord・OAuth・Webhook実動、運用環境の同一digest、実Transcript/S3を含むRestoreは別ゲートとして保持する。Remote Workflowは未実行。Goal全体とPhase 3〜5は未完了。詳細・コマンド・ログは`docs/PROGRESS0910.md`のP3-1完了記録を参照する。
 
 ## 1. 判断と調査範囲
 
-Phase 0〜2のローカル検証基盤・V1除去・責務分離・PostgreSQL移行を完了した。直近はこの構造をPhase 3の同一本番Imageへ載せ、環境分離と運用検証を進める。既存機能の運用品質を満たしてからPhase 5へ進む。
+Phase 0〜2とP3-1のローカル実装・検証を完了した。直近は同一本番Imageを利用して環境分離と運用検証を進める。既存機能の運用品質を満たしてからPhase 5へ進む。
 
 README、ROADMAP、設計・アーキテクチャ・機能・運用資料、起動処理、保存層、主要Domain、API、React画面、CIとテスト定義を確認した。今回は静的調査と計画策定であり、テスト・ビルド実行、本番DB調査、Discord実機検証は行っていない。テストの存在を成功や機能完成の証拠とは扱わない。
 
@@ -143,7 +145,7 @@ ROADMAPの順序を維持する。各機能をDBだけ・画面だけで公開�
 - PostgreSQLの接続枯渇・lock競合・deadlock、Outbox滞留、Worker停止、Discord側成功後のDB失敗を重点監視する。特にRetryは「最大回数」だけでなく冪等性と補償を検証する。
 - Stage検証と将来の本番PostgreSQL運用確認には、対象環境・テストGuild・OAuth/Provider設定へのアクセスが必要。原開発DBのInventory/移送はP2-7の着手条件にしない。アクセスがない期間も、コードInventory、Fixture、コンテナ、Contract testの整備は進められる。
 
-直近の着手はP3-1。P0-1〜P2-7のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
+直近の着手はP3-2。P0-1〜P3-1のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
 
 ## 8. 再調査に基づく具体的な実行単位（2026-09-12）
 

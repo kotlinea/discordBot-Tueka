@@ -142,4 +142,5 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    from runtime.lifecycle import run
+    run(main)

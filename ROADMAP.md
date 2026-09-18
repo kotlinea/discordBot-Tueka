@@ -27,7 +27,7 @@
 
 Phase 2のローカル出口まで完了。P2-7でRuntime・全Repository・Migration・テスト基盤をPostgreSQLへ統一し、空の開発用PostgreSQLへ接続設定を切り替えた。Windows/Linux各298件、Frontend/Docs/画面回帰、実DBの別DB Restoreが成功している。旧開発DBのデータは移送していない。
 
-次はP3-1の本番Imageとコマンド別entrypoint。Stageの実Discord/OAuth/Webhook、運用環境の同一digest、実Transcript/S3の復旧確認は未完了のまま残す。実施証拠と引継ぎは `docs/PROGRESS0910.md` を参照する。
+P3-1の本番Imageとコマンド別entrypointもローカル完了。同一Imageを非root/read-only/権限昇格禁止で検証し、Python302件、Migration、SPA/Docs実配信、Worker Heartbeatと正常終了を確認した。次はP3-2の環境別Compose・Volume・起動順。Stageの実Discord/OAuth/Webhook、運用環境の同一digest、実Transcript/S3の復旧確認は未完了のまま残す。実施証拠と引継ぎは `docs/PROGRESS0910.md` を参照する。
 
 ## 実施順序
 

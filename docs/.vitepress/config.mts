@@ -58,6 +58,7 @@ export default defineConfig({
         { text: '構成と起動', link: '/operations/' }, { text: 'Windows', link: '/operations/windows' }, { text: 'Linux / VPS', link: '/operations/linux' },
         { text: 'バックアップと復元', link: '/operations/backup' }, { text: '更新とロールバック', link: '/operations/upgrade' },
         { text: 'DB Migration', link: '/operations/migrations' },
+        { text: '本番Image', link: '/operations/container' },
         { text: 'セキュリティ', link: '/operations/security' },
       ]}],
       '/reference/': [{ text: 'リファレンス', items: [

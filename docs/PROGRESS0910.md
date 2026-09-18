@@ -476,3 +476,19 @@
 - テスト用`tueka-p27-postgres-test-1`はlocalhost:55432 / tmpfs。Compose起動時は`--env-file tests/postgres.env`を使い、アプリ.envを補間しない。開発DBとは別接続先・別Project・別Volume。開発Composeの構文検査も成功。
 - CIへLinux/PostgreSQL18、Windows runner同梱PostgreSQL17の互換検証、Linuxコンテナ接続、型生成、実Restoreを設定した。Windows runner仕様はGitHub公式`actions/runner-images`のWindows2025資料で確認。Remote Workflowは未実行で、CIが実際にgreenという主張はしない。
 - Stageの実Discord/OAuth/Webhook、Stage/本番の同一digest、実Transcript/S3・鍵世代を組み合わせた復元は未完了。P3-1はSPA/Docsを含む同一Image、非root/read-only、Bot/Dashboard/Worker/Migrate/Testのコマンド境界から開始する。Git Stage/Commit操作は実施していない。ユーザーのStage変更を維持する。
+
+### 2026-09-19 P3-1 完了：同一本番Imageと実行境界
+
+- 判定：P3-1の計画・実装・ローカル検証・運用Docsを完了。次はP3-2。Phase 3全体、Phase 4〜5、実Stageの受入は未完了。
+- Dockerfileを追加。digest固定のNode 24 stageでnpm ciからSPA/Docsを構築、Python 3.13 builderでhash付きrequirements.lockを導入し、Runtimeへ仮想環境と成果物をコピーする。RuntimeはUID/GID 10001、Node/npm/gitを含まない。アプリディレクトリを明示してCOPYし、.dockerignoreへIDE/Agentの作業用ディレクトリも追加した。
+- runtime/にCommand Dispatcherとasyncio Lifecycleを配置し、bot/dashboard/social-worker/migrate/testを同じImageで実行する。Dispatcherはexecでプロセスを置換し、未知のCommandは終了コード2。BotとWorkerはSIGTERMを受けてTaskをCancelし、HTTP/Discord ClientとDB Poolを閉じる。DashboardはUvicornの終了処理を使う。
+- Runtimeは起動オプションでread-only、no-new-privileges、cap-drop ALLを適用する。書込みは/tmpと/dataへ限定。/dataはTranscript等の永続Volume用で所有者10001:10001。P3-2で環境別Composeへこの契約を固定する。
+- 同一Imageで全Pythonテストを行うためtests/Fixture、Docs原稿、Frontendソースを含める。Python依存は共通Lock。Node単体/画面テストは既存Dockerfile.web-testへ分離し、本番RuntimeへNodeを導入しない。
+- 最終Image tueka:p31でPython全302件成功、118.970秒、skipなし（.venv-p0/p3-1-accepted-tests.log）。非root/read-only/権限昇格禁止/Capability除去、専用PostgreSQL接続、/tmp tmpfsで実行。Bot全Cogの起動/再起動、Schema未適用時の起動拒否も既存回帰に含む。Windowsは変更したDispatcher/Lifecycleの4件が成功。
+- scripts/verify_runtime_image.pyで一時SchemaへのMigrationと再適用、Dashboardの実HTTP配信（SPA/Docs日本語・英語/assets）、Worker Heartbeat、実UID/NoNewPrivs、Root FSの書込み拒否、秘密設定/ローカルDB/IDE資材/Node/npm/gitの不在を確認。Dashboard/Workerはdocker stopで終了コード0。検証用コンテナとSchemaはfinallyで削除（p3-1-accepted-smoke.log）。アプリDBや実Discord資格情報は使用しない。
+- 初回ビルドはVitePressの最終更新処理に必要なgitが不足し失敗、web stageだけに追加して解消。初回HTTP smokeはテストTokenでDiscord APIへ問い合わせるトップページを選んで401となったため、外部接続を必要としないSPA routeへ変更。初回終了検証でWorkerがSIGTERMを無視し137で強制停止された問題を検出し、共通Lifecycleと回帰テストを追加して終了コード0を再検証した。
+- 最終Image build成功（p3-1-accepted-build.log）、内部Frontend build 6.14秒、Docs build 10.15秒。検証Imageのローカルmanifest digestはsha256:bb91303e999c94d0e0be9e910c4c748e28d9da8b29d05a8342458cc815c90dda。Registryへpushしておらず、Stage/本番同一digestの運用実績ではない。今回の完了記録はこの検証後に追記した。
+- docs/operations/container.mdへ構築・5 Command・書込み先・権限・テスト資材・検証手順を記載し、Docs navigationへ追加。deploy/README.mdの古いmigrate_json.py手順も現在のPostgreSQL Migration/Lock導入へ訂正した。
+- CIへruntime-image Jobを追加し、同一本番Imageのbuild・隔離起動検証・read-only全回帰を設定した。Remote Workflowは未実行。git diff --checkと変更Python構文検査が成功。Git Stage/Commit操作は実施していない。
+- 引継ぎ：P3-2はdev/stage/prod Compose、PostgreSQL/Transcriptの別Volume、環境別秘密情報/Network/Project、DB readiness→migrate成功→3Service起動、DevのみSource/Vite/reloadを実装する。Imageの起動権限制約をComposeで固定する。実Discord/OAuth/Webhook、実環境同一digest、実Transcript/S3/鍵を含む復元の証拠は今後のゲートとして残す。
+- 完了記録・ROADMAP・EXECUTION_PLAN更新後の最終Docs buildも成功（12.43秒、.venv-p0/p3-1-recorded-docs.log）。最終build後の変更はこの結果追記のみ。

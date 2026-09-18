@@ -1,5 +1,4 @@
 """Discord bot entry point."""
-import asyncio
 import logging
 
 import discord
@@ -8,6 +7,7 @@ from discord.ext import commands
 
 from config import Settings
 from database import require_current
+from runtime.lifecycle import run
 
 
 class TuekaBot(commands.Bot):
@@ -53,4 +53,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    run(main)
