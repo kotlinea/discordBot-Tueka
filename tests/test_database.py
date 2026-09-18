@@ -1,111 +1,101 @@
-import sqlite3
-import tempfile
+"""Native PostgreSQL connection policy and transaction lifecycle."""
 import unittest
-from contextlib import closing
 from pathlib import Path
 
-from database import BUSY_TIMEOUT_MS, SchemaNotReady, readonly, transaction
-from db_support import set_fixture_version
-from migrate import apply
-from reaction_roles import ReactionRoleRepository
-from guild_settings import GuildSettingsRepository
-from suggestions import SuggestionRepository
-from ticketing import TicketRepository
-from dashboard.repository import DashboardRepository
-from community import CommunityRepository
-from moderation import ModerationRepository
-from social import SocialRepository
-from engagement import EngagementRepository
+import psycopg
 
-
-REPOSITORIES = (ModerationRepository, SocialRepository, EngagementRepository, TicketRepository, ReactionRoleRepository, SuggestionRepository, DashboardRepository, GuildSettingsRepository, CommunityRepository)
+from database import connect, database_url, transaction
+from database.testing import temporary_database
 
 
 class DatabaseTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
-        self.db = self.root / 'test.db'
+        self.context = temporary_database()
+        self.url = self.context.__enter__()
+        self.addCleanup(self.context.__exit__, None, None, None)
 
-    def dump(self):
-        with closing(readonly(self.db)) as connection:
-            return list(connection.iterdump())
+    def test_file_and_malformed_urls_are_rejected_without_secret_disclosure(self):
+        for value in (Path('missing/test.db'), 'sqlite:///test.db', 'postgresql://user:secret@host', 'postgresql://user:secret@host:invalid/db'):
+            with self.subTest(kind=type(value).__name__):
+                with self.assertRaises(ValueError) as caught:
+                    database_url(value)
+                self.assertNotIn('secret', str(caught.exception))
 
-    def test_missing_database_is_rejected_without_creating_files(self):
-        path = self.root / 'missing' / 'test.db'
-        for repository in REPOSITORIES:
-            with self.subTest(repository=repository.__name__):
-                with self.assertRaisesRegex(SchemaNotReady, 'migrate.py'):
-                    repository(path)
-                self.assertFalse(path.parent.exists())
+    def test_connection_pool_uses_bounded_timeouts_and_utc(self):
+        with transaction(self.url) as c:
+            for setting, value in [('statement_timeout', '30s'), ('lock_timeout', '10s'), ('idle_in_transaction_session_timeout', '30s'), ('TimeZone', 'UTC')]:
+                self.assertEqual(c.execute('SELECT current_setting(%s) AS value', (setting,)).fetchone()['value'], value)
+            self.assertFalse(c.info.transaction_status == psycopg.pq.TransactionStatus.IDLE)
 
-    def test_unversioned_pending_and_changed_history_do_not_modify_data(self):
-        with closing(sqlite3.connect(self.db)) as connection:
-            connection.execute('CREATE TABLE keep(value TEXT)')
-            connection.execute("INSERT INTO keep VALUES('preserved')")
-            connection.commit()
-        for condition in ('unversioned', 'pending', 'changed'):
-            if condition == 'pending':
-                apply(self.db, self.root / 'backups')
-                set_fixture_version(self.db, 6)
-            elif condition == 'changed':
-                apply(self.db, self.root / 'backups')
-                with transaction(self.db) as connection:
-                    connection.execute("UPDATE schema_migrations SET checksum='changed' WHERE version=7")
-            before = self.dump()
-            for repository in REPOSITORIES:
-                with self.subTest(condition=condition, repository=repository.__name__):
-                    with self.assertRaises(SchemaNotReady):
-                        repository(self.db)
-                    self.assertEqual(self.dump(), before)
+    def test_read_only_connection_rejects_writes(self):
+        with self.assertRaises(psycopg.errors.ReadOnlySqlTransaction):
+            with connect(self.url, read_only=True) as c:
+                c.execute("INSERT INTO app_metadata VALUES('write','forbidden')")
 
-    def test_explicit_migration_boots_all_repositories_with_identical_connection_policy(self):
-        apply(self.db, self.root / 'backups')
-        before = self.dump()
-        for _ in range(2):
-            for repository in REPOSITORIES:
-                instance = repository(self.db)
-                manager = instance.connection if repository is ReactionRoleRepository else instance._connection
-                with manager() as connection:
-                    self.assertEqual(connection.execute('PRAGMA journal_mode').fetchone()[0], 'wal')
-                    self.assertEqual(connection.execute('PRAGMA foreign_keys').fetchone()[0], 1)
-                    self.assertEqual(connection.execute('PRAGMA busy_timeout').fetchone()[0], BUSY_TIMEOUT_MS)
-            self.assertEqual(self.dump(), before)
+    def test_exception_and_keyboard_interrupt_roll_back_and_pool_is_reusable(self):
+        with transaction(self.url) as c:
+            c.execute("INSERT INTO app_metadata VALUES('committed','keep')")
+        for error in (ValueError, KeyboardInterrupt):
+            with self.assertRaises(error):
+                with transaction(self.url) as c:
+                    c.execute("INSERT INTO app_metadata VALUES('partial','discard')")
+                    raise error()
+            with transaction(self.url) as c:
+                self.assertEqual(c.execute('SELECT * FROM app_metadata').fetchall(), [{'key': 'committed', 'value': 'keep'}])
+        with self.assertRaises(psycopg.IntegrityError):
+            with transaction(self.url) as c:
+                c.execute("INSERT INTO app_metadata VALUES('partial','discard')")
+                c.execute("INSERT INTO app_metadata VALUES('committed','duplicate')")
+        with transaction(self.url) as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) AS count FROM app_metadata').fetchone()['count'], 1)
 
-    def test_transaction_commits_and_rolls_back_partial_work(self):
-        apply(self.db, self.root / 'backups')
-        with transaction(self.db) as connection:
-            connection.execute("INSERT INTO app_metadata VALUES('committed','keep')")
-        before = self.dump()
-        with self.assertRaises(sqlite3.IntegrityError):
-            with transaction(self.db) as connection:
-                connection.execute("INSERT INTO app_metadata VALUES('partial','discard')")
-                connection.execute("INSERT INTO app_metadata VALUES('committed','duplicate')")
-        self.assertEqual(self.dump(), before)
+    def test_lock_timeout_rolls_back_partial_work(self):
+        from concurrent.futures import ThreadPoolExecutor
+        with transaction(self.url) as c:
+            c.execute("INSERT INTO app_metadata VALUES('locked','original')")
+        def competing():
+            with transaction(self.url) as c:
+                c.execute("SET LOCAL lock_timeout='50ms'")
+                c.execute("INSERT INTO app_metadata VALUES('partial','discard')")
+                c.execute("UPDATE app_metadata SET value='changed' WHERE key='locked'")
+        with connect(self.url) as owner:
+            owner.execute("SELECT * FROM app_metadata WHERE key='locked' FOR UPDATE")
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                with self.assertRaises(psycopg.errors.LockNotAvailable):
+                    executor.submit(competing).result(timeout=10)
+        with transaction(self.url) as c:
+            self.assertEqual(c.execute('SELECT * FROM app_metadata').fetchall(), [{'key': 'locked', 'value': 'original'}])
 
-        with self.assertRaises(KeyboardInterrupt):
-            with transaction(self.db) as connection:
-                connection.execute("INSERT INTO app_metadata VALUES('interrupt','discard')")
-                raise KeyboardInterrupt()
-        self.assertEqual(self.dump(), before)
+    def test_connection_loss_discards_uncommitted_work_and_pool_recovers(self):
+        with self.assertRaises(psycopg.OperationalError):
+            with transaction(self.url) as c:
+                c.execute("INSERT INTO app_metadata VALUES('uncommitted','discard')")
+                with connect(self.url, autocommit=True) as control:
+                    control.execute('SELECT pg_terminate_backend(%s)', (c.info.backend_pid,))
+                c.execute('SELECT 1')
+        with transaction(self.url) as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) AS count FROM app_metadata').fetchone()['count'], 0)
+            c.execute("INSERT INTO app_metadata VALUES('recovered','keep')")
 
-    def test_previous_v2_missing_columns_are_added_by_cli(self):
-        apply(self.db, self.root / 'backups')
-        with transaction(self.db) as connection:
-            connection.execute("INSERT INTO social_events(provider,event_key,account_id,payload_json,received_at) VALUES('youtube','keep','UC1','{}',1)")
-            connection.execute('DROP INDEX idx_social_events_job_claim')
-            connection.execute('ALTER TABLE social_events DROP COLUMN available_at')
-            connection.execute('ALTER TABLE ticket_feedback DROP COLUMN answers_encrypted_json')
-            connection.execute('ALTER TABLE tickets_v2 DROP COLUMN notes_thread_id')
-        set_fixture_version(self.db, 6)
-        with self.assertRaises(SchemaNotReady):
-            GuildSettingsRepository(self.db)
-        result = apply(self.db, self.root / 'backups')
-        self.assertEqual(result['applied'], ['0007_current_schema.sql', '0008_job_leases.sql', '0009_suggestion_outbox.sql', '0010_resource_leases.sql'])
-        with closing(readonly(self.db)) as connection:
-            self.assertEqual(connection.execute('SELECT event_key,available_at FROM social_events').fetchone(), ('keep', 0))
-            self.assertIn('notes_thread_id', {row[1] for row in connection.execute('PRAGMA table_info(tickets_v2)')})
-            self.assertIn('answers_encrypted_json', {row[1] for row in connection.execute('PRAGMA table_info(ticket_feedback)')})
-        for repository in REPOSITORIES:
-            repository(self.db)
+    def test_deadlock_rolls_back_one_whole_transaction_without_automatic_replay(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+        with transaction(self.url) as c:
+            c.execute("INSERT INTO app_metadata VALUES('one','0'),('two','0')")
+        barrier = Barrier(2)
+        def update(keys):
+            try:
+                with transaction(self.url) as c:
+                    c.execute('UPDATE app_metadata SET value=%s WHERE key=%s', (keys[0], keys[0]))
+                    barrier.wait(timeout=5)
+                    c.execute('UPDATE app_metadata SET value=%s WHERE key=%s', (keys[0], keys[1]))
+                return 'committed'
+            except psycopg.errors.DeadlockDetected:
+                return 'rolled_back'
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(update, [('one', 'two'), ('two', 'one')]))
+        self.assertEqual(sorted(results), ['committed', 'rolled_back'])
+        with transaction(self.url) as c:
+            values = {row['value'] for row in c.execute('SELECT value FROM app_metadata')}
+        self.assertEqual(len(values), 1)
+        self.assertNotIn('0', values)

@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import os
 import socket
-import sqlite3
+from database import IntegrityError
 from typing import Any
 
 from jobs import Outcome, run_batch
@@ -67,7 +67,7 @@ class TicketFeedbackModal(discord.ui.Modal):
             panel = self.cog.repository.panel(int(ticket.get("guild_id", 0)), int(ticket.get("panel_id", 0))) or {}
             self.cog.repository.save_feedback(self.ticket_id, interaction.user.id, self.rating, form_id=panel.get("exit_form_id"), answers_encrypted=answers)
             await interaction.response.send_message("評価を送信しました。", ephemeral=True)
-        except sqlite3.IntegrityError:
+        except IntegrityError:
             await interaction.response.send_message("このTicketは評価済みです。", ephemeral=True)
         except (PermissionError, ValueError):
             await interaction.response.send_message("この評価は受け付けられません。", ephemeral=True)
@@ -81,7 +81,7 @@ class TicketsCog(commands.Cog):
         self.bot = bot
         self.discord = DiscordTicketAdapter(bot)
         settings = bot.settings
-        self.repository = TicketRepository(settings.database_path)
+        self.repository = TicketRepository(settings.database_url)
         self.panel_delivery = PanelDeliveryService(self.repository, self.discord)
         self.transcripts = TranscriptStorage(settings.data_dir / "ticket-transcripts", settings.ticket_encryption_key, s3={
             "endpoint_url": settings.ticket_s3_endpoint_url, "region": settings.ticket_s3_region, "bucket": settings.ticket_s3_bucket,
@@ -203,6 +203,9 @@ class TicketsCog(commands.Cog):
             parts = custom_id.split(":")
             if len(parts) == 3 and parts[1].isdigit() and parts[2].isdigit():
                 try:
+                    message_id = interaction.message.id if interaction.message else 0
+                    if not self.repository.notice_message_recorded(int(parts[1]), message_id):
+                        raise PermissionError("feedback_origin_unknown")
                     ticket = self.repository.ticket(int(parts[1])) or {}
                     panel = self.repository.panel(int(ticket.get("guild_id", 0)), int(ticket.get("panel_id", 0))) or {}
                     if not panel.get("feedback_enabled"):
@@ -213,7 +216,7 @@ class TicketsCog(commands.Cog):
                     else:
                         self.repository.save_feedback(int(parts[1]), interaction.user.id, int(parts[2]))
                         await interaction.response.send_message("評価を送信しました。", ephemeral=True)
-                except sqlite3.IntegrityError:
+                except IntegrityError:
                     await interaction.response.send_message("このTicketは評価済みです。", ephemeral=True)
                 except (PermissionError, ValueError):
                     await interaction.response.send_message("この評価は受け付けられません。", ephemeral=True)
@@ -226,7 +229,7 @@ class TicketsCog(commands.Cog):
                 request = self.repository.close_request(int(parts[2]))
                 ticket = self.repository.ticket(int(request["ticket_id"])) if request else None
                 panel = self.repository.panel(interaction.guild.id, int(ticket["panel_id"])) if ticket else None
-                if not request or not ticket or not await self._staff(interaction.user, panel):
+                if not request or not ticket or ticket['guild_id'] != interaction.guild.id or ticket.get('discord_container_id') != interaction.channel_id or not await self._staff(interaction.user, panel):
                     await interaction.response.send_message("Staffだけが回答できます。", ephemeral=True); return
                 approved = parts[1] == "approve"
                 self.repository.resolve_close_request(int(parts[2]), interaction.user.id, approved)
@@ -241,9 +244,13 @@ class TicketsCog(commands.Cog):
             return
         action, entity_id = parts[1], int(parts[2])
         if action == "open":
+            message_id = interaction.message.id if interaction.message else 0
+            if not self.repository.panel_message_contains(interaction.guild.id, interaction.channel_id or 0, message_id, entity_id):
+                await interaction.response.send_message("このPanelは現在の設定に登録されていません。管理者に確認してください。", ephemeral=True)
+                return
             await self.show_open(interaction, entity_id); return
         ticket = self.repository.ticket(entity_id)
-        if not ticket or ticket['guild_id'] != interaction.guild.id:
+        if not ticket or ticket['guild_id'] != interaction.guild.id or ticket.get('discord_container_id') != interaction.channel_id:
             await interaction.response.send_message("Ticketが見つかりません。", ephemeral=True); return
         if action == "close-reason":
             await interaction.response.send_modal(TicketCloseReasonModal(self, entity_id)); return

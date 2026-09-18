@@ -30,7 +30,7 @@ class SuggestionDeliveryTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        database = prepare_database(Path(self.temp.name) / 'suggestions.db')
+        database = prepare_database(Path(self.temp.name) / 'suggestions.db', self.addCleanup)
         self.repo = SuggestionRepository(database)
         settings = GuildSettingsRepository(database)
         settings.set_module(1, 'suggestions', enabled=True, settings={'channel_id': 10})
@@ -95,5 +95,5 @@ class SuggestionDeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone((await self.service.deliver(job)).error)
         self.assertEqual(self.repo.get(1, self.item['id'])['status'], 'pending')
         with self.repo._connection() as c:
-            self.assertEqual(c.execute("SELECT COUNT(*) FROM suggestion_outbox WHERE action='sync'").fetchone()[0], 1)
+            self.assertEqual(c.execute("SELECT COUNT(*) AS count FROM suggestion_outbox WHERE action='sync'").fetchone()["count"], 1)
         self.assertEqual(self.port.sent, 0)

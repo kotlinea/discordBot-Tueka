@@ -82,7 +82,7 @@ class ReactionRoleModelTests(unittest.TestCase):
 class ReactionRoleRepositoryTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.repo = ReactionRoleRepository(prepare_database(Path(self.temp.name) / "rr.sqlite3"))
+        self.repo = ReactionRoleRepository(prepare_database(Path(self.temp.name) / "rr.sqlite3", self.addCleanup))
         self.service = ReactionRoleService(self.repo)
 
     def tearDown(self):
@@ -257,7 +257,7 @@ class ReactionRoleCogTests(unittest.IsolatedAsyncioTestCase):
         from jobs import Outcome
         from unittest.mock import AsyncMock
         with tempfile.TemporaryDirectory() as directory:
-            repo = ReactionRoleRepository(prepare_database(Path(directory) / 'move.db'))
+            repo = ReactionRoleRepository(prepare_database(Path(directory) / 'move.db', self.addCleanup))
             config = ReactionRoleService(repo).create(1, message())
             repo.set_discord_message(config['id'], 900)
             publication = repo.outbox_jobs.claim('worker')
@@ -291,7 +291,7 @@ class ReactionRoleCogTests(unittest.IsolatedAsyncioTestCase):
     async def test_command_groups_load_without_discord_connection(self):
         with tempfile.TemporaryDirectory() as directory:
             bot = commands.Bot(command_prefix="/", intents=discord.Intents.none())
-            bot.settings = SimpleNamespace(database_path=prepare_database(Path(directory) / "rr.sqlite3"), reaction_role_max_mappings_per_message=20)
+            bot.settings = SimpleNamespace(database_url=prepare_database(Path(directory) / "rr.sqlite3", self.addCleanup), reaction_role_max_mappings_per_message=20)
             async with bot:
                 await bot.load_extension("cogs.reaction_roles")
                 root = bot.tree.get_command("reactionrole")

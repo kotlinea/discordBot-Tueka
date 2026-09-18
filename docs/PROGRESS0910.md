@@ -445,3 +445,34 @@
 - Phase 3もPostgreSQL前提へ変更。DB専用Service/Volume、readiness→migrate→3Serviceの起動順、環境別接続秘密、接続待ち/lock/deadlock監視、DB論理BackupとTranscript・鍵世代を組み合わせたRestoreを計画した。当初のアプリService各1 Replicaは維持する。
 - 開発DB破棄の許可は将来のStage/本番データへ拡張しない。PostgreSQLはまだ未実装であり、現Runtimeと今回のP2-6テストはSQLiteである。次の実装担当はEXECUTION_PLAN第9節を起点に、テスト用PostgreSQLと接続/Migration境界から着手する。
 - 計画変更・P2-6完了記録を反映した最終Docs build成功（7.44秒、`.venv-p0/p2-6-plan-final-docs.log`）。初回は公開対象外のEXECUTION_PLANへのリンクで停止し、Repository内パスの説明へ修正して成功した。最終build後の変更はこの結果追記のみ。
+
+
+### 2026-09-18 P2-7 作業中：PostgreSQL基盤とRepository移行
+
+- P2-7は未完了。PostgreSQL 18の隔離テストServiceを起動し、psycopg 3・接続Pool・Transaction・専用Migration履歴・Checksum・Migration排他・Schema単位のテスト隔離を実装した。初期Migrationは66テーブルで、履歴テーブルを含め67テーブル。SQLiteの旧Migrationは履歴資料として保持し、原開発DBは変更していない。
+- `compose.postgres-test.yaml` は専用Project `tueka-p27`、localhost:55432、tmpfsで稼働。Composeには `--env-file tests/postgres.env` を指定し、アプリの秘密情報を含む.envを補間しない。テストは明示的な `TUEKA_TEST_DATABASE_URL` と `tueka_test` で始まるDB名を要求する。
+- Dashboard/GuildSettings/Community/Engagementに続き、Jobs・Social・Moderation・Suggestions・ReactionRolesをPostgreSQL SQLへ変換。採番はRETURNING、重複処理はON CONFLICT、Queue取得はFOR UPDATE SKIP LOCKED、所有権確認は行Lock、未作成Resourceの競合はTransaction Advisory Lockで保護した。
+- 実PostgreSQLの `tests/test_postgres.py` は13件成功（4.384秒）。Migration初期化/再適用/失敗Rollback/排他、Schema隔離/大きなID、同時revision、Queue期限切れ引継ぎ/旧Owner拒否、Social単一Claim/OAuth一度限り、Moderationポイント同時加算/Case・Lockdown重複防止、Suggestions投票/Review/Outbox、ReactionRole設定更新/Link Group/Recoveryを確認。
+- これは移行済み境界の限定テストであり、全回帰の成功を意味しない。Ticket Repository、RuntimeのDATABASE_URL切替、既存テストFixture、型生成、CI、Backup/Restore、正式Docsが残る。現時点の作業木は移行途中であり、旧SQLite設定での起動はできない。各Domainの全面回帰・競合監査も今後必要。
+- GitのStage/Commit操作は実施していない。P2-7の完了判定とPhase 3への進行は保留し、EXECUTION_PLANの順序を維持する。
+
+
+### 2026-09-19 P2-7 完了：PostgreSQL移行とPhase 2のローカル出口
+
+- 判定：P2-7の計画・実装・実PostgreSQL検証・Docs更新を完了し、Phase 2のローカル出口を満たした。次は既存番号を維持してP3-1。Goal全体は未完了で、Phase 3〜5とStage実環境ゲートを残す。
+- 接続境界を旧`database.py`から`database/connections.py`、`migrations.py`、`operations.py`、`testing.py`へ分割。psycopg/PoolをLockへ追加し、DATABASE_URL、接続先ごとの最大4接続、Transaction、SQL/lock/Pool待ち時間、Schema適用済み検査を共通化した。SQLite Runtime fallbackはない。
+- PostgreSQL専用`migrations/postgresql/0001_initial.sql`に66テーブル・39 Index・外部キーを定義し、履歴を含め67テーブル。BIGINT/Identity、TEXT JSON、既存0/1 bool、UTC epoch秒を明示。SQLite 0001〜0010は過去の履歴として保持し、データETLは実装しない。
+- 9 Domain RepositoryとJobsをnative PostgreSQLへ移行。RETURNING、ON CONFLICT、JSONB演算、集計、revision、外部キー、採番を実DBで検証した。QueueのFOR UPDATE SKIP LOCKED、Resource Leaseの行Lock、Entity単位のAdvisory Lockで競合を制御する。
+- Dashboard/Guild設定・Moderation更新・Social/Reaction Roles削除のrevisionをTransaction内で確認する。Reaction Rolesの削除Outboxと設定削除は同一Transaction。HTTPの同時Rule更新は成功1件・409競合1件を確認。SocialのTarget作成/統合/削除はProvider単位のLockを共有し、同時Alias解決でもCanonical Targetを一つにする。
+- 接続断、lock timeout、deadlockを実DBへ注入し、部分変更のRollback、deadlock被害側のTransaction全体Rollback、Poolの回復、無条件の自動再実行がないことを検証した。時計はアプリ側UTC epoch秒で、接続TimezoneはUTC。Host時刻同期を運用前提としてDocsへ明記した。
+- DB再初期化後の外部Resource誤操作を防ぐため、Ticketの公開Panelは保存されたGuild/Channel/Messageと照合する。管理Button/Close RequestはTicketのContainerと照合し、Feedbackは保存済み通知Messageと照合する。旧IDが新DBで再利用されても旧投稿を現在のResourceとして扱わない。
+- 全Runtime入口・Cog・Service・API ContextをDATABASE_URLへ統一。型生成も一時PostgreSQL Schemaを使用し確実に削除する。既存テストFixtureは明示的なcleanup付きSchemaへ置換。旧SQLite→SQLite移行専用テストは現行のnative Migration・起動拒否・データ保持・Rollbackテストへ整理し、現行Command/古いButton拒否の回帰は残した。テストはアプリDBを流用しない。
+- 最終Windows全298件成功（227.033秒、`.venv-p0/p2-7-accepted-windows.log`）、Linux/Python 3.13全298件成功（153.470秒、`p2-7-accepted-linux.log`）。Linux Imageは`tueka-test:p27`、Buildログは`p2-7-accepted-linux-build.log`。全件実行でskipなし。
+- Frontend単体14件成功（5.92秒、`p2-7-vitest.log`）、TypeScript＋本番build成功（Vite 7.16秒、`p2-7-frontend-build.log`）、Dashboard画面回帰48件成功（2.5分、`p2-7-ui.log`）。日英・外観・4画面幅・保存/再読込・競合・権限・Keyboardを既存シナリオで確認した。
+- 正式Docs build成功（13.96秒、`p2-7-accepted-docs-build.log`）、Docsの5画面幅10件成功（42.8秒、`p2-7-docs-a11y.log`）。Migration・Backup/Restore・環境変数・Architecture・日英の開始手順・各機能説明を更新した。OpenAPI/TypeScript生成`--check`、pip check、git diff HEAD --checkも成功。Runtime Python117ファイルを構文検査し、SQLite import/BEGIN IMMEDIATE/lastrowid/旧INSERT/旧環境変数の依存なしを確認した。
+- 実pg_dump/pg_restoreは`scripts/verify_postgres_restore.py`で検証。専用Server上に今回だけのUUID付きDBを作成し、67テーブル、設定、19桁ID、採番の継続、Queue再取得、Transcript/S3オブジェクト参照、破損dump失敗時の空DB維持を確認して全検証DBを削除した。ログは`p2-7-restore-proof.log`（dump 143216 bytes）。実S3オブジェクト取得や本番暗号鍵による復号の成功を意味しない。
+- 開発用`compose.postgres-dev.yaml`を追加。既存アプリProcessと同名Volumeがないことを確認し、新規`tueka-dev_postgres-dev-data`を作成、`tueka-dev-postgres-dev-1`をhealthyにした。localhost:55433 / DB・User`tueka_dev`へ初期Migrationを適用し、67テーブル・Domain行数0を確認した。アプリ`.env`へDATABASE_URLを設定し、DATABASE_PATHを除去。`Settings.from_env()`からこのDBと現行Schemaを確認した。
+- 開発用資格情報は新規`.env.postgres-dev`に生成し、`.env`とともにGit対象外であることを確認した。秘密値は出力・記録していない。元SQLite・保全DB・鍵・Transcript・外部Discord Resourceは未変更。Bot/Dashboard/Workerの外部接続は起動していない。
+- テスト用`tueka-p27-postgres-test-1`はlocalhost:55432 / tmpfs。Compose起動時は`--env-file tests/postgres.env`を使い、アプリ.envを補間しない。開発DBとは別接続先・別Project・別Volume。開発Composeの構文検査も成功。
+- CIへLinux/PostgreSQL18、Windows runner同梱PostgreSQL17の互換検証、Linuxコンテナ接続、型生成、実Restoreを設定した。Windows runner仕様はGitHub公式`actions/runner-images`のWindows2025資料で確認。Remote Workflowは未実行で、CIが実際にgreenという主張はしない。
+- Stageの実Discord/OAuth/Webhook、Stage/本番の同一digest、実Transcript/S3・鍵世代を組み合わせた復元は未完了。P3-1はSPA/Docsを含む同一Image、非root/read-only、Bot/Dashboard/Worker/Migrate/Testのコマンド境界から開始する。Git Stage/Commit操作は実施していない。ユーザーのStage変更を維持する。

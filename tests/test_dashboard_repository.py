@@ -12,7 +12,7 @@ class DashboardRepositoryTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.path = prepare_database(Path(self.temp.name) / 'test.db')
+        self.path = prepare_database(Path(self.temp.name) / 'test.db', self.addCleanup)
         self.repository = DashboardRepository(self.path)
 
     def test_session_expiry_revocation_and_restart(self):

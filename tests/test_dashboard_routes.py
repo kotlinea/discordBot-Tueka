@@ -19,7 +19,7 @@ class DashboardRouteTests(unittest.TestCase):
         root = Path(self.temp.name)
         env = {'DISCORD_TOKEN': 'test-token', 'DISCORD_CLIENT_ID': '1', 'DISCORD_CLIENT_SECRET': 'test-secret',
                'DISCORD_REDIRECT_URI': 'http://testserver/oauth/callback', 'SESSION_SECRET': 'test-session-secret',
-               'DASHBOARD_HTTPS_ONLY': 'false', 'DATABASE_PATH': str(prepare_database(root / 'test.db')), 'DATA_DIR': str(root),
+               'DASHBOARD_HTTPS_ONLY': 'false', 'DATABASE_URL': str(prepare_database(root / 'test.db', self.addCleanup)), 'DATA_DIR': str(root),
                'DASHBOARD_UI_V2': 'false', 'DASHBOARD_UI_V2_GUILDS': '999',
                'TICKETS_V2': 'false', 'TICKETS_V2_GUILDS': 'retired-allowlist'}
         with patch.dict(os.environ, env):
@@ -116,7 +116,7 @@ class DashboardRouteTests(unittest.TestCase):
 
     def test_ticket_staff_guild_visibility_without_allowlist(self):
         from ticketing import TicketRepository
-        repository = TicketRepository(prepare_database(self.module.settings.database_path))
+        repository = TicketRepository(prepare_database(self.module.settings.database_url, self.addCleanup))
         repository.save_team(1, {'name': 'Staff', 'user_ids': [2]})
         self.login()
         self.module.api.user_guilds = AsyncMock(return_value=[{'id': '1', 'name': 'Support', 'permissions': '0'}, {'id': '3', 'name': 'Other', 'permissions': '0'}])
@@ -129,7 +129,7 @@ class DashboardRouteTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/v1/guilds/3/tickets').status_code, 403)
 
     def test_reaction_roles_uses_only_v2_settings_and_omits_legacy_contract(self):
-        GuildSettingsRepository(self.module.settings.database_path).set_module(1, 'reaction_roles', enabled=True, settings={'reaction_role_ids': [123]})
+        GuildSettingsRepository(self.module.settings.database_url).set_module(1, 'reaction_roles', enabled=True, settings={'reaction_role_ids': [123]})
         url = '/api/v1/guilds/1/reaction-roles'
         self.assertEqual(self.client.get(url).status_code, 401)
         csrf = self.login()

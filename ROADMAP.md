@@ -23,6 +23,12 @@
 
 現行の原DBは開発段階のデータであり、PostgreSQL移行時に破棄・再作成できる。既存SQLiteのデータ保持・ETL・無停止移行は移行の受入条件に含めない。既に記録したBackup/保持検証は過去の実施記録として残す。今後作成するStage/本番データの保護、PostgreSQLのBackup/Restore、Migration失敗時の復旧と監査は引き続き必要とする。破棄の対象は現行開発DBに限定し、秘密情報・暗号鍵・外部Discord Resourceの削除へ範囲を拡張しない。
 
+## 現在地（2026-09-19）
+
+Phase 2のローカル出口まで完了。P2-7でRuntime・全Repository・Migration・テスト基盤をPostgreSQLへ統一し、空の開発用PostgreSQLへ接続設定を切り替えた。Windows/Linux各298件、Frontend/Docs/画面回帰、実DBの別DB Restoreが成功している。旧開発DBのデータは移送していない。
+
+次はP3-1の本番Imageとコマンド別entrypoint。Stageの実Discord/OAuth/Webhook、運用環境の同一digest、実Transcript/S3の復旧確認は未完了のまま残す。実施証拠と引継ぎは `docs/PROGRESS0910.md` を参照する。
+
 ## 実施順序
 
 ### Phase 0 — 基準確立と作業保護

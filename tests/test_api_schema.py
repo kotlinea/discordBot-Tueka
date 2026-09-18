@@ -12,7 +12,7 @@ class ApiSchemaTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.api = ApiFixture(Path(self.temp.name))
+        self.api = ApiFixture(Path(self.temp.name), self.addCleanup)
         self.addCleanup(self.api.client.close)
 
     def test_generated_artifacts_match_the_real_router(self):

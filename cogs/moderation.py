@@ -8,7 +8,7 @@ from guild_settings import GuildSettingsRepository
 class ModerationCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_url)
 
 
     @app_commands.command(description="サーバーログチャネルを設定します。")

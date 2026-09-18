@@ -20,7 +20,7 @@ class TicketV2Tests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
-        self.repository = TicketRepository(prepare_database(self.root / "tickets.db"))
+        self.repository = TicketRepository(prepare_database(self.root / "tickets.db", self.addCleanup))
         self.storage = TranscriptStorage(self.root / "blobs", Fernet.generate_key().decode("ascii"))
         self.service = TicketService(self.repository, self.storage)
         self.repository.save_settings(1, {"enabled": True, "open_limit": 1})
@@ -284,7 +284,7 @@ class TicketV2Tests(unittest.TestCase):
         self.assertTrue(repository.transfer_panel(ticket['id'], self.panel['id']))
         repository.set_auto_close_excluded(ticket['id'], True)
         repository.mark_deleted(ticket['id'], 123)
-        restarted = TicketRepository(repository.database_path)
+        restarted = TicketRepository(repository.database_url)
         saved = restarted.ticket(ticket['id'])
         self.assertEqual(saved['revision'], revision + 3)
         self.assertTrue(saved['auto_close_excluded'])
@@ -337,10 +337,10 @@ class TicketV2Tests(unittest.TestCase):
         ticket, _ = self.service.reserve(1, self.panel["id"], 10, "scheduled", set())
         ticket = self.repository.activate_ticket(ticket["id"], 300, 100)
         self.service.schedule_ticket(ticket)
-        reopened = TicketRepository(prepare_database(self.root / "tickets.db"))
+        reopened = TicketRepository(prepare_database(self.root / "tickets.db", self.addCleanup))
         with reopened._connection() as connection:
-            row = connection.execute("SELECT kind,status FROM ticket_schedules WHERE ticket_id=?", (ticket["id"],)).fetchone()
-        self.assertEqual(("no_user_reply", "pending"), tuple(row))
+            row = connection.execute('SELECT kind,status FROM ticket_schedules WHERE ticket_id=%s', (ticket["id"],)).fetchone()
+        self.assertEqual(("no_user_reply", "pending"), tuple(row.values()))
 
     def test_support_hours_reports_next_open(self):
         panel = {"support_hours": {"timezone": "Asia/Tokyo", "weekdays": {"0": {"start": "09:00", "end": "17:00"}}}}
@@ -397,7 +397,7 @@ class TicketV2Tests(unittest.TestCase):
         with self.assertRaisesRegex(OverflowError, "user_ticket_limit"):
             self.repository.reserve_ticket(1, panel["id"], 10, "limit-2", {})
         with self.repository._connection() as connection:
-            connection.execute("UPDATE tickets_v2 SET status='closed',closed_at=? WHERE id=?", (int(datetime.now().timestamp()), first["id"]))
+            connection.execute("UPDATE tickets_v2 SET status='closed',closed_at=%s WHERE id=%s", (int(datetime.now().timestamp()), first["id"]))
         with self.assertRaisesRegex(OverflowError, "ticket_cooldown"):
             self.repository.reserve_ticket(1, panel["id"], 10, "limit-3", {})
         staff = self.repository.reserve_ticket(1, panel["id"], 10, "limit-staff", {}, staff_exempt=True)

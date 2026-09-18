@@ -11,8 +11,8 @@ from guild_settings import GuildSettingsRepository
 class DashboardV2StorageTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.storage = GuildSettingsRepository(prepare_database(Path(self.temp.name) / "dashboard-v2.db"))
-        self.dashboard_repository = DashboardRepository(self.storage.database_path)
+        self.storage = GuildSettingsRepository(prepare_database(Path(self.temp.name) / "dashboard-v2.db", self.addCleanup))
+        self.dashboard_repository = DashboardRepository(self.storage.database_url)
 
     def tearDown(self):
         self.temp.cleanup()

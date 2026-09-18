@@ -15,7 +15,7 @@
 | `BOT_INVITE_URL` | 空 | 未使用 | `.env.example` に存在するが、現在のRuntimeには読取り処理がない。設定しても招待先は変わらない。 |
 | `DASHBOARD_HTTPS_ONLY` | `true` | Dashboard | Secure Cookieを要求 |
 | `DATA_DIR` | `data` | 全Process | Data Directory |
-| `DATABASE_PATH` | `data/tueka.sqlite3` | 全Process | 共通SQLite Path |
+| `DATABASE_URL` | 必須 | 全Process | 共通PostgreSQL接続URL。秘密値として管理 |
 | `LOG_LEVEL` | `INFO` | 全Process | Log Level |
 
 変更後は対象Processを再起動します。OAuth URLを変更した場合はDiscord Developer Portalも更新します。

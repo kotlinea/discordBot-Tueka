@@ -2,7 +2,7 @@
 
 ## 境界
 
-- **Repository**：SQLiteへの読書き、Transaction、Lease、Revision
+- **Repository**：PostgreSQLへの読書き、Transaction、Lease、Revision
 - **Service**：検証、状態遷移、冪等性、権限に依存しない業務処理
 - **Discord Adapter / Cog**：Discord Event、Interaction、Permission、API操作
 - **Dashboard API**：OAuth、CSRF、Guild所属、Payload Validation
@@ -29,11 +29,11 @@ Guild Moduleの汎用CRUD・有効Guild一覧は `guild_settings/repository.py`�
 
 Moderationのルール更新と設定のrules_revision更新、CaseとTrustイベントの記録は同じTransactionを維持するため `moderation/repository.py` がまとめて扱います。一般的な設定保存をこの経路へ集約しません。TicketのBlacklist・当番・Tag・Panel移動・自動Close除外・削除記録もRepositoryが扱い、ServiceやCogから直接SQLを実行しません。
 
-`social_worker.py` は従来の起動コマンドを保つ薄い入口で、処理本体は `social/worker.py` です。APIの内部生成関数はDBパスを受け取り、DomainごとのRepositoryを生成します。HTTP URLと認可の契約は維持します。共通Outbox/Runnerは `jobs/` にあります。Discord操作はDomainのAdapterへ分離済みです。API Routerは `dashboard/api/` に配置し、`dashboard/api_v1.py` はContextの生成とRouterの合成だけを担当します。
+`social_worker.py` は従来の起動コマンドを保つ薄い入口で、処理本体は `social/worker.py` です。APIの内部生成関数はPostgreSQL接続URLを受け取り、DomainごとのRepositoryを生成します。HTTP URLと認可の契約は維持します。共通Outbox/Runnerは `jobs/` にあります。Discord操作はDomainのAdapterへ分離済みです。API Routerは `dashboard/api/` に配置し、`dashboard/api_v1.py` はContextの生成とRouterの合成だけを担当します。
 
-2026-09-18時点の実装はSQLiteです。次のP2-7でPostgreSQLへ移行する計画をRepository内の `docs/EXECUTION_PLAN.md` に追加しました。以下は未移行の現行実装を説明しています。
+P2-7ではPostgreSQL専用の接続・Migration・テスト基盤へ切り替えています。原開発データは移送しません。
 
-SQLite接続・Transaction・WAL・busy timeout・Backup・Schema適用済み検査は `database.py` に集約しています。全DomainのRepositoryはこの接続を使います。書込み待ちは共通で10秒です。更新処理の必要に応じてRepositoryが `BEGIN IMMEDIATE` を選択します。
+`database/connections.py` がpsycopg接続・有界Pool・Transaction、`database/migrations.py` が適用と履歴検査、`database/operations.py` が棚卸し・論理Backup/Restoreを担当します。Poolは接続先ごとに最大4接続、取得待ち10秒、SQL30秒、lock待ち10秒です。UTC epoch秒を保存し、JSONはTEXT、既存の真偽値は0/1、Discord IDはBIGINT、内部IDはIdentity列を使います。
 
 Schemaは番号付きMigration CLIだけが作成・変更します。RepositoryのコンストラクタはDDLを実行せず、未適用・不一致の履歴を検出すると `SchemaNotReady` で失敗します。BotはDiscord接続前、Dashboard / Workerは保存層の作成時に確認します。現行Ticketの未完了Close復旧やReaction Rolesの不足設定修復は、Schema変更とは別のDomain処理として保持しています。
 
@@ -49,10 +49,10 @@ Schemaは番号付きMigration CLIだけが作成・変更します。Repository
 
 共通Runnerの対象はTicketのOutbox/自動Close Schedule、Reaction RolesのOutbox/期限Schedule、Socialイベント配送、ModerationのDashboard要求/期限付き処置、Suggestions配送の8 Queueです。継続監視するSocial ProviderのCursor/Polling、Panel公開、Lockdown復元はDomain側のライフサイクル処理であり、この有限ジョブQueueとは別です。
 
-- 1件ずつ取得し、処理中はLease期間の1/3ごとに更新します。SQLiteの書込みTransaction内で取得するため並行実行でも同じジョブを取得しません。
+- 1件ずつ取得し、処理中はLease期間の1/3ごとに更新します。PostgreSQLの`FOR UPDATE SKIP LOCKED`で取得するため並行実行でも同じジョブを取得しません。
 - 完了・更新にはID、所有者、取得ごとのToken、有効期限、processing状態の一致が必要です。同じ所有者名で再取得しても古いTokenは拒否します。Lease喪失時はHandlerをキャンセルし、そのBatchを終了します。次の定期実行は継続できます。
 - 取得時に試行数を加算し、最大8回。再試行待ちは `min(3600, 15 × 2^attempt)` 秒。最終試行でProcessが停止した場合も、Lease失効後の取得処理でfailedへ終端化します。failed行がDead Letterで、勝手に再実行しません。
-- completed/done/failedは終端日時から30日保持し、Batch開始時に削除します。保留・実行中の行は保持期限の対象外です。Migration 0008でToken・不足列・検索Indexを追加します。
+- completed/done/failedは終端日時から30日保持し、Batch開始時に削除します。保留・実行中の行は保持期限の対象外です。PostgreSQL初期SchemaにToken・試行数・終端日時・検索Indexを含みます。
 - Queue内の重複実行防止と外部APIの副作用の一回性は区別します。Discord成功直後の停止はDomainの配送記録・補償で扱います。既にModeration実行イベントがある未完了要求は成功に丸めず、照合が必要なfailedとして残します。
 
 Actionの部分失敗は成功扱いに丸めず、各結果と復旧可能性を保存します。Discord Resource作成後にDB更新が失敗した場合は孤立Resourceとして記録します。
@@ -71,7 +71,7 @@ Actionの部分失敗は成功扱いに丸めず、各結果と復旧可能性�
 これらは実装済みの境界です。P2-4全体の完了判定と検証結果は、実行計画と進捗記録で管理します。
 
 
-Ticketの返信・Staff NoteはServiceが復号・配送Intent・記録を担当し、AdapterがDiscordへ投稿します。配送KeyはOutbox IDと作成日時の組で、保持期限後にSQLiteの数値IDが再使用されても以前の配送と混同しません。結果不明の場合は識別印を照合し、明確な未送信エラーだけ新規送信として再試行します。内部Noteは同じ配送Keyの保存済み行を再利用します。
+Ticketの返信・Staff NoteはServiceが復号・配送Intent・記録を担当し、AdapterがDiscordへ投稿します。配送KeyはOutbox IDと作成日時の組で、保持期限後に数値IDが再使用されても以前の配送と混同しません。結果不明の場合は識別印を照合し、明確な未送信エラーだけ新規送信として再試行します。内部Noteは同じ配送Keyの保存済み行を再利用します。
 
 Ticket参加者の変更と回答待ちCategoryの移動・復帰もOutbox経由です。Categoryの移動前後はAPI呼出し前に監査記録へ保存し、DB更新に失敗しても元のCategoryを保持します。現在のCategoryが記録した移動前後のどちらでもなければ、自動移動を止めます。
 
@@ -95,7 +95,7 @@ Suggestionsは投稿予約を提案作成と、表示更新・審査通知の予
 
 ### Resource所有権と復旧時の扱い
 
-`jobs/repository.py` のResourceLeaseRepositoryが所有権の保存と検査、`jobs/leases.py` が非同期処理中の更新・中断・解放を担当します。0010のLeaseをLockdownのGuild、TicketのClaim、Reaction RolesのGuild/Memberに適用します。開始・復旧・期限処理は同じResourceのLeaseを共有し、旧所有者による状態確定と補償を拒否します。DiscordのAPI自体にはSQLiteのTokenを渡せないため、結果不明の外部処理は記録を使って照合します。
+`jobs/repository.py` のResourceLeaseRepositoryが所有権の保存と検査、`jobs/leases.py` が非同期処理中の更新・中断・解放を担当します。`resource_leases`をLockdownのGuild、TicketのClaim、Reaction RolesのGuild/Memberに適用します。開始・復旧・期限処理は同じResourceのLeaseを共有し、旧所有者による状態確定と補償を拒否します。DiscordのAPI自体にはDBのTokenを渡せないため、結果不明の外部処理は記録を使って照合します。
 
 Reaction Rolesは変更前後のRole一覧を保存してから操作し、Assignment・Binding・期限・リアクション除去予約と完了記録を一括確定します。補償には直近100件の監査ログでBot自身とOperation IDを確認します。人手の変更や証拠不足を検出した場合は補償待ちを残します。`View Audit Log`がない場合も成功扱いしません。
 
@@ -148,3 +148,12 @@ RootとDomain Routerは `React.lazy` / `Suspense` で画面を遅延読込みし
 共通UIは値・変更コールバック・見出し等を受け取り、Domainの保存処理を持ちません。例えばEmbedのTicket変数案内とScheduleの見出しはTicket画面から渡します。SaveBarは通常の保存CallbackとHTML form属性によるsubmitの両方に対応し、必須入力のブラウザー検証を維持します。409や権限喪失で編集内容を破棄せず、再試行・再読込を利用者が判断できます。
 
 視覚仕様は `design.md` と既存Tokenを維持します。Playwrightは別の一時出力先へbuildしたSPAをpreviewで配信し、開発サーバーの初回変換時間と画面の動作を切り分けます。本番の `/ui/` buildとは出力先を分け、4画面幅、日英、3外観×light/dark、保存・再読込・競合・権限・キーボード・Accessibilityを検証します。
+
+
+## DB時刻と障害境界
+
+保存時刻・Lease期限はアプリがUTC epoch秒で生成し、接続SessionのTimezoneもUTCに固定します。Bot・Dashboard・Workerを動かすHostの時計を同期してください。テストだけはQueue/Resource Leaseの時計を注入して失効を再現します。
+
+TransactionはRepositoryのDB操作で閉じ、DiscordやProviderへの通信を行う間は保持しません。psycopgのIntegrityError、接続断、LockNotAvailable、DeadlockDetectedを呼出元へ伝え、接続層が処理全体を勝手に再実行することはありません。Queueの再試行は既存のToken・Receipt・補償を通り、外部副作用の結果が不明な場合は照合を先に行います。接続断時の未Commit変更、lock timeout、deadlock被害側のTransactionはRollbackされます。
+
+SocialのTarget作成・Alias統合・孤立Target削除はProvider単位のTransaction Advisory Lockを共有します。複数Workerが同じ外部Accountを同時解決しても、Subscriptionが一つのCanonical Targetへ集約されます。

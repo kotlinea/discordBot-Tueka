@@ -1,5 +1,4 @@
 """Compose the public /api/v1 contract from domain routers."""
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
@@ -7,8 +6,8 @@ from dashboard.api.context import create_context
 from dashboard.api import session, guilds, suggestions, social, ticket_configuration, tickets, reaction_roles, modules, moderation
 
 
-def create_api_router(database_path: str | Path, discord: Any, settings: Any | None = None) -> APIRouter:
-    context = create_context(database_path, discord, settings)
+def create_api_router(database_url: str, discord: Any, settings: Any | None = None) -> APIRouter:
+    context = create_context(database_url, discord, settings)
     router = APIRouter(prefix="/api/v1")
     router.include_router(session.create_router(context))
     router.include_router(guilds.create_router(context))

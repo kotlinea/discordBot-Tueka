@@ -1,10 +1,13 @@
-import sqlite3
+"""PostgreSQL inventory and logical-backup CLI safeguards."""
 import tempfile
 import unittest
-from contextlib import closing
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from scripts.db_inventory import backup, inventory
+from database import transaction
+from database.operations import backup, inventory, restore
+from db_support import prepare_database
 
 
 class BackupTests(unittest.TestCase):
@@ -12,45 +15,47 @@ class BackupTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.source = self.root / 'source.db'
+        self.url = prepare_database(self.root / 'source', self.addCleanup)
 
-    def test_backup_includes_committed_wal_and_restores_to_new_database(self):
-        with closing(sqlite3.connect(self.source)) as connection:
-            connection.execute('PRAGMA journal_mode=WAL')
-            connection.execute('PRAGMA wal_autocheckpoint=0')
-            connection.execute('CREATE TABLE items(id INTEGER PRIMARY KEY, body TEXT)')
-            connection.execute("INSERT INTO items VALUES(1,'private content')")
-            connection.commit()
-            snapshot = self.root / 'backup.db'
-            result = backup(self.source, snapshot)
-            self.assertEqual(result['tables'][0]['rows'], 1)
-            self.assertNotIn('private content', str(result))
-            restored = self.root / 'restore.db'
-            self.assertEqual(backup(snapshot, restored), result)
-            with closing(sqlite3.connect(restored)) as check:
-                self.assertEqual(check.execute('SELECT body FROM items').fetchone()[0], 'private content')
-
-    def test_missing_source_does_not_create_database(self):
-        with self.assertRaises(sqlite3.OperationalError):
-            backup(self.source, self.root / 'backup.db')
-        self.assertFalse(self.source.exists())
-        self.assertFalse((self.root / 'backup.db').exists())
+    def test_inventory_reports_schema_and_counts_without_row_contents(self):
+        with transaction(self.url) as c:
+            c.execute("INSERT INTO app_metadata VALUES('private-key','private-content')")
+        result = inventory(self.url)
+        self.assertEqual(next(t for t in result['tables'] if t['name'] == 'app_metadata')['rows'], 1)
+        self.assertNotIn('private-content', str(result))
+        self.assertNotIn('private-key', str(result))
+        self.assertEqual(result['backend'], 'postgresql')
 
     def test_existing_destination_is_not_overwritten(self):
-        with closing(sqlite3.connect(self.source)) as connection:
-            connection.execute('CREATE TABLE items(id INTEGER)')
-        target = self.root / 'backup.db'
-        target.write_bytes(b'keep me')
-        with self.assertRaises(FileExistsError):
-            backup(self.source, target)
-        self.assertEqual(target.read_bytes(), b'keep me')
+        target = self.root / 'backup.dump'
+        target.write_bytes(b'keep')
+        with patch('database.operations.subprocess.run') as run:
+            with self.assertRaises(FileExistsError):
+                backup(self.url, target)
+            run.assert_not_called()
+        self.assertEqual(target.read_bytes(), b'keep')
 
-    def test_foreign_key_violation_rejects_snapshot_without_changing_source(self):
-        with closing(sqlite3.connect(self.source)) as connection:
-            connection.executescript('CREATE TABLE parent(id INTEGER PRIMARY KEY); CREATE TABLE child(parent_id INTEGER REFERENCES parent(id)); INSERT INTO child VALUES(99);')
-        self.assertEqual(inventory(self.source)['foreign_key_violations'], 1)
-        target = self.root / 'backup.db'
-        with self.assertRaises(ValueError):
-            backup(self.source, target)
+    def test_failed_dump_removes_only_its_partial_artifact(self):
+        target = self.root / 'backup.dump'
+        with patch('database.operations.subprocess.run', return_value=SimpleNamespace(returncode=1, stderr=b'secret')):
+            with self.assertRaises(RuntimeError) as error:
+                backup(self.url, target)
+        self.assertNotIn('secret', str(error.exception))
         self.assertFalse(target.exists())
-        self.assertEqual(inventory(self.source)['foreign_key_violations'], 1)
+
+    def test_dump_uses_environment_credentials_and_custom_format(self):
+        def dump(command, **options):
+            self.assertEqual(command, ['pg_dump', '--format=custom', '--no-owner', '--no-privileges'])
+            self.assertNotIn(self.url, str(command))
+            self.assertIn('PGDATABASE', options['env'])
+            options['stdout'].write(b'PGDMP')
+            return SimpleNamespace(returncode=0)
+        target = self.root / 'backup.dump'
+        with patch('database.operations.subprocess.run', side_effect=dump):
+            self.assertEqual(backup(self.url, target)['bytes'], 5)
+
+    def test_restore_refuses_populated_database_before_starting_client(self):
+        with patch('database.operations.subprocess.run') as run:
+            with self.assertRaisesRegex(ValueError, 'empty database'):
+                restore(self.root / 'missing.dump', self.url)
+            run.assert_not_called()

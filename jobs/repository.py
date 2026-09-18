@@ -4,7 +4,6 @@ import re
 import time
 import uuid
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Callable
 
 from database import require_current, transaction
@@ -30,24 +29,23 @@ class QueueSpec:
 
 
 class QueueRepository:
-    def __init__(self, database_path: str | Path, spec: QueueSpec, *, clock: Callable[[], float] = time.time):
-        self.database_path = Path(database_path)
-        require_current(self.database_path)
+    def __init__(self, database_url: str, spec: QueueSpec, *, clock: Callable[[], float] = time.time):
+        self.database_url = database_url
+        require_current(self.database_url)
         self.spec, self.clock = spec, clock
 
     def claim(self, owner: str, *, lease_seconds: int = 60) -> Claim | None:
         if not owner or lease_seconds < 3:
             raise ValueError('Owner and a lease of at least three seconds are required')
         now, s = int(self.clock()), self.spec
-        with transaction(self.database_path) as c:
-            c.execute('BEGIN IMMEDIATE')
+        with transaction(self.database_url) as c:
             # A crashed final attempt must terminate rather than remain stranded.
-            c.execute(f"UPDATE {s.table} SET {s.state}='failed',{s.completed}=?,last_error='Lease expired at retry limit',lease_owner=NULL,lease_token=NULL,lease_until=NULL WHERE {s.state} IN ('pending','retry','processing') AND attempts>=? AND (lease_until IS NULL OR lease_until<=?)", (now, s.max_attempts, now))
-            row = c.execute(f"SELECT * FROM {s.table} WHERE {s.state} IN ('pending','retry','processing') AND {s.due}<=? AND attempts<? AND (lease_until IS NULL OR lease_until<=?) ORDER BY {s.due},id LIMIT 1", (now, s.max_attempts, now)).fetchone()
+            c.execute(f"UPDATE {s.table} SET {s.state}='failed',{s.completed}=%s,last_error='Lease expired at retry limit',lease_owner=NULL,lease_token=NULL,lease_until=NULL WHERE id IN (SELECT id FROM {s.table} WHERE {s.state} IN ('pending','retry','processing') AND attempts>=%s AND (lease_until IS NULL OR lease_until<=%s) FOR UPDATE SKIP LOCKED)", (now, s.max_attempts, now))
+            row = c.execute(f"SELECT * FROM {s.table} WHERE {s.state} IN ('pending','retry','processing') AND {s.due}<=%s AND attempts<%s AND (lease_until IS NULL OR lease_until<=%s) ORDER BY {s.due},id LIMIT 1 FOR UPDATE SKIP LOCKED", (now, s.max_attempts, now)).fetchone()
             if row is None:
                 return None
             token = uuid.uuid4().hex
-            c.execute(f"UPDATE {s.table} SET {s.state}='processing',lease_owner=?,lease_token=?,lease_until=?,attempts=attempts+1 WHERE id=?", (owner, token, now + lease_seconds, row['id']))
+            c.execute(f"UPDATE {s.table} SET {s.state}='processing',lease_owner=%s,lease_token=%s,lease_until=%s,attempts=attempts+1 WHERE id=%s", (owner, token, now + lease_seconds, row['id']))
             payload = dict(row)
             payload['_lease'] = {'owner': owner, 'token': token}
             for column in ('payload_json', 'options_json'):
@@ -59,28 +57,28 @@ class QueueRepository:
         if lease_seconds < 3:
             raise ValueError('Lease must be at least three seconds')
         now, s = int(self.clock()), self.spec
-        with transaction(self.database_path) as c:
-            return c.execute(f"UPDATE {s.table} SET lease_until=? WHERE id=? AND lease_owner=? AND lease_token=? AND lease_until>? AND {s.state}='processing'", (now + lease_seconds, claim.id, claim.owner, claim.token, now)).rowcount == 1
+        with transaction(self.database_url) as c:
+            return c.execute(f"UPDATE {s.table} SET lease_until=%s WHERE id=%s AND lease_owner=%s AND lease_token=%s AND lease_until>%s AND {s.state}='processing'", (now + lease_seconds, claim.id, claim.owner, claim.token, now)).rowcount == 1
 
     def finish(self, claim: Claim, outcome: Outcome) -> bool:
         now, s = int(self.clock()), self.spec
         retry = outcome.error is not None and outcome.retry and claim.attempt < s.max_attempts
         state = 'retry' if retry else ('failed' if outcome.error is not None else s.done)
         due = now + min(3600, 15 * 2 ** min(claim.attempt, 8))
-        values = [state, None if retry else now, (outcome.error or '')[:500] or None, int(retry), due]
+        values = [state, None if retry else now, (outcome.error or '')[:500] or None, retry, due]
         result_sql = ''
         if s.result:
-            result_sql = f',{s.result}=?'
+            result_sql = f',{s.result}=%s'
             values.append(json.dumps(outcome.result, ensure_ascii=False) if outcome.result is not None else None)
-        with transaction(self.database_path) as c:
-            return c.execute(f"UPDATE {s.table} SET {s.state}=?,{s.completed}=?,last_error=?,{s.due}=CASE WHEN ? THEN ? ELSE {s.due} END{result_sql},lease_owner=NULL,lease_token=NULL,lease_until=NULL WHERE id=? AND lease_owner=? AND lease_token=? AND lease_until>? AND {s.state}='processing'", (*values, claim.id, claim.owner, claim.token, now)).rowcount == 1
+        with transaction(self.database_url) as c:
+            return c.execute(f"UPDATE {s.table} SET {s.state}=%s,{s.completed}=%s,last_error=%s,{s.due}=CASE WHEN %s THEN %s ELSE {s.due} END{result_sql},lease_owner=NULL,lease_token=NULL,lease_until=NULL WHERE id=%s AND lease_owner=%s AND lease_token=%s AND lease_until>%s AND {s.state}='processing'", (*values, claim.id, claim.owner, claim.token, now)).rowcount == 1
 
     def purge(self, *, retention_seconds: int = 30 * 86400) -> int:
         if retention_seconds < 1:
             raise ValueError('Retention must be positive')
         s = self.spec
-        with transaction(self.database_path) as c:
-            return c.execute(f"DELETE FROM {s.table} WHERE {s.state} IN (?, 'failed') AND {s.completed}<? AND lease_owner IS NULL", (s.done, int(self.clock()) - retention_seconds)).rowcount
+        with transaction(self.database_url) as c:
+            return c.execute(f"DELETE FROM {s.table} WHERE {s.state} IN (%s, 'failed') AND {s.completed}<%s AND lease_owner IS NULL", (s.done, int(self.clock()) - retention_seconds)).rowcount
 
 
 class ResourceLeaseRepository:
@@ -92,30 +90,29 @@ class ResourceLeaseRepository:
 
     def acquire(self):
         with transaction(self.database) as c:
-            changed = c.execute('''INSERT INTO resource_leases VALUES(?,?,?,?)
+            changed = c.execute('''INSERT INTO resource_leases VALUES(%s,%s,%s,%s)
                 ON CONFLICT(namespace,resource_key) DO UPDATE SET token=excluded.token,lease_until=excluded.lease_until
-                WHERE resource_leases.lease_until<=?''',
+                WHERE resource_leases.lease_until<=%s''',
                 (self.namespace, self.key, self.token, int(self.clock()) + self.seconds, int(self.clock())))
             if changed.rowcount != 1:
                 raise LostLease('Resource operation already owned')
 
     def guard(self, connection):
         owned = connection.execute('''SELECT 1 FROM resource_leases
-            WHERE namespace=? AND resource_key=? AND token=? AND lease_until>?''',
+            WHERE namespace=%s AND resource_key=%s AND token=%s AND lease_until>%s FOR UPDATE''',
             (self.namespace, self.key, self.token, int(self.clock()))).fetchone()
         if not owned:
             raise LostLease('Resource operation ownership expired or changed')
 
     def renew(self):
         with transaction(self.database) as c:
-            c.execute('BEGIN IMMEDIATE')
             self.guard(c)
-            c.execute('UPDATE resource_leases SET lease_until=? WHERE namespace=? AND resource_key=? AND token=?',
+            c.execute('UPDATE resource_leases SET lease_until=%s WHERE namespace=%s AND resource_key=%s AND token=%s',
                 (int(self.clock()) + self.seconds, self.namespace, self.key, self.token))
 
     def release(self):
         with transaction(self.database) as c:
-            c.execute('DELETE FROM resource_leases WHERE namespace=? AND resource_key=? AND token=?',
+            c.execute('DELETE FROM resource_leases WHERE namespace=%s AND resource_key=%s AND token=%s',
                       (self.namespace, self.key, self.token))
 
     def check(self):

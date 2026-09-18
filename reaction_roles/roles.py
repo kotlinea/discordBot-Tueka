@@ -18,7 +18,7 @@ class RoleChangeService:
         self.repository, self.port = repository, port
 
     async def apply(self, config: dict, mapping: dict, user_id: int, decision):
-        lease = ResourceLease(self.repository.database_path, 'reaction_role_member', f'{config["guild_id"]}:{user_id}')
+        lease = ResourceLease(self.repository.database_url, 'reaction_role_member', f'{config["guild_id"]}:{user_id}')
         try:
             return await lease.run(lambda owned: self._apply_owned(config, mapping, user_id, decision, owned))
         except LostLease as exc:
@@ -59,7 +59,7 @@ class RoleChangeService:
             raise
 
     async def recover(self, operation: dict):
-        lease = ResourceLease(self.repository.database_path, 'reaction_role_member', f'{operation["guild_id"]}:{operation["user_id"]}')
+        lease = ResourceLease(self.repository.database_url, 'reaction_role_member', f'{operation["guild_id"]}:{operation["user_id"]}')
         try:
             return await lease.run(lambda owned: self._recover_owned(operation, owned))
         except LostLease as exc:

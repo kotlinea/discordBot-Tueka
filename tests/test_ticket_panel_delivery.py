@@ -40,7 +40,7 @@ class PanelDeliveryTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.repo = TicketRepository(prepare_database(Path(self.temp.name) / 'panel.db'))
+        self.repo = TicketRepository(prepare_database(Path(self.temp.name) / 'panel.db', self.addCleanup))
         team = self.repo.save_team(1, {'name': 'Staff', 'role_ids': [500]})
         panel = self.repo.save_panel(1, {'name': 'Support', 'mode': 'channel', 'category_id': 100, 'team_id': team['id']})
         self.config = self.repo.save_panel_message(1, {'name': 'Support', 'channel_id': 10,

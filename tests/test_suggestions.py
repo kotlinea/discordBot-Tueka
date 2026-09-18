@@ -9,7 +9,7 @@ from suggestions import SuggestionRepository, SuggestionService, SuggestionValid
 class SuggestionTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
-        self.repository = SuggestionRepository(prepare_database(Path(self.directory.name) / "suggestions.sqlite3"))
+        self.repository = SuggestionRepository(prepare_database(Path(self.directory.name) / "suggestions.sqlite3", self.addCleanup))
         self.service = SuggestionService(self.repository)
 
     def tearDown(self):
@@ -74,7 +74,7 @@ class SuggestionTests(unittest.TestCase):
     def test_delivery_failure_persists_and_closes_operations(self):
         item = self.repository.create(1, 10, 20, {"idea": "Idea"})
         self.repository.mark_delivery_failed(1, item["id"], "Forbidden")
-        restarted = SuggestionRepository(prepare_database(self.repository.database_path))
+        restarted = SuggestionRepository(prepare_database(self.repository.database_url, self.addCleanup))
         self.assertEqual(restarted.get(1, item["id"])["status"], "delivery_failed")
         with self.assertRaises(RuntimeError):
             restarted.vote(1, item["id"], 30, 1)
@@ -85,40 +85,30 @@ class SuggestionTests(unittest.TestCase):
         item = self.repository.create(1, 10, 20, {"idea": "Idea"})
         self.repository.attach_message(1, item["id"], 100)
         self.repository.vote(1, item["id"], 30, 1)
-        restarted = SuggestionRepository(prepare_database(self.repository.database_path))
+        restarted = SuggestionRepository(prepare_database(self.repository.database_url, self.addCleanup))
         restored = restarted.get(1, item["id"])
         self.assertEqual(restored["message_id"], 100)
         self.assertEqual(restored["upvotes"], 1)
         self.assertEqual(restarted.vote(1, item["id"], 30, 1)["upvotes"], 0)
 
-    def test_vote_holds_write_lock_before_reading_status(self):
-        import sqlite3
-        from contextlib import closing
-        from unittest.mock import patch
-
-        item = self.repository.create(1, 10, 20, {"idea": "Idea"})
-        from database import connect as original_connect
-        competing_writes = []
-
-        def connect(*args, **kwargs):
-            connection = original_connect(*args, **kwargs)
-            def trace(statement):
-                if statement.startswith("SELECT status FROM suggestions"):
-                    with closing(sqlite3.connect(self.repository.database_path, timeout=0)) as other:
-                        try:
-                            other.execute("UPDATE suggestions SET status='approved' WHERE id=?", (item["id"],))
-                        except sqlite3.OperationalError as error:
-                            competing_writes.append(str(error))
-            connection.set_trace_callback(trace)
-            return connection
-
-        with patch("database.connect", side_effect=connect):
-            result = self.repository.vote(1, item["id"], 30, 1)
-        self.assertEqual(competing_writes, ["database is locked"])
-        self.assertEqual(result["status"], "pending")
-        self.repository.review(1, item["id"], 40, "approved")
-        with self.assertRaises(RuntimeError):
-            self.repository.vote(1, item["id"], 31, 1)
+    def test_review_row_lock_serializes_a_waiting_vote(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        from database import connect
+        item = self.repository.create(1, 10, 20, {'idea': 'Idea'})
+        entered = Event()
+        def vote():
+            entered.set()
+            return self.repository.vote(1, item['id'], 30, 1)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with connect(self.repository.database_url) as c:
+                c.execute("UPDATE suggestions SET status='approved' WHERE id=%s", (item['id'],))
+                future = executor.submit(vote)
+                self.assertTrue(entered.wait(5))
+                self.assertFalse(future.done())
+            with self.assertRaisesRegex(RuntimeError, 'suggestion_closed'):
+                future.result(timeout=10)
+        self.assertEqual(self.repository.get(1, item['id'])['upvotes'], 0)
 
 
 if __name__ == "__main__":

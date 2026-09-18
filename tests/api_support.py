@@ -14,9 +14,9 @@ from db_support import prepare_database
 
 
 class ApiFixture:
-    def __init__(self, root: Path):
-        self.database = prepare_database(root / 'api.db')
-        self.settings = SimpleNamespace(database_path=self.database, data_dir=root,
+    def __init__(self, root: Path, cleanup):
+        self.database = prepare_database(root / 'api.db', cleanup)
+        self.settings = SimpleNamespace(database_url=self.database, data_dir=root,
             ticket_encryption_key=Fernet.generate_key().decode(), reaction_role_max_mappings_per_message=20,
             twitch_client_id='', twitch_client_secret='', dashboard_base_url='', social_webhook_secret='',
             x_bearer_token='', instagram_rss_url_template='', social_max_subscriptions_per_provider=10,

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 
+from database import database_url
 from dotenv import load_dotenv
 
 
@@ -48,7 +49,7 @@ class Settings:
     reaction_role_max_mappings_per_message: int
     dashboard_base_url: str | None
     data_dir: Path
-    database_path: Path
+    database_url: str
     log_level: str = "INFO"
     extensions: tuple[str, ...] = (
         "cogs.general",
@@ -106,6 +107,6 @@ class Settings:
             reaction_role_max_mappings_per_message=max(1, min(int(os.getenv("REACTION_ROLE_MAX_MAPPINGS_PER_MESSAGE", "20")), 100)),
             dashboard_base_url=os.getenv("DASHBOARD_BASE_URL"),
             data_dir=BASE_DIR / os.getenv("DATA_DIR", "data"),
-            database_path=BASE_DIR / os.getenv("DATABASE_PATH", "data/tueka.sqlite3"),
+            database_url=database_url(),
             log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
         )

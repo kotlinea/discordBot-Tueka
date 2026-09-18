@@ -58,7 +58,7 @@ class DomainBoundaryTests(unittest.TestCase):
 
     def test_poll_votes_restart_expiry_and_message_isolation(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = prepare_database(Path(directory) / 'test.db')
+            path = prepare_database(Path(directory) / 'test.db', self.addCleanup)
             repository = EngagementRepository(path)
             repository.create_poll(100, 1, 10, 20, 'Choose', ['A', 'B'], None, None)
             repository.create_poll(200, 2, 10, 20, 'Other', ['A', 'B'], None, None)
@@ -78,14 +78,14 @@ class DomainBoundaryTests(unittest.TestCase):
 class AuditPersistenceTests(unittest.IsolatedAsyncioTestCase):
     async def test_discord_audit_delivery_persists_to_moderation_repository(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = prepare_database(Path(directory) / 'test.db')
+            path = prepare_database(Path(directory) / 'test.db', self.addCleanup)
             GuildSettingsRepository(path).set_module(1, 'moderation_logs', enabled=True,
                 settings={'log_join': True, 'log_channel_id': 10})
             channel = MagicMock(spec=discord.TextChannel)
             channel.id = 10
             channel.send = AsyncMock()
             guild = SimpleNamespace(id=1, get_channel=lambda _: channel)
-            cog = AuditLogCog(SimpleNamespace(settings=SimpleNamespace(database_path=path)))
+            cog = AuditLogCog(SimpleNamespace(settings=SimpleNamespace(database_url=path)))
             await cog._send(guild, 'members', '参加', discord.Color.green())
             channel.send.assert_awaited_once()
             repository = ModerationRepository(path)

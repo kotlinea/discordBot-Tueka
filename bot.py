@@ -12,7 +12,7 @@ from database import require_current
 
 class TuekaBot(commands.Bot):
     def __init__(self, settings: Settings) -> None:
-        require_current(settings.database_path)
+        require_current(settings.database_url)
         intents = discord.Intents.default()
         intents.members = True
         intents.message_content = True

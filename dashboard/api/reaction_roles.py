@@ -2,7 +2,7 @@
 from __future__ import annotations
 from .errors import api_error, revision_conflict, check_revision
 from fastapi import Depends
-import sqlite3
+from database import IntegrityError
 from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import Response
@@ -153,7 +153,7 @@ def create_router(context: ApiContext) -> APIRouter:
             return rr_payload(repository.create_message(guild_id, value, actor_id))
         except ReactionRoleValidationError as exc:
             raise rr_error(exc) from exc
-        except sqlite3.IntegrityError as exc:
+        except IntegrityError as exc:
             raise api_error(409, 'message_exists', 'このDiscordメッセージはすでに登録されています。') from exc
 
     @router.get('/guilds/{guild_id}/reaction-roles/messages/{config_id}', response_model=schemas.ReactionRoleMessage, response_model_exclude_unset=True)
@@ -187,8 +187,10 @@ def create_router(context: ApiContext) -> APIRouter:
             raise api_error(404, 'reaction_role_not_found', 'Reaction Role設定が見つかりません。')
         check_revision(if_match, int(config['revision']), '設定を再読み込みしてください。', required=True)
         actor = await discord.current_user(access, use_cache=False)
-        repository.queue_action(guild_id, config_id, 'delete', {'channel_id': config['channel_id'], 'message_id': config.get('message_id'), 'source': config['source']})
-        repository.delete_message(guild_id, config_id, recoverable=False, actor_id=int(actor['id']))
+        try:
+            repository.delete_message(guild_id, config_id, recoverable=False, actor_id=int(actor['id']), expected_revision=config['revision'], queue_delete=True)
+        except RuntimeError as exc:
+            raise revision_conflict('設定を再読み込みしてください。') from exc
         return Response(status_code=204)
 
     @router.post('/guilds/{guild_id}/reaction-roles/messages/{config_id}/fix', status_code=202, dependencies=[Depends(auth.csrf)], response_model=schemas.StatusResponse, response_model_exclude_unset=True)

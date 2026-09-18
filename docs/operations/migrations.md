@@ -1,67 +1,69 @@
-# 番号付きDB Migration
+# PostgreSQL Migration
 
-明示CLIは、`migrations/0001_名前.sql` から番号順にSQLを適用します。0001はSuggestionsの作成、0002は旧Ticket、0003は旧Reaction Roles、0004は旧Moderation、0005は共有設定FallbackとJSON移行済み判定、0006はSocialの旧単一Template列の削除を扱います。新規導入もこのCLIを先に実行します。0007で現行64テーブル・23Indexと不足列の作成をCLIへ集約しました。RuntimeはDDLを実行せず、DB不存在・未適用・履歴不一致ならSchemaNotReadyで起動を拒否します。
+現行RuntimeはPostgreSQLを使用します。`migrations/postgresql/0001_initial.sql` が66テーブルとIndex・外部キーを作成し、適用履歴を加えた67テーブルが初期構成です。SQLite用の `migrations/0001_*.sql`〜`0010_*.sql` は過去の履歴であり、新しいCLIでは実行しません。
+
+## 初期化
+
+接続先に空のPostgreSQL DBを作り、`DATABASE_URL`を設定します。接続先DBの作成・削除はMigration CLIの責務に含めません。
 
 ```sh
-python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrations
+python migrate.py
 ```
 
-## 実行前
+Bot・Dashboard・Workerは同じ `DATABASE_URL` を使用します。未適用またはChecksum不一致のSchemaでは起動できません。Repositoryが起動時にテーブルを作成することはありません。
 
-1. まずStageまたはDBの複製へ適用して確認します。
-2. 運用DBへ適用する場合はBot・Dashboard・Workerを停止します。SQLiteの書込みロックはDB操作を直列化しますが、外部Discord操作の途中状態までは保護しません。
-3. DB、暗号化Transcript、必要な鍵世代を保全します。CLIの自動SnapshotはSQLiteだけが対象です。
-4. 空き容量とBackup保存先を確認します。既存DBを開く際はパスの指定間違いがないか確認してください。未存在パスは新規DBとして作成されます。
+## 更新
 
-## 適用と失敗時の動作
+1. 対象環境と接続先DBを確認し、Stageで適用・復元を検証します。
+2. Bot・Dashboard・Workerを停止します。
+3. [論理BackupとTranscript・鍵の保全](./backup.md)を実施します。Migration CLIは自動Backupを作りません。
+4. `python migrate.py` を実行し、成功後に各Serviceを起動します。
 
-- 未適用SQLがあるときだけ、書込みロック取得後・DDL実行前にSQLite Backup APIで新しいSnapshotを作成します。
-- Snapshotの整合性・外部キー検証に失敗した場合はMigrationを開始しません。
-- 適用履歴は `schema_migrations` に番号・ファイル名・SHA256・適用日時を保存します。SQLの改行コードはLFへ正規化してハッシュ化します。
-- 未適用の全ファイルと履歴更新を一つのTransactionで実行します。途中失敗時はDDLとデータ更新をRollbackし、適用前Snapshotを保持します。
-- 同じMigrationの再実行は何も変更しません。適用済みファイルの改変、番号欠落、既知ファイルにない適用履歴は拒否します。
-- SQL内のCOMMIT / ROLLBACK / SAVEPOINT / PRAGMA / ATTACH / DETACHは拒否します。TransactionやConnectionの制御はCLIが担当します。
+MigrationはDB・Schema単位のTransaction Advisory Lockを取得します。同時実行者は拒否され、未適用SQLと履歴更新は一つのTransactionで処理されます。途中失敗時はDDL・データ・履歴がRollbackされます。再適用は変更を行いません。適用済みファイルの改変、未知の履歴、番号欠落は拒否します。
 
-異常終了後は、原DBを再開する前に適用履歴・整合性・ログを確認します。DBを自動的にSnapshotで上書きすることはありません。復元する場合は[バックアップと復元](./backup.md)の手順で、停止中に別DBへ復元して検証します。Snapshot以後の変更は復元先に含まれません。
+履歴には番号・ファイル名・LF正規化後のSHA256・UTC epoch秒を記録します。SQL内からのTransaction・Session制御は認めません。通常のDDL/DMLを使い、各文をセミコロンで終えます。条件付き列追加はPostgreSQLの `ADD COLUMN IF NOT EXISTS` を使用します。
 
-0008は7つのOutbox/Scheduleテーブルに取得Token・不足していたLease/試行数/終端日時と検索Indexを追加します。既存Payloadを維持し、完了済み行の終端日時だけを補います。BotとWorkerを停止して適用し、適用後は共通Runnerを使うコードで再起動してください。旧版への復帰は適用前Snapshotを伴う手順で行います。
+## 開発DBの切替
 
-0009はSuggestions専用Outboxを追加します。既存の提案・投票・審査履歴を変更せず、投稿IDがなくpending/reviewingの提案だけを「既存投稿の照合」として登録します。旧投稿に識別印がない場合は自動再投稿せず、管理者による照合が必要です。配送IDはAUTOINCREMENTで、保持期限後も以前の通知識別印を再使用しません。
+今回の原SQLite DBは破棄可能な開発データです。ETL・Dual Write・旧DBへの逆移送は実装しません。元ファイルを残していてもRuntimeは読み込みません。この例外は将来のStage・本番データには適用しません。
 
-0010は有限Queue以外のResource操作を排他する `resource_leases` を追加します。Lockdownの開始と復元は同じGuildのLeaseを共有します。TicketのClaim変更/補償とReaction RolesのRole変更/補償/期限処理も、それぞれ同じResourceのLeaseを共有します。所有権はTokenと有効期限で照合し、期限切れの処理は状態を確定できません。期限切れのLeaseは次回の操作で取得し直せるため、復旧時に履歴やLeaseを手動で削除する必要はありません。
+DBの再作成はDiscord上のPanel・Role・Channelを削除しません。空DBではそれらの所有記録も存在しないため、旧PanelからのInteractionで自動復旧・再作成せず、管理者が対象を確認して新しい設定を登録してください。暗号鍵、Transcriptファイル、S3オブジェクトはDBとは別管理です。
 
-## Migrationの追加
+## 永続化するローカル開発DB
 
-連続する4桁番号と英小文字・数字・underscoreの名前を使い、各SQL文をセミコロンで終えます。適用済みファイルを編集せず、新しい番号を追加してください。
+`.env.postgres-dev`に開発専用の `POSTGRES_DEV_PASSWORD` を設定します。このファイルはGit対象外です。URLへの記載を簡単にするため、十分な長さのランダムな英数字を使用できます。
 
-削除Migrationには次の検証を同じ変更へ含めます。
-
-- 空DB、既存V2、V1/V2混在、直前Version、再適用。
-- Snapshot失敗、DDL途中失敗、外部キー検査、Rollback後のデータ保持。
-- 削除対象のRuntime読書きとコンストラクタDDLの除去。Bot/Dashboard/Workerの再初期化で旧テーブルが復活しないこと。
-- 旧Imageへ戻す手順と、Snapshot復元で失われる更新範囲。
-
-0002は `support_tickets` と `ticket_migrations` を削除し、V2 Ticket・暗号化Transcript・配送待ち処理を保持します。0003は旧 `reaction_role_panels` のみ削除し、V2の付与状態・期限・復旧記録を保持します。
-
-0004は `automod_rules` / `automod_events` / `automod_migrations` / `moderation_migrations` と旧ID列・`guild_users.warn` を削除します。現行のRule・Event・処置結果は子テーブルから退避/再作成し、外部キーの連鎖削除で関連付けが失われないようにします。Case・Point・XP・期限付き処置は保持します。
-
-0005はV2が共有設定から参照していたWelcome・Autorole・Leveling・Auditの実効値を `guild_modules` へ固定し、`guild_settings` を削除します。明示設定、JSONのnull、有効/無効、revisionを保持します。未保存の候補は無効・revision 0で保存し、自動有効化しません。既存Audit設定にカテゴリ指定がない場合だけ、従来有効だったメッセージカテゴリを明示保存します。汎用 `app_metadata` は保持し、JSON移行マーカーだけを削除します。
-
-JSON V1ファイルのImportは廃止しました。起動時にJSONからXP・設定を取り込む処理はありません。旧アプリへのRollbackには適用前Snapshotと対応するファイル・鍵が必要です。Snapshot以後の更新は復元先に含まれません。
-
-0006はSocial購読の旧単一 `template` 列を削除し、現行のイベント別 `templates_json`、購読ID・Target・Cursor・配送履歴を保持します。購読の旧形式を起動時にTargetやイベント別Templateへ変換する処理と、旧 `live` イベントへの配送Fallbackは廃止しました。現在のイベント名は `live_start` / `live_end` です。
-
-共有表内の旧購読行も、残す列の値は変更しません。Targetがない行からTargetを自動作成したり、機能を自動で有効化したりしません。配送には現行Targetが必要です。旧購読の運用を再開する場合は、Dashboardから現行形式で再登録し、重複設定を整理してください。Migrationの更新対象は現行V2のSchemaを持つDBであり、過去の純V1 Schemaへの自動Importは提供しません。適用に失敗した場合は原DBへ手動でDDLを継ぎ足さず、SnapshotとSchemaを確認してください。
-
-## 既存テーブルへの列追加
-
-0007には、以前のRuntimeが行っていた39件の条件付き列追加も含みます。指定列が存在する場合は値と定義を変更せず、不足する場合だけ追加します。Index作成より前に適用します。
-
-```sql
--- tueka: add-column-if-missing
-ALTER TABLE example ADD COLUMN new_value INTEGER NOT NULL DEFAULT 0;
+```sh
+docker compose --env-file .env.postgres-dev -p tueka-dev -f compose.postgres-dev.yaml up -d --wait
 ```
 
-この注釈はTuekaのCLIが解釈します。単一の `ALTER TABLE ... ADD COLUMN` 以外や、存在しないテーブルへの指定は拒否します。注釈も適用履歴のハッシュ対象です。CLI自身のSchema照会後にSQLの実行制限を適用するため、Migration本文のTransaction / PRAGMA / ATTACH操作は引き続き許可しません。
+この構成の接続先は `127.0.0.1:55433`、DB名・User名は `tueka_dev`、永続Volumeは `tueka-dev_postgres-dev-data` です。アプリの `.env` で `DATABASE_URL=postgresql://tueka_dev:設定したパスワード@127.0.0.1:55433/tueka_dev` を設定し、`python migrate.py` を実行します。特殊文字を含むパスワードはURLエンコードしてください。変更前のBot・Dashboard・Workerは停止し、空Schemaの作成後に起動します。
 
-アプリとMigrationファイルは同じVersionを配布してください。起動エラー時に履歴を手動で書き換えず、3Processを停止して対応するCLIを実行します。SQLの変更が必要なら適用済みファイルを編集せず、次の番号を追加します。
+破棄可能なローカル開発DBだけを再初期化する場合は、接続先とProject名を確認してから次を実行します。
+
+```sh
+docker compose --env-file .env.postgres-dev -p tueka-dev -f compose.postgres-dev.yaml down --volumes
+docker compose --env-file .env.postgres-dev -p tueka-dev -f compose.postgres-dev.yaml up -d --wait
+python migrate.py
+```
+
+この手順は指定した開発ProjectのDB Volumeを削除します。Stage・本番には使用しません。Transcript・暗号鍵・旧SQLiteファイル・Discord ResourceはこのComposeの削除対象ではありません。PostgreSQL初期化後にパスワードを変更しても既存Roleのパスワードは自動変更されません。
+
+## テスト専用PostgreSQL
+
+```sh
+docker compose --env-file tests/postgres.env -p tueka-test -f compose.postgres-test.yaml up -d --wait
+```
+
+テスト専用URLを `TUEKA_TEST_DATABASE_URL` に設定します。例は `postgresql://tueka_test:tueka_test_local_only@127.0.0.1:55432/tueka_test` です。このServiceはlocalhostのみ公開し、データはtmpfs上にあります。停止・再作成でテストデータは失われます。アプリの開発DBや本番DBには使わないでください。
+
+各テストと型生成はUUID付きSchemaを作り、終了時に削除します。アプリの `DATABASE_URL` はテスト接続先に流用しません。
+
+```sh
+python -m unittest discover -s tests -p 'test_*.py'
+python scripts/generate_api.py --check
+python scripts/verify_postgres_restore.py --client-container tueka-test-postgres-test-1
+docker compose --env-file tests/postgres.env -p tueka-test -f compose.postgres-test.yaml down
+```
+
+復元検証だけは同じテストServer上にUUID付きDBを3個作成し、実pg_dump/pg_restoreで復元・採番・Queue・失敗時Rollbackを検証して削除します。DB作成権限が必要です。PostgreSQLクライアントがPATHにある場合は `--client-container` を省略できます。

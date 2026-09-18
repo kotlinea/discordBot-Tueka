@@ -173,7 +173,7 @@ class ModerationService:
 
     async def lockdown(self, guild: GuildRef, reason: str, duration_minutes: int, *, started_by: int | None = None,
             source_event_id: int | None = None, channel_ids: list[int] | None = None, category_ids: list[int] | None = None) -> int:
-        lease = ResourceLease(self.repository.database_path, 'moderation_lockdown', guild.id)
+        lease = ResourceLease(self.repository.database_url, 'moderation_lockdown', guild.id)
         try:
             return await lease.run(lambda owned: self._lockdown_owned(guild, reason, duration_minutes,
                 started_by, source_event_id, channel_ids, category_ids, owned))
@@ -200,7 +200,7 @@ class ModerationService:
         return lockdown_id
 
     async def unlock_lockdown(self, guild: GuildRef, lockdown_id: int | None = None) -> dict[str, int]:
-        lease = ResourceLease(self.repository.database_path, 'moderation_lockdown', guild.id)
+        lease = ResourceLease(self.repository.database_url, 'moderation_lockdown', guild.id)
         try:
             return await lease.run(lambda owned: self._unlock_owned(guild, lockdown_id, owned))
         except LostLease as exc:

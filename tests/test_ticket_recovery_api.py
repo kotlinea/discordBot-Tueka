@@ -20,8 +20,8 @@ class TicketRecoveryApiTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         root = Path(self.temp.name)
-        database = prepare_database(root / 'api.db')
-        settings = SimpleNamespace(database_path=database, data_dir=root,
+        database = prepare_database(root / 'api.db', self.addCleanup)
+        settings = SimpleNamespace(database_url=database, data_dir=root,
             ticket_encryption_key=Fernet.generate_key().decode(), reaction_role_max_mappings_per_message=20,
             **{f'ticket_s3_{key}': '' for key in ('endpoint_url', 'region', 'bucket', 'access_key_id', 'secret_access_key', 'prefix')})
         DashboardRepository(database).create_dashboard_session('session', 'token', 3600)

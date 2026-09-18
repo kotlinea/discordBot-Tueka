@@ -33,7 +33,7 @@ class RoleChangeTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.repo = ReactionRoleRepository(prepare_database(Path(self.temp.name) / 'roles.db'))
+        self.repo = ReactionRoleRepository(prepare_database(Path(self.temp.name) / 'roles.db', self.addCleanup))
         self.decisions = ReactionRoleService(self.repo)
         value = message(behavior='unique')
         value['mappings'].append({'emoji': '✅', 'role_id': 21, 'max_members': None})

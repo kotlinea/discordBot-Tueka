@@ -12,7 +12,7 @@ class CommunityRepositoryTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.path = prepare_database(Path(self.temp.name) / 'test.db')
+        self.path = prepare_database(Path(self.temp.name) / 'test.db', self.addCleanup)
         self.repository = CommunityRepository(self.path)
 
     def test_parallel_xp_additions_are_not_lost_and_tracks_are_isolated(self):

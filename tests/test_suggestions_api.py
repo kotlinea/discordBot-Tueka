@@ -18,8 +18,8 @@ class SuggestionsApiTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.storage = GuildSettingsRepository(prepare_database(Path(self.temp.name) / 'test.db'))
-        self.dashboard_repository = DashboardRepository(self.storage.database_path)
+        self.storage = GuildSettingsRepository(prepare_database(Path(self.temp.name) / 'test.db', self.addCleanup))
+        self.dashboard_repository = DashboardRepository(self.storage.database_url)
         self.dashboard_repository.create_dashboard_session('test-session', 'test-token', 3600)
         self.session = {'session_id': 'test-session', 'csrf_token': 'test-csrf'}
         self.discord = SimpleNamespace(
@@ -31,7 +31,7 @@ class SuggestionsApiTests(unittest.TestCase):
         async def session(request, call_next):
             request.scope['session'] = self.session
             return await call_next(request)
-        app.include_router(create_api_router(self.storage.database_path, self.discord))
+        app.include_router(create_api_router(self.storage.database_url, self.discord))
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
         self.url = '/api/v1/guilds/1/suggestions/settings'

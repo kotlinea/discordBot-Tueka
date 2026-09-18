@@ -6,7 +6,7 @@ Tuekaは、Discordサーバーのモデレーション、コミュニティ運�
 
 ```text
 管理者 ──HTTPS──> Dashboard ──┐
-                              ├──> SQLite (WAL)
+                              ├──> PostgreSQL
 外部SNS ──Webhook/Poll──> Social Worker ──┤
                               └──> Discord Bot ──> Discord
 ```
@@ -14,13 +14,13 @@ Tuekaは、Discordサーバーのモデレーション、コミュニティ運�
 - **Discord Bot**：Discordイベントの受信、コマンド、Role・Channel操作、通知配送
 - **Dashboard**：Discord OAuth、設定、検証、Webhook受付、公開ドキュメント
 - **Social Worker**：YouTube、Twitch、X、TikTok、Instagramの監視とイベント正規化
-- **SQLite**：設定、ルール、ケース、Ticket、Social Event、Outboxを共有
+- **PostgreSQL**：設定、ルール、ケース、Ticket、Social Event、Outboxを共有
 
 ## 最短セットアップ
 
 1. Python 3.13で仮想環境を作成し、`pip install --require-hashes -r requirements.lock`を実行します。
 2. `.env.example`を`.env`へコピーし、Discord BotとOAuthの値を設定します。
-3. `python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrations`で番号付きMigrationを適用します。DBパスを変更している場合は引数も合わせます。既存環境は先に全Processを停止・Backupしてください。
+3. `python migrate.py`で番号付きMigrationを適用します。空のPostgreSQL DBを用意し、DATABASE_URLを設定します。既存環境は先に全Processを停止・Backupしてください。
 4. Botを`python bot.py`、Dashboardを`python -m uvicorn dashboard.app:app --host 127.0.0.1 --port 8000`で起動します。
 5. ソーシャル通知を使う場合は`python social_worker.py`も起動します。
 
@@ -49,4 +49,4 @@ Frontendの `npm run test:a11y` はビルド済みSPAで4画面幅の画面検�
 
 ## セキュリティ
 
-`.env`、SQLite DB、Transcript、バックアップを公開ディレクトリへ置かないでください。Discord Token、OAuth Secret、暗号鍵、SNS API Keyは環境変数だけで管理し、漏えい時は直ちに再発行します。
+`.env`、PostgreSQL DB、Transcript、バックアップを公開ディレクトリへ置かないでください。Discord Token、OAuth Secret、暗号鍵、SNS API Keyは環境変数だけで管理し、漏えい時は直ちに再発行します。

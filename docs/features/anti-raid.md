@@ -15,7 +15,7 @@ keywords: Join Raid 大量参加 大量退出 新規アカウント Lockdown
 - `new_account_ratio`：参加者に占める作成直後アカウントの割合
 - `new_member_activity`：参加直後の投稿など
 
-Raid状態はSQLiteへ保存されます。開始後は継続条件を評価し、解除条件または管理者操作で終了します。WorkerやBotの再起動後も状態を復旧します。
+Raid状態はPostgreSQLへ保存されます。開始後は継続条件を評価し、解除条件または管理者操作で終了します。WorkerやBotの再起動後も状態を復旧します。
 
 ## Action
 

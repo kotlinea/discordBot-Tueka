@@ -17,7 +17,7 @@ Discord Token、OAuth Secret、SNS API Key、Webhook Secret、暗号鍵、S3 Cre
 - Ticket本文・Form回答・Note・Transcript：暗号化。保持期限後に本文を削除
 - Reaction Role監査：Message本文を保存せず、既定90日
 
-SQLite、Backup、暗号化前の一時FileへOS権限を設定します。暗号化はHost侵害や復号鍵漏えいを防ぐものではありません。
+DB Backup、暗号化前の一時FileへOS権限を設定します。暗号化はHost侵害や復号鍵漏えいを防ぐものではありません。
 
 ## 外部送信
 

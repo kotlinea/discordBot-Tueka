@@ -4,8 +4,6 @@ import time
 import unittest
 import hashlib
 import hmac
-import sqlite3
-from contextlib import closing
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from datetime import datetime, timedelta, timezone
@@ -226,7 +224,7 @@ class YouTubeAdapterTests(unittest.IsolatedAsyncioTestCase):
 class SocialStorageV2Tests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.storage = SocialRepository(prepare_database(Path(self.temp.name) / "test.sqlite3"))
+        self.storage = SocialRepository(prepare_database(Path(self.temp.name) / "test.sqlite3", self.addCleanup))
 
     def tearDown(self):
         self.temp.cleanup()
@@ -291,24 +289,10 @@ class SocialStorageV2Tests(unittest.TestCase):
         self.assertEqual(claimed[0]["status"], "orphaned")
         self.assertTrue(self.storage.delete_social_target(claimed[0]["id"], claimed[0]["lease_owner"]))
 
-    def test_old_subscription_is_not_imported_or_enabled_at_startup(self):
-        path = Path(self.temp.name) / "legacy.sqlite3"
-        connection = sqlite3.connect(path)
-        try:
-            connection.execute("""CREATE TABLE social_subscriptions (id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, provider TEXT NOT NULL, account_id TEXT NOT NULL, account_name TEXT NOT NULL, channel_id INTEGER NOT NULL, role_id INTEGER, template TEXT NOT NULL DEFAULT '', events_json TEXT NOT NULL DEFAULT '[]', enabled INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(guild_id,provider,account_id))""")
-            connection.execute("INSERT INTO social_subscriptions VALUES(1,1,'twitch','Creator','Creator',10,NULL,'{account}','[\"live\"]',1,1,1)")
-            connection.commit()
-        finally:
-            connection.close()
-        from database import SchemaNotReady
-        with self.assertRaises(SchemaNotReady):
+    def test_file_database_is_rejected_without_modifying_it(self):
+        path = Path(self.temp.name) / 'legacy.sqlite3'
+        path.write_bytes(b'legacy development database')
+        before = path.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'PostgreSQL URL'):
             SocialRepository(path)
-        with closing(sqlite3.connect(path)) as connection:
-            self.assertEqual(connection.execute('SELECT events_json FROM social_subscriptions').fetchone()[0], '["live"]')
-            self.assertNotIn('target_id', {row[1] for row in connection.execute('PRAGMA table_info(social_subscriptions)')})
-            self.assertIsNone(connection.execute("SELECT name FROM sqlite_master WHERE name='social_targets'").fetchone())
-
-
-
-if __name__ == "__main__":
-    unittest.main()
+        self.assertEqual(path.read_bytes(), before)

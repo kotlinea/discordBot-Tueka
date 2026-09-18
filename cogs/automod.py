@@ -29,8 +29,8 @@ class AutoModCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.owner = f"moderation:{id(self)}"
-        self.moderation_repository = ModerationRepository(bot.settings.database_path)
-        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
+        self.moderation_repository = ModerationRepository(bot.settings.database_url)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_url)
         self.engine = AutoModEngine()
         self.service = ModerationService(DiscordModerationAdapter(bot), self.moderation_repository, self.guild_settings)
         self.http = httpx.AsyncClient(timeout=3)

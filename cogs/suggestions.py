@@ -51,8 +51,8 @@ class SuggestionModal(discord.ui.Modal):
 class SuggestionsCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
-        self.repository = SuggestionRepository(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_url)
+        self.repository = SuggestionRepository(bot.settings.database_url)
         self.service = SuggestionService(self.repository)
         self.delivery = SuggestionDeliveryService(self.repository, self.guild_settings, DiscordSuggestionAdapter(bot))
         self.owner = f'suggestions:{socket.gethostname()}:{os.getpid()}'

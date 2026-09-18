@@ -1,0 +1,17 @@
+services:
+  postgres-test:
+    image: postgres:18-bookworm@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af
+    environment:
+      POSTGRES_USER: tueka_test
+      POSTGRES_PASSWORD: tueka_test_local_only
+      POSTGRES_DB: tueka_test
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tueka_test -d tueka_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    shm_size: 256mb

@@ -78,7 +78,7 @@ class ReactionRolesCog(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.repository = ReactionRoleRepository(bot.settings.database_path)
+        self.repository = ReactionRoleRepository(bot.settings.database_url)
         self.discord = DiscordReactionRoleAdapter(bot)
         self.delivery = ReactionRoleDeliveryService(self.repository, self.discord)
         self.role_changes = RoleChangeService(self.repository, self.discord)

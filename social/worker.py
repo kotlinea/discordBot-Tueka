@@ -23,7 +23,7 @@ log = logging.getLogger("tueka.social_worker")
 class SocialWorker:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.repository = SocialRepository(settings.database_path)
+        self.repository = SocialRepository(settings.database_url)
         self.owner = f"{socket.gethostname()}:{os.getpid()}"
         self.failures: dict[str, int] = {}
 

@@ -18,7 +18,7 @@ OAuth2 Redirectsへ`DISCORD_REDIRECT_URI`と完全に同じURLを登録します
 py -3.13 -m venv .venv
 .venv\Scripts\python.exe -m pip install --require-hashes -r requirements.lock
 Copy-Item .env.example .env
-.venv\Scripts\python.exe migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrations
+.venv\Scripts\python.exe migrate.py
 ```
 
 最低限、`DISCORD_TOKEN`、`DISCORD_CLIENT_ID`、`DISCORD_CLIENT_SECRET`、`DISCORD_REDIRECT_URI`、`SESSION_SECRET`を設定します。

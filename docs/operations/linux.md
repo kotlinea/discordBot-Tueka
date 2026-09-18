@@ -7,7 +7,7 @@
 ```bash
 python3.13 -m venv .venv
 .venv/bin/pip install --require-hashes -r requirements.lock
-.venv/bin/python migrate.py --database data/tueka.sqlite3 --backup-dir data/backups/migrations
+.venv/bin/python migrate.py
 cd dashboard/frontend && npm ci && npm run build
 cd ../../docs && npm ci && npm run build
 ```
@@ -34,4 +34,4 @@ Discord Developer PortalのRedirect URIと`DISCORD_REDIRECT_URI`を公開HTTPS U
 - 公開HTTPSからOAuthログイン、Guild一覧の認可、権限のないGuildへのアクセス拒否、ログアウト・期限切れセッションを確認します。
 - Dashboardで保存・再読込、Botの権限不足表示と不正設定拒否を確認します。利用する各機能はテストGuildで操作から終了・復旧まで確認してください。
 - Bot / Dashboard / Workerを個別に再起動し、Command・Webhook・配送・期限処理の再開とログを確認します。TicketはTranscript復号も確認します。
-- SQLiteとTranscript・鍵を同じ世代で保全し、[別DBへの復元](./backup.md)を実施します。ローカルの自動テスト成功を、この実環境確認の代替にはしません。
+- PostgreSQLとTranscript・鍵を同じ世代で保全し、[別DBへの復元](./backup.md)を実施します。ローカルの自動テスト成功を、この実環境確認の代替にはしません。

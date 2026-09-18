@@ -1,6 +1,6 @@
 # Tuekaについて
 
-Tuekaは、Discord Bot、管理ダッシュボード、ソーシャル通知Workerで構成されます。サーバーごとの設定は共通SQLite DBへ保存され、BotとWorkerが同じ状態を参照します。
+Tuekaは、Discord Bot、管理ダッシュボード、ソーシャル通知Workerで構成されます。サーバーごとの設定は共通PostgreSQL DBへ保存され、BotとWorkerが同じ状態を参照します。
 
 ## 主な機能
 
@@ -15,4 +15,4 @@ Tuekaは、Discord Bot、管理ダッシュボード、ソーシャル通知Work
 
 ## データの所在
 
-設定、ケース、イベント、配送状態は`DATABASE_PATH`のSQLiteへ保存されます。Ticket Transcriptは暗号化してローカルまたはS3互換ストレージへ保存できます。秘密値は`.env`だけで管理します。
+設定、ケース、イベント、配送状態は`DATABASE_URL`のPostgreSQLへ保存されます。Ticket Transcriptは暗号化してローカルまたはS3互換ストレージへ保存できます。秘密値は`.env`だけで管理します。

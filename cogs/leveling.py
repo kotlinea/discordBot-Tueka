@@ -28,8 +28,8 @@ def required_xp(level: int) -> int:
 class LevelingCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.repository = CommunityRepository(bot.settings.database_path)
-        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
+        self.repository = CommunityRepository(bot.settings.database_url)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_url)
         self.last_xp_time: dict[tuple[int, int], float] = {}
         self.voice_xp_tick.start()
 

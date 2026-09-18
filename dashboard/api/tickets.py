@@ -2,7 +2,7 @@
 from __future__ import annotations
 from .errors import api_error
 from fastapi import Depends
-import sqlite3
+from database import IntegrityError
 import time
 from typing import Any
 from urllib.parse import quote
@@ -180,6 +180,6 @@ def create_router(context: ApiContext) -> APIRouter:
             raise api_error(403, 'feedback_forbidden', 'このTicketを評価できません。') from exc
         except (TypeError, ValueError) as exc:
             raise api_error(422, 'feedback_invalid', '評価は1～5で指定してください。') from exc
-        except sqlite3.IntegrityError as exc:
+        except IntegrityError as exc:
             raise api_error(409, 'feedback_exists', 'このTicketは評価済みです。') from exc
     return router

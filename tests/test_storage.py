@@ -18,25 +18,25 @@ class DomainPersistenceContractsTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.root = Path(self.temp_dir.name)
-        self.storage = GuildSettingsRepository(prepare_database(self.root / "bot.sqlite3"))
-        self.dashboard_repository = DashboardRepository(self.storage.database_path)
+        self.storage = GuildSettingsRepository(prepare_database(self.root / "bot.sqlite3", self.addCleanup))
+        self.dashboard_repository = DashboardRepository(self.storage.database_url)
 
     def tearDown(self):
         self.temp_dir.cleanup()
 
     def test_settings_and_user_stats_are_shared(self):
         self.storage.set_module(1, "welcome", enabled=False, settings={"welcome_channel_id": 11})
-        CommunityRepository(self.storage.database_path).add_xp(1, 99, 25)
+        CommunityRepository(self.storage.database_url).add_xp(1, 99, 25)
         self.assertEqual(self.storage.get_module(1, "welcome")["settings"]["welcome_channel_id"], 11)
-        self.assertEqual(CommunityRepository(self.storage.database_path).get_user(1, 99), {"xp": 25})
+        self.assertEqual(CommunityRepository(self.storage.database_url).get_user(1, 99), {"xp": 25})
 
     def test_voice_xp_is_independent_from_text_xp_and_ranked(self):
-        CommunityRepository(self.storage.database_path).add_xp(1, 99, 25)
-        CommunityRepository(self.storage.database_path).add_voice_xp(1, 99, 10)
-        CommunityRepository(self.storage.database_path).add_voice_xp(1, 100, 20)
-        self.assertEqual(CommunityRepository(self.storage.database_path).get_user(1, 99)["xp"], 25)
-        self.assertEqual(CommunityRepository(self.storage.database_path).get_voice_user(1, 99)["xp"], 10)
-        self.assertEqual(CommunityRepository(self.storage.database_path).voice_leaderboard(1), [{"user_id": 100, "xp": 20}, {"user_id": 99, "xp": 10}])
+        CommunityRepository(self.storage.database_url).add_xp(1, 99, 25)
+        CommunityRepository(self.storage.database_url).add_voice_xp(1, 99, 10)
+        CommunityRepository(self.storage.database_url).add_voice_xp(1, 100, 20)
+        self.assertEqual(CommunityRepository(self.storage.database_url).get_user(1, 99)["xp"], 25)
+        self.assertEqual(CommunityRepository(self.storage.database_url).get_voice_user(1, 99)["xp"], 10)
+        self.assertEqual(CommunityRepository(self.storage.database_url).voice_leaderboard(1), [{"user_id": 100, "xp": 20}, {"user_id": 99, "xp": 10}])
 
     def test_leveling_uses_explicit_notification_channel(self):
         self.storage.set_module(1, "leveling", enabled=False, settings={"text_notification_channel_id": 77})
@@ -103,23 +103,23 @@ class DomainPersistenceContractsTests(unittest.TestCase):
     def test_social_subscription_limit_and_event_deduplication(self):
         templates = default_templates("youtube", ["video"])
         for index in range(10):
-            SocialRepository(self.storage.database_path).save_social_subscription_v2(1, "youtube", f"UC{index}", 100, ["video"], {}, templates)
+            SocialRepository(self.storage.database_url).save_social_subscription_v2(1, "youtube", f"UC{index}", 100, ["video"], {}, templates)
         with self.assertRaises(OverflowError):
-            SocialRepository(self.storage.database_path).save_social_subscription_v2(1, "youtube", "UC-over", 100, ["video"], {}, templates)
-        self.assertTrue(SocialRepository(self.storage.database_path).enqueue_social_event_v2("youtube", "video:1", "UC0", "video", {"type": "video"}))
-        self.assertFalse(SocialRepository(self.storage.database_path).enqueue_social_event_v2("youtube", "video:1", "UC0", "video", {"type": "video"}))
-        self.assertEqual(len(SocialRepository(self.storage.database_path).matching_social_subscriptions("youtube", "UC0", "video")), 1)
+            SocialRepository(self.storage.database_url).save_social_subscription_v2(1, "youtube", "UC-over", 100, ["video"], {}, templates)
+        self.assertTrue(SocialRepository(self.storage.database_url).enqueue_social_event_v2("youtube", "video:1", "UC0", "video", {"type": "video"}))
+        self.assertFalse(SocialRepository(self.storage.database_url).enqueue_social_event_v2("youtube", "video:1", "UC0", "video", {"type": "video"}))
+        self.assertEqual(len(SocialRepository(self.storage.database_url).matching_social_subscriptions("youtube", "UC0", "video")), 1)
 
     def test_social_oauth_state_is_single_use_and_bound_to_provider(self):
-        SocialRepository(self.storage.database_path).create_social_oauth_state("social-state", 123, "tiktok")
-        self.assertIsNone(SocialRepository(self.storage.database_path).consume_social_oauth_state("social-state", "instagram"))
-        SocialRepository(self.storage.database_path).create_social_oauth_state("social-state", 123, "tiktok")
-        self.assertEqual(SocialRepository(self.storage.database_path).consume_social_oauth_state("social-state", "tiktok"), 123)
-        self.assertIsNone(SocialRepository(self.storage.database_path).consume_social_oauth_state("social-state", "tiktok"))
+        SocialRepository(self.storage.database_url).create_social_oauth_state("social-state", 123, "tiktok")
+        self.assertIsNone(SocialRepository(self.storage.database_url).consume_social_oauth_state("social-state", "instagram"))
+        SocialRepository(self.storage.database_url).create_social_oauth_state("social-state", 123, "tiktok")
+        self.assertEqual(SocialRepository(self.storage.database_url).consume_social_oauth_state("social-state", "tiktok"), 123)
+        self.assertIsNone(SocialRepository(self.storage.database_url).consume_social_oauth_state("social-state", "tiktok"))
 
     def test_moderation_case_keeps_audit_details(self):
-        ModerationRepository(self.storage.database_path).add_case(1, 2, "timeout", "reason", moderator_id=3, expires_at=100, dm_sent=True)
-        case = ModerationRepository(self.storage.database_path).recent_cases(1, 2)[0]
+        ModerationRepository(self.storage.database_url).add_case(1, 2, "timeout", "reason", moderator_id=3, expires_at=100, dm_sent=True)
+        case = ModerationRepository(self.storage.database_url).recent_cases(1, 2)[0]
         self.assertEqual(case["action"], "timeout")
         self.assertEqual(case["moderator_id"], 3)
         self.assertEqual(case["expires_at"], 100)
@@ -127,25 +127,25 @@ class DomainPersistenceContractsTests(unittest.TestCase):
 
 
     def test_temporary_voice_state_is_guild_scoped(self):
-        CommunityRepository(self.storage.database_path).add_temporary_voice_channel(10, 1, 2)
-        self.assertEqual(CommunityRepository(self.storage.database_path).temporary_voice_channel(10), {"guild_id": 1, "owner_id": 2})
-        CommunityRepository(self.storage.database_path).remove_temporary_voice_channel(10)
-        self.assertIsNone(CommunityRepository(self.storage.database_path).temporary_voice_channel(10))
+        CommunityRepository(self.storage.database_url).add_temporary_voice_channel(10, 1, 2)
+        self.assertEqual(CommunityRepository(self.storage.database_url).temporary_voice_channel(10), {"guild_id": 1, "owner_id": 2})
+        CommunityRepository(self.storage.database_url).remove_temporary_voice_channel(10)
+        self.assertIsNone(CommunityRepository(self.storage.database_url).temporary_voice_channel(10))
 
     def test_poll_votes_are_atomic_per_member_and_can_close(self):
-        EngagementRepository(self.storage.database_path).create_poll(30, 1, 4, 2, "Question", ["A", "B"], None, None)
-        self.assertEqual(EngagementRepository(self.storage.database_path).cast_poll_vote(30, 99, 0), [1, 0])
-        self.assertEqual(EngagementRepository(self.storage.database_path).cast_poll_vote(30, 99, 1), [0, 1])
+        EngagementRepository(self.storage.database_url).create_poll(30, 1, 4, 2, "Question", ["A", "B"], None, None)
+        self.assertEqual(EngagementRepository(self.storage.database_url).cast_poll_vote(30, 99, 0), [1, 0])
+        self.assertEqual(EngagementRepository(self.storage.database_url).cast_poll_vote(30, 99, 1), [0, 1])
 
     def test_trust_score_has_reasons_and_manual_release(self):
         self.storage.set_module(1, "trust_score", enabled=True)
-        ModerationRepository(self.storage.database_path).add_case(1, 2, "warn", "test warning")
-        trust = ModerationRepository(self.storage.database_path).trust_score(1, 2)
+        ModerationRepository(self.storage.database_url).add_case(1, 2, "warn", "test warning")
+        trust = ModerationRepository(self.storage.database_url).trust_score(1, 2)
         self.assertEqual(trust["score"], 90)
         self.assertEqual(trust["events"][0]["reason"], "test warning")
-        ModerationRepository(self.storage.database_path).clear_trust_events(1, 2)
-        self.assertEqual(ModerationRepository(self.storage.database_path).trust_score(1, 2)["score"], 100)
+        ModerationRepository(self.storage.database_url).clear_trust_events(1, 2)
+        self.assertEqual(ModerationRepository(self.storage.database_url).trust_score(1, 2)["score"], 100)
 
     def test_disabled_trust_module_does_not_collect_events(self):
-        ModerationRepository(self.storage.database_path).add_case(1, 2, "warn", "not collected")
-        self.assertEqual(ModerationRepository(self.storage.database_path).trust_score(1, 2)["score"], 100)
+        ModerationRepository(self.storage.database_url).add_case(1, 2, "warn", "not collected")
+        self.assertEqual(ModerationRepository(self.storage.database_url).trust_score(1, 2)["score"], 100)

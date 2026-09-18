@@ -15,8 +15,8 @@ class AuditLogCog(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.moderation_repository = ModerationRepository(bot.settings.database_path)
-        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
+        self.moderation_repository = ModerationRepository(bot.settings.database_url)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_url)
         self._recent_actions: dict[tuple[int, str, int], float] = {}
 
     @staticmethod

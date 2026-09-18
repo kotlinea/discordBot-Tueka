@@ -40,7 +40,7 @@ class ApiContractTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.api = ApiFixture(Path(self.temp.name))
+        self.api = ApiFixture(Path(self.temp.name), self.addCleanup)
         self.addCleanup(self.api.client.close)
 
     def test_openapi_paths_parameters_statuses_and_shapes_are_preserved(self):
@@ -226,7 +226,7 @@ class ApiContractTests(unittest.TestCase):
         from guild_settings import GuildSettingsRepository
         other_root = Path(self.temp.name) / 'other'
         other_root.mkdir()
-        other = ApiFixture(other_root)
+        other = ApiFixture(other_root, self.addCleanup)
         self.addCleanup(other.client.close)
         GuildSettingsRepository(self.api.database).set_module(1, 'welcome', enabled=True, settings={'welcome_content': 'First'})
         url = '/api/v1/guilds/1/modules/welcome'
@@ -262,3 +262,18 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(self.api.client.get(url).status_code, 401)
         self.assertEqual(self.api.client.put(url, json={}, headers=self.api.headers).status_code, 401)
         self.api.discord.can_manage.assert_not_awaited()
+
+    def test_concurrent_rule_updates_return_one_success_and_one_conflict(self):
+        from concurrent.futures import ThreadPoolExecutor
+        root = '/api/v1/guilds/1/moderation/automod/rules'
+        value = {**default_rule('keyword'), 'name': 'Keyword', 'trigger_config': {'keywords': ['blocked']}}
+        created = self.api.client.post(root, json=value, headers=self.api.headers)
+        self.assertEqual(created.status_code, 201, created.text)
+        item = created.json()
+        def update(name):
+            return self.api.client.put(root + '/' + str(item['id']), json={**value, 'revision': item['revision'], 'name': name}, headers=self.api.headers)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = list(executor.map(update, ['first', 'second']))
+        self.assertEqual(sorted(response.status_code for response in responses), [200, 409])
+        loser = next(response for response in responses if response.status_code == 409)
+        self.assertEqual(loser.json()['detail']['code'], 'revision_conflict')

@@ -50,7 +50,7 @@ class ModerationAdapterTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        path = prepare_database(Path(self.temp.name) / 'test.db')
+        path = prepare_database(Path(self.temp.name) / 'test.db', self.addCleanup)
         self.repository = ModerationRepository(path)
         self.port = FakePort()
         self.service = ModerationService(self.port, self.repository, GuildSettingsRepository(path))
@@ -64,13 +64,13 @@ class ModerationAdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.port.calls), 1)
         with self.assertRaises(ActionFailure):
             await self.service.apply_case(self.guild, self.member, 'tempban', 'reason', execution_key='request')
-        restarted = ModerationService(self.port, ModerationRepository(self.repository.database_path), self.service.guild_settings)
+        restarted = ModerationService(self.port, ModerationRepository(self.repository.database_url), self.service.guild_settings)
         case = await restarted.reconcile_case(self.guild, 'request')
         self.assertEqual(await restarted.reconcile_case(self.guild, 'request'), case)
         self.assertEqual(len(self.port.calls), 1)
         self.assertEqual(len(self.repository.recent_cases(1, 2)), 1)
         with self.repository._connection() as c:
-            self.assertEqual(c.execute('SELECT COUNT(*) FROM scheduled_moderation_actions WHERE case_id=?', (case,)).fetchone()[0], 1)
+            self.assertEqual(c.execute('SELECT COUNT(*) AS count FROM scheduled_moderation_actions WHERE case_id=%s', (case,)).fetchone()["count"], 1)
 
     async def test_lockdown_intent_survives_permission_failure_and_conflicts_remain_active(self):
         self.port.fail_permissions = True
@@ -143,5 +143,5 @@ class ModerationAdapterTests(unittest.IsolatedAsyncioTestCase):
                 await self.service.lockdown(self.guild, 'raid', 1)
         self.assertIsNotNone(self.repository.active_lockdown(1))
         with self.repository._connection() as c:
-            self.assertEqual(c.execute('SELECT token FROM resource_leases').fetchone()[0], 'successor')
-            self.assertEqual(c.execute('SELECT COUNT(*) FROM moderation_raid_state WHERE active=1').fetchone()[0], 0)
+            self.assertEqual(c.execute('SELECT token FROM resource_leases').fetchone()['token'], 'successor')
+            self.assertEqual(c.execute('SELECT COUNT(*) AS count FROM moderation_raid_state WHERE active=1').fetchone()["count"], 0)

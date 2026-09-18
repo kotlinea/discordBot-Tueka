@@ -15,3 +15,5 @@ docs/.vitepress/cache/
 data/
 welcome.png
 rank.png
+
+.env.postgres-dev

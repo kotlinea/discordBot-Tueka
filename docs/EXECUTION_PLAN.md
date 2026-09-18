@@ -26,13 +26,15 @@ Windows/Linuxの全Python各211件、Docs build、保全DB複製の全Dump不変
 
 **P2-6：型生成・入力Schema共有・UI構造の整理はローカル完了。** Domain別公開Schemaと共通入力検証、OpenAPI/TypeScript/制約生成、共通UI、Shell/Domain Router、画面遅延読込、日英Namespaceを実装した。最終Windows/Linux全各296件、Frontend型検査/build、Vitest14件、4画面幅の画面検証48件、Docs表示/Accessibility10件が成功。イベントのnullable項目と19桁ID、保存・再読込・競合・権限喪失・無効化、Embed/Schedule編集、日英・全外観/light/dark・キーボードを検証した。詳細とログは進捗記録を参照する。
 
-**次はP2-7：PostgreSQL移行。** 2026-09-18の指示により、PostgreSQLを必須の移行先として計画へ追加する。原DBは破棄可能な開発データであり、空のPostgreSQLから切り替える。旧データ移送・SQLite二重運用・性能閾値超過を前提にしない。P2-7を終えてから既存のP3-1〜4へ進み、番号は変更しない。
+**P2-7：PostgreSQL移行はローカル完了（2026-09-19）。** 接続/Pool・専用Migration・9 Domain Repository・Queue/Lease・API競合・Runtime・型生成・テスト/CI設定・論理Backup/RestoreをPostgreSQLへ統一した。最終Windows/Linux各298件、Frontend単体14件・本番build、画面回帰48件、Docs build・5画面幅10件、型生成差分検査が成功。実pg_dump/pg_restoreで67テーブル、設定・Queue・Transcript参照、採番と破損dumpのRollbackを確認した。
 
-今回の計画変更では原DB・保全DBを削除していない。旧データ保持を今後の開発DB切替の必須ゲートから外すが、StageのDiscord・OAuth・Webhook実動、PostgreSQLの導入・更新・Restore、実Transcript/S3復元は別途検証する。P2-7追加によりPhase 2全体とGoalは継続する。
+開発用Composeを空Volumeから起動し、localhost:55433の`tueka_dev`へ初期Migrationを適用した。アプリの`.env`もDATABASE_URLへ切替済み。元SQLite・保全DB・暗号鍵・Transcript・Discord Resourceは変更せず、データは移送していない。Bot・Dashboard・Workerの外部接続は起動していない。
+
+**Phase 2のローカル出口を完了し、次はP3-1：同一の本番Imageとコマンド別entrypoint。** StageのDiscord・OAuth・Webhook実動、運用環境の同一digest、実Transcript/S3を含むRestoreは別ゲートとして保持する。CIは接続先を整備したが、Remote Workflowは未実行。Goal全体とPhase 3〜5は未完了。詳細・コマンド・ログは`docs/PROGRESS0910.md`のP2-7完了記録を参照する。
 
 ## 1. 判断と調査範囲
 
-直近の目標は新機能追加ではなく、Phase 0の検証基盤確立とPhase 1のV1除去である。続いて責務を整理し、その構造を本番用コンテナへ載せる。既存機能の運用品質を満たしてからPhase 5へ進む。
+Phase 0〜2のローカル検証基盤・V1除去・責務分離・PostgreSQL移行を完了した。直近はこの構造をPhase 3の同一本番Imageへ載せ、環境分離と運用検証を進める。既存機能の運用品質を満たしてからPhase 5へ進む。
 
 README、ROADMAP、設計・アーキテクチャ・機能・運用資料、起動処理、保存層、主要Domain、API、React画面、CIとテスト定義を確認した。今回は静的調査と計画策定であり、テスト・ビルド実行、本番DB調査、Discord実機検証は行っていない。テストの存在を成功や機能完成の証拠とは扱わない。
 
@@ -141,7 +143,7 @@ ROADMAPの順序を維持する。各機能をDBだけ・画面だけで公開�
 - PostgreSQLの接続枯渇・lock競合・deadlock、Outbox滞留、Worker停止、Discord側成功後のDB失敗を重点監視する。特にRetryは「最大回数」だけでなく冪等性と補償を検証する。
 - Stage検証と将来の本番PostgreSQL運用確認には、対象環境・テストGuild・OAuth/Provider設定へのアクセスが必要。原開発DBのInventory/移送はP2-7の着手条件にしない。アクセスがない期間も、コードInventory、Fixture、コンテナ、Contract testの整備は進められる。
 
-直近の着手はP2-7。P0-1〜P2-6のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
+直近の着手はP3-1。P0-1〜P2-7のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
 
 ## 8. 再調査に基づく具体的な実行単位（2026-09-12）
 

@@ -36,7 +36,7 @@ class SocialAdapterTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        path = prepare_database(Path(self.temp.name) / 'test.db')
+        path = prepare_database(Path(self.temp.name) / 'test.db', self.addCleanup)
         self.repository = SocialRepository(path)
         self.settings = GuildSettingsRepository(path)
         self.settings.set_module(1, 'twitch_updates', enabled=True)
@@ -51,7 +51,7 @@ class SocialAdapterTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(self.repository, 'update_social_delivery', side_effect=RuntimeError('database unavailable')):
             with self.assertRaises(RuntimeError):
                 await self.service.deliver(self.event)
-        restarted = SocialDeliveryService(SocialRepository(self.repository.database_path), self.settings, self.port)
+        restarted = SocialDeliveryService(SocialRepository(self.repository.database_url), self.settings, self.port)
         self.assertTrue(await restarted.deliver(self.event))
         self.assertEqual(self.port.created, 1)
         delivery = self.repository.social_delivery(self.subscription['id'], self.event['event_key'])

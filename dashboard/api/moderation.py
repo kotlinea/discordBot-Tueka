@@ -54,6 +54,8 @@ def create_router(context: ApiContext) -> APIRouter:
             value = normalized_rule(await read_body(request, inputs.RuleInput), family)
             value['priority'] = moderation_repository.next_moderation_rule_priority(guild_id, family)
             return _serialize_rule_resource_ids(moderation_repository.save_moderation_rule(guild_id, value))
+        except RuntimeError as exc:
+            raise revision_conflict('別の管理者がルールを更新しました。再読み込みしてください。') from exc
         except (TypeError, ValueError) as exc:
             raise api_error(422, 'rule_invalid', str(exc) or 'ルールを確認してください。') from exc
 
@@ -81,7 +83,9 @@ def create_router(context: ApiContext) -> APIRouter:
         try:
             value = normalized_rule(body, family)
             value['priority'] = current['priority']
-            return _serialize_rule_resource_ids(moderation_repository.save_moderation_rule(guild_id, value, rule_id))
+            return _serialize_rule_resource_ids(moderation_repository.save_moderation_rule(guild_id, value, rule_id, expected_revision=current['revision']))
+        except RuntimeError as exc:
+            raise revision_conflict('別の管理者がルールを更新しました。再読み込みしてください。') from exc
         except (TypeError, ValueError) as exc:
             raise api_error(422, 'rule_invalid', str(exc) or 'ルールを確認してください。') from exc
 
@@ -91,7 +95,10 @@ def create_router(context: ApiContext) -> APIRouter:
         if not current or current['family'] != family:
             raise api_error(404, 'rule_not_found', 'ルールが見つかりません。')
         check_revision(if_match, int(current['revision']), '別の管理者がルールを更新しました。')
-        moderation_repository.delete_moderation_rule(guild_id, rule_id)
+        try:
+            moderation_repository.delete_moderation_rule(guild_id, rule_id, expected_revision=current['revision'])
+        except RuntimeError as exc:
+            raise revision_conflict('別の管理者がルールを更新しました。') from exc
 
     @router.post('/guilds/{guild_id}/moderation/{family}/rules/{rule_id}/duplicate', status_code=201, dependencies=[Depends(auth.csrf)], response_model=schemas.Rule, response_model_exclude_unset=True)
     async def duplicate_rule(request: Request, guild_id: int, family: str, rule_id: int, _access: str=Depends(auth.write)) -> dict[str, Any]:

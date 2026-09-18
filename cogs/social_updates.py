@@ -20,8 +20,8 @@ MODULE_FOR_PROVIDER = {"youtube": "youtube_updates", "twitch": "twitch_updates",
 class SocialUpdatesCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.social_repository = SocialRepository(bot.settings.database_path)
-        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
+        self.social_repository = SocialRepository(bot.settings.database_url)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_url)
         self.delivery = SocialDeliveryService(self.social_repository, self.guild_settings, DiscordSocialAdapter(bot))
         self.owner = f"discord:{socket.gethostname()}:{os.getpid()}"
         self.deliver_events.start()

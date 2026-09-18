@@ -13,8 +13,8 @@ from guild_settings import GuildSettingsRepository
 class EngagementCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.engagement_repository = EngagementRepository(bot.settings.database_path)
-        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
+        self.engagement_repository = EngagementRepository(bot.settings.database_url)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_url)
         self.close_expired_polls.start()
 
     def cog_unload(self) -> None:

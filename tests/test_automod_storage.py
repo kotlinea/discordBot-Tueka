@@ -17,7 +17,7 @@ from moderation import ModerationRepository
 class AutoModStorageTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.storage = ModerationRepository(prepare_database(Path(self.temp_dir.name) / "bot.sqlite3"))
+        self.storage = ModerationRepository(prepare_database(Path(self.temp_dir.name) / "bot.sqlite3", self.addCleanup))
 
     def tearDown(self):
         self.temp_dir.cleanup()
@@ -30,13 +30,13 @@ class AutoModStorageTests(unittest.TestCase):
 
     def test_rule_crud_updates_revision_and_is_guild_scoped(self):
         saved = self.storage.save_moderation_rule(1, self.keyword_rule())
-        first_revision = GuildSettingsRepository(self.storage.database_path).get_module(1, "moderation")["settings"]["rules_revision"]
+        first_revision = GuildSettingsRepository(self.storage.database_url).get_module(1, "moderation")["settings"]["rules_revision"]
         self.assertEqual(self.storage.moderation_rule(1, saved["id"])["name"], "words")
         self.assertIsNone(self.storage.moderation_rule(2, saved["id"]))
         saved["name"] = "updated"
         updated = self.storage.save_moderation_rule(1, saved, saved["id"])
         self.assertEqual(updated["revision"], 2)
-        self.assertGreater(GuildSettingsRepository(self.storage.database_path).get_module(1, "moderation")["settings"]["rules_revision"], first_revision)
+        self.assertGreater(GuildSettingsRepository(self.storage.database_url).get_module(1, "moderation")["settings"]["rules_revision"], first_revision)
         self.assertTrue(self.storage.delete_moderation_rule(1, saved["id"]))
         self.assertFalse(self.storage.delete_moderation_rule(1, saved["id"]))
 
@@ -61,10 +61,10 @@ class AutoModStorageTests(unittest.TestCase):
         self.assertEqual(self.storage.revoke_points(1, 2), 2)
         self.assertEqual(self.storage.active_points(1, 2), 0)
         with self.storage._connection() as connection:
-            connection.execute("UPDATE moderation_events SET evidence_expires_at=0 WHERE id=?", (event_id,))
+            connection.execute('UPDATE moderation_events SET evidence_expires_at=0 WHERE id=%s', (event_id,))
         self.assertEqual(self.storage.purge_moderation_evidence(), 1)
         with self.storage._connection() as connection:
-            event = connection.execute("SELECT evidence_text,evidence_json FROM moderation_events WHERE id=?", (event_id,)).fetchone()
+            event = connection.execute('SELECT evidence_text,evidence_json FROM moderation_events WHERE id=%s', (event_id,)).fetchone()
         self.assertIsNone(event["evidence_text"])
         self.assertEqual(json.loads(event["evidence_json"]), {})
 
@@ -89,10 +89,10 @@ class AutoModStorageTests(unittest.TestCase):
             reason="reason",rule_id=rule["id"],actor_id=2,target_user_id=2,target_id=4,dedupe_key="one")
         self.storage.finish_moderation_event(event,[{"type":"points","status":"success","case_id":9,"before":0,"after":1}])
         with self.storage._connection() as connection:
-            stored = connection.execute("SELECT case_id FROM moderation_events WHERE id=?",(event,)).fetchone()
-            action = connection.execute("SELECT action_type,status FROM moderation_action_results WHERE event_id=?",(event,)).fetchone()
+            stored = connection.execute('SELECT case_id FROM moderation_events WHERE id=%s',(event,)).fetchone()
+            action = connection.execute('SELECT action_type,status FROM moderation_action_results WHERE event_id=%s',(event,)).fetchone()
         self.assertEqual(stored["case_id"],9)
-        self.assertEqual(tuple(action),("points","success"))
+        self.assertEqual(tuple(action.values()),("points","success"))
         lockdown = self.storage.start_lockdown(1,reason="raid",started_by=3,unlock_at=10,source_event_id=event)
         self.storage.save_lockdown_snapshot(lockdown,20,1,{"send_messages":None},{"send_messages":False})
         self.assertEqual(self.storage.due_lockdowns(10)[0]["id"],lockdown)
@@ -114,14 +114,14 @@ class AutoModStorageTests(unittest.TestCase):
 class ModerationThresholdTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.storage = ModerationRepository(prepare_database(Path(self.temp_dir.name) / "bot.sqlite3"))
-        self.service = ModerationService(None, self.storage, GuildSettingsRepository(self.storage.database_path))
-        settings = GuildSettingsRepository(self.storage.database_path).get_module(1, "infractions")["settings"]
+        self.storage = ModerationRepository(prepare_database(Path(self.temp_dir.name) / "bot.sqlite3", self.addCleanup))
+        self.service = ModerationService(None, self.storage, GuildSettingsRepository(self.storage.database_url))
+        settings = GuildSettingsRepository(self.storage.database_url).get_module(1, "infractions")["settings"]
         settings["point_thresholds"] = [
             {"points": 3, "action": {"type": "timeout", "duration_minutes": 10}},
             {"points": 5, "action": {"type": "ban"}},
         ]
-        GuildSettingsRepository(self.storage.database_path).set_module(1, "infractions", enabled=True, settings=settings)
+        GuildSettingsRepository(self.storage.database_url).set_module(1, "infractions", enabled=True, settings=settings)
 
     async def asyncTearDown(self):
         self.temp_dir.cleanup()
@@ -137,11 +137,11 @@ class ModerationThresholdTests(unittest.IsolatedAsyncioTestCase):
         self.service.apply_case.assert_not_awaited()
 
     async def test_disabled_infractions_never_falls_back_to_old_thresholds(self):
-        GuildSettingsRepository(self.storage.database_path).set_module(1, 'infractions', enabled=False)
-        GuildSettingsRepository(self.storage.database_path).set_module(1, 'automod', enabled=True, settings={'point_thresholds': [
+        GuildSettingsRepository(self.storage.database_url).set_module(1, 'infractions', enabled=False)
+        GuildSettingsRepository(self.storage.database_url).set_module(1, 'automod', enabled=True, settings={'point_thresholds': [
             {'points': 1, 'action': {'type': 'ban'}},
         ]})
-        GuildSettingsRepository(self.storage.database_path).set_module(1, 'moderation', enabled=True, settings={
+        GuildSettingsRepository(self.storage.database_url).set_module(1, 'moderation', enabled=True, settings={
             'escalation_enabled': True, 'escalation_threshold': 1, 'escalation_action': 'ban',
         })
         self.service.apply_case = AsyncMock()

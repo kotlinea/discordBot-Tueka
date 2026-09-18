@@ -18,8 +18,8 @@ LOGGER = logging.getLogger(__name__)
 
 class SafetyCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
-        self.bot, self.moderation_repository = bot, ModerationRepository(bot.settings.database_path)
-        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
+        self.bot, self.moderation_repository = bot, ModerationRepository(bot.settings.database_url)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_url)
         self.moderation = ModerationService(DiscordModerationAdapter(bot), self.moderation_repository, self.guild_settings)
 
     async def _enabled(self, interaction: discord.Interaction, module_id: str) -> bool:

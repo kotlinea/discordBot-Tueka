@@ -24,7 +24,7 @@ class QueueContracts(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.path = prepare_database(Path(self.temp.name) / 'jobs.db')
+        self.path = prepare_database(Path(self.temp.name) / 'jobs.db', self.addCleanup)
         self.now = 1000
 
     def seed(self, spec, columns, values):
@@ -48,7 +48,7 @@ class QueueContracts(unittest.TestCase):
                 self.assertTrue(store.renew(second))
                 self.assertTrue(store.finish(second, Outcome(result={'done': True})))
                 with transaction(self.path) as c:
-                    self.assertEqual(c.execute(f'SELECT {spec.due} FROM {spec.table} WHERE id=?', (second.id,)).fetchone()[0], second.payload[spec.due])
+                    self.assertEqual(c.execute(f'SELECT {spec.due} FROM {spec.table} WHERE id=%s', (second.id,)).fetchone()[spec.due], second.payload[spec.due])
                 self.assertFalse(store.finish(second, Outcome()))
                 self.assertIsNone(store.claim('other'))
 
@@ -76,7 +76,7 @@ class QueueContracts(unittest.TestCase):
             self.now += 3
         self.assertIsNone(store.claim('restart'))
         with transaction(self.path) as c:
-            self.assertEqual(c.execute('SELECT status FROM ticket_outbox').fetchone()[0], 'failed')
+            self.assertEqual(c.execute('SELECT status FROM ticket_outbox').fetchone()['status'], 'failed')
 
     def test_parallel_claims_have_one_owner(self):
         store = self.seed(*QUEUES[0])

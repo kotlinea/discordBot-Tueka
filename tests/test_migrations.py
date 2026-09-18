@@ -1,135 +1,123 @@
-from db_support import prepare_database, set_fixture_version
-import sqlite3
+"""PostgreSQL migration invariants; SQLite data conversion is intentionally retired."""
 import tempfile
 import unittest
-from contextlib import closing
 from pathlib import Path
 
-from migrate import apply
-from scripts.db_inventory import inventory
-from suggestions import SuggestionRepository
+import psycopg
+
+from database import SchemaNotReady, connect, require_current
+from database.migrations import MIGRATIONS, apply, load
+from database.testing import temporary_database
 
 
 class MigrationTests(unittest.TestCase):
     def setUp(self):
+        self.context = temporary_database(migrate=False)
+        self.url = self.context.__enter__()
+        self.addCleanup(self.context.__exit__, None, None, None)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
-        self.db = self.root / 'test.db'
-        self.backups = self.root / 'backups'
+        self.directory = Path(self.temp.name)
 
-    def sql(self, text):
-        directory = self.root / 'migrations'
-        directory.mkdir(exist_ok=True)
-        (directory / '0001_test.sql').write_text(text, encoding='utf-8')
-        return directory
+    def sql(self, source, name='0001_test.sql'):
+        (self.directory / name).write_text(source, encoding='utf-8')
+        return self.directory
 
     def seed(self):
-        with closing(sqlite3.connect(self.db)) as connection:
-            connection.execute('CREATE TABLE preserved(id INTEGER PRIMARY KEY, value TEXT)')
-            connection.execute("INSERT INTO preserved VALUES(1,'keep')")
-            connection.commit()
+        with connect(self.url) as c:
+            c.execute('CREATE TABLE preserved(id BIGINT PRIMARY KEY, value TEXT)')
+            c.execute("INSERT INTO preserved VALUES(1,'keep')")
 
-    def test_empty_database_and_reapplication(self):
-        result = apply(self.db, self.backups)
-        self.assertEqual(result['applied'], ['0001_suggestions.sql', '0002_remove_legacy_tickets.sql', '0003_remove_legacy_reaction_roles.sql', '0004_remove_legacy_moderation.sql', '0005_remove_shared_settings_fallback.sql', '0006_remove_legacy_social_template.sql', '0007_current_schema.sql', '0008_job_leases.sql', '0009_suggestion_outbox.sql', '0010_resource_leases.sql'])
-        self.assertEqual(inventory(Path(result['snapshot']))['tables'], [])
-        repository = SuggestionRepository(self.db)
-        item = repository.create(1, 2, 3, {'idea': 'keep'})
-        before = inventory(self.db)
-        self.assertEqual(apply(self.db, self.backups), {'applied': [], 'snapshot': None})
-        self.assertEqual(inventory(self.db), before)
-        self.assertEqual(repository.get(1, item['id'])['answers'], {'idea': 'keep'})
-
-    def test_existing_v2_data_is_preserved(self):
-        prepare_database(self.db)
-        repository = SuggestionRepository(self.db)
-        item = repository.create(1, 2, 3, {'idea': 'existing'})
-        set_fixture_version(self.db, 6)
-        result = apply(self.db, self.backups)
-        self.assertTrue(Path(result['snapshot']).exists())
-        self.assertEqual(repository.get(1, item['id'])['answers'], {'idea': 'existing'})
-
-    def test_concurrent_runners_apply_each_version_once(self):
-        from concurrent.futures import ThreadPoolExecutor
+    def test_failed_ddl_preserves_original_data_and_removes_partial_history(self):
         self.seed()
-        with ThreadPoolExecutor(max_workers=2) as workers:
-            results = list(workers.map(lambda _: apply(self.db, self.backups), range(2)))
-        self.assertEqual(sum(len(result['applied']) for result in results), 10)
-        self.assertEqual(len(list(self.backups.glob('*.sqlite3'))), 1)
-        with closing(sqlite3.connect(self.db)) as connection:
-            self.assertEqual(connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0], 10)
+        self.sql('DROP TABLE preserved; CREATE TABLE partial(id BIGINT); INSERT INTO absent VALUES(1);')
+        with self.assertRaises(psycopg.errors.UndefinedTable):
+            apply(self.url, self.directory)
+        with connect(self.url) as c:
+            self.assertEqual(c.execute('SELECT value FROM preserved').fetchone()['value'], 'keep')
+            self.assertIsNone(c.execute("SELECT to_regclass('partial') AS relation").fetchone()['relation'])
+            self.assertIsNone(c.execute("SELECT to_regclass('schema_migrations') AS relation").fetchone()['relation'])
 
-    def test_runtime_initialization_does_not_change_migrated_suggestions_schema(self):
-        apply(self.db, self.backups)
-        before = inventory(self.db)
-        SuggestionRepository(self.db)
-        self.assertEqual(inventory(self.db), before)
-
-    def test_failed_ddl_rolls_back_data_schema_and_history(self):
+    def test_transaction_and_session_control_cannot_escape_rollback(self):
         self.seed()
-        before = inventory(self.db)
-        directory = self.sql('DROP TABLE preserved; CREATE TABLE partial(id INTEGER); INSERT INTO missing VALUES(1);')
-        with self.assertRaises(sqlite3.OperationalError):
-            apply(self.db, self.backups, directory)
-        self.assertEqual(inventory(self.db), before)
-        snapshot, = self.backups.glob('*.sqlite3')
-        self.assertEqual(inventory(snapshot), before)
-        with closing(sqlite3.connect(self.db)) as connection:
-            self.assertEqual(connection.execute('SELECT value FROM preserved').fetchone()[0], 'keep')
-
-    def test_commit_in_migration_cannot_escape_rollback(self):
-        self.seed()
-        directory = self.sql('DROP TABLE preserved; COMMIT;')
-        with self.assertRaises(sqlite3.DatabaseError):
-            apply(self.db, self.backups, directory)
-        self.assertEqual(inventory(self.db)['tables'][0]['name'], 'preserved')
-
-    def test_conditional_column_addition_preserves_existing_values(self):
-        directory = self.sql("""CREATE TABLE example(id INTEGER PRIMARY KEY, existing TEXT);
-            INSERT INTO example VALUES(1,'keep');
--- tueka: add-column-if-missing
-ALTER TABLE example ADD COLUMN existing TEXT DEFAULT 'replace';
--- tueka: add-column-if-missing
-ALTER TABLE example ADD COLUMN added INTEGER NOT NULL DEFAULT 7;
-""")
-        apply(self.db, self.backups, directory)
-        with closing(sqlite3.connect(self.db)) as connection:
-            self.assertEqual(connection.execute('SELECT * FROM example').fetchall(), [(1, 'keep', 7)])
-        self.assertEqual(apply(self.db, self.backups, directory), {'applied': [], 'snapshot': None})
-
-    def test_conditional_annotation_does_not_allow_other_sql_or_escape_rollback(self):
-        self.seed()
-        for sql in ('COMMIT;', 'PRAGMA foreign_keys=OFF;', 'ALTER TABLE absent ADD COLUMN x TEXT;'):
-            with self.subTest(sql=sql):
-                directory = self.sql('DROP TABLE preserved;\n-- tueka: add-column-if-missing\n' + sql)
+        for command in ('COMMIT', 'ROLLBACK', 'SET search_path=public', 'BEGIN', 'VACUUM'):
+            with self.subTest(command=command):
+                self.sql('DROP TABLE preserved; ' + command + ';')
                 with self.assertRaises(ValueError):
-                    apply(self.db, self.backups, directory)
-                with closing(sqlite3.connect(self.db)) as connection:
-                    self.assertEqual(connection.execute('SELECT value FROM preserved').fetchone()[0], 'keep')
+                    apply(self.url, self.directory)
+                with connect(self.url) as c:
+                    self.assertEqual(c.execute('SELECT value FROM preserved').fetchone()['value'], 'keep')
 
-    def test_history_checksum_change_is_rejected(self):
-        directory = self.sql('CREATE TABLE example(id INTEGER);')
-        apply(self.db, self.backups, directory)
-        self.sql('CREATE TABLE example(id TEXT);')
-        with self.assertRaisesRegex(ValueError, 'history'):
-            apply(self.db, self.backups, directory)
-        self.assertEqual(len(list(self.backups.glob('*.sqlite3'))), 1)
+    def test_second_migration_foreign_key_failure_is_atomic_and_retryable(self):
+        self.sql('CREATE TABLE parent(id BIGINT PRIMARY KEY); CREATE TABLE child(parent_id BIGINT REFERENCES parent(id));')
+        apply(self.url, self.directory)
+        self.sql('INSERT INTO child VALUES(99);', '0002_child.sql')
+        with self.assertRaises(psycopg.IntegrityError):
+            apply(self.url, self.directory)
+        with connect(self.url) as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) AS count FROM schema_migrations').fetchone()['count'], 1)
+            self.assertEqual(c.execute('SELECT COUNT(*) AS count FROM child').fetchone()['count'], 0)
+        self.sql('INSERT INTO parent VALUES(99); INSERT INTO child VALUES(99);', '0002_child.sql')
+        self.assertEqual(apply(self.url, self.directory)['applied'], ['0002_child.sql'])
 
-    def test_backup_failure_prevents_migration(self):
-        self.seed()
-        self.backups.write_text('not a directory')
-        with self.assertRaises(FileExistsError):
-            apply(self.db, self.backups)
-        self.assertEqual([table['name'] for table in inventory(self.db)['tables']], ['preserved'])
+    def test_native_conditional_column_addition_preserves_values(self):
+        self.sql("CREATE TABLE example(id BIGINT PRIMARY KEY, existing TEXT); INSERT INTO example VALUES(1,'keep'); ALTER TABLE example ADD COLUMN IF NOT EXISTS existing TEXT DEFAULT 'replace'; ALTER TABLE example ADD COLUMN added BIGINT NOT NULL DEFAULT 7;")
+        apply(self.url, self.directory)
+        with connect(self.url) as c:
+            self.assertEqual(c.execute('SELECT * FROM example').fetchone(), {'id': 1, 'existing': 'keep', 'added': 7})
+        self.assertEqual(apply(self.url, self.directory), {'applied': []})
 
-    def test_second_version_and_foreign_key_failure_rollback(self):
-        directory = self.sql('CREATE TABLE parent(id INTEGER PRIMARY KEY); CREATE TABLE child(parent_id INTEGER REFERENCES parent(id));')
-        apply(self.db, self.backups, directory)
-        (directory / '0002_invalid.sql').write_text('INSERT INTO child VALUES(99);')
-        with self.assertRaises(sqlite3.IntegrityError):
-            apply(self.db, self.backups, directory)
-        with closing(sqlite3.connect(self.db)) as connection:
-            self.assertEqual(connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0], 1)
-        (directory / '0002_invalid.sql').write_text('INSERT INTO parent VALUES(99); INSERT INTO child VALUES(99);')
-        self.assertEqual(apply(self.db, self.backups, directory)['applied'], ['0002_invalid.sql'])
+    def test_quoted_semicolons_and_comments_are_preserved(self):
+        self.sql("-- initial comment\nCREATE TABLE example(value TEXT); /* separator ; */ INSERT INTO example VALUES('semi;quote''--text');")
+        apply(self.url, self.directory)
+        with connect(self.url) as c:
+            self.assertEqual(c.execute('SELECT value FROM example').fetchone()['value'], "semi;quote'--text")
+
+    def test_invalid_filenames_gaps_and_unterminated_sql_are_rejected(self):
+        self.sql('CREATE TABLE example(id BIGINT);', '0002_gap.sql')
+        with self.assertRaises(ValueError):
+            load(self.directory)
+        (self.directory / '0002_gap.sql').unlink()
+        self.sql('CREATE TABLE example(id BIGINT)')
+        with self.assertRaises(ValueError):
+            apply(self.url, self.directory)
+
+    def test_current_repositories_do_not_create_or_change_schema(self):
+        from community import CommunityRepository
+        from dashboard.repository import DashboardRepository
+        from engagement import EngagementRepository
+        from guild_settings import GuildSettingsRepository
+        from moderation import ModerationRepository
+        from reaction_roles import ReactionRoleRepository
+        from social import SocialRepository
+        from suggestions import SuggestionRepository
+        from ticketing import TicketRepository
+        repositories = (CommunityRepository, DashboardRepository, EngagementRepository, GuildSettingsRepository,
+            ModerationRepository, ReactionRoleRepository, SocialRepository, SuggestionRepository, TicketRepository)
+        for repository in repositories:
+            with self.subTest(repository=repository.__name__), self.assertRaises(SchemaNotReady):
+                repository(self.url)
+        apply(self.url)
+        def schema():
+            with connect(self.url) as c:
+                return c.execute("SELECT table_name,column_name,data_type,column_default FROM information_schema.columns WHERE table_schema=current_schema() ORDER BY table_name,ordinal_position").fetchall()
+        before = schema()
+        for repository in repositories:
+            repository(self.url)
+        self.assertEqual(schema(), before)
+        require_current(self.url)
+        self.assertEqual(apply(self.url), {'applied': []})
+
+    def test_later_migration_preserves_current_domain_data(self):
+        from suggestions import SuggestionRepository
+        baseline = next(MIGRATIONS.glob('*.sql'))
+        self.sql(baseline.read_text(encoding='utf-8'), baseline.name)
+        apply(self.url, self.directory)
+        item = SuggestionRepository(self.url).create(1, 2, 3, {'idea': 'keep'})
+        self.sql('ALTER TABLE suggestions ADD COLUMN migration_probe TEXT;', '0002_probe.sql')
+        apply(self.url, self.directory)
+        with connect(self.url) as c:
+            row = c.execute('SELECT answers_json FROM suggestions WHERE id=%s', (item['id'],)).fetchone()
+            self.assertIn('keep', row['answers_json'])
+        with self.assertRaises(SchemaNotReady):
+            require_current(self.url)

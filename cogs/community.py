@@ -15,8 +15,8 @@ LOGGER = logging.getLogger(__name__)
 class CommunityCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.repository = CommunityRepository(bot.settings.database_path)
-        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
+        self.repository = CommunityRepository(bot.settings.database_url)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_url)
         self.refresh_live_stats.start()
 
     def cog_unload(self) -> None:

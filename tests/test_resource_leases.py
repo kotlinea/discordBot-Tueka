@@ -14,7 +14,7 @@ class ResourceLeaseTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.database = prepare_database(Path(self.temp.name) / 'test.db')
+        self.database = prepare_database(Path(self.temp.name) / 'test.db', self.addCleanup)
 
     async def test_expired_owner_cannot_commit_renew_or_release_successor(self):
         now = 100

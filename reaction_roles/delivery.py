@@ -65,7 +65,7 @@ class ReactionRoleDeliveryService:
 
     async def schedule(self, item: dict) -> Outcome:
         if item['kind'] == 'temp_role':
-            lease = ResourceLease(self.repository.database_path, 'reaction_role_member', f'{item["guild_id"]}:{item["user_id"]}')
+            lease = ResourceLease(self.repository.database_url, 'reaction_role_member', f'{item["guild_id"]}:{item["user_id"]}')
             try:
                 return await lease.run(lambda owned: self._schedule_owned(item, owned))
             except LostLease as exc:

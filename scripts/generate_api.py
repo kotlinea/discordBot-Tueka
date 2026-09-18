@@ -1,6 +1,6 @@
 """Export the real router's OpenAPI and deterministic TypeScript contracts.
 
-Uses an isolated temporary database and no OAuth, Discord, or network access.
+Uses an isolated PostgreSQL test schema and no OAuth or Discord access.
 Run with --check in CI to reject stale checked-in generated artifacts.
 """
 from __future__ import annotations
@@ -9,7 +9,6 @@ import argparse
 import json
 import re
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +16,7 @@ sys.path.insert(0, str(ROOT))
 
 from fastapi import FastAPI
 from dashboard.api_v1 import create_api_router
-from migrate import apply
+from database.testing import temporary_database
 
 
 def identifier(value: str) -> str:
@@ -49,10 +48,7 @@ def typescript(schema: dict) -> str:
 
 
 def artifacts() -> dict[Path, str]:
-    with tempfile.TemporaryDirectory(prefix='tueka-openapi-') as directory:
-        base = Path(directory)
-        database = base / 'schema.sqlite3'
-        apply(database, base / 'backups')
+    with temporary_database() as database:
         app = FastAPI(title='Tueka Dashboard API', version='1.0.0')
         app.include_router(create_api_router(database, object()))
         document = app.openapi()

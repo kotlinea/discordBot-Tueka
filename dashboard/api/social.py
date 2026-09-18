@@ -101,7 +101,10 @@ def create_router(context: ApiContext) -> APIRouter:
         if not current or int(current['guild_id']) != guild_id or current['provider'] != provider:
             raise api_error(404, 'subscription_not_found', '登録が見つかりません。')
         check_revision(if_match, int(current.get('revision', 1)), '別の管理者がこの登録を更新しました。')
-        social_repository.delete_social_subscription(guild_id, subscription_id)
+        try:
+            social_repository.delete_social_subscription(guild_id, subscription_id, expected_revision=current['revision'])
+        except RuntimeError as exc:
+            raise revision_conflict('別の管理者がこの登録を更新しました。') from exc
         guild_settings_repository.set_module(guild_id, f'{provider}_updates', enabled=any((bool(item['enabled']) for item in social_repository.social_subscriptions(guild_id, provider))))
 
     @router.post('/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}/retry', dependencies=[Depends(auth.csrf)], response_model=schemas.StatusResponse, response_model_exclude_unset=True)

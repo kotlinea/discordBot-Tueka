@@ -1,26 +1,37 @@
-"""Explicit CLI-equivalent database preparation for runtime tests."""
-from pathlib import Path
-import sqlite3
-from contextlib import closing
-
-from migrate import apply
+"""Explicit PostgreSQL schema lifecycle for runtime tests."""
+from database import require_current
+from database.testing import temporary_database
 
 
-def prepare_database(path):
-    path = Path(path)
-    apply(path, path.parent / 'migration-backups')
-    return path
+_databases = {}
 
 
-def set_fixture_version(path, version):
-    """Reconstruct pre-outbox fixtures after seeding the domain's old DDL.
+def prepare_database(label, cleanup):
+    """Reuse a test's logical label; explicitly register schema cleanup with its owner."""
+    key = str(label)
+    if key.startswith(('postgresql://', 'postgres://')):
+        require_current(key)
+        return key
+    if key not in _databases:
+        context = temporary_database()
+        url = context.__enter__()
+        _databases[key] = url
 
-    The legacy fixtures retain additive 0007/0008 columns deliberately. Unlike
-    those idempotent additions, 0009 introduces a new table: remove it together
-    with its history. Actual 0008-to-current preservation is tested separately.
-    """
-    with closing(sqlite3.connect(path)) as connection:
-        if version < 9:
-            connection.execute('DROP TABLE IF EXISTS suggestion_outbox')
-        connection.execute('DELETE FROM schema_migrations WHERE version>?', (version,))
-        connection.commit()
+        def close():
+            try:
+                context.__exit__(None, None, None)
+            finally:
+                _databases.pop(key, None)
+
+        cleanup(close)
+    return _databases[key]
+
+
+def snapshot(url):
+    """Test-only state comparison; never print application rows in CLI output."""
+    from psycopg import sql
+    from database import connect
+    with connect(url, read_only=True) as c:
+        c.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ')
+        tables = c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_type='BASE TABLE' ORDER BY table_name").fetchall()
+        return {row['table_name']: sorted((repr(item) for item in c.execute(sql.SQL('SELECT * FROM {}').format(sql.Identifier(row['table_name'])))), key=str) for row in tables}

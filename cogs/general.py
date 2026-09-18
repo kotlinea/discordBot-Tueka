@@ -92,7 +92,7 @@ class HelpView(discord.ui.View):
 class GeneralCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_url)
 
     async def _available_commands(self, interaction: discord.Interaction, include_all: bool) -> list[tuple[str, list[app_commands.Command]]]:
         categories: dict[str, list[app_commands.Command]] = {}

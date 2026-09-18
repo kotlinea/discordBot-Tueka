@@ -149,7 +149,7 @@ class TicketService:
             self.repository.remove_participant(ticket['id'], 'user', user_id)
 
     async def change_claim(self, port: TicketResourcePort, ticket: dict, panel: dict, member_id: int | None, expected_revision: int | None):
-        lease = ResourceLease(self.repository.database_path, 'ticket_claim', ticket['id'])
+        lease = ResourceLease(self.repository.database_url, 'ticket_claim', ticket['id'])
         try:
             return await lease.run(lambda owned: self._change_claim_owned(port, ticket, panel, member_id, expected_revision, owned))
         except LostLease as exc:
@@ -188,7 +188,7 @@ class TicketService:
         return saved
 
     async def recover_claim(self, port: TicketResourcePort, operation: dict):
-        lease = ResourceLease(self.repository.database_path, 'ticket_claim', operation['ticket_id'])
+        lease = ResourceLease(self.repository.database_url, 'ticket_claim', operation['ticket_id'])
         try:
             return await lease.run(lambda owned: self._recover_claim_owned(port, operation, owned))
         except LostLease as exc:

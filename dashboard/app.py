@@ -37,8 +37,8 @@ session_secret = os.getenv("SESSION_SECRET")
 if not all((client_id, client_secret, redirect_uri, session_secret)):
     raise RuntimeError("Dashboard OAuth settings are missing. Configure .env from .env.example.")
 
-social_repository = SocialRepository(settings.database_path)
-dashboard_repository = DashboardRepository(settings.database_path)
+social_repository = SocialRepository(settings.database_url)
+dashboard_repository = DashboardRepository(settings.database_url)
 api = DiscordAPI(settings.discord_token, client_id, client_secret, redirect_uri)
 access_dependencies = ApiDependencies(dashboard_repository, api)
 social_cipher = SocialTokenCipher(settings.social_token_encryption_key)
@@ -67,7 +67,7 @@ app.mount("/ui", StaticFiles(directory=FRONTEND_DIST, check_dir=False), name="da
 DOCS_DIST = BASE_DIR.parent / "docs" / ".vitepress" / "dist"
 app.mount("/docs", StaticFiles(directory=DOCS_DIST, html=True, check_dir=False), name="documentation")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
-app.include_router(create_api_router(settings.database_path, api, settings))
+app.include_router(create_api_router(settings.database_url, api, settings))
 
 
 def spa_response():

@@ -15,7 +15,7 @@ VARIABLE_HELP = "{user}, {username}, {displayname}, {server}, {membercount}"
 class WelcomeCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.guild_settings = GuildSettingsRepository(bot.settings.database_path)
+        self.guild_settings = GuildSettingsRepository(bot.settings.database_url)
 
     @staticmethod
     def render_content(template: str, member: discord.Member) -> str:

@@ -3,8 +3,8 @@
 外部サービスの更新をSocial Workerが検知し、共通DBへイベントを保存し、Discord Botが購読サーバーへ配送します。
 
 ```text
-Dashboard ──購読設定──> SQLite
-Provider ──Webhook / Stream / Poll──> Social Worker ──正規化Event──> SQLite
+Dashboard ──購読設定──> PostgreSQL
+Provider ──Webhook / Stream / Poll──> Social Worker ──正規化Event──> PostgreSQL
 Discord Bot ──Delivery lease──> Discord Channel
 ```
 

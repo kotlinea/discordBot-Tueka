@@ -29,7 +29,7 @@ Manage Roles、Add Reactions、Read Message History、Manage Messages、View Cha
 
 ## Social Workerがdegraded／offline
 
-Process、Heartbeat、Provider資格情報、429、Timeout、次回実行時刻を確認します。`DATABASE_PATH`がBot／Dashboardと一致していることも確認します。1 ProviderのCircuit Breakerは他Providerを停止しません。
+Process、Heartbeat、Provider資格情報、429、Timeout、次回実行時刻を確認します。`DATABASE_URL`がBot／Dashboardと一致していることも確認します。1 ProviderのCircuit Breakerは他Providerを停止しません。
 
 ## Ticket Transcriptを作成できない
 

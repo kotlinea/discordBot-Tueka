@@ -12,6 +12,8 @@ py -3.13 -m venv .venv
 
 `Remove-Item`はプロジェクト直下の`.venv`であることを確認してから実行します。
 
+PostgreSQLの[開発DB初期化](./migrations.md)と `DATABASE_URL` の設定を先に完了します。
+
 ## 起動
 
 Bot、Dashboard、Workerは別Terminalで起動します。Dashboardだけは`runDashboard.bat`も利用できます。
