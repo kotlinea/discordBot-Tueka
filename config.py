@@ -4,11 +4,11 @@ import os
 from pathlib import Path
 
 from database import database_url
-from dotenv import load_dotenv
+from runtime.environment import load_environment
 
 
 BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR / ".env")
+load_environment()
 
 
 def _optional_int(name: str) -> int | None:

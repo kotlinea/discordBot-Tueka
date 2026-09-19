@@ -32,11 +32,13 @@ Windows/Linuxの全Python各211件、Docs build、保全DB複製の全Dump不変
 
 **P3-1：同一の本番Imageとコマンド別entrypointはローカル完了。** NodeでSPA/Docs、Python builderでhash付きLock依存を構築し、非rootの同じImageでbot/dashboard/social-worker/migrate/testを実行する。read-only・権限昇格禁止・Capability除去でPython全302件、空SchemaのMigration/再適用、実HTTPでのSPA/Docs/assets配信、Worker Heartbeat、正常終了を検証した。Botの全Cog起動/再起動はオフライン回帰で確認。PID 1のSIGTERM問題を共通Lifecycleで修正した。
 
-**次はP3-2：環境別Compose・Volume・秘密情報・起動順。** StageのDiscord・OAuth・Webhook実動、運用環境の同一digest、実Transcript/S3を含むRestoreは別ゲートとして保持する。Remote Workflowは未実行。Goal全体とPhase 3〜5は未完了。詳細・コマンド・ログは`docs/PROGRESS0910.md`のP3-1完了記録を参照する。
+**P3-2：環境別Compose・Volume・秘密情報・起動順はローカル完了。** 共通Composeとdev/stage/prod差分、環境別設定の生成・検査、停止→DB readiness→Migration成功→3Service起動を実装した。隔離した3 Projectで空Volume、DB/Transcript保持、Schema更新/失敗Rollback、環境分離、Stage/本番の同一Image ID、DevのVite/API proxy/実Source reloadを確認。最終Windows/Linux各315件、Frontend単体14件・画面48件とImage内の実配信/正常終了が成功した。
+
+**次はP3-3：Readiness・Heartbeat・DB/Queue監視・ログ/Resource制限。** StageのDiscord・OAuth・Webhook実動、実運用環境への同一digest配布、実Transcript/S3を含むRestoreは別ゲートとして保持する。Remote Workflowは未実行。Goal全体とPhase 3〜5は未完了。詳細・コマンド・ログは`docs/PROGRESS0910.md`のP3-2完了記録を参照する。
 
 ## 1. 判断と調査範囲
 
-Phase 0〜2とP3-1のローカル実装・検証を完了した。直近は同一本番Imageを利用して環境分離と運用検証を進める。既存機能の運用品質を満たしてからPhase 5へ進む。
+Phase 0〜2とP3-1〜2のローカル実装・検証を完了した。直近は環境別Composeを使い、監視と障害検知・復旧の検証を進める。既存機能の運用品質を満たしてからPhase 5へ進む。
 
 README、ROADMAP、設計・アーキテクチャ・機能・運用資料、起動処理、保存層、主要Domain、API、React画面、CIとテスト定義を確認した。今回は静的調査と計画策定であり、テスト・ビルド実行、本番DB調査、Discord実機検証は行っていない。テストの存在を成功や機能完成の証拠とは扱わない。
 
@@ -145,7 +147,7 @@ ROADMAPの順序を維持する。各機能をDBだけ・画面だけで公開�
 - PostgreSQLの接続枯渇・lock競合・deadlock、Outbox滞留、Worker停止、Discord側成功後のDB失敗を重点監視する。特にRetryは「最大回数」だけでなく冪等性と補償を検証する。
 - Stage検証と将来の本番PostgreSQL運用確認には、対象環境・テストGuild・OAuth/Provider設定へのアクセスが必要。原開発DBのInventory/移送はP2-7の着手条件にしない。アクセスがない期間も、コードInventory、Fixture、コンテナ、Contract testの整備は進められる。
 
-直近の着手はP3-2。P0-1〜P3-1のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
+直近の着手はP3-3。P0-1〜P3-2のローカル完了済み作業をやり直さず、既存の検証基盤と保全Fixtureを利用する。納期は担当者・Stage環境の可用性と各単位の見積りから設定する。
 
 ## 8. 再調査に基づく具体的な実行単位（2026-09-12）
 

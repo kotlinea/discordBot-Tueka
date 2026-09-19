@@ -1,0 +1,60 @@
+x-source: &source
+  - ./automod:/app/automod:ro
+  - ./cogs:/app/cogs:ro
+  - ./community:/app/community:ro
+  - ./dashboard:/app/dashboard:ro
+  - ./database:/app/database:ro
+  - ./discord_io:/app/discord_io:ro
+  - ./engagement:/app/engagement:ro
+  - ./guild_settings:/app/guild_settings:ro
+  - ./jobs:/app/jobs:ro
+  - ./migrations:/app/migrations:ro
+  - ./moderation:/app/moderation:ro
+  - ./reaction_roles:/app/reaction_roles:ro
+  - ./runtime:/app/runtime:ro
+  - ./social:/app/social:ro
+  - ./suggestions:/app/suggestions:ro
+  - ./ticketing:/app/ticketing:ro
+  - ./bot.py:/app/bot.py:ro
+  - ./config.py:/app/config.py:ro
+  - ./migrate.py:/app/migrate.py:ro
+  - ./social_worker.py:/app/social_worker.py:ro
+  - ./feature_registry.py:/app/feature_registry.py:ro
+  - ./template_defaults.py:/app/template_defaults.py:ro
+services:
+  migrate:
+    volumes: *source
+  bot:
+    volumes: *source
+  social-worker:
+    volumes: *source
+  dashboard:
+    command: [dashboard, --reload, --reload-dir, /app]
+    environment:
+      WATCHFILES_FORCE_POLLING: "true"
+    volumes: *source
+    ports: ["127.0.0.1:${DASHBOARD_PORT:-8002}:8000"]
+  vite:
+    image: ${DEV_IMAGE:-tueka-development:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ["/tmp:rw,nosuid,size=128m"]
+    environment:
+      TUEKA_DEV_API_ORIGIN: http://dashboard:8000
+    volumes:
+      - ./dashboard/frontend:/app/dashboard/frontend:ro
+      - ./tokens.css:/app/tokens.css:ro
+      - frontend-node-modules:/app/dashboard/frontend/node_modules
+    command: [sh, -c, "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0"]
+    ports: ["127.0.0.1:${VITE_PORT:-5173}:5173"]
+    networks: [outbound]
+    depends_on:
+      dashboard: {condition: service_started}
+volumes:
+  frontend-node-modules: {}

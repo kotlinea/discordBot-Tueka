@@ -93,6 +93,8 @@ jobs:
       - run: docker build -t tueka:ci .
       - run: docker compose --env-file tests/postgres.env -p tueka-runtime -f compose.postgres-test.yaml up -d --wait
       - run: python scripts/verify_runtime_image.py --image tueka:ci --network tueka-runtime_default
+      - name: Compose environments and migration gates
+        run: python scripts/verify_compose.py --image tueka:ci
       - name: Full regression in production image
         run: >-
           docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges:true

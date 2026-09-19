@@ -1,6 +1,6 @@
 # 本番Image
 
-P3-1の共通Imageは、Bot・Dashboard・Social Worker・Migration・Pythonテストを同じ依存とソースで実行する。環境別Composeと起動順はP3-2で整備する。実Discord/OAuth/Provider接続の確認はStageで実施する。
+共通Imageは、Bot・Dashboard・Social Worker・Migration・Pythonテストを同じ依存とソースで実行する。環境別ComposeとMigration後の起動順は[環境別Compose](./compose)を参照する。実Discord/OAuth/Provider接続の確認はStageで実施する。
 
 ## ビルドと起動
 

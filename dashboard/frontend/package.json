@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "test": "vitest run",
+    "dev": "vite --config vite.config.ts",
+    "build": "tsc -b && vite build --config vite.config.ts",
+    "test": "vitest run --config vite.config.ts",
     "test:a11y": "playwright test",
     "test:docs-a11y": "playwright test --config playwright.docs.config.ts",
     "typecheck": "tsc -b --pretty false",

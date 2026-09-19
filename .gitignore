@@ -17,3 +17,6 @@ welcome.png
 rank.png
 
 .env.postgres-dev
+**/app.env
+**/database-password
+**/postgres-admin-password

@@ -1,0 +1,3 @@
+services:
+  dashboard:
+    ports: ["127.0.0.1:${DASHBOARD_PORT:-8000}:8000"]

@@ -492,3 +492,24 @@
 - CIへruntime-image Jobを追加し、同一本番Imageのbuild・隔離起動検証・read-only全回帰を設定した。Remote Workflowは未実行。git diff --checkと変更Python構文検査が成功。Git Stage/Commit操作は実施していない。
 - 引継ぎ：P3-2はdev/stage/prod Compose、PostgreSQL/Transcriptの別Volume、環境別秘密情報/Network/Project、DB readiness→migrate成功→3Service起動、DevのみSource/Vite/reloadを実装する。Imageの起動権限制約をComposeで固定する。実Discord/OAuth/Webhook、実環境同一digest、実Transcript/S3/鍵を含む復元の証拠は今後のゲートとして残す。
 - 完了記録・ROADMAP・EXECUTION_PLAN更新後の最終Docs buildも成功（12.43秒、.venv-p0/p3-1-recorded-docs.log）。最終build後の変更はこの結果追記のみ。
+
+### 2026-09-19 P3-2 完了：環境別ComposeとMigrationを起点とした起動
+
+- 判定：P3-2の実装・隔離環境での受入・全回帰・運用Docsを完了。次はP3-3。Phase 3全体と実Stage/本番の受入は未完了。既存の開発DB/Volume、アプリ.env、鍵、Transcript、Discord Resourceは変更していない。
+- deploy/compose.yamlに共通構成、compose.dev.yaml / compose.stage.yaml / compose.prod.yamlに差分を配置した。Project/Network/DB/Transcript Volume/秘密ファイルは環境ごとに分離。DBは内部NetworkのみでHost portを公開せず、Dashboardはlocalhostへ公開する。アプリの非root/read-only/no-new-privileges/cap-drop ALLと/tmp tmpfsを固定した。
+- deploy/configuration.pyが環境専用設定の生成・検査を担当し、scripts/deploy.pyがCLI、deploy/compose.pyが実行順を担当する。initは既存ディレクトリを上書きせず、DB/Sessionの乱数と設定雛形を生成する。Image/Project/DB名・Role・接続先・password・OAuth Originを検査し、Stage/本番はsha256の固定参照を必須にした。秘密ファイルはGit/build contextから除外する。
+- PostgreSQL初期化では管理者とは別のアプリRole/DBを作成する。アプリRoleにsuperuser/createdb/createroleを付けない。秘密ファイルはHost側の保護ディレクトリ内で管理し、Compose file secretとして個別にmountする。これはSwarm Secretの暗号化保管ではない。WindowsのACL要件とLF/改行なしのpassword保存をDocsへ記載した。
+- runtime/environment.pyへ明示した秘密ファイルの読込みを集約し、Config/Migration/DB Inventoryへ適用。TUEKA_ENV_FILEがあればソース.envへfallbackせず、変数展開を行わない。既に注入済みの環境変数を上書きしない。
+- upはImage/設定を検査してから旧Writerを停止し、DB readiness→今回のmigrate→終了成功→3Serviceの順で起動する。成功済みmigrateも毎回作り直す。失敗時はWriterを停止したままにし、修正後の再実行で復旧する。通常CLIにVolume削除を設けていない。資格情報が欠けてもstop/statusの対象Projectを選べるよう、設定メタデータと秘密値の検査を分けた。
+- 本番昇格はStage/本番の同一固定Image、異なるDiscord Token/Client ID/Client Secret/Session Secret/callback、Stageで起動中の3Serviceの実Image IDを照合する。現在のlauncherは同一Docker Hostでの照合を対象とし、遠隔Host昇格は未実施。ローカルImage IDでの受入を、Registry公開/実Stageの機能受入と区別する。
+- Devだけ必要なソースを個別にread-only mountし、Repository全体/.env/dataはmountしない。Uvicorn reloadとWatchFiles polling、非rootのNode development target、独立node_modules Volume、ViteからAPI/OAuth等への同一Origin proxyを用意した。SPA/Docs成果物を/opt/tueka-assetsへ移し、Source mountで隠れないようにした。
+- TranscriptStorageのコンストラクタによるmkdirを除去し、保存時だけディレクトリを作成する。これにより空VolumeでBotよりDashboardが先に起動しても、読取り専用Volumeへの書込みで失敗しない。暗号化保存後にmkdirを拒否したReaderから復号できる回帰を追加した。
+- 実検証でtmpfsのYAML flow sequence内のカンマ、Windows CRLFのDB password混入、テスト表のOwner、Dashboardの起動時mkdir、古い生成済みvite.config.jsの優先読込みを検出・修正した。Vite/Vitest/Playwrightは正本vite.config.tsを明示し、生成済みconfig.js/d.tsはImageへコピーしない。既存のHost生成物は削除していない。
+- scripts/verify_compose.pyの最終受入成功（.venv-p0/p3-2-final-compose.log）。UUID付き専用dev/stage/prod Projectで空Volume導入、権限を絞ったDB Role、同一Image ID、秘密値/Network/Volume分離、DBとTranscriptの再起動後保持、Dashboardの読取り専用アクセス、Schema更新、途中失敗Rollback/全Writer停止/再実行復旧、Vite SPA/API proxy、Source変更による実reloadを確認した。テスト専用の0002/0003 Migrationは一時ディレクトリにだけ作成し、正規Migrationは変更していない。
+- Compose検証BotはImage内の全Cogを読み込むoffline fixtureで、Discord Login/Command同期は行わない。検証に使った全Project/Volume/Networkと一時ファイルをfinallyで削除した。削除対象は今回生成したUUID付きProjectに限定する。実Guild/OAuth/Webhookの成功とは扱わない。
+- 最終Image tueka:p32のbuild成功（p3-2-final-build.log）。Image ID sha256:87d6a6a88c0757acabfc27cb6a9165959912c10cca06f86daaf08b94560afc1f、ローカルmanifest digest sha256:e4ffdeac67402cc5a2f52390fdfed022423135bc11fbfb5f46391334d231fcd5。Registryへpushしていない。Runtime smokeも非root/read-only/NoNewPrivs、SPA/Docs/assets、Migration再適用、Heartbeat、終了コード0を確認（p3-2-final-smoke.log）。
+- 最終Python全回帰：Linuxの同一本番Imageで315件成功、273.056秒（p3-2-final-linux.log）。Windows/Python 3.13で315件成功、393.994秒（p3-2-final-windows.log）。skipなし。新規検証は設定/昇格/起動失敗の12件とTranscript Readerの1件。前段313件の結果ではなく、この最終315件を基準とする。
+- Frontend単体14件成功、5.98秒（p3-2-vitest.log）。画面回帰48件成功、2.2分（p3-2-ui.log）。ImageのNode stageはLockからTypeScript/SPA/Docsを構築する。CI runtime-image JobにもCompose受入を追加したが、Remote Workflowは未実行。
+- 運用手順はdocs/operations/compose.md。Image手順、環境変数Reference、Docs navigation、deploy/READMEも更新した。Git Stage/Commit操作は実施していない。.env.exampleにはユーザー側の変更があるため保持し、その差分を除外したgit diff --checkが成功した。
+- 引継ぎ：P3-3はDashboard liveness/readiness、Bot/Worker Heartbeat、Outbox最古滞留、PostgreSQL接続待ち/lock/deadlock、構造化LogとResource/ログ上限を実装し、Worker停止や配送/DB障害を注入して検知を確認する。運用閾値は実Stage計測から確定する。P3-4の実Transcript/S3/鍵世代を含む復元とRollback、Phase 4〜5は今後の作業として維持する。
+- 完了記録・計画・運用手順を反映した最終Docs buildも成功（12.54秒、.venv-p0/p3-2-recorded-docs.log）。最終build後の変更はこの結果追記のみ。ユーザーによるStage操作を検出したが、Indexは変更していない。

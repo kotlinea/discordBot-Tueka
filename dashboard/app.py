@@ -62,9 +62,9 @@ app = FastAPI(
 )
 app.add_middleware(SessionMiddleware, secret_key=session_secret, https_only=os.getenv("DASHBOARD_HTTPS_ONLY", "true").lower() == "true", same_site="lax")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
-FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
+FRONTEND_DIST = Path(os.getenv("TUEKA_FRONTEND_DIST", str(BASE_DIR / "frontend" / "dist")))
 app.mount("/ui", StaticFiles(directory=FRONTEND_DIST, check_dir=False), name="dashboard-v2")
-DOCS_DIST = BASE_DIR.parent / "docs" / ".vitepress" / "dist"
+DOCS_DIST = Path(os.getenv("TUEKA_DOCS_DIST", str(BASE_DIR.parent / "docs" / ".vitepress" / "dist")))
 app.mount("/docs", StaticFiles(directory=DOCS_DIST, html=True, check_dir=False), name="documentation")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 app.include_router(create_api_router(settings.database_url, api, settings))

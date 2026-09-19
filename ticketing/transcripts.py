@@ -24,7 +24,6 @@ class StoredTranscript:
 class TranscriptStorage:
     def __init__(self, base_dir: str | Path, encryption_key: str | None, *, s3: dict[str, str | None] | None = None) -> None:
         self.base_dir = Path(base_dir)
-        self.base_dir.mkdir(parents=True, exist_ok=True)
         self._cipher = Fernet(encryption_key.encode("ascii")) if encryption_key else None
         self.s3 = s3 or {}
 

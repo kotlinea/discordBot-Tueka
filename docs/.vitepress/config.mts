@@ -59,6 +59,7 @@ export default defineConfig({
         { text: 'バックアップと復元', link: '/operations/backup' }, { text: '更新とロールバック', link: '/operations/upgrade' },
         { text: 'DB Migration', link: '/operations/migrations' },
         { text: '本番Image', link: '/operations/container' },
+        { text: '環境別Compose', link: '/operations/compose' },
         { text: 'セキュリティ', link: '/operations/security' },
       ]}],
       '/reference/': [{ text: 'リファレンス', items: [

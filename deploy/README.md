@@ -1,6 +1,6 @@
 # VPS deployment
 
-The shared production image and command contract are documented in [container operations](../docs/operations/container.md). Environment-specific Compose is the next P3-2 milestone. The systemd instructions below remain the existing host deployment path.
+The shared production image is documented in [container operations](../docs/operations/container.md). Use the [environment-specific Compose launcher](../docs/operations/compose.md) for separate dev/stage/prod projects and migration-gated upgrades. The systemd instructions below remain the existing host deployment path.
 
 1. Copy `.env.example` to `.env`, set secrets, and set `DISCORD_REDIRECT_URI` to the public HTTPS callback.
 2. In Discord Developer Portal, add that exact URI under OAuth2 Redirects. Enable the **Server Members Intent** and **Message Content Intent** (the dashboard's role/member features and chat filters require them).

@@ -4,7 +4,6 @@ import json
 import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -13,7 +12,8 @@ from database.operations import backup, inventory, restore
 
 
 def main():
-    load_dotenv(Path(__file__).resolve().parents[1] / '.env')
+    from runtime.environment import load_environment
+    load_environment()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--database-url', default=os.environ.get('DATABASE_URL'))
     parser.add_argument('--output', type=Path, help='New metadata-only JSON file')

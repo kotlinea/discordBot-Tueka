@@ -9,12 +9,21 @@ COPY docs docs
 COPY tokens.css ./
 RUN npm --prefix dashboard/frontend run build && npm --prefix docs run build
 
+FROM node:24-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553 AS development
+COPY --from=web --chown=10001:10001 /app/dashboard/frontend /app/dashboard/frontend
+COPY --from=web /app/tokens.css /app/tokens.css
+ENV NPM_CONFIG_CACHE=/tmp/npm
+USER 10001:10001
+WORKDIR /app/dashboard/frontend
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
 FROM python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285 AS python-builder
 COPY requirements.lock /tmp/requirements.lock
 RUN python -m venv /opt/venv && /opt/venv/bin/pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock && /opt/venv/bin/pip check
 
 FROM python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285 AS runtime
 ENV PATH="/opt/venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 DATA_DIR=/data
+ENV TUEKA_FRONTEND_DIST=/opt/tueka-assets/ui TUEKA_DOCS_DIST=/opt/tueka-assets/docs
 WORKDIR /app
 RUN groupadd --gid 10001 tueka && useradd --uid 10001 --gid 10001 --no-create-home tueka && mkdir /data && chown 10001:10001 /data
 COPY --from=python-builder /opt/venv /opt/venv
@@ -23,6 +32,7 @@ COPY cogs cogs
 COPY community community
 COPY dashboard dashboard
 COPY database database
+COPY deploy deploy
 COPY discord_io discord_io
 COPY docs docs
 COPY engagement engagement
@@ -38,8 +48,8 @@ COPY suggestions suggestions
 COPY tests tests
 COPY ticketing ticketing
 COPY *.py requirements.lock .env.example tokens.css tueka-icon.png banned_words.csv ./
-COPY --from=web /app/dashboard/frontend/dist dashboard/frontend/dist
-COPY --from=web /app/docs/.vitepress/dist docs/.vitepress/dist
+COPY --from=web /app/dashboard/frontend/dist /opt/tueka-assets/ui
+COPY --from=web /app/docs/.vitepress/dist /opt/tueka-assets/docs
 USER 10001:10001
 EXPOSE 8000
 ENTRYPOINT ["python", "-m", "runtime"]

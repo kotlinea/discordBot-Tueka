@@ -3,6 +3,10 @@
 .hallmark
 .agents
 .codex
+**/app.env
+**/database-password
+**/postgres-admin-password
+**/deployment.json
 .env
 .env.*
 !.env.example
@@ -14,6 +18,8 @@
 **/test-results
 **/playwright-report
 **/*.tsbuildinfo
+dashboard/frontend/vite.config.js
+dashboard/frontend/vite.config.d.ts
 docs/.vitepress/cache
 data
 **/*.db
