@@ -75,9 +75,23 @@ def read(directory, *, require_credentials=True, draft=False):
     directory = Path(directory).resolve()
     metadata = read_metadata(directory, draft=draft)
     environment = metadata['environment']
-    values = dotenv_values(directory / 'app.env', interpolate=False)
+    app_file = directory / 'app.env'
+    metadata_file = directory / ('setup.json' if draft else 'deployment.json')
+    if not app_file.is_file():
+        raise ValueError(f'{app_file}: app.env is missing. Select the intended --config-dir or restore this environment configuration; do not copy another environment file.')
+    values = dotenv_values(app_file, interpolate=False, encoding='utf-8-sig')
     if values.get('TUEKA_ENV') != environment:
-        raise ValueError('Secret file belongs to a different environment')
+        actual = values.get('TUEKA_ENV')
+        actual_label = actual if actual in ENVIRONMENTS else ('<missing or empty>' if not actual else '<invalid value; expected dev/stage/prod>')
+        raise ValueError(
+            f'Secret file belongs to a different environment.\n'
+            f'File: {app_file}\n'
+            f'Field: TUEKA_ENV\n'
+            f'Actual: {actual_label}\nExpected: {environment} (from {metadata_file}, field environment)\n'
+            f'Fix: If this is the intended environment, edit {app_file} and set TUEKA_ENV={environment}. '
+            f'If you intended another environment, retry with its --config-dir instead. '
+            f'Do not change metadata environment or copy another environment secrets merely to bypass this check.'
+        )
     try:
         url = urlsplit(values.get('DATABASE_URL', ''))
         name = 'tueka_' + environment
@@ -90,20 +104,27 @@ def read(directory, *, require_credentials=True, draft=False):
     except (ValueError, OSError):
         matches = False
     if not matches:
-        raise ValueError('Database secrets do not match this environment')
+        raise ValueError(
+            f'Database secrets do not match this environment. File: {app_file}; field: DATABASE_URL. '
+            f'Expected: postgresql scheme, host postgres, port 5432, user/database tueka_{environment}, no query/fragment. '
+            f'The URL password must match {directory / "database-password"}; '
+            f'{directory / "postgres-admin-password"} must contain a different nonempty password. '
+            f'Password files must contain a single LF-only line. Compare these files locally; values are not logged. '
+            f'Restore the matching configuration for this environment; do not regenerate passwords for an existing DB.'
+        )
     if require_credentials:
         for key in ('DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'SESSION_SECRET'):
             value = values.get(key, '')
             if not value or value.startswith('replace-'):
-                raise ValueError('Dedicated Discord and session credentials are required')
+                raise ValueError(f'{app_file}: {key} is missing, empty or a placeholder. Set {key} to this environment dedicated value in a local editor; its value is not logged.')
         if not str(values['DISCORD_CLIENT_ID']).isdecimal():
-            raise ValueError('Discord client ID must be numeric')
+            raise ValueError(f'{app_file}: DISCORD_CLIENT_ID must be numeric. Enter the Application ID from Discord Developer Portal; do not use a Bot Token or Client Secret.')
         base = urlsplit(values.get('DASHBOARD_BASE_URL', ''))
         callback = values.get('DISCORD_REDIRECT_URI', '')
         if not base.hostname or base.hostname.endswith('.invalid') or base.path not in ('', '/') or callback != values['DASHBOARD_BASE_URL'].rstrip('/') + '/oauth/callback':
-            raise ValueError('Dashboard origin and OAuth callback must match')
+            raise ValueError(f'{app_file}: DASHBOARD_BASE_URL / DISCORD_REDIRECT_URI do not match. Set DASHBOARD_BASE_URL to the public origin (scheme and host, no path; not .invalid), and DISCORD_REDIRECT_URI to that origin plus /oauth/callback. Register the same callback in Discord Developer Portal. Values are not logged.')
         if environment != 'dev' and (base.scheme != 'https' or values.get('DASHBOARD_HTTPS_ONLY') != 'true'):
-            raise ValueError('Stage and production require HTTPS sessions')
+            raise ValueError(f'{app_file}: Stage and production require HTTPS sessions. Set DASHBOARD_BASE_URL to an https:// origin, DISCORD_REDIRECT_URI to the same origin plus /oauth/callback, and DASHBOARD_HTTPS_ONLY=true.')
     return metadata, values
 
 

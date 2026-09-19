@@ -54,6 +54,39 @@ class DeploymentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'different environment'):
             read(self.root / 'stage')
 
+    def test_environment_error_names_file_field_actual_expected_and_fix(self):
+        for draft in (False, True):
+            directory = self.root / ('draft' if draft else 'release')
+            initialize(directory, 'stage', IMAGE, draft=draft)
+            path = directory / 'app.env'
+            path.write_text(path.read_text().replace('TUEKA_ENV=stage', 'TUEKA_ENV=dev'))
+            with self.assertRaises(ValueError) as caught:
+                read(directory, draft=draft)
+            message = str(caught.exception)
+            for expected in (str(path), 'Field: TUEKA_ENV', 'Actual: dev', 'Expected: stage',
+                             str(directory / ('setup.json' if draft else 'deployment.json')),
+                             'set TUEKA_ENV=stage', '--config-dir'):
+                self.assertIn(expected, message)
+            self.assertNotIn((directory / 'database-password').read_text(), message)
+
+    def test_invalid_environment_value_is_not_echoed_and_missing_file_is_named(self):
+        directory = self.root / 'stage'
+        initialize(directory, 'stage', IMAGE)
+        path = directory / 'app.env'
+        path.write_text('TUEKA_ENV=accidentally-pasted-private-value\n')
+        with self.assertRaises(ValueError) as caught:
+            read(directory)
+        self.assertIn('Actual: <invalid value', str(caught.exception))
+        self.assertNotIn('accidentally-pasted-private-value', str(caught.exception))
+        path.write_text('TUEKA_ENV=\n')
+        with self.assertRaisesRegex(ValueError, '<missing or empty>'):
+            read(directory)
+        path.unlink()
+        with self.assertRaises(ValueError) as caught:
+            read(directory)
+        self.assertIn(str(path), str(caught.exception))
+        self.assertIn('app.env is missing', str(caught.exception))
+
     def test_database_endpoint_and_password_are_bound_to_environment(self):
         for replacement in ('@outside:5432', '@postgres:5433', '@postgres:5432/tueka_prod'):
             directory = self.root / str(len(list(self.root.iterdir())))

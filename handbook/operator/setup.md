@@ -178,3 +178,11 @@ bash scripts/setup.sh start --config-dir data/environments/prod --stage-config d
 ```
 
 Nginx/TLS、Registry認証・push、Backup timer、通知先設定は自動変更しません。既存DB・Volume・鍵の削除やデータ移送も行いません。
+
+## 環境不一致エラーの直し方
+
+`Secret file belongs to a different environment` は、選択した設定ディレクトリの `app.env` 内の `TUEKA_ENV` と、`setup.json`（build前）または `deployment.json` の `environment` が一致しない場合に出ます。エラーには対象ファイルの絶対パス、項目、現在値、期待値、修正方法を表示します。
+
+例えば `Actual: dev`・`Expected: stage` でStageを起動したい場合は、表示された `app.env` をエディタで開き、`TUEKA_ENV=stage` に修正・保存してから同じbuildコマンドを再実行してください。他のDiscord資格情報・DB接続先もそのStage用であることを確認します。Devを起動したかった場合は、Stageの設定を書き換えず `--config-dir data/environments/dev` を指定します。
+
+`Actual: <missing or empty>` は項目の欠落・空欄です。`<invalid value; expected dev/stage/prod>` は環境名以外の値です。誤って秘密値を貼り付けた可能性を考慮し、不正値の内容はログへ出しません。検証を通すためだけにJSONのenvironmentを変更したり、別環境のapp.envで上書きしたりしないでください。

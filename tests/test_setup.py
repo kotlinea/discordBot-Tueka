@@ -1,5 +1,6 @@
 """First-install safety: drafts, credentials, failure and idempotent retries."""
 import json
+import io
 from pathlib import Path
 import subprocess
 import tempfile
@@ -39,6 +40,22 @@ class SetupTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 setup.build(self.directory)
             run.assert_not_called()
+
+    def test_build_cli_prints_actionable_environment_mismatch_without_building(self):
+        from scripts.setup import main
+        setup.configure(self.directory, 'stage')
+        path = self.directory / 'app.env'
+        path.write_text(path.read_text().replace('TUEKA_ENV=stage', 'TUEKA_ENV=dev'))
+        output = io.StringIO()
+        with patch('sys.argv', ['setup.py', 'build', '--config-dir', str(self.directory)]), \
+                patch('deploy.setup.check'), patch('deploy.setup.subprocess.run') as run, \
+                patch('sys.stderr', output):
+            with self.assertRaises(SystemExit) as caught:
+                main()
+        self.assertEqual(caught.exception.code, 2)
+        run.assert_not_called()
+        for expected in (str(path), 'Actual: dev', 'Expected: stage', 'set TUEKA_ENV=stage'):
+            self.assertIn(expected, output.getvalue())
 
     def test_failed_build_leaves_draft_and_success_is_idempotent(self):
         self.prepared()
