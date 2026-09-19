@@ -2,13 +2,15 @@
 
 TuekaはBot、Dashboard、Social Workerの3プロセスを同じコードとPostgreSQL DBで動かします。
 
-| Process | Entry point | 必須 |
+以下はCompose内で起動するプロセスの一覧であり、Hostで個別に実行する手順ではありません。実際のコマンドは[導入フロー](setup.md)を使います。
+
+| Process | コンテナ内のEntry point | 必須 |
 | --- | --- | --- |
 | Bot | `python bot.py` | はい |
 | Dashboard | `python -m uvicorn dashboard.app:app` | 設定画面を使う場合 |
 | Social Worker | `python social_worker.py` | Social通知を使う場合 |
 
-全Processで同じ`DATABASE_URL`を設定します。PostgreSQLの永続VolumeとTranscriptの保存先・暗号鍵を分けて管理し、外部公開しません。DB readiness、Migration成功、アプリ起動の順に確認します。
+各環境のapp.envから全Processへ同じ`DATABASE_URL`を渡します。PostgreSQLの永続VolumeとTranscriptの保存先・暗号鍵を分けて管理し、外部公開しません。DB readiness、Migration成功、アプリ起動の順に確認します。
 
 ## 起動後の確認
 

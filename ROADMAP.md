@@ -69,7 +69,7 @@ V1は開発段階で終了しており、本番互換要件として保持しま
 
 - 削除対象テーブルと列を番号付きMigrationで除去する。Migration前に自動Snapshotを作り、失敗時はTransactionをRollbackする。
 - `PROGRESS.md`、`DEPLOYMENT_TODO.md`、`FEATURE_MODULE_GUIDE.md`など一時互換文書を削除し、必要な内容だけ正式ページへ移す。
-- `.env.example`、README、運用資料からV1用Flagと旧起動方法を削除する。
+- `deploy/app.env.example`、README、運用資料からV1用Flagと旧起動方法を削除する。
 
 完了条件：RuntimeとDashboardからV1分岐がなく、V2だけでBot、Dashboard、Worker、全専用機能が動作すること。V1削除Migrationを空DBと既存V2 DBの両方で検証すること。
 
@@ -195,7 +195,7 @@ Phase 0のテスト用コンテナを、本番運用可能な構成へ発展さ�
 - StageでOAuth、Discord command、Webhook、Outbox、Scheduleを実動確認している。
 - Backupから別VolumeへRestoreできる。
 - Error rate、Outbox滞留、PostgreSQL接続待ち・lock待ち・deadlock、Worker heartbeatを確認できる。
-- README、`.env.example`、公式Docsが実装と一致している。
+- README、`deploy/app.env.example`、公式Docsが実装と一致している。
 - Rollback方法と、Rollbackで失われるデータが明記されている。
 
 ## 次に着手する作業（2026-09-19更新）

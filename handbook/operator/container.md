@@ -6,19 +6,7 @@
 
 Repositoryルートで `docker build -t tueka:local .` を実行する。Node stageはnpm LockからSPAとDocsを構築し、Python builderはhash付きrequirements.lockから仮想環境を構築する。RuntimeにはNode・npm・gitを導入しない。ベースImageはdigestで固定する。
 
-```sh
-docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges:true \
-  --tmpfs /tmp:rw,noexec,nosuid,size=128m \
-  --env-file /secure/tueka.env --network tueka \
-  tueka:local migrate
-
-docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges:true \
-  --tmpfs /tmp:rw,noexec,nosuid,size=128m \
-  --env-file /secure/tueka.env --network tueka \
-  -p 127.0.0.1:8000:8000 tueka:local dashboard
-```
-
-`/secure/tueka.env`とNetworkは環境に合わせて用意する。DATABASE_URLはPostgreSQLへの接続先であり、コンテナのlocalhostはDB Hostではない。初回はmigrateを成功させてから各Serviceを起動する。
+起動は[導入フロー](setup.md)の各OSの完全なコマンドを使用します。アプリ設定は対象環境のapp.envのみとし、別の `docker run --env-file` 用設定ファイルは作成しません。ComposeがDB readiness→Migration→サービス起動を管理します。
 
 | Command | 実行する処理 |
 | --- | --- |

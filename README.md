@@ -8,7 +8,7 @@ Discordのモデレーション、チケット、リアクションロール、�
 | システム構築・保守担当 | [運用者ガイド](handbook/operator/README.md)：クローン、設定、build、起動、監視、復旧 |
 | コード修正・リリース担当 | [開発者ガイド](handbook/developer/README.md)：設計、テスト、実行計画、進捗 |
 
-本番ImageはBot/Dashboard/Social Worker/Migrationで共用し、PostgreSQLへ接続します。導入の正本は[Windows/Linuxの導入フロー](handbook/operator/setup.md)です。Hostへの直接起動は開発・既存環境向けの補助手順です。
+本番ImageはBot/Dashboard/Social Worker/Migrationで共用し、PostgreSQLへ接続します。導入の正本は[Windows/Linuxの導入フロー](handbook/operator/setup.md)です。Dev／Stage／Prodのアプリ設定は各設定ディレクトリの `app.env` に統一し、ルート `.env` は読み込みません。
 
 開発順序は[ROADMAP](ROADMAP.md)と[現行実行計画](handbook/developer/EXECUTION_PLAN.md)を参照してください。運用・開発資料は公開Docsおよび本番Imageに含めません。
 

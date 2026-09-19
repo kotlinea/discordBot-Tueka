@@ -1,6 +1,6 @@
 # 環境変数
 
-値は`.env`またはProcess Managerから設定します。秘密値をGitへCommitしないでください。
+DockerのDev／Stage／Prodでは、対象設定ディレクトリの `app.env` だけをアプリ設定の正本とします。ルート `.env` は読み込みません。`setup configure` が生成したファイルを編集し、秘密値をGitへCommitしないでください。設定項目の見本は `deploy/app.env.example` ですが、既存app.envへ丸ごと上書きしないでください。
 
 ## 基本・Dashboard
 
@@ -12,7 +12,7 @@
 | `DISCORD_REDIRECT_URI` | Dashboard必須 | Dashboard | Developer Portalと完全一致するCallback |
 | `SESSION_SECRET` | Dashboard必須 | Dashboard | Session署名鍵。秘密 |
 | `DASHBOARD_BASE_URL` | 公開機能で推奨 | 全Process | 例：`https://bot.example.com` |
-| `BOT_INVITE_URL` | 空 | 未使用 | `.env.example` に存在するが、現在のRuntimeには読取り処理がない。設定しても招待先は変わらない。 |
+| `BOT_INVITE_URL` | 空 | 未使用 | `deploy/app.env.example` に存在するが、現在のRuntimeには読取り処理がない。設定しても招待先は変わらない。 |
 | `DASHBOARD_HTTPS_ONLY` | `true` | Dashboard | Secure Cookieを要求 |
 | `DATA_DIR` | `data` | 全Process | Data Directory |
 | `DATABASE_URL` | 必須 | 全Process | 共通PostgreSQL接続URL。秘密値として管理 |
@@ -76,9 +76,9 @@ Provider資格情報を変更した場合はDashboardとSocial Workerを再起�
 
 設定方法・初期閾値とStage判定は[監視と障害対応](monitoring.md)を参照してください。
 
-環境別Composeは`TUEKA_ENV_FILE=/run/secrets/app_env`を指定し、明示した秘密ファイルだけを読み込みます。ファイルがなければ起動を拒否し、ソースの.envへfallbackしません。既に注入された環境変数を上書きせず、秘密ファイル内の変数展開を無効にします。
+環境別Composeは`TUEKA_ENV_FILE=/run/secrets/app_env`を指定し、明示した秘密ファイルだけを読み込みます。ファイルがなければ起動を拒否し、ソースの.envへfallbackしません。同名のProcess環境変数よりapp.envの値を優先し、ファイル内の変数展開を無効にします。未指定項目にはコードの既定値を使います。ComposeのDATA_DIRなど実行基盤の値はComposeが供給します。
 
-Imageは`TUEKA_FRONTEND_DIST=/opt/tueka-assets/ui`と`TUEKA_DOCS_DIST=/opt/tueka-assets/docs`を設定します。Devのソースmountからビルド済み資産を分離するための設定で、Host起動では未指定のまま従来のdistを使用できます。`DATA_DIR`はComposeが`/data`へ固定します。
+Imageは`TUEKA_FRONTEND_DIST=/opt/tueka-assets/ui`と`TUEKA_DOCS_DIST=/opt/tueka-assets/docs`を設定します。Devのソースmountからビルド済み資産を分離するための設定です。`DATA_DIR`はComposeの永続Volumeに合わせて `/data` のまま使用します。app.envに追記する場合も別のパスへ変更しないでください。
 
 Project/Image/Portと環境専用の接続秘密の生成・検査は[環境別Compose](compose.md)を参照してください。
 

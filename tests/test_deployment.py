@@ -97,16 +97,21 @@ class DeploymentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'separate'):
             validate_promotion(stage, prod)
 
-    def test_explicit_secret_file_does_not_expand_or_override_environment(self):
+    def test_explicit_app_env_is_authoritative_and_does_not_expand(self):
         secret = self.root / 'secret.env'
         secret.write_text('SECRET=literal${OTHER}\nDATA_DIR=/wrong\n')
         with patch.dict(os.environ, {'TUEKA_ENV_FILE': str(secret), 'DATA_DIR': '/data'}, clear=True):
             load_environment()
             self.assertEqual(os.environ['SECRET'], 'literal${OTHER}')
-            self.assertEqual(os.environ['DATA_DIR'], '/data')
+            self.assertEqual(os.environ['DATA_DIR'], '/wrong')
         with patch.dict(os.environ, {'TUEKA_ENV_FILE': str(self.root / 'missing')}, clear=True):
             with self.assertRaises(RuntimeError):
                 load_environment()
+
+    def test_no_implicit_dotenv(self):
+        with patch.dict(os.environ, {}, clear=True), patch('runtime.environment.load_dotenv') as load:
+            load_environment()
+            load.assert_not_called()
 
     def test_migration_failure_does_not_restart_writers(self):
         configure(self.root / 'stage', 'stage')

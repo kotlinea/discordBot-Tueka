@@ -129,3 +129,8 @@
 | `handbook/operator/legacy-mixed-pages/social-youtube.md` | 運用者・非公開 |
 | `handbook/operator/legacy-mixed-pages/troubleshooting-index.md` | 運用者・非公開 |
 | `handbook/operator/setup.md` | 運用者・非公開 |
+
+## 2026-09-20 設定方式の統一
+
+- ルート `.env.example` は `deploy/app.env.example` へ移転（項目参照用）。Dev／Stage／Prodの設定の正本は生成された環境別app.env。
+- `deploy/tueka-bot.service`・`tueka-dashboard.service`・`tueka-social-worker.service` は `handbook/developer/history/host-services/` へ移転。旧Host直接起動の履歴であり、現行導入では使用しない。

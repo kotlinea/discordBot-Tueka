@@ -74,7 +74,7 @@ class Settings:
     def from_env(cls) -> "Settings":
         token = os.getenv("DISCORD_TOKEN")
         if not token:
-            raise RuntimeError("DISCORD_TOKEN is not set. Copy .env.example to .env and configure it.")
+            raise RuntimeError("DISCORD_TOKEN is not set. Configure the selected environment app.env using scripts/setup.ps1 or scripts/setup.sh.")
         return cls(
             discord_token=token,
             gemini_api_key=os.getenv("GEMINI_API_KEY"),

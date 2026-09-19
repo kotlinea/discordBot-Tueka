@@ -30,7 +30,7 @@ class DocumentationTests(unittest.TestCase):
             return  # Private handbook is intentionally not shipped in runtime images.
         reference = reference_path.read_text(encoding="utf-8")
         keys = []
-        for line in (ROOT / ".env.example").read_text(encoding="utf-8").splitlines():
+        for line in (ROOT / "deploy/app.env.example").read_text(encoding="utf-8").splitlines():
             if line and not line.startswith("#") and "=" in line:
                 keys.append(line.split("=", 1)[0])
         missing = [key for key in keys if f"`{key}`" not in reference]

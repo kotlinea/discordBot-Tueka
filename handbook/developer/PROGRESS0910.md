@@ -594,3 +594,14 @@
 
 - 最終補強として設定後のcheckでもポート競合・Devポート重複を検査。差分の導入テスト7件をWindows/Linuxで再実行して成功（`roles-setup-final.log` / `roles-setup-linux-final.log`）、Linuxで `bash -n /app/scripts/setup.sh` 成功。全348件の基準実行後に追加した1テストを含む差分検証であり、最終全349件を再実行したとの扱いはしない。
 - 補強後のクリーン導入も成功（`roles-clean-setup-final.log`、Project `0284324d55d3`）、専用リソースcleanup完了。最終公開Docsに対するRuntime検証は `roles-runtime-final.log` で成功。Docs変更後のブラウザー15件・生成物検査も成功している。最終 `git diff --check` 成功、Git indexは空のまま。
+
+
+### 2026-09-20 Docker設定のapp.env統一
+
+- Docker Dev／Stage／Prodのアプリ設定を環境別app.envへ統一。共通ローダーのルート.env自動探索を廃止し、TUEKA_ENV_FILEの指定ファイルだけを読み込む。明示ファイルは同名のProcess環境変数より優先し、変数展開しない。指定ファイルが存在しなければ起動を拒否する。Hostのオフラインテストは明示したProcess環境変数を使う。
+- ルート.env.exampleをdeploy/app.env.exampleへ移し、Dockerfileの旧COPYを除去。README・環境変数・導入・Migration・Image手順を同期。旧Host用systemdサービス3個はdeveloper/history/host-servicesへ移管。setup/deployment.jsonは配布メタデータ、DB秘密ファイルはPostgreSQL用であり、別のアプリ設定元ではないことを明記。
+- 実環境の.env/app.env・DB・Volume・鍵は変更しない。秘密値の転記は利用者が対象環境を確認して必要項目だけ行う手順とし、自動移送やDB初期化はしない。
+- WindowsのDashboard/Deployment/Setup/Docs回帰38件成功（29.411秒、.venv-p0/app-env-regression.log）。Linux Image内のDeployment14件も成功（app-env-linux.log）。Image build成功（app-env-build.log）、文書リンク検査・git diff --check成功。
+- 作業ディレクトリ直下でのCompose受入はStage/Prod・監視・Migration失敗時停止/回復を通過。Devの起動とVite応答確認後、Uvicorn source reload検出が30秒でタイムアウトした（app-env-compose.log）。この実行を全体成功とは扱わない。専用Projectのcleanup完了。クリーンコピーでの切り分け結果は下記に追記する。
+
+- クリーンコピー `.venv-p0/app-env-clean` でのCompose再検証は終了0（`app-env-compose-clean.log`）。Dev／Stage／Prodの起動、環境分離、監視、Migration失敗と回復、Vite API proxy、Uvicorn reloadが成功。専用Project `982152185b47` とVolumeのcleanupも完了。最初のタイムアウト原因を設定読込み変更と断定せず、作業ツリー上の再読み込み制限として記録する。Remote CI・実Stage受入は未実施。

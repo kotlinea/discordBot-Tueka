@@ -40,7 +40,7 @@ client_secret = os.getenv("DISCORD_CLIENT_SECRET")
 redirect_uri = os.getenv("DISCORD_REDIRECT_URI")
 session_secret = os.getenv("SESSION_SECRET")
 if not all((client_id, client_secret, redirect_uri, session_secret)):
-    raise RuntimeError("Dashboard OAuth settings are missing. Configure .env from .env.example.")
+    raise RuntimeError("Dashboard OAuth settings are missing. Configure the selected environment app.env.")
 
 social_repository = SocialRepository(settings.database_url)
 dashboard_repository = DashboardRepository(settings.database_url)
