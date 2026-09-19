@@ -135,7 +135,26 @@ class DeploymentTests(unittest.TestCase):
     def test_missing_dev_image_does_not_stop_writers(self):
         directory = self.root / 'dev'
         configure(directory, 'dev')
-        with patch('deploy.compose.execute') as execute, patch('deploy.compose.subprocess.run', side_effect=RuntimeError('missing image')):
+        (self.root / 'dashboard/frontend').mkdir(parents=True)
+        with patch('deploy.compose.ROOT', self.root), patch('deploy.compose.execute') as execute, patch('deploy.compose.subprocess.run', side_effect=RuntimeError('missing image')):
             with self.assertRaisesRegex(RuntimeError, 'missing image'):
                 up(directory)
         self.assertFalse(any(item.args[1] == 'stop' for item in execute.call_args_list))
+
+    def test_dev_prepares_nested_mountpoint_and_preserves_existing_dependencies(self):
+        directory = self.root / 'dev'
+        configure(directory, 'dev')
+        frontend = self.root / 'dashboard/frontend'
+        frontend.mkdir(parents=True)
+        modules = frontend / 'node_modules'
+
+        def execute(directory, *args, **kwargs):
+            if args[0] in ('build', 'up'):
+                self.assertTrue(modules.is_dir())
+
+        with patch('deploy.compose.ROOT', self.root), patch('deploy.compose.execute', side_effect=execute), patch('deploy.compose.subprocess.run'):
+            up(directory)
+            marker = modules / 'existing-dependency'
+            marker.write_text('preserved')
+            up(directory)
+            self.assertEqual(marker.read_text(), 'preserved')

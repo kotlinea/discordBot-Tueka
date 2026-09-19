@@ -58,6 +58,9 @@ def _up(directory, stage_directory=None):
                 raise ValueError('Running Stage image differs from the requested release')
     execute(directory, 'config', '--quiet')
     if config['environment'] == 'dev':
+        # The read-only frontend bind hides the image's node_modules directory.
+        # Docker needs a host mountpoint before mounting the nested named volume.
+        (ROOT / 'dashboard/frontend/node_modules').mkdir(exist_ok=True)
         execute(directory, 'build', 'vite')
     else:
         # Resolve/download before stopping existing writers.

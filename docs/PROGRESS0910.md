@@ -560,3 +560,12 @@
 - Gitleaks v8.28.0の全37コミット走査で同じ3件を再現し、履歴ソースを照合。設定テンプレートの `replace-with-dedicated-*` 2件とSQL UPSERT式1件であり、今回の検出3件に実資格情報はなかった。`.gitleaksignore` は該当Commit/File/Rule/LineのFingerprintだけを指定し、ファイル全体・ルール全体・履歴走査の除外は行わない。CIで除外ファイルのパスを明示し、スキャン中のネットワークを無効化した。
 - ネットワーク無効・Git履歴読取専用の再走査は37コミット、約4.82 MB、検出0、終了0（`ci-gitleaks-fixed.log`）。同じダミー文字列を別の検証ファイルへ置くと検出1、終了1となり、限定除外後も新しい検知が有効なことを確認した（`ci-gitleaks-positive.log`）。
 - Deploymentテスト12件成功（`ci-deployment.log`）。完成Imageで専用テストDBを使うruntime受入も成功し、非root/read-only/NoNewPrivs、SPA/Docs資産、Migration再適用、Worker heartbeat、正常終了を確認（`ci-fixed-runtime.log`）。元開発DB・資格情報・Git indexは変更していない。GitHub上のCI再実行は未実施。Phase 3の実機受入ゲートは未完了のまま。
+
+
+### 2026-09-19 CI修正：Dev Viteの読取専用mount先
+
+- CIのDev起動失敗は、クリーンcheckoutに `dashboard/frontend/node_modules` がない状態で、読取専用Frontend bind内へnamed volumeをmountしようとしてDockerがmountpointを作成できないことが原因。ユーザー提供のdaemonログとLinux Volumeでの最小再現が一致した。
+- `deploy.compose.up` のDev分岐で、build/起動前にHost側の空mountpointを `mkdir(exist_ok=True)` で用意する。既存依存ファイルは保持し、非root/read-only構成と依存用named volumeは維持する。直接Composeを実行する場合の事前作成も運用Docsに記載した。
+- Deployment回帰13件成功。クリーン状態からの作成と、再実行時の既存依存保持を検証。Linuxの最小再現でも事前作成後は非root/read-onlyで起動成功。
+- 追跡ファイルの作業コピーだけを `.venv-p0/compose-clean-checkout` に複製し、node_modules不在を確認して `verify_compose.py --image tueka:ci` を実行、終了0（`.venv-p0/ci-compose-clean-fixed.log`）。Stage/Prod分離、保持、監視障害復旧、Migration失敗/復旧、DevのVite SPA/API proxy/Uvicorn reloadがすべて成功。終了後のHost node_modulesは空で、UUID専用検証Project/Volumeは削除済み。
+- 通常作業ツリーで先行した実行はDev reload待ち30秒で失敗しており、全受入成功の根拠にはしない（`ci-compose-repro.log`）。クリーンコピーでの成功と区別する。GitHub上での再実行、実Stage受入、commit/pushは未実施。

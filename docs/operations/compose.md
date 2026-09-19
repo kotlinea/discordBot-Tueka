@@ -62,6 +62,7 @@ python scripts/deploy.py up --config-dir data/environments/prod --stage-config d
 - アプリはUID/GID 10001、read-only root filesystem、cap-drop ALL、no-new-privileges、/tmp tmpfsで動く。各Serviceは当初1 Replica。
 - Dashboard公開はlocalhostのみ。既定は本番8000、Stage8001、Dev8002。HostのNginx/TLSを維持し、それぞれの公開Originへ転送する。
 - Devだけ必要なソースファイル/ディレクトリを読取り専用bind mountする。Repository全体や.env/dataをmountしない。Uvicorn reloadを有効にし、Viteは5173でSPAを配信し、API/OAuth等をDashboardへ同一Originでproxyする。Bot/WorkerのPython変更はupで再起動する。
+- Devの`up`は、読取り専用Frontend内のVolume mount先としてHostの`dashboard/frontend/node_modules`を事前作成する。既存内容は変更せず、依存のインストールはコンテナ内のnamed volumeへ行う。Composeを直接操作する場合も先にこのディレクトリを作成する。
 - ImageのSPA/Docsは/opt/tueka-assetsへ配置し、Devのソースmountで隠れない。明示したTUEKA_ENV_FILEから秘密値を読み、ソースの.envへのfallbackや`${...}`展開を行わない。
 
 ## ローカル受入の再現
