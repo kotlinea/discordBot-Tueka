@@ -158,6 +158,10 @@ TransactionはRepositoryのDB操作で閉じ、DiscordやProviderへの通信を
 
 SocialのTarget作成・Alias統合・孤立Target削除はProvider単位のTransaction Advisory Lockを共有します。複数Workerが同じ外部Accountを同時解決しても、Subscriptionが一つのCanonical Targetへ集約されます。
 
+## 運用復旧の構造
+
+復旧処理は`recovery/`に暗号化BlobのArchive・復号/Hash検証とone-shot CLIを置き、`deploy/recovery.py`がComposeの停止・Snapshot・別Project復元・起動保留・解放を調整します。`deploy/recovery-db.sh`はPostgreSQL公式Image内のDBツールだけを呼び、アプリImageへDB Server/Clientを追加しません。`scripts/recovery.py`が運用者の入口、`scripts/verify_recovery.py`が実コンテナでの復旧契約検証です。
+
 ## 運用監視の構造
 
 `observability/`に運用観測を集約します。`repository.py`はHeartbeat保存とDB/Queue集計、`heartbeat.py`は各イベントループからの定期送信とコンテナprobe、`metrics.py`は数値Counter、`http.py`はHealth/認証付きメトリクスとHTTP計測、`export.py`はPrometheus形式、`logging.py`は許可した項目だけのJSONログ、`configuration.py`はHTTP/CLI共通閾値を担当します。

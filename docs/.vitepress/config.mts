@@ -61,6 +61,7 @@ export default defineConfig({
         { text: '本番Image', link: '/operations/container' },
         { text: '環境別Compose', link: '/operations/compose' },
         { text: '監視と障害対応', link: '/operations/monitoring' },
+        { text: 'Stage受入', link: '/operations/stage-acceptance' },
         { text: 'セキュリティ', link: '/operations/security' },
       ]}],
       '/reference/': [{ text: 'リファレンス', items: [

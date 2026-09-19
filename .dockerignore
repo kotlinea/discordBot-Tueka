@@ -31,3 +31,7 @@ data
 **/ticket-transcripts
 **/backups
 **/*.log
+**/*.dump
+**/transcripts.tar
+**/recovery-*.json
+**/.recovery.lock

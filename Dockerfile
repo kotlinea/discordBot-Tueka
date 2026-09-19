@@ -42,6 +42,7 @@ COPY migrations migrations
 COPY moderation moderation
 COPY observability observability
 COPY reaction_roles reaction_roles
+COPY recovery recovery
 COPY runtime runtime
 COPY scripts scripts
 COPY social social

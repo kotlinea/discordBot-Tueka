@@ -27,7 +27,9 @@
 
 Phase 2のローカル出口まで完了。P2-7でRuntime・全Repository・Migration・テスト基盤をPostgreSQLへ統一し、空の開発用PostgreSQLへ接続設定を切り替えた。Windows/Linux各298件、Frontend/Docs/画面回帰、実DBの別DB Restoreが成功している。旧開発DBのデータは移送していない。
 
-P3-1〜2もローカル完了。同一本番Imageと環境別Composeを整備し、非root/read-only、空Volume導入、環境分離、Stage/本番の同一Image ID、DB/Transcript保持、Migration失敗時の停止/復旧、DevのVite/reloadを検証した。最終Windows/Linux各315件、Frontend単体14件・画面48件が成功。次はP3-3のReadiness・Heartbeat・DB/Queue監視・ログ/Resource制限。Stageの実Discord/OAuth/Webhook、実運用環境への同一digest配布、実Transcript/S3の復旧確認は未完了のまま残す。実施証拠と引継ぎは `docs/PROGRESS0910.md` を参照する。
+P3-1〜4もローカル完了。同一本番Image、環境別Compose、監視、Resource制限に加え、DB/暗号化Blob/鍵世代/対応Imageの復旧セットと別Volume復元を整備した。Windows/Linux全各335件、最終追加を含む復旧8件の両環境検証、破損dumpのRollback、保留配送の照合再開、新旧Image/Schema間のRollbackが成功している。
+
+次はPhase 3の実Stage受入。Stage/Guild/Registry/Hostは未準備とユーザーが回答しており、現時点はローカル検証と実機受入手順の整備までとする。Stage実測の閾値、実Discord/OAuth/Webhook、Registry経由の同一digest配布、実S3、Host公開経路とBackup Jobの運用確認は未完了。Phase 3全体の完了やPhase 4開始とは扱わない。実機受入は `docs/operations/stage-acceptance.md`、実施証拠と引継ぎは `docs/PROGRESS0910.md` を参照する。
 
 ## 実施順序
 

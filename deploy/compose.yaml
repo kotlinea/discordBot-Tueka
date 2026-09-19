@@ -21,6 +21,37 @@ x-app: &app
     options: {max-size: "10m", max-file: "3"}
 
 services:
+  recovery-db:
+    image: postgres:18-bookworm@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af
+    profiles: [operations]
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [database]
+    secrets: [database_password]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: tueka_${TUEKA_ENV}
+      PGDATABASE: tueka_${TUEKA_ENV}
+      PGCONNECT_TIMEOUT: "10"
+    volumes: ["./deploy/recovery-db.sh:/recovery-db.sh:ro"]
+    entrypoint: [sh, /recovery-db.sh]
+    restart: "no"
+    cpus: "1.0"
+    mem_limit: 768m
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+  recovery-data:
+    <<: *app
+    profiles: [operations]
+    entrypoint: [python, -m, recovery]
+    command: [inspect]
+    volumes: [transcripts:/data]
+    restart: "no"
   postgres:
     image: postgres:18-bookworm@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af
     environment:

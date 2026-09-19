@@ -66,4 +66,6 @@ python scripts/deploy.py up --config-dir data/environments/prod --stage-config d
 
 ## ローカル受入の再現
 
+Backup/Restore用の`recovery-db`と`recovery-data`はoperations profileのone-shot Serviceです。通常upでは起動せず、[復旧CLI](./backup)から明示実行します。復元元のfence、復元先のpending、実行中lockがある設定は通常upを拒否します。設定ディレクトリを複製してこの制御を迂回しないでください。
+
 `python scripts/verify_compose.py --image tueka:local` はUUID付きの専用Projectを作る。空Volume、非管理者DB Role、同一Image、秘密情報/Network/Volume分離、再起動後のDB/Transcript保持、Schema更新、Migration失敗時のRollback/起動拒否、DevのVite/reloadを確認する。検証Botは実Cogを読み込むがDiscord LoginとCommand同期をMockし、実Guildを変更しない。最後にこの検証で作成したProjectのVolumeだけを削除する。実Stage受入の成功とは区別する。

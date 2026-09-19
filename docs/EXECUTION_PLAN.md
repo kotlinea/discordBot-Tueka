@@ -34,11 +34,15 @@ Windows/Linuxの全Python各211件、Docs build、保全DB複製の全Dump不変
 
 **P3-2：環境別Compose・Volume・秘密情報・起動順はローカル完了。** 共通Composeとdev/stage/prod差分、環境別設定の生成・検査、停止→DB readiness→Migration成功→3Service起動を実装した。隔離した3 Projectで空Volume、DB/Transcript保持、Schema更新/失敗Rollback、環境分離、Stage/本番の同一Image ID、DevのVite/API proxy/実Source reloadを確認。最終Windows/Linux各315件、Frontend単体14件・画面48件とImage内の実配信/正常終了が成功した。
 
-**次はP3-3：Readiness・Heartbeat・DB/Queue監視・ログ/Resource制限。** StageのDiscord・OAuth・Webhook実動、実運用環境への同一digest配布、実Transcript/S3を含むRestoreは別ゲートとして保持する。Remote Workflowは未実行。Goal全体とPhase 3〜5は未完了。詳細・コマンド・ログは`docs/PROGRESS0910.md`のP3-2完了記録を参照する。
+**P3-3：Readiness・Heartbeat・DB/Queue監視・ログ/Resource制限はローカル完了。** `observability/`に観測処理をまとめ、HTTP health、認証付きメトリクス、3ServiceのHeartbeat、Pool/lock/deadlock、8 Queue、JSONログとCompose上限を実装した。Windows/Linux各328件、隔離ComposeのWorker停止・配送失敗・DB停止/復旧、68表の論理Restoreが成功。開発DBもBackup後に0002を適用済み。
+
+**P3-4：Backup/RestoreとRollbackはローカル完了。** 環境別one-shot、対応Image/鍵世代/DB/暗号化Blobの復旧セット、別Project/Volume復元、起動保留/解放/中止、排他、定期Backup Jobテンプレートを追加した。破損dumpのRollbackと復旧中止、Transcript/添付/DB暗号文の復号、Receiptを照合する保留配送、実際に異なる新旧Image/Schemaへの更新とRollbackを隔離Composeで実演した。
+
+**次はPhase 3の実Stage受入。** ユーザーは2026-09-19にStage/Guild/Registry/Host未準備と回答し、ローカル検証と実機受入手順の整備まで進める方針を指定した。`docs/operations/stage-acceptance.md`へ必要な対象・手順・証拠をまとめた。Stage実測の閾値、Discord/OAuth/Webhook、Registry経由の同一digest配布、実Transcript/S3、Host転送先と定期Job/通知の確認を未完了として残す。P4-1の前提であるPhase 3の運用出口はまだ満たしておらず、Phase 4〜5へ進んだとは扱わない。Remote Workflowも未実行。詳細は`PROGRESS0910.md`のP3-4記録を参照する。
 
 ## 1. 判断と調査範囲
 
-Phase 0〜2とP3-1〜2のローカル実装・検証を完了した。直近は環境別Composeを使い、監視と障害検知・復旧の検証を進める。既存機能の運用品質を満たしてからPhase 5へ進む。
+Phase 0〜2とP3-1〜4のローカル実装・検証を完了した。直近はStageの準備後に実運用出口を確認し、P4-1の機能判定表へ進む。既存機能の運用品質を満たしてからPhase 5へ進む。
 
 README、ROADMAP、設計・アーキテクチャ・機能・運用資料、起動処理、保存層、主要Domain、API、React画面、CIとテスト定義を確認した。今回は静的調査と計画策定であり、テスト・ビルド実行、本番DB調査、Discord実機検証は行っていない。テストの存在を成功や機能完成の証拠とは扱わない。
 

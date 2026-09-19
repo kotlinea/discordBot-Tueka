@@ -1,0 +1,10 @@
+[Unit]
+Description=Tueka daily backup window
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+Unit=tueka-backup.service
+
+[Install]
+WantedBy=timers.target

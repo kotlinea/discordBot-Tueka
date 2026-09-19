@@ -513,3 +513,41 @@
 - 運用手順はdocs/operations/compose.md。Image手順、環境変数Reference、Docs navigation、deploy/READMEも更新した。Git Stage/Commit操作は実施していない。.env.exampleにはユーザー側の変更があるため保持し、その差分を除外したgit diff --checkが成功した。
 - 引継ぎ：P3-3はDashboard liveness/readiness、Bot/Worker Heartbeat、Outbox最古滞留、PostgreSQL接続待ち/lock/deadlock、構造化LogとResource/ログ上限を実装し、Worker停止や配送/DB障害を注入して検知を確認する。運用閾値は実Stage計測から確定する。P3-4の実Transcript/S3/鍵世代を含む復元とRollback、Phase 4〜5は今後の作業として維持する。
 - 完了記録・計画・運用手順を反映した最終Docs buildも成功（12.54秒、.venv-p0/p3-2-recorded-docs.log）。最終build後の変更はこの結果追記のみ。ユーザーによるStage操作を検出したが、Indexは変更していない。
+
+### 2026-09-19 P3-3 完了：Health・Heartbeat・DB/Queue監視
+
+- 判定：P3-3の実装・ローカル回帰・障害注入・運用Docsを完了。次はP3-4。Stage実測の通知閾値は未確定であり、Phase 3全体とGoal全体を完了扱いしない。
+- observability/にHTTP入口、数値Registry、集計Repository、Heartbeat、Prometheus出力、JSONログ、共通閾値を分離した。database/jobsは軽量metricsだけを参照する。8 Queueの列対応をjobs/catalog.pyへまとめ、各Domainと監視で共有する。構造と依存方向をarchitecture.mdへ追記した。
+- /health/liveはDB/資産に依存しないasync応答。/health/readyはPool接続、全MigrationのVersion/Checksum、SPA/Docs資産を検査する。/internal/metricsは32文字以上の専用MONITORING_TOKENで保護し、不成立404、DB取得失敗503。OpenAPIの既存公開契約は維持する。
+- Bot・Dashboard・Social Workerは5秒ごとにHeartbeat/数値を送信。BotはGateway readinessも判定し、停止時はfalseを保存。0002_observability.sqlで起動Instance別のruntime_heartbeatsを追加。DB時刻を小数epochで保存し、同じ秒の再起動を識別する。古い観測は1日で削除。ファイルprobeはPID/ready/30秒TTLを確認し、Windowsでは危険なos.kill(pid,0)を使わない。
+- HTTP件数/所要時間、Provider失敗、Queue確定結果、期限超過最古Job、Dead Letter、失効Lease、Pool使用/待ち/接続失敗、DB例外分類、pg_stat_activityの同Role lock待ち、pg_stat_databaseのdeadlockを公開。本文・個別ID・URL/query・資格情報をMetricへ入れず、Registryは系列数を制限する。未来Scheduleを遅延として誤検出しない。
+- HTTPとCLIで閾値を共通化。Heartbeat 30秒/Queue 300秒は初期値で、Stage計測済み値ではない。scripts/deploy.py healthは対象環境の一時コンテナから集計JSONと終了コードを返す。収集器の接続失敗、Counter再起動Reset、最大約5秒の観測遅延、DB停止時の集計不可を運用Docsへ明記した。
+- アプリログを許可したJSON項目だけに限定し、raw message/arguments/exception text/SQL/URLを除外。例外型とコード位置を残す。Uvicorn既定access logを無効化。Composeはアプリ/PGにCPU 1、768 MiB、PID 128、ログ10 MiB×3、Dev Viteは1 GiB。PGのSQL/パラメータログを抑制。Nginx sampleはqueryを含まないaccess logと/internal/遮断を追加。実Host Nginx/TLS変更・logrotate設定は行っていない。
+- Windows/Python 3.13の最終全328件成功、223.317秒（.venv-p0/p3-3-final-windows.log）。同一本番ImageのLinux全328件成功、159.600秒（p3-3-linux.log）。skipなし。新規監視12件、0001→0002保持/再適用1件を追加し、既存deadlockテストでプロセス/PG Counter増加も検証した。前段Windows326件の結果は最終判定に使わない。
+- Compose受入は初回にdev/stage/prod全構成を成功（p3-3-compose.log）。最終Imageでもstage/prodと障害検知を再実行し成功（p3-3-final-compose.log、--skip-dev）。Worker停止、配送失敗、DB停止でlive200/ready503、復旧後全Heartbeat正常、メトリクス認証、秘密データ不在、実Resource上限を確認した。Dev Source reloadはログ文字列ではなくDashboard実PIDの変更で検証する。検証Project/Volumeはfinallyで削除。
+- Runtime smokeは非root/read-only/NoNewPrivs、実SPA/Docs/assets、Migration再適用、Heartbeat、正常終了を成功（p3-3-smoke.log）。最初の呼出しは必須--network不足で実行前終了2となり、明示ネットワークを追加して成功した。初期監視テストでscheduled_moderation_actionsにcreated_atがない問題を検出し、QueueSpecの列契約で解決した。
+- 実pg_dump/pg_restoreで68表、大きなID、採番、設定、Queue、Transcript参照、破損dumpのRollbackを確認（p3-3-restore.log）。実開発DBは既存接続0を確認し、data/backups/p3-observability-0919.dumpを取得してから0002を適用。再適用0件とrequire_current成功（p3-3-dev-migrate.log）。原SQLite、既存鍵/Transcript、Discord Resourceは変更していない。Bot/Dashboard/Workerの実外部接続も起動していない。
+- 最終候補Image tueka:p33のbuild成功（p3-3-final-build.log）。Image ID sha256:721624a02e3d4883d8959a2722df2c239a813002dcda3bc434319e5a6e73511f、ローカルmanifest digest sha256:e2557003f4051dd83ca141691a44ebea6b53d6dc8fecd6d002b01dbdefcf6f9b。内部SPA build 4.42秒、Docs build 6.07秒。Registry配布は未実行。以後の変更は構造説明・計画・作業記録の文書だけ。
+- docs/operations/monitoring.md、環境変数Reference、運用indexとnavigationを整備。既存CIの全Python/Compose経路が監視検証を実行する。Remote Workflowは未実行。Frontendコード変更はなく、今回の画面回帰/Vitest再実行は行わない。P3-2の14件/48件を今回実行済みとは扱わない。Git Stage/Commit操作は行っていない。
+- 引継ぎ：P3-4は環境別のone-shot Backup/Restore、別VolumeでDBとTranscript/鍵世代の復元・復号、保留処理の安全な再開、Snapshotと対応ImageによるRollbackを実演する。0001/0002は検証・開発DBへ適用済みなので書き換えず、以後のSchema変更は0003から追加する。実S3/Stage資格情報の確認は別ゲートとして扱う。
+- 完了記録・構造説明・計画を反映した最終Docs build成功、12.69秒（.venv-p0/p3-3-recorded-docs.log）。git diff --checkも成功。最終build後の変更はこの結果追記のみ。
+
+### 2026-09-19 P3-4 ローカル完了：復旧セット・別Volume復元・Snapshot Rollback
+
+- 判定：P3-4の実装、ローカルの実DB/Volume受入、回帰、運用手順を完了。Phase 3の実運用出口は未完了。ユーザーはStage設定/Guild/Registry/Hostが未準備と回答し、「ローカル検証と実機受入手順の整備まで進める」と指定した。実Stageへの接続、送信、配布、Host設定変更は行わない。
+- recovery/に暗号化BlobのArchive、参照/鍵/Hash/復号検証、one-shot CLIを配置。deploy/recovery.pyは停止・Snapshot・別Project復元・起動保留/解放/中止を調整し、scripts/recovery.pyを運用入口にした。PostgreSQL Clientは専用recovery-db Serviceで公式PostgreSQL 18 Imageを使用し、アプリImageへ追加しない。recovery-dataは対応アプリImage/非root/read-onlyとTranscript Volumeを使用する。
+- Backupは3Writerを停止し、接続残存を拒否してDB dumpとready状態のTranscript/添付を保存する。既存宛先は上書きせず、完成時だけmanifest.jsonを作成。Image ID/参照、環境/Project、Discord Application ID、Migration、Queue集計、鍵世代指紋、Artifact SHA-256を記録する。資格情報・鍵そのものは含めない。セット全体は暗号化していないため、私有ディレクトリ/ACLとHost外保管時の暗号化が必要。参照なし/削除済みBlobは保存対象外。
+- S3参照は実Object取得を必須にし、取得した暗号文を復号/内容Hash検証してセットへ保存する。失敗をローカルfallbackで隠さない。復元は全Blobを新しいlocal Volumeへ置き、復号成功後にDB backendをlocalへ変更する。復元時のTICKET_S3_BUCKET設定を拒否し、元S3へ書込み/削除しない。S3通信は単体テストでMockし、実S3の受入は未実施。
+- Restoreは同じ環境/Discord Application/鍵世代/対応Image、別Project、空DB/Transcript先を要求する。DBはpg_restoreの単一Transaction。全参照Blob、Ticket回答/Message/Feedback、Social Token暗号文を復号検査し、MigrationとQueue状態を照合する。古いHeartbeatだけを除去し、Queueの試行数/Lease/Receipt/配送開始フラグは維持する。
+- 元設定にrecovery-fence.json、復元先にrecovery-pending.jsonを残し、通常upを拒否。release --reconciledは外部副作用照合済みの明示後に再検証し、解放記録を保存する。自動Discord操作/自動起動は行わない。abortは失敗した復元先を起動禁止に保ち、元環境のfenceだけを解放する。部分データやVolumeを自動削除しない。Host喪失時の--source-fencedは操作者による旧Writer隔離済みの明示であり、自動隔離機能ではない。
+- deploy/locking.pyで通常upとBackup/Restore/解放/中止の排他を共有。可変Source mountを持つDevを、Imageと一致する復旧セットの対象と偽らないよう拒否する。開発DBの単体Backup CLIは従来どおり使用可能。設定複製やDocker直接操作はこの制御を迂回するため運用手順で禁止する。
+- deploy/tueka-backup.service/.timerを追加。専用運用アカウント、絶対パス、毎日04:00の停止時間帯をHostごとに調整して使う。--backup-rootは時刻/UUID付き宛先を作り、--resume-sourceは成功後に元々稼働していたServiceだけを再開する。今回Timerは登録・有効化していない。保持世代削除も自動化しない。
+- scripts/verify_recovery.pyの最終受入成功（.venv-p0/p3-4-final-recovery.log）。UUID付きsource/restored/failedの専用Stage Projectで、Backup成功後の元Service再開、別DB/Transcript named volume、暗号化Transcript/添付2件とTicket回答/Social Token3値の復号、Checksum不一致拒否、ネイティブpg_restore失敗時の空DB保持、abort後の復元先起動禁止を確認した。
+- 同じ受入で検証用0003を含む実際に異なる新Imageを構築し、元ProjectをSchema 3へ更新。Snapshotの旧Image/Schema 2へ別Projectで戻し、元DBの更新後データを保全したまま旧状態と3Serviceの正常起動を確認した。検証用0003は一時Imageにのみ存在し、正規Migrationは0001/0002のまま。
+- 復元後、実Suggestions Repository/Service/共通Runnerを使い、保存済みmessage_id=111を保持し、配送不明Jobはrecover=Trueで外部Receipt Portの既存message_id=222と照合。公開後syncまで完了し、2回目のBatchは0件、公開Port呼出しは1回を確認した。Discord PortはオフラインFixtureであり実Guildへ送信していない。
+- Windows全335件成功、565.050秒（p3-4-windows.log）。Linux全335件成功、381.534秒（p3-4-linux.log）。skipなし。最後にDevの可変Source拒否を1件追加し、現行復旧境界8件をWindows 6.541秒/Linux 3.446秒で再検証した（p3-4-final-boundary-windows.log / p3-4-final-boundary-linux.log）。現行のテスト総数は336だが、全336件を一回のコマンドで再実行したとは記録しない。更新排他を含むDeployment12件も成功（p3-4-deployment.log）。
+- 通常Compose受入もstage/prod・環境分離・Migration失敗・監視/DB復旧が成功（p3-4-compose.log、--skip-dev）。DevのImage Snapshotは意図的に対象外とした。Frontendコードは変更しておらず、画面/Vitestを再実行したとは扱わない。CI runtime-image Jobへ復旧/旧Image Rollback受入を追加したが、Remote Workflowは未実行。
+- 初期検証ではDockerfileのFROMに裸のImage IDを指定した問題、Suggestions公開後syncを考慮しないFixture、Mounts配列順に依存したVolume検査を検出。専用ローカルTag、実Queue遷移、Destination指定で修正して最終受入を成功させた。最終検証のProject/Volume/Network/派生Imageは今回のUUID対象だけを後始末した。
+- 最終Image tueka:p34はp3-4-release-build.logでbuild成功。Image ID sha256:df52059331e4232e25b357593b138056b23fe5096791d62d7e71b8adb2d372a1、ローカルmanifest digest sha256:023f1b1577aad27162290649bc41da0b72b3e6ddc384d416a5d8044836f5e7fd。内部SPA build 10.01秒/Docs 11.79秒。最終境界8件と最終復旧受入はこのImageで実行。Linux全335件は直前Image（6336f51a...）で実行し、その後の変更はDev拒否ガード/対応テストとDocsに限定。Registryへpushしていない。
+- Backup/Restore・更新/Rollback・Compose・構造説明を更新し、docs/operations/stage-acceptance.mdへ実機の対象固定、Gate、証拠、切戻し手順を追加。正式Docs build成功、25.00秒（p3-4-docs.log）。元開発DB/Volume/鍵/Transcript/.env/Discord Resourceはこの作業では変更していない。Git Index/Commitも操作していない。
+- 引継ぎ：次はStage準備後のPhase 3実運用受入。専用設定/Guild/Registry/Host、実S3使用の有無、通知先、許容停止時間帯を確定し、stage-acceptance.mdに沿って証拠を収集する。監視閾値、実Discord/OAuth/Webhook、Registry配布、Host Nginx切替、定期Backup/通知/Host外保管は未実施。P4-1はPhase 3出口確認後。Goal全体とPhase 4〜5は未完了のまま保持する。

@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 
 from .configuration import read, read_metadata, validate_promotion
+from .locking import locked
 
 ROOT = Path(__file__).resolve().parents[1]
 APPLICATIONS = ('bot', 'dashboard', 'social-worker')
@@ -29,6 +30,15 @@ def execute(directory, *args, capture=False):
 
 
 def up(directory, stage_directory=None):
+    if any((Path(directory) / name).exists() for name in ('.recovery.lock', 'recovery-pending.json', 'recovery-fence.json')):
+        raise ValueError('Recovery is active or awaiting reconciliation; use the recovery release command')
+    with locked(directory):
+        return _up(directory, stage_directory)
+
+
+def _up(directory, stage_directory=None):
+    if any((Path(directory) / name).exists() for name in ('recovery-pending.json', 'recovery-fence.json')):
+        raise ValueError('Recovery is awaiting reconciliation')
     config, _ = read(directory)
     if config['environment'] == 'prod':
         if not stage_directory:
