@@ -551,3 +551,12 @@
 - 最終Image tueka:p34はp3-4-release-build.logでbuild成功。Image ID sha256:df52059331e4232e25b357593b138056b23fe5096791d62d7e71b8adb2d372a1、ローカルmanifest digest sha256:023f1b1577aad27162290649bc41da0b72b3e6ddc384d416a5d8044836f5e7fd。内部SPA build 10.01秒/Docs 11.79秒。最終境界8件と最終復旧受入はこのImageで実行。Linux全335件は直前Image（6336f51a...）で実行し、その後の変更はDev拒否ガード/対応テストとDocsに限定。Registryへpushしていない。
 - Backup/Restore・更新/Rollback・Compose・構造説明を更新し、docs/operations/stage-acceptance.mdへ実機の対象固定、Gate、証拠、切戻し手順を追加。正式Docs build成功、25.00秒（p3-4-docs.log）。元開発DB/Volume/鍵/Transcript/.env/Discord Resourceはこの作業では変更していない。Git Index/Commitも操作していない。
 - 引継ぎ：次はStage準備後のPhase 3実運用受入。専用設定/Guild/Registry/Host、実S3使用の有無、通知先、許容停止時間帯を確定し、stage-acceptance.mdに沿って証拠を収集する。監視閾値、実Discord/OAuth/Webhook、Registry配布、Host Nginx切替、定期Backup/通知/Host外保管は未実施。P4-1はPhase 3出口確認後。Goal全体とPhase 4〜5は未完了のまま保持する。
+
+
+### 2026-09-19 CI修正：クリーンbuildとGitleaks誤検知
+
+- Dockerfileに残っていた `COPY automod automod` とDev Composeの同ディレクトリmountを削除。実装は `moderation/` へ移動済みで、`automod/` はGitに存在しなかった。以前のローカルbuildは未追跡のキャッシュディレクトリが残る作業ツリーで成功しており、クリーンcheckoutの再現性を確認できていなかった。
+- HEADのGit archiveでCIと同じ欠落エラーを再現。修正後はGit追跡ファイルの作業コピーと新規 `.gitleaksignore` だけからGNU tarを作り、`docker build -t tueka:ci -` を実行して成功した（`.venv-p0/ci-fixed-build.log`）。Frontend/Docsも同build内で成功。後続のCI設定変更と本記録はImage内容に影響しない。
+- Gitleaks v8.28.0の全37コミット走査で同じ3件を再現し、履歴ソースを照合。設定テンプレートの `replace-with-dedicated-*` 2件とSQL UPSERT式1件であり、今回の検出3件に実資格情報はなかった。`.gitleaksignore` は該当Commit/File/Rule/LineのFingerprintだけを指定し、ファイル全体・ルール全体・履歴走査の除外は行わない。CIで除外ファイルのパスを明示し、スキャン中のネットワークを無効化した。
+- ネットワーク無効・Git履歴読取専用の再走査は37コミット、約4.82 MB、検出0、終了0（`ci-gitleaks-fixed.log`）。同じダミー文字列を別の検証ファイルへ置くと検出1、終了1となり、限定除外後も新しい検知が有効なことを確認した（`ci-gitleaks-positive.log`）。
+- Deploymentテスト12件成功（`ci-deployment.log`）。完成Imageで専用テストDBを使うruntime受入も成功し、非root/read-only/NoNewPrivs、SPA/Docs資産、Migration再適用、Worker heartbeat、正常終了を確認（`ci-fixed-runtime.log`）。元開発DB・資格情報・Git indexは変更していない。GitHub上のCI再実行は未実施。Phase 3の実機受入ゲートは未完了のまま。

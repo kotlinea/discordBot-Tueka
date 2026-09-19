@@ -1,5 +1,4 @@
 x-source: &source
-  - ./automod:/app/automod:ro
   - ./cogs:/app/cogs:ro
   - ./community:/app/community:ro
   - ./dashboard:/app/dashboard:ro

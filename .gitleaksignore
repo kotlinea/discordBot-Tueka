@@ -1,0 +1,6 @@
+# Historical false positives only; keep scanning all commits and rules.
+# Configuration template placeholders (replace-with-dedicated-*), not credentials.
+fd930d3cb3581f4effb6933ec0c659f89b7680c4:deploy/configuration.py:discord-client-secret:29
+fd930d3cb3581f4effb6933ec0c659f89b7680c4:deploy/configuration.py:discord-client-secret:30
+# SQL UPSERT expression token=excluded.token, not an API key.
+8cdd280e12388d44ab5bf33b285de3375fb2a923:jobs/repository.py:generic-api-key:96
