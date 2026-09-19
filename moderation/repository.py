@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 from jobs import QueueRepository, QueueSpec
+from jobs.catalog import QUEUE_SPECS
 from database import lock_resource, require_current, transaction
 from guild_settings.models import moderation_settings
 
@@ -12,8 +13,8 @@ class ModerationRepository:
     def __init__(self, database_url: str) -> None:
         self.database_url = database_url
         require_current(self.database_url)
-        self.request_jobs = QueueRepository(self.database_url, QueueSpec('moderation_action_requests', result='result_json'))
-        self.schedule_jobs = QueueRepository(self.database_url, QueueSpec('scheduled_moderation_actions', due='due_at'))
+        self.request_jobs = QueueRepository(self.database_url, QUEUE_SPECS['moderation_action_requests'])
+        self.schedule_jobs = QueueRepository(self.database_url, QUEUE_SPECS['scheduled_moderation_actions'])
 
     def _connection(self):
         return transaction(self.database_url)

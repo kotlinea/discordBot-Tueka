@@ -6,6 +6,7 @@ import re
 import time
 import uuid
 from jobs import QueueRepository, QueueSpec
+from jobs.catalog import QUEUE_SPECS
 from database import lock_resource, require_current, transaction
 from typing import Any, Iterable
 
@@ -24,8 +25,8 @@ class TicketRepository:
     def __init__(self, database_url: str) -> None:
         self.database_url = database_url
         require_current(self.database_url)
-        self.outbox_jobs = QueueRepository(self.database_url, QueueSpec('ticket_outbox'))
-        self.schedule_jobs = QueueRepository(self.database_url, QueueSpec('ticket_schedules', due='due_at'))
+        self.outbox_jobs = QueueRepository(self.database_url, QUEUE_SPECS['ticket_outbox'])
+        self.schedule_jobs = QueueRepository(self.database_url, QUEUE_SPECS['ticket_schedules'])
         self.recover_incomplete_closes()
 
     def _connection(self):

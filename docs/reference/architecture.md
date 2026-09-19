@@ -157,3 +157,9 @@ RootとDomain Routerは `React.lazy` / `Suspense` で画面を遅延読込みし
 TransactionはRepositoryのDB操作で閉じ、DiscordやProviderへの通信を行う間は保持しません。psycopgのIntegrityError、接続断、LockNotAvailable、DeadlockDetectedを呼出元へ伝え、接続層が処理全体を勝手に再実行することはありません。Queueの再試行は既存のToken・Receipt・補償を通り、外部副作用の結果が不明な場合は照合を先に行います。接続断時の未Commit変更、lock timeout、deadlock被害側のTransactionはRollbackされます。
 
 SocialのTarget作成・Alias統合・孤立Target削除はProvider単位のTransaction Advisory Lockを共有します。複数Workerが同じ外部Accountを同時解決しても、Subscriptionが一つのCanonical Targetへ集約されます。
+
+## 運用監視の構造
+
+`observability/`に運用観測を集約します。`repository.py`はHeartbeat保存とDB/Queue集計、`heartbeat.py`は各イベントループからの定期送信とコンテナprobe、`metrics.py`は数値Counter、`http.py`はHealth/認証付きメトリクスとHTTP計測、`export.py`はPrometheus形式、`logging.py`は許可した項目だけのJSONログ、`configuration.py`はHTTP/CLI共通閾値を担当します。
+
+接続層とJobsは軽量な`metrics.py`だけを参照し、HTTPや監視Repositoryに依存しません。Queueのテーブル・列対応は`jobs/catalog.py`をDomain Repositoryと監視で共有し、SQL命名の重複を避けます。`runtime_heartbeats`はService/起動Instance単位で保存し、DB時刻と最新Instanceのready状態から停止を判定します。公開APIのOpenAPI契約には監視入口を追加しません。運用方法と限界は[監視と障害対応](../operations/monitoring)を参照してください。

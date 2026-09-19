@@ -26,10 +26,15 @@ from social.crypto import SocialTokenCipher
 from social.webhooks import verify_twitch_signature, verify_youtube_signature
 from dashboard.api_v1 import create_api_router
 from dashboard.api.dependencies import ApiDependencies
+from observability.heartbeat import ServiceHeartbeat
+from observability.http import router as health_router, observe_request
+from observability.logging import configure_logging
+from observability.configuration import thresholds
 
 
 BASE_DIR = Path(__file__).resolve().parent
 settings = Settings.from_env()
+configure_logging('dashboard', settings.log_level)
 client_id = os.getenv("DISCORD_CLIENT_ID")
 client_secret = os.getenv("DISCORD_CLIENT_SECRET")
 redirect_uri = os.getenv("DISCORD_REDIRECT_URI")
@@ -48,7 +53,8 @@ social_cipher = SocialTokenCipher(settings.social_token_encryption_key)
 async def dashboard_lifespan(_: FastAPI):
     await api.start()
     try:
-        yield
+        async with ServiceHeartbeat('dashboard', settings.database_url):
+            yield
     finally:
         await api.close()
 
@@ -65,6 +71,9 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 FRONTEND_DIST = Path(os.getenv("TUEKA_FRONTEND_DIST", str(BASE_DIR / "frontend" / "dist")))
 app.mount("/ui", StaticFiles(directory=FRONTEND_DIST, check_dir=False), name="dashboard-v2")
 DOCS_DIST = Path(os.getenv("TUEKA_DOCS_DIST", str(BASE_DIR.parent / "docs" / ".vitepress" / "dist")))
+app.include_router(health_router(settings.database_url, (FRONTEND_DIST, DOCS_DIST), os.getenv('MONITORING_TOKEN'),
+    **thresholds()))
+app.middleware('http')(observe_request)
 app.mount("/docs", StaticFiles(directory=DOCS_DIST, html=True, check_dir=False), name="documentation")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 app.include_router(create_api_router(settings.database_url, api, settings))

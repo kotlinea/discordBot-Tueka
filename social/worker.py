@@ -15,6 +15,9 @@ import httpx
 from config import Settings
 from social.providers import PollResult, build_adapters
 from social import SocialRepository
+from observability.heartbeat import ServiceHeartbeat
+from observability.logging import configure_logging
+from observability.metrics import registry
 
 
 log = logging.getLogger("tueka.social_worker")
@@ -51,6 +54,7 @@ class SocialWorker:
                 events=[{'external_id': event.external_id, 'account_id': account_id, 'event_type': event.event_type,
                          'payload': event.payload, 'occurred_at': event.occurred_at} for event in result.events])
         except Exception as exc:
+            registry.add('provider_errors_total', provider=provider)
             failures = self.failures.get(provider, 0) + 1
             self.failures[provider] = failures
             delay = min(3600, 30 * (2 ** min(failures, 7))) + random.randint(0, 15)
@@ -131,13 +135,13 @@ class SocialWorker:
 
     async def run(self) -> None:
         limits = httpx.Limits(max_connections=20, max_keepalive_connections=10)
-        async with httpx.AsyncClient(timeout=httpx.Timeout(20), limits=limits, follow_redirects=False, headers={"User-Agent": "Tueka-SocialWorker/1"}) as client:
+        async with ServiceHeartbeat('social-worker', self.settings.database_url), httpx.AsyncClient(timeout=httpx.Timeout(20), limits=limits, follow_redirects=False, headers={"User-Agent": "Tueka-SocialWorker/1"}) as client:
             await asyncio.gather(self.poll_loop(client), self.x_stream_loop(client), self.heartbeat_loop())
 
 
 async def main() -> None:
     settings = Settings.from_env()
-    logging.basicConfig(level=settings.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    configure_logging('social-worker', settings.log_level)
     await SocialWorker(settings).run()
 
 

@@ -58,6 +58,61 @@ def ready(directory):
     raise RuntimeError('Compose services did not become ready')
 
 
+def operational_snapshot(directory):
+    code = "from runtime.environment import load_environment; load_environment(); import os,json; from observability.repository import snapshot; print(json.dumps(snapshot(os.environ['DATABASE_URL'])))"
+    return json.loads(docker('exec', container(directory, 'dashboard'), 'python', '-c', code).stdout)
+
+
+def monitoring_checks(directory):
+    dashboard = container(directory, 'dashboard')
+    def get(path):
+        code = "import urllib.request,urllib.error;\ntry:\n r=urllib.request.urlopen('http://127.0.0.1:8000" + path + "',timeout=6); print(r.status)\nexcept urllib.error.HTTPError as e: print(e.code)"
+        return int(docker('exec', dashboard, 'python', '-c', code).stdout.strip())
+    deadline = time.monotonic() + 45
+    while time.monotonic() < deadline:
+        if all(value['ready'] for value in operational_snapshot(directory)['services'].values()):
+            break
+        time.sleep(1)
+    else:
+        raise RuntimeError('Initial service readiness missing')
+    for service in compose.APPLICATIONS:
+        state = json.loads(docker('inspect', container(directory, service)).stdout)[0]
+        assert state['HostConfig']['Memory'] == 768 * 1024 * 1024
+        assert state['HostConfig']['NanoCpus'] == 1_000_000_000
+        assert state['HostConfig']['PidsLimit'] == 128
+        assert state['HostConfig']['LogConfig']['Config']['max-file'] == '3'
+        assert state['Config']['Healthcheck']['Test']
+    assert get('/internal/metrics') == 404
+    assert get('/health/live?code=PRIVATE_QUERY') == 200
+    sql(directory, "INSERT INTO social_events(provider,event_key,account_id,payload_json,received_at,status,available_at) VALUES('youtube','monitor_probe','offline','{\"value\":\"PRIVATE_PAYLOAD\"}',0,'failed',0)")
+    assert 'dead_letter:social_events' in operational_snapshot(directory)['alerts']
+    metrics = docker('exec', dashboard, 'python', '-c', "from runtime.environment import load_environment; load_environment(); import os,urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/internal/metrics',headers={'Authorization':'Bearer '+os.environ['MONITORING_TOKEN']}); print(urllib.request.urlopen(r).read().decode())").stdout
+    assert 'tueka_queue_failed{queue="social_events"} 1.0' in metrics
+    assert 'PRIVATE_' not in metrics
+    sql(directory, "DELETE FROM social_events WHERE event_key='monitor_probe'")
+    compose.execute(directory, 'stop', 'social-worker')
+    assert 'service_unavailable:social-worker' in operational_snapshot(directory)['alerts']
+    compose.execute(directory, 'up', '-d', '--no-deps', 'social-worker')
+    ready(directory)
+    compose.execute(directory, 'stop', 'postgres')
+    assert get('/health/live') == 200
+    assert get('/health/ready') == 503
+    compose.execute(directory, 'up', '-d', '--wait', 'postgres')
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        if get('/health/ready') == 200 and all(value['ready'] for value in operational_snapshot(directory)['services'].values()):
+            break
+        time.sleep(2)
+    else:
+        raise RuntimeError('Services did not recover after database outage')
+    logs = docker('logs', dashboard)
+    assert 'PRIVATE_QUERY' not in logs.stdout + logs.stderr
+    assert 'PRIVATE_PAYLOAD' not in logs.stdout + logs.stderr
+    events = [json.loads(line) for line in logs.stdout.splitlines() if line.startswith('{')]
+    assert any(event.get('event') == 'http_request' for event in events)
+    print('monitoring: worker stop, failed delivery, database outage/recovery, safe logs and resource limits: OK', flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--image', required=True)
@@ -109,6 +164,7 @@ def main():
                         assert 'vite' not in rendered['services']
                 compose.up(stage)
                 ready(stage)
+                monitoring_checks(stage)
                 assert sql(stage, "SELECT rolsuper OR rolcreatedb OR rolcreaterole FROM pg_roles WHERE rolname='tueka_stage'") == 'f'
                 compose.up(prod, stage)
                 ready(prod)
@@ -137,7 +193,8 @@ def main():
 
                 migrations = temporary / 'migrations'
                 shutil.copytree(ROOT / 'migrations/postgresql', migrations)
-                (migrations / '0002_compose_probe.sql').write_text('ALTER TABLE deployment_marker ADD COLUMN revision BIGINT NOT NULL DEFAULT 1;\n', encoding='utf-8')
+                next_version = len(list(migrations.glob('*.sql'))) + 1
+                (migrations / f'{next_version:04d}_compose_probe.sql').write_text('ALTER TABLE deployment_marker ADD COLUMN revision BIGINT NOT NULL DEFAULT 1;\n', encoding='utf-8')
                 migration_override = temporary / 'migration.json'
                 migration_override.write_text(json.dumps({'services': {name: {'volumes': [{
                     'type': 'bind', 'source': str(migrations), 'target': '/app/migrations/postgresql', 'read_only': True
@@ -146,7 +203,7 @@ def main():
                 compose.up(stage)
                 ready(stage)
                 assert sql(stage, 'SELECT value || revision FROM deployment_marker') == 'preserved1'
-                bad = migrations / '0003_failure.sql'
+                bad = migrations / f'{next_version+1:04d}_failure.sql'
                 bad.write_text('CREATE TABLE must_rollback(id BIGINT); INSERT INTO must_rollback VALUES (1/0);\n', encoding='utf-8')
                 try:
                     compose.up(stage)
@@ -177,15 +234,15 @@ def main():
                         time.sleep(2)
                     else:
                         raise RuntimeError('Vite SPA or backend proxy failed')
-                    logs = docker('logs', container(dev, 'dashboard'))
-                    assert 'Started reloader process' in logs.stderr
+                    pid_probe = "import json; print(json.load(open('/tmp/tueka-health-dashboard.json'))['pid'])"
+                    previous_pid = docker('exec', container(dev, 'dashboard'), 'python', '-c', pid_probe).stdout.strip()
                     probe = ROOT / 'runtime' / ('_compose_reload_' + unique + '.py')
                     try:
                         probe.write_text('# Temporary Compose reload acceptance probe\n', encoding='utf-8')
                         deadline = time.monotonic() + 30
                         while time.monotonic() < deadline:
-                            logs = docker('logs', container(dev, 'dashboard'))
-                            if probe.name in logs.stderr and 'Reloading' in logs.stderr:
+                            current_pid = docker('exec', container(dev, 'dashboard'), 'python', '-c', pid_probe).stdout.strip()
+                            if current_pid != previous_pid:
                                 break
                             time.sleep(1)
                         else:

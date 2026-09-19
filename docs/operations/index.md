@@ -18,3 +18,5 @@ TuekaはBot、Dashboard、Social Workerの3プロセスを同じコードとPost
 - DB：Migration Error、database locked、permission deniedがない
 
 構造化LogへToken、Webhook本文、Ticket本文、外部応答全文を出力しないでください。
+
+Health、Heartbeat、DB/Queueメトリクス、ログとResource制限は[監視と障害対応](./monitoring)を参照してください。

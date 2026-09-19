@@ -10,7 +10,7 @@ from deploy.compose import execute, up
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('init', 'check', 'up', 'stop', 'status'))
+    parser.add_argument('action', choices=('init', 'check', 'up', 'stop', 'status', 'health'))
     parser.add_argument('--config-dir', type=Path, required=True)
     parser.add_argument('--environment', choices=('dev', 'stage', 'prod'))
     parser.add_argument('--image', default='tueka:local')
@@ -29,6 +29,9 @@ def main():
             execute(args.config_dir, 'config', '--quiet')
         elif args.action == 'stop':
             execute(args.config_dir, 'stop')
+        elif args.action == 'health':
+            read(args.config_dir)
+            execute(args.config_dir, 'run', '--rm', '--no-deps', '--entrypoint', 'python', 'dashboard', '-m', 'observability', 'snapshot')
         else:
             execute(args.config_dir, 'ps')
     except (ValueError, OSError) as error:

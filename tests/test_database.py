@@ -78,6 +78,13 @@ class DatabaseTests(unittest.TestCase):
             c.execute("INSERT INTO app_metadata VALUES('recovered','keep')")
 
     def test_deadlock_rolls_back_one_whole_transaction_without_automatic_replay(self):
+        from observability.metrics import registry
+        from observability.repository import snapshot
+        import time
+        def deadlocks():
+            return sum(item['value'] for item in registry.snapshot() if item['name'] == 'db_errors_total' and item['labels'].get('category') == 'deadlock')
+        before = deadlocks()
+        database_before = snapshot(self.url)['database']['deadlocks_total']
         from concurrent.futures import ThreadPoolExecutor
         from threading import Barrier
         with transaction(self.url) as c:
@@ -99,3 +106,11 @@ class DatabaseTests(unittest.TestCase):
             values = {row['value'] for row in c.execute('SELECT value FROM app_metadata')}
         self.assertEqual(len(values), 1)
         self.assertNotIn('0', values)
+        self.assertEqual(deadlocks(), before + 1)
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            database_after = snapshot(self.url)['database']['deadlocks_total']
+            if database_after > database_before:
+                break
+            time.sleep(.1)
+        self.assertGreater(database_after, database_before)

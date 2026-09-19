@@ -8,6 +8,7 @@ from typing import Callable
 
 from database import require_current, transaction
 from .models import Claim, Outcome, LostLease
+from observability.metrics import registry
 
 
 @dataclass(frozen=True)
@@ -19,9 +20,10 @@ class QueueSpec:
     done: str = 'completed'
     result: str | None = None
     max_attempts: int = 8
+    created: str | None = 'created_at'
 
     def __post_init__(self):
-        for name in (self.table, self.state, self.due, self.completed, self.result):
+        for name in (self.table, self.state, self.due, self.completed, self.result, self.created):
             if name is not None and not re.fullmatch('[a-z_]+', name):
                 raise ValueError('Invalid queue identifier')
         if self.max_attempts < 1 or self.done not in {'completed', 'done'}:
@@ -71,7 +73,10 @@ class QueueRepository:
             result_sql = f',{s.result}=%s'
             values.append(json.dumps(outcome.result, ensure_ascii=False) if outcome.result is not None else None)
         with transaction(self.database_url) as c:
-            return c.execute(f"UPDATE {s.table} SET {s.state}=%s,{s.completed}=%s,last_error=%s,{s.due}=CASE WHEN %s THEN %s ELSE {s.due} END{result_sql},lease_owner=NULL,lease_token=NULL,lease_until=NULL WHERE id=%s AND lease_owner=%s AND lease_token=%s AND lease_until>%s AND {s.state}='processing'", (*values, claim.id, claim.owner, claim.token, now)).rowcount == 1
+            changed = c.execute(f"UPDATE {s.table} SET {s.state}=%s,{s.completed}=%s,last_error=%s,{s.due}=CASE WHEN %s THEN %s ELSE {s.due} END{result_sql},lease_owner=NULL,lease_token=NULL,lease_until=NULL WHERE id=%s AND lease_owner=%s AND lease_token=%s AND lease_until>%s AND {s.state}='processing'", (*values, claim.id, claim.owner, claim.token, now)).rowcount == 1
+        if changed:
+            registry.add('job_results_total', queue=s.table, outcome=state)
+        return changed
 
     def purge(self, *, retention_seconds: int = 30 * 86400) -> int:
         if retention_seconds < 1:

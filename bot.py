@@ -8,6 +8,8 @@ from discord.ext import commands
 from config import Settings
 from database import require_current
 from runtime.lifecycle import run
+from observability.heartbeat import ServiceHeartbeat
+from observability.logging import configure_logging
 
 
 class TuekaBot(commands.Bot):
@@ -19,6 +21,7 @@ class TuekaBot(commands.Bot):
         intents.presences = True
         super().__init__(command_prefix="/", intents=intents)
         self.settings = settings
+        self.heartbeat = None
 
     async def setup_hook(self) -> None:
         self.tree.on_error = self.on_app_command_error
@@ -26,6 +29,13 @@ class TuekaBot(commands.Bot):
             await self.load_extension(extension)
         synced = await self.tree.sync()
         logging.info("Synced %s application commands", len(synced))
+        self.heartbeat = await ServiceHeartbeat('bot', self.settings.database_url, ready=self.is_ready).start()
+
+    async def close(self) -> None:
+        if self.heartbeat:
+            await self.heartbeat.stop()
+            self.heartbeat = None
+        await super().close()
 
     async def on_ready(self) -> None:
         logging.info("%s is online", self.user)
@@ -46,7 +56,7 @@ class TuekaBot(commands.Bot):
 
 async def main() -> None:
     settings = Settings.from_env()
-    logging.basicConfig(level=settings.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    configure_logging('bot', settings.log_level)
     bot = TuekaBot(settings)
     async with bot:
         await bot.start(settings.discord_token)

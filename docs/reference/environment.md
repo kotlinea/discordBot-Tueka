@@ -68,6 +68,14 @@ Provider資格情報を変更した場合はDashboardとSocial Workerを再起�
 
 ## コンテナの実行設定
 
+| 変数 | 既定値 | 内容 |
+| --- | --- | --- |
+| `MONITORING_TOKEN` | 空 | 内部メトリクスの専用Bearer Token。32文字以上。未設定時は公開しない。秘密 |
+| `HEARTBEAT_MAX_AGE_SECONDS` | `30` | HTTP/CLI集計のHeartbeat許容秒。5～3600 |
+| `OUTBOX_MAX_AGE_SECONDS` | `300` | 期限超過Queueの遅延閾値。1～86400 |
+
+設定方法・初期閾値とStage判定は[監視と障害対応](../operations/monitoring)を参照してください。
+
 環境別Composeは`TUEKA_ENV_FILE=/run/secrets/app_env`を指定し、明示した秘密ファイルだけを読み込みます。ファイルがなければ起動を拒否し、ソースの.envへfallbackしません。既に注入された環境変数を上書きせず、秘密ファイル内の変数展開を無効にします。
 
 Imageは`TUEKA_FRONTEND_DIST=/opt/tueka-assets/ui`と`TUEKA_DOCS_DIST=/opt/tueka-assets/docs`を設定します。Devのソースmountからビルド済み資産を分離するための設定で、Host起動では未指定のまま従来のdistを使用できます。`DATA_DIR`はComposeが`/data`へ固定します。

@@ -20,11 +20,11 @@ class PostgresTests(unittest.TestCase):
     def test_empty_schema_gate_initialization_and_idempotency(self):
         with self.assertRaises(SchemaNotReady):
             require_current(self.url)
-        self.assertEqual(apply(self.url)['applied'], ['0001_initial.sql'])
+        self.assertEqual(apply(self.url)['applied'], ['0001_initial.sql', '0002_observability.sql'])
         require_current(self.url)
         self.assertEqual(apply(self.url)['applied'], [])
         with transaction(self.url) as c:
-            self.assertEqual(c.execute('SELECT count(*) count FROM information_schema.tables WHERE table_schema=current_schema()').fetchone()['count'], 67)
+            self.assertEqual(c.execute('SELECT count(*) count FROM information_schema.tables WHERE table_schema=current_schema()').fetchone()['count'], 68)
 
     def test_transaction_and_migration_failures_roll_back(self):
         apply(self.url)
@@ -36,8 +36,9 @@ class PostgresTests(unittest.TestCase):
             self.assertIsNone(c.execute('SELECT * FROM app_metadata').fetchone())
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / '0001_initial.sql').write_bytes((MIGRATIONS / '0001_initial.sql').read_bytes())
-            (root / '0002_failure.sql').write_text("INSERT INTO app_metadata VALUES('partial','discard'); INSERT INTO app_metadata VALUES('partial','fail');")
+            for migration in MIGRATIONS.glob('*.sql'):
+                (root / migration.name).write_bytes(migration.read_bytes())
+            (root / '0003_failure.sql').write_text("INSERT INTO app_metadata VALUES('partial','discard'); INSERT INTO app_metadata VALUES('partial','fail');")
             with self.assertRaises(IntegrityError):
                 apply(self.url, root)
         require_current(self.url)

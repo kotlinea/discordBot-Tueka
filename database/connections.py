@@ -4,6 +4,7 @@ from __future__ import annotations
 import atexit
 import hashlib
 import os
+import time
 from collections import OrderedDict
 from contextlib import contextmanager
 from threading import RLock
@@ -12,6 +13,7 @@ import psycopg
 from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row, tuple_row
 from psycopg_pool import ConnectionPool
+from observability.metrics import registry
 
 POOL_TIMEOUT = 10
 _pools: OrderedDict[str, ConnectionPool] = OrderedDict()
@@ -71,9 +73,27 @@ def pool(url: str) -> ConnectionPool:
 
 @contextmanager
 def transaction(url: str):
-    with pool(url).connection() as connection:
-        with connection.transaction():
-            yield connection
+    started = time.monotonic()
+    try:
+        with pool(url).connection() as connection:
+            registry.observe('db_pool_acquire_seconds', time.monotonic() - started)
+            with connection.transaction():
+                yield connection
+    except Exception as error:
+        code = getattr(error, 'sqlstate', '')
+        category = {'40P01': 'deadlock', '55P03': 'lock_timeout', '57014': 'query_timeout'}.get(code, 'connection' if isinstance(error, psycopg.OperationalError) else 'other')
+        registry.add('db_errors_total', category=category)
+        raise
+    finally:
+        registry.observe('db_transaction_seconds', time.monotonic() - started)
+
+
+def pool_statistics():
+    with _lock:
+        pools = list(_pools.values())
+    names = ('pool_size', 'pool_available', 'requests_waiting', 'requests_queued', 'requests_wait_ms', 'requests_errors', 'connections_errors')
+    snapshots = [item.get_stats() for item in pools]
+    return {name: sum(snapshot.get(name, 0) for snapshot in snapshots) for name in names}
 
 
 def lock_resource(connection, namespace: str, key: str | int):

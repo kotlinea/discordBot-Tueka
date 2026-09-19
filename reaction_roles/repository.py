@@ -5,6 +5,7 @@ import json
 from contextlib import nullcontext
 import time
 from jobs import QueueRepository, QueueSpec
+from jobs.catalog import QUEUE_SPECS
 from database import Connection, lock_resource, require_current, transaction
 from typing import Any
 
@@ -13,8 +14,8 @@ class ReactionRoleRepository:
     def __init__(self, database_url: str) -> None:
         self.database_url = database_url
         require_current(self.database_url)
-        self.outbox_jobs = QueueRepository(self.database_url, QueueSpec('reaction_role_outbox', state='state', due='next_attempt_at', done='done'))
-        self.schedule_jobs = QueueRepository(self.database_url, QueueSpec('reaction_role_schedules', state='state', due='due_at', done='done'))
+        self.outbox_jobs = QueueRepository(self.database_url, QUEUE_SPECS['reaction_role_outbox'])
+        self.schedule_jobs = QueueRepository(self.database_url, QUEUE_SPECS['reaction_role_schedules'])
 
     def connection(self):
         return transaction(self.database_url)

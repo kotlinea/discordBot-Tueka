@@ -30,6 +30,7 @@ def initialize(directory, environment, image, project=None):
         'DISCORD_CLIENT_ID': 'replace-with-dedicated-client-id',
         'DISCORD_CLIENT_SECRET': 'replace-with-dedicated-client-secret',
         'SESSION_SECRET': secrets.token_hex(32),
+        'MONITORING_TOKEN': secrets.token_hex(32),
         'DISCORD_REDIRECT_URI': ('http://127.0.0.1:5173' if environment == 'dev' else f'https://{environment}.example.invalid') + '/oauth/callback',
         'DASHBOARD_BASE_URL': 'http://127.0.0.1:5173' if environment == 'dev' else f'https://{environment}.example.invalid',
         'DASHBOARD_HTTPS_ONLY': 'false' if environment == 'dev' else 'true',

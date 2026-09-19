@@ -5,6 +5,7 @@ import json
 import time
 from database import require_current, transaction
 from jobs import QueueRepository, QueueSpec, LostLease
+from jobs.catalog import QUEUE_SPECS
 from typing import Any
 from discord_io import DiscordFailure
 
@@ -13,7 +14,7 @@ class SuggestionRepository:
     def __init__(self, database_url: str) -> None:
         self.database_url = database_url
         require_current(self.database_url)
-        self.outbox_jobs = QueueRepository(self.database_url, QueueSpec('suggestion_outbox'))
+        self.outbox_jobs = QueueRepository(self.database_url, QUEUE_SPECS['suggestion_outbox'])
 
     @staticmethod
     def _queue(connection, suggestion_id: int, action: str, payload: dict | None = None):

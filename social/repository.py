@@ -6,6 +6,7 @@ import uuid
 from typing import Any
 
 from jobs import QueueRepository, QueueSpec
+from jobs.catalog import QUEUE_SPECS
 from database import IntegrityError, lock_resource, require_current, transaction
 
 
@@ -13,7 +14,7 @@ class SocialRepository:
     def __init__(self, database_url: str) -> None:
         self.database_url = database_url
         require_current(self.database_url)
-        self.event_jobs = QueueRepository(self.database_url, QueueSpec('social_events', completed='processed_at'))
+        self.event_jobs = QueueRepository(self.database_url, QUEUE_SPECS['social_events'])
 
     def _connection(self):
         return transaction(self.database_url)

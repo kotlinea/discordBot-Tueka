@@ -5,7 +5,7 @@ import sys
 
 COMMANDS = {
     "bot": ["python", "bot.py"],
-    "dashboard": ["python", "-m", "uvicorn", "dashboard.app:app", "--host", "0.0.0.0", "--port", "8000"],
+    "dashboard": ["python", "-m", "uvicorn", "dashboard.app:app", "--host", "0.0.0.0", "--port", "8000", "--log-config", "observability/logging.json", "--no-access-log"],
     "social-worker": ["python", "social_worker.py"],
     "migrate": ["python", "migrate.py"],
     "test": ["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"],

@@ -40,6 +40,7 @@ COPY guild_settings guild_settings
 COPY jobs jobs
 COPY migrations migrations
 COPY moderation moderation
+COPY observability observability
 COPY reaction_roles reaction_roles
 COPY runtime runtime
 COPY scripts scripts

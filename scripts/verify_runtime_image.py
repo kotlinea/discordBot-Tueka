@@ -16,6 +16,7 @@ import uuid
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from database import connect
 from database.testing import temporary_database
+from database.migrations import load
 
 
 def docker(*args, check=True):
@@ -43,7 +44,7 @@ def main():
         try:
             assert docker('run', '--rm', *common, args.image, '--help').returncode == 0
             assert docker('run', '--rm', *common, args.image, 'unknown', check=False).returncode == 2
-            for expected in ([1], []):
+            for expected in (load(), []):
                 result = docker('run', '--rm', *common, args.image, 'migrate')
                 applied = json.loads(result.stdout)['applied']
                 assert len(applied) == len(expected), result.stdout

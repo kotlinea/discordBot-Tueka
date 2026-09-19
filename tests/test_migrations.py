@@ -28,6 +28,20 @@ class MigrationTests(unittest.TestCase):
             c.execute('CREATE TABLE preserved(id BIGINT PRIMARY KEY, value TEXT)')
             c.execute("INSERT INTO preserved VALUES(1,'keep')")
 
+    def test_observability_upgrade_preserves_existing_application_data(self):
+        initial = MIGRATIONS / '0001_initial.sql'
+        (self.directory / initial.name).write_bytes(initial.read_bytes())
+        apply(self.url, self.directory)
+        with connect(self.url) as c:
+            c.execute("INSERT INTO app_metadata VALUES('upgrade_probe','preserved')")
+            before = c.execute('SELECT version,name,checksum FROM schema_migrations').fetchall()
+        self.assertEqual(apply(self.url)['applied'], ['0002_observability.sql'])
+        with connect(self.url) as c:
+            self.assertEqual(c.execute("SELECT value FROM app_metadata WHERE key='upgrade_probe'").fetchone()['value'], 'preserved')
+            self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version=1').fetchall(), before)
+            self.assertEqual(c.execute('SELECT COUNT(*) AS count FROM runtime_heartbeats').fetchone()['count'], 0)
+        self.assertEqual(apply(self.url), {'applied': []})
+
     def test_failed_ddl_preserves_original_data_and_removes_partial_history(self):
         self.seed()
         self.sql('DROP TABLE preserved; CREATE TABLE partial(id BIGINT); INSERT INTO absent VALUES(1);')
@@ -110,11 +124,11 @@ class MigrationTests(unittest.TestCase):
 
     def test_later_migration_preserves_current_domain_data(self):
         from suggestions import SuggestionRepository
-        baseline = next(MIGRATIONS.glob('*.sql'))
-        self.sql(baseline.read_text(encoding='utf-8'), baseline.name)
+        for baseline in MIGRATIONS.glob('*.sql'):
+            self.sql(baseline.read_text(encoding='utf-8'), baseline.name)
         apply(self.url, self.directory)
         item = SuggestionRepository(self.url).create(1, 2, 3, {'idea': 'keep'})
-        self.sql('ALTER TABLE suggestions ADD COLUMN migration_probe TEXT;', '0002_probe.sql')
+        self.sql('ALTER TABLE suggestions ADD COLUMN migration_probe TEXT;', f'{len(load())+1:04d}_probe.sql')
         apply(self.url, self.directory)
         with connect(self.url) as c:
             row = c.execute('SELECT answers_json FROM suggestions WHERE id=%s', (item['id'],)).fetchone()
