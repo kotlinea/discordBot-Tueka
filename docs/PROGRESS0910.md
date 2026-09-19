@@ -569,3 +569,11 @@
 - Deployment回帰13件成功。クリーン状態からの作成と、再実行時の既存依存保持を検証。Linuxの最小再現でも事前作成後は非root/read-onlyで起動成功。
 - 追跡ファイルの作業コピーだけを `.venv-p0/compose-clean-checkout` に複製し、node_modules不在を確認して `verify_compose.py --image tueka:ci` を実行、終了0（`.venv-p0/ci-compose-clean-fixed.log`）。Stage/Prod分離、保持、監視障害復旧、Migration失敗/復旧、DevのVite SPA/API proxy/Uvicorn reloadがすべて成功。終了後のHost node_modulesは空で、UUID専用検証Project/Volumeは削除済み。
 - 通常作業ツリーで先行した実行はDev reload待ち30秒で失敗しており、全受入成功の根拠にはしない（`ci-compose-repro.log`）。クリーンコピーでの成功と区別する。GitHub上での再実行、実Stage受入、commit/pushは未実施。
+
+
+### 2026-09-19 CI修正：RecoveryのWriter停止判定
+
+- 添付CIログでは旧ImageへのRestore直前に3サービスの停止完了が出た後、`Source writers are still running` で失敗した。従来は `compose ps --status running --services` のサービス名一覧だけで判断していた。修正前のローカル受入は成功し、同じ失敗自体は再現していないため、Composeの特定Versionの不具合とは断定しない。
+- `deploy.recovery.running` を、各アプリの全コンテナIDを列挙して `docker inspect` のState.Running/State.Restartingを調べる方式へ変更した。停止済みの名前が一覧に残っていても稼働扱いしない。複数Replicaの一部稼働・再起動中は拒否し、inspect失敗や状態取得件数不一致も復旧を進めない。停止確認の安全ゲートは削除していない。
+- Windowsの復旧テスト11件成功（`.venv-p0/ci-recovery-tests.log`）、Linux非root/read-only/network noneで境界7件成功（`ci-recovery-linux-boundary.log`）。停止済み/再作成後の一覧、稼働・再起動中Replica、取得失敗・不完全応答を回帰対象に追加。
+- 修正後の `python scripts/verify_recovery.py --image tueka:ci` は終了0（`ci-recovery-fixed.log`）。Backup後の再開、暗号化Blob/値の別Volume復元、不正dump拒否/abort、起動保留、外部Receiptのオフライン復旧、旧Image/SchemaへのRollbackと元側の新データ保持を確認。専用UUID Project/Volume/派生Imageの後片付けまで完了。実開発DB、実Discord、Git indexは変更していない。GitHub CIでの再実行とcommit/pushは未実施。

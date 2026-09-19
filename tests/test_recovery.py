@@ -2,6 +2,7 @@
 import asyncio
 import io
 import json
+import subprocess
 from pathlib import Path
 import tarfile
 import tempfile
@@ -13,7 +14,7 @@ from cryptography.fernet import Fernet
 from database import transaction
 from database.testing import temporary_database
 from deploy import compose
-from deploy.recovery import backup, digest, load_bundle, validate_target, locked, release
+from deploy.recovery import backup, digest, load_bundle, validate_target, locked, release, running
 from recovery.storage import export_blobs, import_blobs, key_generations, verify
 from ticketing import TicketRepository
 from ticketing.transcripts import TranscriptStorage
@@ -88,6 +89,31 @@ class RecoveryStorageTests(unittest.IsolatedAsyncioTestCase):
 
 
 class RecoveryBoundaryTests(unittest.TestCase):
+    def test_writer_detection_uses_container_state_after_recreation(self):
+        listings = ['old-bot\nnew-bot\n', 'dashboard\n', '']
+        stopped = json.dumps({'Running': False, 'Restarting': False})
+        with patch('deploy.recovery.compose.execute', side_effect=[SimpleNamespace(stdout=s) for s in listings]), patch(
+            'deploy.recovery.subprocess.check_output', side_effect=[stopped + '\n' + stopped, stopped]
+        ):
+            self.assertEqual(running('source'), set())
+
+    def test_writer_detection_includes_running_and_restarting_replicas(self):
+        stopped = json.dumps({'Running': False, 'Restarting': False})
+        for state in ({'Running': True, 'Restarting': False}, {'Running': False, 'Restarting': True}):
+            with self.subTest(state=state), patch('deploy.recovery.compose.execute', side_effect=[
+                SimpleNamespace(stdout='old\nnew\n'), SimpleNamespace(stdout=''), SimpleNamespace(stdout='')
+            ]), patch('deploy.recovery.subprocess.check_output', return_value=stopped + '\n' + json.dumps(state)):
+                self.assertEqual(running('source'), {'bot'})
+
+    def test_writer_detection_fails_closed_when_inspection_fails_or_is_incomplete(self):
+        with patch('deploy.recovery.compose.execute', return_value=SimpleNamespace(stdout='container\n')):
+            with patch('deploy.recovery.subprocess.check_output', side_effect=subprocess.CalledProcessError(1, 'docker')):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    running('source')
+            with patch('deploy.recovery.subprocess.check_output', return_value=''):
+                with self.assertRaisesRegex(RuntimeError, 'every application'):
+                    running('source')
+
     def test_mutable_dev_source_cannot_be_claimed_as_an_image_matched_snapshot(self):
         with tempfile.TemporaryDirectory() as directory, patch('deploy.recovery.read', return_value=({'environment': 'dev'}, {})), patch('deploy.recovery.image_id') as image:
             with self.assertRaisesRegex(ValueError, 'mutable source'):

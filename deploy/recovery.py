@@ -38,8 +38,21 @@ def operation(directory, service, action, *, source=None, output=None):
 
 
 def running(directory):
-    output = compose.execute(directory, 'ps', '--status', 'running', '--services', capture=True).stdout
-    return set(output.splitlines()) & set(compose.APPLICATIONS)
+    # Compose's service listing is not proof of container liveness, especially
+    # after recreation. Inspect all instances, including stopped/restarting ones.
+    active = set()
+    for service in compose.APPLICATIONS:
+        identifiers = compose.execute(directory, 'ps', '-a', '-q', service, capture=True).stdout.split()
+        if not identifiers:
+            continue
+        output = subprocess.check_output(
+            ['docker', 'inspect', '--format', '{{json .State}}', *identifiers], text=True)
+        container_states = [json.loads(line) for line in output.splitlines()]
+        if len(container_states) != len(identifiers):
+            raise RuntimeError('Could not verify every application container state')
+        if any(state['Running'] or state['Restarting'] for state in container_states):
+            active.add(service)
+    return active
 
 
 def image_id(reference):
