@@ -228,7 +228,7 @@ def main():
                     vite = container(dev, 'vite')
                     deadline = time.monotonic() + 120
                     while time.monotonic() < deadline:
-                        result = docker('exec', vite, 'node', '-e', "Promise.all(['/servers','/api/openapi.json'].map(p=>fetch('http://127.0.0.1:5173'+p).then(r=>{if(!r.ok)throw Error(r.status)}))).catch(()=>process.exit(1))", check=False)
+                        result = docker('exec', vite, 'node', '-e', "Promise.all([['/servers',200],['/api/v1/session',401],['/api/openapi.json',404]].map(([p,s])=>fetch('http://127.0.0.1:5173'+p).then(r=>{if(r.status!==s)throw Error(r.status)}))).catch(()=>process.exit(1))", check=False)
                         if result.returncode == 0:
                             break
                         time.sleep(2)

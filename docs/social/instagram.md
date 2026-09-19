@@ -6,12 +6,18 @@ keywords: Instagram RSS Professional OAuth best effort ETag Last-Modified
 
 # Instagram通知
 
-本人連携済みProfessional Accountの情報を保持し、任意公開アカウント監視には運用者設定の外部RSS Adapterを使用します。
+本人アカウントの接続機能と、運用者が用意した公開アカウント監視を利用します。非公式の公開監視はbest effortです。
 
-外部RSSを使う場合は`INSTAGRAM_RSS_URL_TEMPLATE`を設定します。WorkerはテンプレートからだけURLを生成し、Dashboard利用者に任意URLを入力させません。固定HostとRedirect先を検証し、ETagとLast-Modifiedを利用します。
+## 登録
 
-::: warning ベストエフォート
-外部RSS Adapterは非公式です。未設定時は公開アカウントの登録画面を利用不可にします。RSS認証値は`INSTAGRAM_RSS_AUTH_TOKEN`で管理し、画面やログへ表示しません。
-:::
+アカウントを指定し、通知Channelを選択します。接続機能が表示される場合は画面の認証フローに従います。
 
-確認間隔は既定120秒です。Adapter障害時もYouTube、Twitch、X、TikTokの処理を停止しません。
+## 利用と確認
+
+利用不可のProviderを、利用者が任意のFeed URLや資格情報を入力して有効化することはできません。
+
+通知先のBot権限とRole階層を確認し、通知Roleは専用選択欄で指定します。Providerの利用可否は運用者の設定によります。
+
+## 問題が起きたら
+
+確認待ちや失敗が続く場合はアカウント・時刻・表示状態を運用者へ伝えてください。

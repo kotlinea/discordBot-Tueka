@@ -60,6 +60,15 @@ for name in ('.env', '.env.postgres-dev', '.git', '.idea', 'data', '.venv', '.ve
     assert not pathlib.Path('/app', name).exists(), name
 for executable in ('node', 'npm', 'git'):
     assert shutil.which(executable) is None, executable
+assert not pathlib.Path('/app/handbook').exists()
+for path in ('operations/index.html', 'reference/environment.html', 'reference/architecture.html', 'reference/api.html', 'reference/extending.html', 'social/worker.html', 'EXECUTION_PLAN.html', 'PROGRESS0910.html', 'TESTING.html', 'en/operations.html'):
+    assert not pathlib.Path('/opt/tueka-assets/docs', path).exists(), path
+    try:
+        urllib.request.urlopen('http://127.0.0.1:8000/docs/' + path)
+    except urllib.error.HTTPError as error:
+        assert error.code == 404, path
+    else:
+        raise AssertionError('Private document served: ' + path)
 try:
     open('/app/forbidden-write', 'w')
 except OSError:

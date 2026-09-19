@@ -59,11 +59,12 @@ async def dashboard_lifespan(_: FastAPI):
         await api.close()
 
 
+api_docs_enabled = os.getenv('TUEKA_ENV') == 'dev' and os.getenv('TUEKA_API_DOCS_ENABLED', '').lower() == 'true'
 app = FastAPI(
     title="Tueka Dashboard",
     lifespan=dashboard_lifespan,
-    docs_url="/api/docs",
-    openapi_url="/api/openapi.json",
+    docs_url="/api/docs" if api_docs_enabled else None,
+    openapi_url="/api/openapi.json" if api_docs_enabled else None,
     redoc_url=None,
 )
 app.add_middleware(SessionMiddleware, secret_key=session_secret, https_only=os.getenv("DASHBOARD_HTTPS_ONLY", "true").lower() == "true", same_site="lax")

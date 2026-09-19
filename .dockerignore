@@ -1,4 +1,5 @@
 .git
+handbook
 .idea
 .hallmark
 .agents
@@ -7,6 +8,7 @@
 **/database-password
 **/postgres-admin-password
 **/deployment.json
+**/setup.json
 .env
 .env.*
 !.env.example

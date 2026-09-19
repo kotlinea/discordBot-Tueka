@@ -1,6 +1,6 @@
 # Tueka 開発ロードマップ
 
-この文書は、TuekaのV2完全移行、システムリファクタリング、Docker化、既存機能の改善、新機能開発を進める順序と判断基準を定める正本です。個別機能の仕様は公式ドキュメント、視覚仕様は`design.md`、現在の実装境界は`docs/reference/architecture.md`を参照します。
+この文書は、TuekaのV2完全移行、システムリファクタリング、Docker化、既存機能の改善、新機能開発を進める順序と判断基準を定める正本です。個別機能の仕様は公式ドキュメント、視覚仕様は[視覚仕様](handbook/developer/design.md)、現在の実装境界は[設計](handbook/developer/architecture.md)を参照します。
 
 ## 目標
 
@@ -29,7 +29,7 @@ Phase 2のローカル出口まで完了。P2-7でRuntime・全Repository・Migr
 
 P3-1〜4もローカル完了。同一本番Image、環境別Compose、監視、Resource制限に加え、DB/暗号化Blob/鍵世代/対応Imageの復旧セットと別Volume復元を整備した。Windows/Linux全各335件、最終追加を含む復旧8件の両環境検証、破損dumpのRollback、保留配送の照合再開、新旧Image/Schema間のRollbackが成功している。
 
-次はPhase 3の実Stage受入。Stage/Guild/Registry/Hostは未準備とユーザーが回答しており、現時点はローカル検証と実機受入手順の整備までとする。Stage実測の閾値、実Discord/OAuth/Webhook、Registry経由の同一digest配布、実S3、Host公開経路とBackup Jobの運用確認は未完了。Phase 3全体の完了やPhase 4開始とは扱わない。実機受入は `docs/operations/stage-acceptance.md`、実施証拠と引継ぎは `docs/PROGRESS0910.md` を参照する。
+役割別Docs・公開境界（D1）とWindows/Linux導入フロー（D2）を実装し、Windows Host・Linuxコンテナでローカル検証した（Python各348件、Docsブラウザー15件、103コマンド照合、クリーン導入、Compose/Recovery）。次はLinux HostのShell入口を含む最終CI確認、その後Phase 3の実Stage受入へ進む。Stage/Guild/Registry/Hostは未準備とユーザーが回答しており、現時点はローカル検証と実機受入手順の整備までとする。Stage実測の閾値、実Discord/OAuth/Webhook、Registry経由の同一digest配布、実S3、Host公開経路とBackup Jobの運用確認は未完了。Phase 3全体の完了やPhase 4開始とは扱わない。実機受入は [Stage受入](handbook/operator/stage-acceptance.md)、実施証拠と引継ぎは [進捗](handbook/developer/PROGRESS0910.md) を参照する。
 
 ## 実施順序
 
@@ -198,12 +198,11 @@ Phase 0のテスト用コンテナを、本番運用可能な構成へ発展さ�
 - README、`.env.example`、公式Docsが実装と一致している。
 - Rollback方法と、Rollbackで失われるデータが明記されている。
 
-## 次に着手する作業（2026-09-18更新）
+## 次に着手する作業（2026-09-19更新）
 
-P0-1〜P2-6はローカル実装・検証を完了した。詳細は `docs/EXECUTION_PLAN.md` と `docs/PROGRESS0910.md` を参照する。Stageの実機受入と全体の完了は別に判定する。
+1. 利用者DocsとOperator/Developer handbookを分離し、日英全コマンドと公開境界を検証する。
+2. check/configure/build/startと運用一覧を整え、クリーン環境で受入する。
+3. 最新CommitのCI成功を確認し、Stage準備後に実機受入する。
+4. Phase 3出口を満たしてから既存機能の完成度判定・UX、続いて新機能へ進む。
 
-1. P2-7として、SQLite依存を棚卸しし、実PostgreSQLの隔離テスト基盤・接続/Pool・初期Migrationを作る。
-2. 全Domain Repository、Queue/Lease、Runtime、テスト/型生成をPostgreSQLへ揃える。開発データは移送せず空DBから切り替える。
-3. PostgreSQLで全回帰・同時更新・Migration・Backup/Restoreを検証し、Phase 2のローカル出口を満たす。
-4. P3-1〜4で同一Image、PostgreSQLを含む環境別Compose、監視、運用Backup/Restoreを完成させる。
-5. Phase 4の既存機能受入を経て、Phase 5の新機能へ記載順に進む。
+詳細・担当・状態・依存・証拠は[現行実行計画](handbook/developer/EXECUTION_PLAN.md)に集約する。

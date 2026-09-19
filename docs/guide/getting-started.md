@@ -1,58 +1,17 @@
-# 導入する
+# 利用を始める
 
-## 1. Discord Applicationを作成する
+## 一般メンバー
 
-Discord Developer PortalでApplicationとBotを作成し、Bot Tokenを発行します。Tokenは`DISCORD_TOKEN`へ設定し、リポジトリやログへ記録しないでください。
+1. Botが参加済みのサーバーで `/help` を開きます。
+2. [全コマンド](../reference/commands)から目的の機能と必要権限を確認します。
+3. チケット・リアクションロールなどはサーバー管理者が公開したPanelから利用します。
 
-OAuth2 Redirectsへ`DISCORD_REDIRECT_URI`と完全に同じURLを登録します。例は`https://bot.example.com/oauth/callback`です。末尾スラッシュの有無も一致させます。
+## サーバー管理者
 
-## 2. Botをサーバーへ追加する
+1. システム運用者から共有されたBot招待リンクを開き、管理するサーバーへ招待します。
+2. Botの権限とRole階層を[権限ガイド](./permissions)で確認します。
+3. DashboardへDiscordでログインし、管理するサーバーを選びます。
+4. 必要な機能だけを有効にし、Channel・Role等を設定して保存します。
+5. 保存結果を再読込で確認し、Discordで `/ping` と `/help` を試します。
 
-`bot`と`applications.commands`スコープを指定します。権限は利用する機能に合わせて付与してください。Administratorは必須ではありません。
-
-[必要な権限とIntents](./permissions)に、機能別の権限を掲載しています。
-
-## 3. アプリケーションを準備する
-
-```powershell
-py -3.13 -m venv .venv
-.venv\Scripts\python.exe -m pip install --require-hashes -r requirements.lock
-Copy-Item .env.example .env
-.venv\Scripts\python.exe migrate.py
-```
-
-最低限、`DISCORD_TOKEN`、`DISCORD_CLIENT_ID`、`DISCORD_CLIENT_SECRET`、`DISCORD_REDIRECT_URI`、`SESSION_SECRET`を設定します。
-
-## 4. UIとドキュメントをビルドする
-
-```powershell
-Set-Location dashboard/frontend
-npm ci
-npm run build
-Set-Location ../../docs
-npm ci
-npm run build
-Set-Location ..
-```
-
-## 5. 起動する
-
-```powershell
-.venv\Scripts\python.exe bot.py
-.venv\Scripts\python.exe -m uvicorn dashboard.app:app --host 127.0.0.1 --port 8000
-.venv\Scripts\python.exe social_worker.py
-```
-
-Social Workerはソーシャル通知を使用しない場合は省略できます。本番では3プロセスを別サービスとして管理してください。
-
-## 6. 動作を確認する
-
-1. DashboardへDiscordでログインします。
-2. 管理するサーバーを選択します。
-3. 権限不足の表示がないことを確認します。
-4. 必要な機能を設定し、明示的に保存します。
-5. Discordで`/ping`と`/help`を実行します。
-
-::: warning HTTPS
-公開環境ではDashboardを直接インターネットへ公開せず、NginxなどからHTTPSでリバースプロキシしてください。
-:::
+サーバーが表示されない場合はManage Server権限とBotの参加状態を確認してください。Botの招待リンクや公開URLが不明な場合はシステム運用者へ問い合わせます。利用者がTokenやサーバーの接続設定を入力する必要はありません。

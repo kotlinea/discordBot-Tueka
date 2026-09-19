@@ -6,10 +6,18 @@ keywords: Twitch EventSub stream.online stream.offline HMAC challenge
 
 # Twitch通知
 
-Twitch EventSub Webhookの`stream.online`と`stream.offline`を使用し、配信開始と終了を通知します。
+配信開始・終了など、画面で選択したイベントを通知します。
 
-`TWITCH_CLIENT_ID`、`TWITCH_CLIENT_SECRET`、公開HTTPSの`DASHBOARD_BASE_URL`、`SOCIAL_WEBHOOK_SECRET`が必要です。WorkerはApp Access Token、購読期限、失効、再登録を管理します。
+## 登録
 
-WebhookはMessage ID、Timestamp、本文のHMACを検証し、Challengeへ即時応答します。古いTimestamp、不正署名、再送Message IDは拒否または重複抑止します。
+Twitchのアカウントを指定し、解決された対象を確認します。
 
-配信終了時は開始通知のDiscord Messageを終了状態へ更新します。Messageが削除済み、Channelが移動済みなどで更新できない場合だけ終了通知を新規送信します。
+## 利用と確認
+
+通知Channelとイベント別テンプレートを保存し、Previewで表示とMentionを確認してください。
+
+通知先のBot権限とRole階層を確認し、通知Roleは専用選択欄で指定します。Providerの利用可否は運用者の設定によります。
+
+## 問題が起きたら
+
+確認待ちが続く場合はアカウント名とChannel権限を確認し、運用者へ問い合わせます。

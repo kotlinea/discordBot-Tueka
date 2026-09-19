@@ -1,0 +1,3938 @@
+{
+  "ban": {
+    "contract": {
+      "description": "メンバーを追放します。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.safety"
+    },
+    "ja": {
+      "usage": "メンバーを追放します。",
+      "permissions": "ban_members; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "ban member:@TestMember"
+    },
+    "en": {
+      "usage": "Ban a member.",
+      "permissions": "ban_members; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "ban member:@TestMember"
+    }
+  },
+  "calculate": {
+    "contract": {
+      "description": "四則演算と累乗を計算します。",
+      "parameters": [
+        {
+          "name": "expression",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.general"
+    },
+    "ja": {
+      "usage": "四則演算と累乗を計算します。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "公開応答。エラーは本人向け。",
+      "disabled": "基本コマンド。権限・実行場所などの条件は引き続き適用。",
+      "example": "calculate expression:2+3*4"
+    },
+    "en": {
+      "usage": "Evaluate arithmetic and exponentiation.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "Public response; errors are private.",
+      "disabled": "Core command; access and execution-context restrictions still apply.",
+      "example": "calculate expression:2+3*4"
+    }
+  },
+  "clear": {
+    "contract": {
+      "description": "このチャネルのメッセージを削除します。",
+      "parameters": [
+        {
+          "name": "confirm",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation"
+    },
+    "ja": {
+      "usage": "このチャネルのメッセージを削除します。",
+      "permissions": "manage_messages; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "clear confirm:confirm"
+    },
+    "en": {
+      "usage": "Delete messages in this channel after confirmation.",
+      "permissions": "manage_messages; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "clear confirm:confirm"
+    }
+  },
+  "clear_trust_score": {
+    "contract": {
+      "description": "メンバーの信頼度イベントを手動で解除します。制裁履歴は残ります。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.trust"
+    },
+    "ja": {
+      "usage": "メンバーの信頼度イベントを手動で解除します。制裁履歴は残ります。",
+      "permissions": "manage_guild; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "clear_trust_score member:@TestMember"
+    },
+    "en": {
+      "usage": "Clear trust events while retaining sanction history.",
+      "permissions": "manage_guild; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "clear_trust_score member:@TestMember"
+    }
+  },
+  "echo": {
+    "contract": {
+      "description": "自由にEmbedを組み立てて送信します。",
+      "parameters": [
+        {
+          "name": "title",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "description",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "color",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "url",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "author_name",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "author_url",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "author_icon_url",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "footer_text",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "footer_icon_url",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "thumbnail_url",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "image_url",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "fields_json",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "timestamp",
+          "description": "…",
+          "required": false,
+          "type": "boolean",
+          "choices": [],
+          "default": false,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "ephemeral",
+          "description": "…",
+          "required": false,
+          "type": "boolean",
+          "choices": [],
+          "default": false,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.general"
+    },
+    "ja": {
+      "usage": "自由にEmbedを組み立てて送信します。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "ephemeral引数で本人向け／公開を選択。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "echo"
+    },
+    "en": {
+      "usage": "Build and send an embed with the supplied fields.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "The ephemeral argument selects private or public response.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "echo"
+    }
+  },
+  "gemini": {
+    "contract": {
+      "description": "Gemini APIから質問します。",
+      "parameters": [
+        {
+          "name": "message",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.ai"
+    },
+    "ja": {
+      "usage": "Gemini APIから質問します。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "応答と生成エラーは公開。未設定時の案内は本人向け。",
+      "disabled": "システム運用者が利用可能にしていない場合は質問できません。",
+      "example": "gemini message:Hello"
+    },
+    "en": {
+      "usage": "Ask Gemini a question.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "Responses and generation errors are public; the unconfigured notice is private.",
+      "disabled": "Unavailable unless enabled/configured by the system operator.",
+      "example": "gemini message:Hello"
+    }
+  },
+  "help": {
+    "contract": {
+      "description": "利用できるコマンド一覧を表示します。",
+      "parameters": [
+        {
+          "name": "all",
+          "description": "…",
+          "required": false,
+          "type": "boolean",
+          "choices": [],
+          "default": false,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.general"
+    },
+    "ja": {
+      "usage": "利用できるコマンド一覧を表示します。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "all:falseは本人向け、all:trueは公開。",
+      "disabled": "基本コマンド。権限・実行場所などの条件は引き続き適用。",
+      "example": "help"
+    },
+    "en": {
+      "usage": "List available commands; all:true includes disabled features.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "Private when all:false; public when all:true.",
+      "disabled": "Core command; access and execution-context restrictions still apply.",
+      "example": "help"
+    }
+  },
+  "kick": {
+    "contract": {
+      "description": "メンバーをキックします。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.safety"
+    },
+    "ja": {
+      "usage": "メンバーをキックします。",
+      "permissions": "kick_members; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "kick member:@TestMember"
+    },
+    "en": {
+      "usage": "Kick a member.",
+      "permissions": "kick_members; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "kick member:@TestMember"
+    }
+  },
+  "leaderboard": {
+    "contract": {
+      "description": "テキストXPランキングを表示します。",
+      "parameters": [],
+      "module": "cogs.leveling"
+    },
+    "ja": {
+      "usage": "テキストXPランキングを表示します。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "公開応答。エラーは本人向け。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "leaderboard"
+    },
+    "en": {
+      "usage": "Show text XP rankings.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "Public response; errors are private.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "leaderboard"
+    }
+  },
+  "mod ban": {
+    "contract": {
+      "description": "メンバーをBanします。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation_commands"
+    },
+    "ja": {
+      "usage": "メンバーをBanします。",
+      "permissions": "ban_members; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "mod ban member:@TestMember"
+    },
+    "en": {
+      "usage": "Ban a member.",
+      "permissions": "ban_members; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "mod ban member:@TestMember"
+    }
+  },
+  "mod kick": {
+    "contract": {
+      "description": "メンバーをKickします。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation_commands"
+    },
+    "ja": {
+      "usage": "メンバーをKickします。",
+      "permissions": "kick_members; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "mod kick member:@TestMember"
+    },
+    "en": {
+      "usage": "Kick a member.",
+      "permissions": "kick_members; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "mod kick member:@TestMember"
+    }
+  },
+  "mod lock": {
+    "contract": {
+      "description": "チャンネルをロックします。",
+      "parameters": [
+        {
+          "name": "channel",
+          "description": "…",
+          "required": false,
+          "type": "channel",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation_commands"
+    },
+    "ja": {
+      "usage": "チャンネルをロックします。",
+      "permissions": "manage_channels; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "mod lock"
+    },
+    "en": {
+      "usage": "Lock role changes or a channel.",
+      "permissions": "manage_channels; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "mod lock"
+    }
+  },
+  "mod lockdown": {
+    "contract": {
+      "description": "サーバーを期限付きでLockdownします。",
+      "parameters": [
+        {
+          "name": "minutes",
+          "description": "…",
+          "required": false,
+          "type": "integer",
+          "choices": [],
+          "default": 30,
+          "min": 1,
+          "max": 1440
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation_commands"
+    },
+    "ja": {
+      "usage": "サーバーを期限付きでLockdownします。",
+      "permissions": "administrator; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "mod lockdown"
+    },
+    "en": {
+      "usage": "Lock down the server temporarily.",
+      "permissions": "administrator; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "mod lockdown"
+    }
+  },
+  "mod purge": {
+    "contract": {
+      "description": "最近のメッセージを削除します。",
+      "parameters": [
+        {
+          "name": "count",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation_commands"
+    },
+    "ja": {
+      "usage": "最近のメッセージを削除します。",
+      "permissions": "manage_messages; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "mod purge count:1"
+    },
+    "en": {
+      "usage": "Delete recent messages.",
+      "permissions": "manage_messages; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "mod purge count:1"
+    }
+  },
+  "mod softban": {
+    "contract": {
+      "description": "メンバーをSoftbanします。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation_commands"
+    },
+    "ja": {
+      "usage": "メンバーをSoftbanします。",
+      "permissions": "ban_members; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "mod softban member:@TestMember"
+    },
+    "en": {
+      "usage": "Ban then unban a member.",
+      "permissions": "ban_members; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "mod softban member:@TestMember"
+    }
+  },
+  "mod timeout": {
+    "contract": {
+      "description": "Timeoutを設定します。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "minutes",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": 1,
+          "max": 40320
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation_commands"
+    },
+    "ja": {
+      "usage": "Timeoutを設定します。",
+      "permissions": "moderate_members; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "mod timeout member:@TestMember minutes:5"
+    },
+    "en": {
+      "usage": "Set a timeout.",
+      "permissions": "moderate_members; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "mod timeout member:@TestMember minutes:5"
+    }
+  },
+  "mod unban": {
+    "contract": {
+      "description": "ユーザーIDを指定してBanを解除します。",
+      "parameters": [
+        {
+          "name": "user_id",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation_commands"
+    },
+    "ja": {
+      "usage": "ユーザーIDを指定してBanを解除します。",
+      "permissions": "ban_members; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "mod unban user_id:123456789012345678"
+    },
+    "en": {
+      "usage": "Unban a user ID.",
+      "permissions": "ban_members; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "mod unban user_id:123456789012345678"
+    }
+  },
+  "mod unlock": {
+    "contract": {
+      "description": "チャンネルのロックを解除します。",
+      "parameters": [
+        {
+          "name": "channel",
+          "description": "…",
+          "required": false,
+          "type": "channel",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation_commands"
+    },
+    "ja": {
+      "usage": "チャンネルのロックを解除します。",
+      "permissions": "manage_channels; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "mod unlock"
+    },
+    "en": {
+      "usage": "Unlock role changes or a channel.",
+      "permissions": "manage_channels; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "mod unlock"
+    }
+  },
+  "mod unlockdown": {
+    "contract": {
+      "description": "有効なLockdownを解除します。",
+      "parameters": [
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation_commands"
+    },
+    "ja": {
+      "usage": "有効なLockdownを解除します。",
+      "permissions": "administrator; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "mod unlockdown"
+    },
+    "en": {
+      "usage": "Release the active lockdown.",
+      "permissions": "administrator; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "mod unlockdown"
+    }
+  },
+  "mod untimeout": {
+    "contract": {
+      "description": "Timeoutを解除します。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation_commands"
+    },
+    "ja": {
+      "usage": "Timeoutを解除します。",
+      "permissions": "moderate_members; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "mod untimeout member:@TestMember"
+    },
+    "en": {
+      "usage": "Remove a timeout.",
+      "permissions": "moderate_members; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "mod untimeout member:@TestMember"
+    }
+  },
+  "mod warn": {
+    "contract": {
+      "description": "Warningを追加します。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation_commands"
+    },
+    "ja": {
+      "usage": "Warningを追加します。",
+      "permissions": "moderate_members; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "mod warn member:@TestMember"
+    },
+    "en": {
+      "usage": "Add a warning.",
+      "permissions": "moderate_members; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "mod warn member:@TestMember"
+    }
+  },
+  "ping": {
+    "contract": {
+      "description": "Botの応答速度を計測します。",
+      "parameters": [],
+      "module": "cogs.general"
+    },
+    "ja": {
+      "usage": "Botの応答速度を計測します。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "公開応答。エラーは本人向け。",
+      "disabled": "基本コマンド。権限・実行場所などの条件は引き続き適用。",
+      "example": "ping"
+    },
+    "en": {
+      "usage": "Measure Bot latency.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "Public response; errors are private.",
+      "disabled": "Core command; access and execution-context restrictions still apply.",
+      "example": "ping"
+    }
+  },
+  "poll": {
+    "contract": {
+      "description": "最大10択のボタン投票を作成します。選択肢は | で区切ります。",
+      "parameters": [
+        {
+          "name": "question",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "options",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "duration_minutes",
+          "description": "…",
+          "required": false,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": 1,
+          "max": 10080
+        },
+        {
+          "name": "image_url",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.engagement"
+    },
+    "ja": {
+      "usage": "最大10択のボタン投票を作成します。選択肢は | で区切ります。",
+      "permissions": "manage_guild; Bot permissions and role hierarchy also apply.",
+      "response": "公開応答。エラーは本人向け。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "poll question:Lunch? options:A|B"
+    },
+    "en": {
+      "usage": "Create a poll; separate up to ten choices with |.",
+      "permissions": "manage_guild; Bot permissions and role hierarchy also apply.",
+      "response": "Public response; errors are private.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "poll question:Lunch? options:A|B"
+    }
+  },
+  "r add": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "emoji",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。EmojiとRoleの対応を追加します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r add config_id:1 emoji:✅ role:@TestRole"
+    },
+    "en": {
+      "usage": "Add the selected member or mapping.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r add config_id:1 emoji:✅ role:@TestRole"
+    }
+  },
+  "r addmany": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。フォームから複数のEmojiとRole対応を追加します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r addmany config_id:1"
+    },
+    "en": {
+      "usage": "Open a form to add multiple emoji/role mappings.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r addmany config_id:1"
+    }
+  },
+  "r aio": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "channel",
+          "description": "…",
+          "required": true,
+          "type": "channel",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "emoji",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。投稿と対応を一括作成します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r aio channel:#test emoji:✅ role:@TestRole"
+    },
+    "en": {
+      "usage": "Create a message and mappings together.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r aio channel:#test emoji:✅ role:@TestRole"
+    }
+  },
+  "r aioi": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "channel",
+          "description": "…",
+          "required": true,
+          "type": "channel",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "emoji",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。binding方式で投稿と対応を一括作成します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r aioi channel:#test emoji:✅ role:@TestRole"
+    },
+    "en": {
+      "usage": "Create an AIO message with binding behavior.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r aioi channel:#test emoji:✅ role:@TestRole"
+    }
+  },
+  "r aiou": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "channel",
+          "description": "…",
+          "required": true,
+          "type": "channel",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "emoji",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。unique方式で投稿と対応を一括作成します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r aiou channel:#test emoji:✅ role:@TestRole"
+    },
+    "en": {
+      "usage": "Create an AIO message with unique behavior.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r aiou channel:#test emoji:✅ role:@TestRole"
+    }
+  },
+  "r aiov": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "channel",
+          "description": "…",
+          "required": true,
+          "type": "channel",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "emoji",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。verify方式で投稿と対応を一括作成します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r aiov channel:#test emoji:✅ role:@TestRole"
+    },
+    "en": {
+      "usage": "Create an AIO message with verify behavior.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r aiov channel:#test emoji:✅ role:@TestRole"
+    }
+  },
+  "r binding": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。binding方式へ変更します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r binding config_id:1"
+    },
+    "en": {
+      "usage": "Use binding behavior.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r binding config_id:1"
+    }
+  },
+  "r drop": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。drop方式へ変更します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r drop config_id:1"
+    },
+    "en": {
+      "usage": "Use drop behavior.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r drop config_id:1"
+    }
+  },
+  "r fix": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。Messageのリアクションと設定を再同期します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r fix config_id:1"
+    },
+    "en": {
+      "usage": "Repair the configured message.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r fix config_id:1"
+    }
+  },
+  "r lock": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。Role変更を停止します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r lock config_id:1"
+    },
+    "en": {
+      "usage": "Lock role changes or a channel.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r lock config_id:1"
+    }
+  },
+  "r normal": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。normal方式へ変更します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r normal config_id:1"
+    },
+    "en": {
+      "usage": "Use normal behavior.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r normal config_id:1"
+    }
+  },
+  "r remove": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。Roleの対応を削除します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r remove config_id:1 role:@TestRole"
+    },
+    "en": {
+      "usage": "Remove the selected member or mapping.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r remove config_id:1 role:@TestRole"
+    }
+  },
+  "r reversed": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。reversed方式へ変更します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r reversed config_id:1"
+    },
+    "en": {
+      "usage": "Use reversed behavior.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r reversed config_id:1"
+    }
+  },
+  "r show": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。設定を表示します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r show config_id:1"
+    },
+    "en": {
+      "usage": "Show configuration.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r show config_id:1"
+    }
+  },
+  "r temp": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "minutes",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。期限付きRoleへ変更します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r temp config_id:1 minutes:5"
+    },
+    "en": {
+      "usage": "Set a temporary role duration.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r temp config_id:1 minutes:5"
+    }
+  },
+  "r unique": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。unique方式へ変更します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r unique config_id:1"
+    },
+    "en": {
+      "usage": "Use unique behavior.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r unique config_id:1"
+    }
+  },
+  "r unlock": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。Role変更を再開します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r unlock config_id:1"
+    },
+    "en": {
+      "usage": "Unlock role changes or a channel.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r unlock config_id:1"
+    }
+  },
+  "r verify": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "短縮コマンド。verify方式へ変更します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "r verify config_id:1"
+    },
+    "en": {
+      "usage": "Use verify behavior.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "r verify config_id:1"
+    }
+  },
+  "rank": {
+    "contract": {
+      "description": "現在のテキストレベルを確認します。",
+      "parameters": [],
+      "module": "cogs.leveling"
+    },
+    "ja": {
+      "usage": "現在のテキストレベルを確認します。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "公開応答。エラーは本人向け。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "rank"
+    },
+    "en": {
+      "usage": "Show your text XP rank.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "Public response; errors are private.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "rank"
+    }
+  },
+  "reactionrole add": {
+    "contract": {
+      "description": "EmojiとRoleの対応を追加します",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "emoji",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "EmojiとRoleの対応を追加します",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole add config_id:1 emoji:✅ role:@TestRole"
+    },
+    "en": {
+      "usage": "Add the selected member or mapping.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole add config_id:1 emoji:✅ role:@TestRole"
+    }
+  },
+  "reactionrole addmany": {
+    "contract": {
+      "description": "複数のEmojiとRoleをまとめて追加します",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "複数のEmojiとRoleをまとめて追加します",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole addmany config_id:1"
+    },
+    "en": {
+      "usage": "Open a form to add multiple emoji/role mappings.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole addmany config_id:1"
+    }
+  },
+  "reactionrole aio": {
+    "contract": {
+      "description": "投稿とEmoji→Role対応を一括作成します",
+      "parameters": [
+        {
+          "name": "channel",
+          "description": "…",
+          "required": true,
+          "type": "channel",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "emoji",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "behavior",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": "normal",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "title",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": "ロールを選択",
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "投稿とEmoji→Role対応を一括作成します",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole aio channel:#test emoji:✅ role:@TestRole"
+    },
+    "en": {
+      "usage": "Create a message and mappings together.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole aio channel:#test emoji:✅ role:@TestRole"
+    }
+  },
+  "reactionrole blacklist add": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "対象Roleをリストへ追加します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole blacklist add config_id:1 role:@TestRole"
+    },
+    "en": {
+      "usage": "Add the selected member or mapping. Target: denied roles.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole blacklist add config_id:1 role:@TestRole"
+    }
+  },
+  "reactionrole blacklist clear": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "対象リストを空にします。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole blacklist clear config_id:1"
+    },
+    "en": {
+      "usage": "Clear the access list. Target: denied roles.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole blacklist clear config_id:1"
+    }
+  },
+  "reactionrole blacklist remove": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "対象Roleをリストから削除します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole blacklist remove config_id:1 role:@TestRole"
+    },
+    "en": {
+      "usage": "Remove the selected member or mapping. Target: denied roles.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole blacklist remove config_id:1 role:@TestRole"
+    }
+  },
+  "reactionrole channel": {
+    "contract": {
+      "description": "Reaction Roles専用チャンネルを作成します",
+      "parameters": [
+        {
+          "name": "name",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": "roles",
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "Reaction Roles専用チャンネルを作成します",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole channel"
+    },
+    "en": {
+      "usage": "Create a reaction-role channel.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole channel"
+    }
+  },
+  "reactionrole create": {
+    "contract": {
+      "description": "Bot投稿または既存メッセージへReaction Rolesを作成します",
+      "parameters": [
+        {
+          "name": "channel",
+          "description": "対象チャンネル",
+          "required": true,
+          "type": "channel",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "emoji",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "title",
+          "description": "パネルタイトル",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": "ロールを選択",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "message_id",
+          "description": "既存メッセージID。未指定ならBotが投稿",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "Bot投稿または既存メッセージへReaction Rolesを作成します",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole create channel:#test emoji:✅ role:@TestRole"
+    },
+    "en": {
+      "usage": "Create a reaction-role message.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole create channel:#test emoji:✅ role:@TestRole"
+    }
+  },
+  "reactionrole link create": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "name",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "message_ids",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "メッセージのLinkグループを作成します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole link create name:test message_ids:123456789012345678"
+    },
+    "en": {
+      "usage": "Create a linked message group.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole link create name:test message_ids:123456789012345678"
+    }
+  },
+  "reactionrole link list": {
+    "contract": {
+      "description": "…",
+      "parameters": [],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "Linkグループを一覧表示します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole link list"
+    },
+    "en": {
+      "usage": "List linked groups.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole link list"
+    }
+  },
+  "reactionrole link unlink": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "group_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "Linkを解除します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole link unlink group_id:1"
+    },
+    "en": {
+      "usage": "Remove the link group.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole link unlink group_id:1"
+    }
+  },
+  "reactionrole manage color": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "color",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "Embed色を変更します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole manage color config_id:1 color:#336699"
+    },
+    "en": {
+      "usage": "Change embed color.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole manage color config_id:1 color:#336699"
+    }
+  },
+  "reactionrole manage edit": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "title",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "description",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": "",
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "Embedを編集します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole manage edit config_id:1 title:Test"
+    },
+    "en": {
+      "usage": "Edit the message embed.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole manage edit config_id:1 title:Test"
+    }
+  },
+  "reactionrole manage fix": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "設定を修復します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole manage fix config_id:1"
+    },
+    "en": {
+      "usage": "Repair the configured message.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole manage fix config_id:1"
+    }
+  },
+  "reactionrole manage fixforeign": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "外部絵文字のリアクションロール設定を修復します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole manage fixforeign config_id:1"
+    },
+    "en": {
+      "usage": "Repair reaction-role bindings for external emoji.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole manage fixforeign config_id:1"
+    }
+  },
+  "reactionrole manage move": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "channel",
+          "description": "…",
+          "required": true,
+          "type": "channel",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "message_id",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "設定先Messageを変更します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole manage move config_id:1 channel:#test message_id:123456789012345678"
+    },
+    "en": {
+      "usage": "Move the configuration to another message.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole manage move config_id:1 channel:#test message_id:123456789012345678"
+    }
+  },
+  "reactionrole manage reset-binding": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "user",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "利用者のBinding記録を解除します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole manage reset-binding config_id:1 user:@TestMember"
+    },
+    "en": {
+      "usage": "Clear a member’s binding.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole manage reset-binding config_id:1 user:@TestMember"
+    }
+  },
+  "reactionrole manage selfdestruct": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "minutes",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "設定の削除を予約します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole manage selfdestruct config_id:1 minutes:5"
+    },
+    "en": {
+      "usage": "Schedule configuration removal.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole manage selfdestruct config_id:1 minutes:5"
+    }
+  },
+  "reactionrole manage show": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "設定を表示します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole manage show config_id:1"
+    },
+    "en": {
+      "usage": "Show configuration.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole manage show config_id:1"
+    }
+  },
+  "reactionrole modify limit": {
+    "contract": {
+      "description": "ユーザーごとの選択上限を変更します",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "limit",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "ユーザーごとの選択上限を変更します",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole modify limit config_id:1 limit:1"
+    },
+    "en": {
+      "usage": "Set the per-member selection limit.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole modify limit config_id:1 limit:1"
+    }
+  },
+  "reactionrole modify lock": {
+    "contract": {
+      "description": "Role変更を停止します",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "Role変更を停止します",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole modify lock config_id:1"
+    },
+    "en": {
+      "usage": "Lock role changes or a channel.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole modify lock config_id:1"
+    }
+  },
+  "reactionrole modify maxroles": {
+    "contract": {
+      "description": "Roleの実人数上限を変更します",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "maximum",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "Roleの実人数上限を変更します",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole modify maxroles config_id:1 role:@TestRole maximum:10"
+    },
+    "en": {
+      "usage": "Set a role membership capacity.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole modify maxroles config_id:1 role:@TestRole maximum:10"
+    }
+  },
+  "reactionrole modify type": {
+    "contract": {
+      "description": "動作Typeを変更します",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "behavior",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [
+            "binding",
+            "drop",
+            "normal",
+            "reversed",
+            "temp",
+            "unique",
+            "verify"
+          ],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "duration_minutes",
+          "description": "…",
+          "required": false,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "動作Typeを変更します",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole modify type config_id:1 behavior:normal"
+    },
+    "en": {
+      "usage": "Change the behavior type.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole modify type config_id:1 behavior:normal"
+    }
+  },
+  "reactionrole modify unlock": {
+    "contract": {
+      "description": "Role変更を再開します",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "Role変更を再開します",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole modify unlock config_id:1"
+    },
+    "en": {
+      "usage": "Unlock role changes or a channel.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole modify unlock config_id:1"
+    }
+  },
+  "reactionrole purge": {
+    "contract": {
+      "description": "Reaction Role設定を削除します",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": false,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "Reaction Role設定を削除します",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole purge"
+    },
+    "en": {
+      "usage": "Delete recent messages.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole purge"
+    }
+  },
+  "reactionrole remove": {
+    "contract": {
+      "description": "Roleの対応を削除します",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "Roleの対応を削除します",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole remove config_id:1 role:@TestRole"
+    },
+    "en": {
+      "usage": "Remove the selected member or mapping.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole remove config_id:1 role:@TestRole"
+    }
+  },
+  "reactionrole whitelist add": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "対象Roleをリストへ追加します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole whitelist add config_id:1 role:@TestRole"
+    },
+    "en": {
+      "usage": "Add the selected member or mapping. Target: allowed roles.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole whitelist add config_id:1 role:@TestRole"
+    }
+  },
+  "reactionrole whitelist clear": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "対象リストを空にします。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole whitelist clear config_id:1"
+    },
+    "en": {
+      "usage": "Clear the access list. Target: allowed roles.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole whitelist clear config_id:1"
+    }
+  },
+  "reactionrole whitelist remove": {
+    "contract": {
+      "description": "…",
+      "parameters": [
+        {
+          "name": "config_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "role",
+          "description": "…",
+          "required": true,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.reaction_roles"
+    },
+    "ja": {
+      "usage": "対象Roleをリストから削除します。",
+      "permissions": "サーバー管理（Manage Server）。BotのManage RolesとRole階層も必要。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "reactionrole whitelist remove config_id:1 role:@TestRole"
+    },
+    "en": {
+      "usage": "Remove the selected member or mapping. Target: allowed roles.",
+      "permissions": "Manage Server; Bot Manage Roles and role hierarchy are also required.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "reactionrole whitelist remove config_id:1 role:@TestRole"
+    }
+  },
+  "roll": {
+    "contract": {
+      "description": "指定された乱数を振ります。",
+      "parameters": [
+        {
+          "name": "sides",
+          "description": "…",
+          "required": false,
+          "type": "number",
+          "choices": [],
+          "default": 6.0,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.general"
+    },
+    "ja": {
+      "usage": "指定された乱数を振ります。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "公開応答。エラーは本人向け。",
+      "disabled": "基本コマンド。権限・実行場所などの条件は引き続き適用。",
+      "example": "roll"
+    },
+    "en": {
+      "usage": "Roll a die with the specified number of sides.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "Public response; errors are private.",
+      "disabled": "Core command; access and execution-context restrictions still apply.",
+      "example": "roll"
+    }
+  },
+  "rps": {
+    "contract": {
+      "description": "じゃんけんでBotと対戦します。",
+      "parameters": [
+        {
+          "name": "hand",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [
+            "rock",
+            "paper",
+            "scissors"
+          ],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.engagement"
+    },
+    "ja": {
+      "usage": "じゃんけんでBotと対戦します。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "公開応答。エラーは本人向け。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "rps hand:rock"
+    },
+    "en": {
+      "usage": "Play rock, paper, scissors against the Bot.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "Public response; errors are private.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "rps hand:rock"
+    }
+  },
+  "serverinfo": {
+    "contract": {
+      "description": "サーバー情報を表示します。",
+      "parameters": [],
+      "module": "cogs.general"
+    },
+    "ja": {
+      "usage": "サーバー情報を表示します。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "公開応答。エラーは本人向け。",
+      "disabled": "基本コマンド。権限・実行場所などの条件は引き続き適用。",
+      "example": "serverinfo"
+    },
+    "en": {
+      "usage": "Show server information.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "Public response; errors are private.",
+      "disabled": "Core command; access and execution-context restrictions still apply.",
+      "example": "serverinfo"
+    }
+  },
+  "set_management": {
+    "contract": {
+      "description": "サーバーログチャネルを設定します。",
+      "parameters": [
+        {
+          "name": "channel",
+          "description": "…",
+          "required": true,
+          "type": "channel",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation"
+    },
+    "ja": {
+      "usage": "サーバーログチャネルを設定します。",
+      "permissions": "manage_guild; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "set_management channel:#test"
+    },
+    "en": {
+      "usage": "Select the server log channel.",
+      "permissions": "manage_guild; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "set_management channel:#test"
+    }
+  },
+  "suggest": {
+    "contract": {
+      "description": "サーバーへアイデアや改善案を投稿します。",
+      "parameters": [],
+      "module": "cogs.suggestions"
+    },
+    "ja": {
+      "usage": "サーバーへアイデアや改善案を投稿します。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "フォームと確認は本人向け、送信した提案は設定Channelへ公開。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "suggest"
+    },
+    "en": {
+      "usage": "Open the server suggestion form.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "Private form and acknowledgement; the submitted suggestion is posted to the configured channel.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "suggest"
+    }
+  },
+  "t close": {
+    "contract": {
+      "description": "TicketをCloseします。",
+      "parameters": [
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": "解決済み",
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "TicketをCloseします。",
+      "permissions": "作成はPanelの受付・アクセス条件、Closeは作成者またはStaff（PanelのClose方針に従う）。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "t close"
+    },
+    "en": {
+      "usage": "Close the ticket and retain its transcript.",
+      "permissions": "Opening requires panel intake/access; closing requires opener or staff access according to panel policy.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "t close"
+    }
+  },
+  "t open": {
+    "contract": {
+      "description": "Ticketを作成します。",
+      "parameters": [
+        {
+          "name": "panel_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "Ticketを作成します。",
+      "permissions": "作成はPanelの受付・アクセス条件、Closeは作成者またはStaff（PanelのClose方針に従う）。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "t open panel_id:1"
+    },
+    "en": {
+      "usage": "Open a ticket.",
+      "permissions": "Opening requires panel intake/access; closing requires opener or staff access according to panel policy.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "t open panel_id:1"
+    }
+  },
+  "ticket add": {
+    "contract": {
+      "description": "Ticketへユーザーを追加します。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "Ticketへユーザーを追加します。",
+      "permissions": "Ticket担当Staff／設定権限。現在のPanel・Team・Ticketへのアクセスを確認。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket add member:@TestMember"
+    },
+    "en": {
+      "usage": "Add the selected member or mapping.",
+      "permissions": "Authorized ticket staff/settings access; panel, team and ticket access are checked.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket add member:@TestMember"
+    }
+  },
+  "ticket blacklist": {
+    "contract": {
+      "description": "ユーザーのTicket作成制限を変更します。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "enabled",
+          "description": "…",
+          "required": true,
+          "type": "boolean",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": "管理者による制限",
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "ユーザーのTicket作成制限を変更します。",
+      "permissions": "サーバー管理権限（Manage Server）。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket blacklist member:@TestMember enabled:true"
+    },
+    "en": {
+      "usage": "Change a member’s ticket intake restriction. Target: denied roles.",
+      "permissions": "Manage Server.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket blacklist member:@TestMember enabled:true"
+    }
+  },
+  "ticket claim": {
+    "contract": {
+      "description": "現在のTicketをClaimします。",
+      "parameters": [],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "現在のTicketをClaimします。",
+      "permissions": "Ticket担当Staff／設定権限。現在のPanel・Team・Ticketへのアクセスを確認。",
+      "response": "Ticket内／実行Channelへの公開応答。失敗は本人向け。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket claim"
+    },
+    "en": {
+      "usage": "Claim this ticket.",
+      "permissions": "Authorized ticket staff/settings access; panel, team and ticket access are checked.",
+      "response": "Public response in the ticket/current channel; failures are private.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket claim"
+    }
+  },
+  "ticket close": {
+    "contract": {
+      "description": "TicketをCloseしてTranscriptを保存します。",
+      "parameters": [
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": "解決済み",
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "TicketをCloseしてTranscriptを保存します。",
+      "permissions": "作成はPanelの受付・アクセス条件、Closeは作成者またはStaff（PanelのClose方針に従う）。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket close"
+    },
+    "en": {
+      "usage": "Close the ticket and retain its transcript.",
+      "permissions": "Opening requires panel intake/access; closing requires opener or staff access according to panel policy.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket close"
+    }
+  },
+  "ticket close-request": {
+    "contract": {
+      "description": "StaffへCloseの承認を依頼します。",
+      "parameters": [
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": "解決済み",
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "StaffへCloseの承認を依頼します。",
+      "permissions": "現在のTicket内で実行可能。承認・却下は担当Staff。",
+      "response": "Ticket内への公開応答。失敗は本人向け。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket close-request"
+    },
+    "en": {
+      "usage": "Ask staff to approve closing.",
+      "permissions": "Run inside the current ticket; approval/rejection requires staff.",
+      "response": "Public response inside the ticket; failures are private.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket close-request"
+    }
+  },
+  "ticket join": {
+    "contract": {
+      "description": "Thread TicketへStaffとして参加します。",
+      "parameters": [
+        {
+          "name": "ticket_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "Thread TicketへStaffとして参加します。",
+      "permissions": "Ticket担当Staff／設定権限。現在のPanel・Team・Ticketへのアクセスを確認。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket join ticket_id:1"
+    },
+    "en": {
+      "usage": "Join a thread ticket as staff.",
+      "permissions": "Authorized ticket staff/settings access; panel, team and ticket access are checked.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket join ticket_id:1"
+    }
+  },
+  "ticket notes": {
+    "contract": {
+      "description": "作成者には見えないStaff Noteを追加します。",
+      "parameters": [
+        {
+          "name": "content",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "作成者には見えないStaff Noteを追加します。",
+      "permissions": "Ticket担当Staff／設定権限。現在のPanel・Team・Ticketへのアクセスを確認。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket notes content:Test note"
+    },
+    "en": {
+      "usage": "Add a staff-only note.",
+      "permissions": "Authorized ticket staff/settings access; panel, team and ticket access are checked.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket notes content:Test note"
+    }
+  },
+  "ticket on-call": {
+    "contract": {
+      "description": "Thread Ticketへの自動参加を切り替えます。",
+      "parameters": [
+        {
+          "name": "team_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "enabled",
+          "description": "…",
+          "required": true,
+          "type": "boolean",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "Thread Ticketへの自動参加を切り替えます。",
+      "permissions": "Ticket担当Staff／設定権限。現在のPanel・Team・Ticketへのアクセスを確認。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket on-call team_id:1 enabled:true"
+    },
+    "en": {
+      "usage": "Toggle automatic participation in thread tickets.",
+      "permissions": "Authorized ticket staff/settings access; panel, team and ticket access are checked.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket on-call team_id:1 enabled:true"
+    }
+  },
+  "ticket open": {
+    "contract": {
+      "description": "Ticketを作成します。",
+      "parameters": [
+        {
+          "name": "panel_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "Ticketを作成します。",
+      "permissions": "作成はPanelの受付・アクセス条件、Closeは作成者またはStaff（PanelのClose方針に従う）。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "ticket open panel_id:1"
+    },
+    "en": {
+      "usage": "Open a ticket.",
+      "permissions": "Opening requires panel intake/access; closing requires opener or staff access according to panel policy.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "ticket open panel_id:1"
+    }
+  },
+  "ticket remove": {
+    "contract": {
+      "description": "Ticketからユーザーを削除します。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "Ticketからユーザーを削除します。",
+      "permissions": "Ticket担当Staff／設定権限。現在のPanel・Team・Ticketへのアクセスを確認。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket remove member:@TestMember"
+    },
+    "en": {
+      "usage": "Remove the selected member or mapping.",
+      "permissions": "Authorized ticket staff/settings access; panel, team and ticket access are checked.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket remove member:@TestMember"
+    }
+  },
+  "ticket rename": {
+    "contract": {
+      "description": "Ticket名を変更します。",
+      "parameters": [
+        {
+          "name": "name",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "Ticket名を変更します。",
+      "permissions": "現在のTicket Channel/Threadを参照できる利用者。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket rename name:test"
+    },
+    "en": {
+      "usage": "Rename the ticket.",
+      "permissions": "A user with access to the current ticket channel/thread.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket rename name:test"
+    }
+  },
+  "ticket reopen": {
+    "contract": {
+      "description": "Closed Thread Ticketを再開します。",
+      "parameters": [
+        {
+          "name": "ticket_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "Closed Thread Ticketを再開します。",
+      "permissions": "Manage Threads。閉じた同一サーバーのThread Ticketが対象。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "ticket reopen ticket_id:1"
+    },
+    "en": {
+      "usage": "Reopen a closed private-thread ticket.",
+      "permissions": "Manage Threads; a closed private-thread ticket in this server.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "ticket reopen ticket_id:1"
+    }
+  },
+  "ticket setup": {
+    "contract": {
+      "description": "Ticket設定画面を開きます。",
+      "parameters": [],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "Ticket設定画面を開きます。",
+      "permissions": "サーバー管理権限（Manage Server）。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket setup"
+    },
+    "en": {
+      "usage": "Open ticket settings.",
+      "permissions": "Manage Server.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket setup"
+    }
+  },
+  "ticket stats": {
+    "contract": {
+      "description": "Ticketの概要を表示します。",
+      "parameters": [],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "Ticketの概要を表示します。",
+      "permissions": "サーバー管理権限（Manage Server）。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket stats"
+    },
+    "en": {
+      "usage": "Show ticket statistics.",
+      "permissions": "Manage Server.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket stats"
+    }
+  },
+  "ticket switch-panel": {
+    "contract": {
+      "description": "同じModeの別Panelへ切り替えます。",
+      "parameters": [
+        {
+          "name": "panel_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "同じModeの別Panelへ切り替えます。",
+      "permissions": "Ticket担当Staff／設定権限。現在のPanel・Team・Ticketへのアクセスを確認。",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket switch-panel panel_id:1"
+    },
+    "en": {
+      "usage": "Switch to a panel using the same mode.",
+      "permissions": "Authorized ticket staff/settings access; panel, team and ticket access are checked.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket switch-panel panel_id:1"
+    }
+  },
+  "ticket tag": {
+    "contract": {
+      "description": "定型文を送信します。",
+      "parameters": [
+        {
+          "name": "name",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "定型文を送信します。",
+      "permissions": "サーバー内で登録済みTagを参照できる利用者。",
+      "response": "Ticket内／実行Channelへの公開応答。失敗は本人向け。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket tag name:test"
+    },
+    "en": {
+      "usage": "Send a configured canned response.",
+      "permissions": "A user in the server with an existing canned-response tag.",
+      "response": "Public response in the ticket/current channel; failures are private.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket tag name:test"
+    }
+  },
+  "ticket transfer": {
+    "contract": {
+      "description": "Claim担当者を変更します。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "Claim担当者を変更します。",
+      "permissions": "Ticket担当Staff／設定権限。現在のPanel・Team・Ticketへのアクセスを確認。",
+      "response": "Ticket内への公開応答。失敗は本人向け。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket transfer member:@TestMember"
+    },
+    "en": {
+      "usage": "Transfer the ticket claim.",
+      "permissions": "Authorized ticket staff/settings access; panel, team and ticket access are checked.",
+      "response": "Public response inside the ticket; failures are private.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket transfer member:@TestMember"
+    }
+  },
+  "ticket unclaim": {
+    "contract": {
+      "description": "Claimを解除します。",
+      "parameters": [],
+      "module": "cogs.tickets"
+    },
+    "ja": {
+      "usage": "Claimを解除します。",
+      "permissions": "自分がClaimしたTicket内。",
+      "response": "Ticket内／実行Channelへの公開応答。失敗は本人向け。",
+      "disabled": "受付無効は新規作成を停止します。既存Ticket操作は各コマンドの権限・状態条件に従います。",
+      "example": "ticket unclaim"
+    },
+    "en": {
+      "usage": "Release the ticket claim.",
+      "permissions": "Inside a ticket claimed by you.",
+      "response": "Public response in the ticket/current channel; failures are private.",
+      "disabled": "Disabling intake stops new tickets; existing-ticket actions follow their own access and state conditions.",
+      "example": "ticket unclaim"
+    }
+  },
+  "timeout": {
+    "contract": {
+      "description": "メンバーを一時的にタイムアウトします。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "minutes",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.safety"
+    },
+    "ja": {
+      "usage": "メンバーを一時的にタイムアウトします。",
+      "permissions": "moderate_members; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "timeout member:@TestMember minutes:5"
+    },
+    "en": {
+      "usage": "Temporarily time out a member.",
+      "permissions": "moderate_members; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "timeout member:@TestMember minutes:5"
+    }
+  },
+  "trust_score": {
+    "contract": {
+      "description": "メンバーの信頼度スコアと算出理由を表示します。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.trust"
+    },
+    "ja": {
+      "usage": "メンバーの信頼度スコアと算出理由を表示します。",
+      "permissions": "manage_guild; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "trust_score member:@TestMember"
+    },
+    "en": {
+      "usage": "Show the trust score and its reasons.",
+      "permissions": "manage_guild; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "trust_score member:@TestMember"
+    }
+  },
+  "userinfo": {
+    "contract": {
+      "description": "ユーザー情報を表示します。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": false,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.general"
+    },
+    "ja": {
+      "usage": "ユーザー情報を表示します。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "公開応答。エラーは本人向け。",
+      "disabled": "基本コマンド。権限・実行場所などの条件は引き続き適用。",
+      "example": "userinfo"
+    },
+    "en": {
+      "usage": "Show member information.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "Public response; errors are private.",
+      "disabled": "Core command; access and execution-context restrictions still apply.",
+      "example": "userinfo"
+    }
+  },
+  "vcleaderboard": {
+    "contract": {
+      "description": "VC XPランキングを表示します。",
+      "parameters": [],
+      "module": "cogs.leveling"
+    },
+    "ja": {
+      "usage": "VC XPランキングを表示します。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "公開応答。エラーは本人向け。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "vcleaderboard"
+    },
+    "en": {
+      "usage": "Show voice XP rankings.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "Public response; errors are private.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "vcleaderboard"
+    }
+  },
+  "vcrank": {
+    "contract": {
+      "description": "現在のVCレベルを確認します。",
+      "parameters": [],
+      "module": "cogs.leveling"
+    },
+    "ja": {
+      "usage": "現在のVCレベルを確認します。",
+      "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
+      "response": "公開応答。エラーは本人向け。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "vcrank"
+    },
+    "en": {
+      "usage": "Show your voice XP rank.",
+      "permissions": "Members with access to the server/channel.",
+      "response": "Public response; errors are private.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "vcrank"
+    }
+  },
+  "warn": {
+    "contract": {
+      "description": "メンバーに警告を与えます。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": true,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "reason",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.safety"
+    },
+    "ja": {
+      "usage": "メンバーに警告を与えます。",
+      "permissions": "moderate_members; Bot permissions and role hierarchy also apply.",
+      "response": "操作結果は本人向け。処置・投稿・ログ等の効果は対象Channelや権限を持つ利用者から見えます。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "warn member:@TestMember"
+    },
+    "en": {
+      "usage": "Warn a member.",
+      "permissions": "moderate_members; Bot permissions and role hierarchy also apply.",
+      "response": "Private confirmation; actions, posts and logs remain visible to users with access.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "warn member:@TestMember"
+    }
+  },
+  "welcome": {
+    "contract": {
+      "description": "ウェルカムメッセージを送信します。",
+      "parameters": [
+        {
+          "name": "member",
+          "description": "…",
+          "required": false,
+          "type": "user",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.welcome"
+    },
+    "ja": {
+      "usage": "ウェルカムメッセージを送信します。",
+      "permissions": "一般メンバー。対象サーバーでWelcome機能が有効。",
+      "response": "公開応答。エラーは本人向け。",
+      "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
+      "example": "welcome"
+    },
+    "en": {
+      "usage": "Send a welcome message.",
+      "permissions": "Members; Welcome must be enabled in this server.",
+      "response": "Public response; errors are private.",
+      "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
+      "example": "welcome"
+    }
+  }
+}

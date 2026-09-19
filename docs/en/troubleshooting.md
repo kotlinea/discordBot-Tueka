@@ -1,8 +1,14 @@
 # Troubleshooting
 
-- **A saved resource becomes unset:** inspect the 422 field path, guild ownership, required fields, and Bot permissions.
-- **409 Conflict:** reload the latest revision and reapply the intended change.
-- **Reaction Role does not grant a role:** check Manage Roles, role hierarchy, message access, lock, access policy, binding history, and limits.
-- **YouTube RSS returns 404:** verify the channel ID and inspect API or `yt-dlp` fallback and circuit state.
-- **Social Worker is offline:** check the process, database path, provider credentials, heartbeat, 429 responses, and next retry time.
-- **Ticket transcript fails:** check the encryption key, disk permissions, Discord history permission, S3 settings, and transcript outbox.
+| Symptom | Action |
+| --- | --- |
+| Expired session (401) | Sign in again. |
+| Denied (403) | Check Manage Server, team membership, Bot role hierarchy and channel access. |
+| Conflict (409) | Reload and reapply your intended differences; do not resend stale values. |
+| Invalid input (422) | Correct the highlighted field, required values and server resource selection. |
+| Role not assigned | Check Manage Roles, hierarchy, emoji, lock/access rules. Managers can use `/reactionrole manage fix`. |
+| Notification missing | Check account existence, channel and Bot permissions; initial old posts are suppressed. |
+| Transcript unavailable | Check access/link; give ticket ID and time to the operator. |
+| Page unavailable or provider offline | Report time, URL, provider and displayed error. Do not share tokens or private ticket content. |
+
+See [Permissions](./guide/permissions) and [Saving](./dashboard/saving).

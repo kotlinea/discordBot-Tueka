@@ -1,0 +1,50 @@
+"""Repository/public-build documentation boundaries and active Markdown links."""
+import argparse
+from pathlib import Path
+import re
+
+ROOT = Path(__file__).resolve().parents[1]
+PRIVATE = ('operations', 'reference/environment', 'reference/architecture', 'reference/api',
+           'reference/extending', 'social/worker', 'EXECUTION_PLAN', 'PROGRESS0910', 'TESTING', 'inventory', 'en/operations')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--built', action='store_true')
+    args = parser.parse_args()
+    errors = []
+    pages = [ROOT / 'README.md', ROOT / 'ROADMAP.md', *(ROOT / 'docs').rglob('*.md'), *(ROOT / 'handbook').rglob('*.md')]
+    for page in pages:
+        if any(part in ('node_modules', '.vitepress', 'history', 'inventory', 'legacy-mixed-pages') for part in page.parts) or page.name in ('PROGRESS0910.md', 'DOCUMENT_MAP.md', 'legacy-english-operations.md'):
+            continue
+        text = page.read_text(encoding='utf-8')
+        public = page.is_relative_to(ROOT / 'docs')
+        if public and ('handbook/' in text or re.search(r'\]\([^)]*/operations/', text)):
+            errors.append(f'Private reference in {page.relative_to(ROOT)}')
+        for target in re.findall(r'\]\(([^\s)]+)\)', text):
+            if target.startswith(('#', '/', 'http:', 'https:', 'mailto:')) or '${' in target:
+                continue
+            target = target.split('#')[0]
+            resolved = (page.parent / target).resolve()
+            if not any(p.exists() for p in (resolved, resolved.with_suffix('.md'), resolved / 'index.md')):
+                errors.append(f'Broken link {page.relative_to(ROOT)}: {target}')
+    if args.built:
+        dist = ROOT / 'docs/.vitepress/dist'
+        if not (dist / 'index.html').is_file():
+            errors.append('Docs build missing')
+        for target in PRIVATE:
+            if (dist / target).exists() or (dist / (target + '.html')).exists():
+                errors.append('Private build page: ' + target)
+        for path in dist.rglob('*'):
+            if path.suffix in ('.html', '.js', '.json'):
+                content = path.read_text(encoding='utf-8')
+                for marker in ('PROGRESS0910', 'EXECUTION_PLAN', 'handbook/operator', 'handbook/developer'):
+                    if marker in content:
+                        errors.append(f'Private content/index marker {marker}: {path.name}')
+    if errors:
+        raise SystemExit('\n'.join(sorted(set(errors))))
+    print('Documentation links and public boundaries: OK')
+
+
+if __name__ == '__main__':
+    main()

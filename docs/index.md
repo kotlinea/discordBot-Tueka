@@ -1,6 +1,6 @@
 ---
 title: Tueka Docs
-description: Discordサーバー管理の設定、機能、運用、復旧手順
+description: Discordサーバー管理の基本操作、機能設定、コマンド
 keywords: Tueka, Discord Bot, モデレーション, チケット, リアクションロール, ソーシャル通知
 ---
 
@@ -9,7 +9,7 @@ keywords: Tueka, Discord Bot, モデレーション, チケット, リアクシ�
 Tuekaの導入、サーバー設定、日常運用、障害対応をまとめた公式ドキュメントです。設定名や必要権限は現在の実装に合わせています。
 
 <div class="doc-index">
-  <a href="./guide/getting-started"><span><strong>Botを導入する</strong><br>Discord Developer Portal、OAuth、最初の起動</span></a>
+  <a href="./guide/getting-started"><span><strong>Botを導入する</strong><br>招待、ログイン、サーバー設定</span></a>
   <a href="./dashboard/"><span><strong>ダッシュボードを使う</strong><br>サーバー選択、保存、競合、権限診断</span></a>
   <a href="./features/moderation"><span><strong>サーバーを保護する</strong><br>AutoMod、Anti-Spam、Anti-Raid、違反履歴</span></a>
   <a href="./features/tickets"><span><strong>問い合わせを受け付ける</strong><br>Panel、Form、Staff対応、Close、Transcript</span></a>
@@ -19,5 +19,5 @@ Tuekaの導入、サーバー設定、日常運用、障害対応をまとめた
 </div>
 
 ::: tip 最初に読むページ
-初めて導入する場合は、[導入する](./guide/getting-started)と[必要な権限とIntents](./guide/permissions)を順番に確認してください。
+初めて導入する場合は、[導入する](guide/getting-started.md)と[必要な権限](guide/permissions.md)を順番に確認してください。
 :::

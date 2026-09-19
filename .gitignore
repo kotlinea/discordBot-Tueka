@@ -24,3 +24,5 @@ rank.png
 **/transcripts.tar
 **/recovery-*.json
 **/.recovery.lock
+**/setup.json
+**/deployment.json

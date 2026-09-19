@@ -44,6 +44,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:PGBIN | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - run: python scripts/generate_api.py --check
+      - run: python scripts/generate_commands.py --check
+      - run: python scripts/check_documentation.py
       - run: python -m unittest discover -s tests -p 'test_*.py'
       - name: Verify logical restore (Linux)
         if: runner.os == 'Linux'
@@ -95,6 +97,10 @@ jobs:
       - run: python scripts/verify_runtime_image.py --image tueka:ci --network tueka-runtime_default
       - name: Compose environments and migration gates
         run: python scripts/verify_compose.py --image tueka:ci
+      - name: First installation from empty configuration
+        run: |
+          bash scripts/setup.sh check --config-dir .venv-p0/setup-prerequisites
+          .venv-operator/bin/python scripts/verify_setup.py
       - name: Snapshot restore and older-image rollback
         run: python scripts/verify_recovery.py --image tueka:ci
       - name: Full regression in production image

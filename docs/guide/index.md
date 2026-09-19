@@ -1,18 +1,9 @@
 # Tuekaについて
 
-Tuekaは、Discord Bot、管理ダッシュボード、ソーシャル通知Workerで構成されます。サーバーごとの設定は共通PostgreSQL DBへ保存され、BotとWorkerが同じ状態を参照します。
+TuekaはDiscordサーバーのモデレーション、チケット対応、ロール付与、投票、提案、SNS通知を提供します。
 
-## 主な機能
+- 一般メンバー：コマンド、公開Panel、投票、提案を利用します。
+- サーバー管理者・モデレーター：付与された権限の範囲で設定や処置を行います。
+- システム運用者：Botのホスト、配布、障害対応を担当します。このサイトではインフラ手順は扱いません。
 
-| 分類 | 機能 |
-| --- | --- |
-| Moderation | AutoMod、Anti-Spam、Anti-Raid、Warnings、手動処置、ログ |
-| Community | 入退室、初期Role、レベリング、Ticket、Reaction Roles、一時VC、ライブ統計 |
-| Engagement | 投票、ミニゲーム |
-| Social | YouTube、Twitch、X、TikTok、Instagram通知 |
-
-設定を変更できるのはDiscord OAuthで対象サーバーの管理権限を確認できたユーザーです。Ticket Staffは、許可されたTicket画面だけを利用できます。
-
-## データの所在
-
-設定、ケース、イベント、配送状態は`DATABASE_URL`のPostgreSQLへ保存されます。Ticket Transcriptは暗号化してローカルまたはS3互換ストレージへ保存できます。秘密値は`.env`だけで管理します。
+[利用を始める](./getting-started) → [Dashboard](../dashboard/) → [全コマンド](../reference/commands)の順に確認してください。

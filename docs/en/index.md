@@ -1,10 +1,10 @@
-# Tueka documentation
+# Tueka Docs
 
-Tueka combines moderation, community operations, tickets, reaction roles, and social notifications for Discord servers.
+Guides for members, server managers and moderators. Infrastructure instructions are maintained separately by the system operator.
 
-- [Getting started](./getting-started)
-- [Feature overview](./features)
-- [Operations](./operations)
-- [Troubleshooting](./troubleshooting)
-
-The Japanese documentation is the complete reference. These English pages cover installation, major capabilities, operations, and recovery.
+- [Getting started](./guide/getting-started)
+- [Dashboard](./dashboard/)
+- [All Discord commands](./reference/commands)
+- [Features](./features)
+- [Social notifications](./social/)
+- [Troubleshooting](./troubleshooting/)

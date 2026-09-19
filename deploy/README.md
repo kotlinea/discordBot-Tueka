@@ -1,6 +1,10 @@
+# 配布用テンプレート
+
+新規導入は[運用者ガイド](../handbook/operator/setup.md)、コマンドは[運用一覧](../handbook/operator/commands.md)を正本とします。以下は既存のHost直接配備用の補助手順です。
+
 # VPS deployment
 
-The shared production image is documented in [container operations](../docs/operations/container.md). Use the [environment-specific Compose launcher](../docs/operations/compose.md) for separate dev/stage/prod projects and migration-gated upgrades. The systemd instructions below remain the existing host deployment path.
+The shared production image is documented in [container operations](../handbook/operator/container.md). Use the [environment-specific Compose launcher](../handbook/operator/compose.md) for separate dev/stage/prod projects and migration-gated upgrades. The systemd instructions below remain the existing host deployment path.
 
 1. Copy `.env.example` to `.env`, set secrets, and set `DISCORD_REDIRECT_URI` to the public HTTPS callback.
 2. In Discord Developer Portal, add that exact URI under OAuth2 Redirects. Enable the **Server Members Intent** and **Message Content Intent** (the dashboard's role/member features and chat filters require them).
@@ -24,7 +28,7 @@ Grant only the features you enable. The dashboard prevents activation when the B
 
 After deployment, check all services independently with `systemctl status tueka-bot tueka-dashboard tueka-social-worker`, then complete an OAuth login through the public HTTPS URL. The Redirect URI must match the Developer Portal value exactly.
 
-The public documentation is served at `/docs/`. FastAPI Swagger UI is served at `/api/docs`; its OpenAPI document is `/api/openapi.json`.
+The public documentation is served at `/docs/`. Swagger and OpenAPI are available only with TUEKA_ENV=dev and TUEKA_API_DOCS_ENABLED=true.
 
 ## Social notification worker
 

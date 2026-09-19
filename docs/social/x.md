@@ -6,16 +6,18 @@ keywords: X API Filtered Stream poll since_id 429 credits
 
 # X通知
 
-新規Postを通知します。返信とRepostは既定で除外します。
+登録したアカウントの更新を通知します。取得方法と利用可否はシステム運用者が管理します。
 
-`X_BEARER_TOKEN`が必要です。運用者は`SOCIAL_X_MODE=stream`または`poll`を選択し、利用者ごとの切替は行いません。
+## 登録
 
-## Stream
+アカウントIDまたはHandleと通知Channelを指定します。
 
-監視対象を`from:`条件へ集約し、Filtered Streamを1接続で管理します。切断時は指数Backoffで再接続し、保存済み`since_id`以降をTimeline APIで補完します。
+## 利用と確認
 
-## Poll
+保存後の対象解決を待ち、Previewで通知を確認します。取得方式は利用者ごとには切り替えません。
 
-Timelineを定期確認します。Streamを維持できない契約・ネットワーク構成で使用します。429の`Retry-After`を尊重します。
+通知先のBot権限とRole階層を確認し、通知Roleは専用選択欄で指定します。Providerの利用可否は運用者の設定によります。
 
-APIの課金停止、Rate Limit、残Credit不足はProvider状態へ反映されます。対象だけを停止し、他Providerの監視は継続します。
+## 問題が起きたら
+
+Provider側の制限によって遅延することがあります。対象が公開されているか確認し、継続する失敗は運用者へ伝えます。

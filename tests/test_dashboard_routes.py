@@ -20,6 +20,7 @@ class DashboardRouteTests(unittest.TestCase):
         env = {'DISCORD_TOKEN': 'test-token', 'DISCORD_CLIENT_ID': '1', 'DISCORD_CLIENT_SECRET': 'test-secret',
                'DISCORD_REDIRECT_URI': 'http://testserver/oauth/callback', 'SESSION_SECRET': 'test-session-secret',
                'DASHBOARD_HTTPS_ONLY': 'false', 'DATABASE_URL': str(prepare_database(root / 'test.db', self.addCleanup)), 'DATA_DIR': str(root),
+               'TUEKA_ENV': 'stage', 'TUEKA_API_DOCS_ENABLED': 'false',
                'DASHBOARD_UI_V2': 'false', 'DASHBOARD_UI_V2_GUILDS': '999',
                'TICKETS_V2': 'false', 'TICKETS_V2_GUILDS': 'retired-allowlist'}
         with patch.dict(os.environ, env):
@@ -75,7 +76,24 @@ class DashboardRouteTests(unittest.TestCase):
         self.assertEqual(self.client.get('/').status_code, 200)
         self.assertEqual(self.client.get('/unknown').status_code, 404)
         self.assertEqual(self.client.get('/static/landing-v2.css').status_code, 200)
-        self.assertEqual(self.client.get('/api/openapi.json').status_code, 200)
+        self.assertEqual(self.client.get('/api/openapi.json').status_code, 404)
+        self.assertEqual(self.client.get('/api/docs').status_code, 404)
+
+    def test_api_docs_require_explicit_development_environment(self):
+        for environment, enabled, expected in [('dev', 'true', 200), ('dev', 'false', 404), ('stage', 'true', 404), ('prod', 'true', 404), ('', 'true', 404)]:
+            with self.subTest(environment=environment, enabled=enabled), patch.dict(os.environ, {
+                'TUEKA_ENV': environment, 'TUEKA_API_DOCS_ENABLED': enabled,
+                'DATABASE_URL': self.module.settings.database_url, 'DISCORD_CLIENT_ID': '1',
+                'DISCORD_CLIENT_SECRET': 'offline', 'DISCORD_REDIRECT_URI': 'http://testserver/oauth/callback',
+                'SESSION_SECRET': 'offline', 'DISCORD_TOKEN': 'offline',
+            }):
+                spec = importlib.util.spec_from_file_location('api_docs_test', 'dashboard/app.py')
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                client = TestClient(module.app, follow_redirects=False)
+                self.addCleanup(client.close)
+                for path in ('/api/docs', '/api/openapi.json'):
+                    self.assertEqual(client.get(path).status_code, expected)
 
     def test_social_oauth_rejects_missing_csrf_and_retires_old_form_url(self):
         response = self.client.post('/social/oauth/tiktok/connect/1')

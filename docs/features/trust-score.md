@@ -13,4 +13,4 @@ Moderationケースと違反履歴から管理者向けの参考値を表示し�
 | 保持日数 | 1～3650日 | 算出対象に残す履歴期間 |
 | フラグ閾値 | 0～100 | 管理者画面で確認対象として表示する境界 |
 
-履歴の取消や失効は再計算へ反映されます。自動処罰はTrust Scoreではなく、[Warnings / Infractions](./infractions)のpoints閾値で設定してください。
+履歴の取消や失効は再計算へ反映されます。自動処罰はTrust Scoreではなく、[Warnings / Infractions](infractions.md)のpoints閾値で設定してください。

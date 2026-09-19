@@ -11,18 +11,18 @@ ENVIRONMENTS = ('dev', 'stage', 'prod')
 IMMUTABLE_IMAGE = re.compile(r'(?:[a-zA-Z0-9./:_-]+@)?sha256:[0-9a-f]{64}\Z')
 
 
-def initialize(directory, environment, image, project=None):
+def initialize(directory, environment, image, project=None, *, draft=False):
     if environment not in ENVIRONMENTS:
         raise ValueError('Unknown environment')
     directory = Path(directory).resolve()
     project = project or 'tueka-' + environment
-    validate_identity(environment, image, project)
+    validate_identity(environment, ('sha256:' + '0' * 64) if draft else image, project)
     directory.mkdir(parents=True, exist_ok=False)
     directory.chmod(0o700)
     password = secrets.token_hex(32)
-    metadata = {'environment': environment, 'image': image, 'project': project,
+    metadata = {'environment': environment, 'image': None if draft else image, 'project': project,
                 'dashboard_port': {'dev': 8002, 'stage': 8001, 'prod': 8000}[environment], 'vite_port': 5173}
-    (directory / 'deployment.json').write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
+    (directory / ('setup.json' if draft else 'deployment.json')).write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
     values = {
         'TUEKA_ENV': environment,
         'DATABASE_URL': f'postgresql://tueka_{environment}:{quote(password)}@postgres:5432/tueka_{environment}',
@@ -60,20 +60,20 @@ def validate_identity(environment, image, project):
         raise ValueError('Stage and production require an immutable sha256 image reference')
 
 
-def read_metadata(directory):
+def read_metadata(directory, *, draft=False):
     directory = Path(directory).resolve()
-    metadata = json.loads((directory / 'deployment.json').read_text(encoding='utf-8'))
+    metadata = json.loads((directory / ('setup.json' if draft else 'deployment.json')).read_text(encoding='utf-8'))
     environment = metadata['environment']
-    validate_identity(environment, metadata['image'], metadata['project'])
+    validate_identity(environment, ('sha256:' + '0' * 64) if draft else metadata['image'], metadata['project'])
     for port in ('dashboard_port', 'vite_port'):
         if type(metadata[port]) is not int or not 1024 <= metadata[port] <= 65535:
             raise ValueError('Deployment ports must be integers between 1024 and 65535')
     return metadata
 
 
-def read(directory, *, require_credentials=True):
+def read(directory, *, require_credentials=True, draft=False):
     directory = Path(directory).resolve()
-    metadata = read_metadata(directory)
+    metadata = read_metadata(directory, draft=draft)
     environment = metadata['environment']
     values = dotenv_values(directory / 'app.env', interpolate=False)
     if values.get('TUEKA_ENV') != environment:

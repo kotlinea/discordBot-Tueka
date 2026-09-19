@@ -1,13 +1,6 @@
-# 必要な権限とIntents
+# 必要な権限
 
-## Gateway Intents
-
-| Intent | 使用する機能 |
-| --- | --- |
-| Server Members | 入退室、Auto Role、Anti-Raid、メンバー情報、Role関連機能 |
-| Message Content | AutoMod、Anti-Spam、Ticket履歴、レベリング |
-
-Discord Developer PortalのBot設定で有効にし、コード側のIntent設定とも一致させます。
+メンバーは各コマンドの権限を確認してください。サーバー管理者はBotの権限とRole階層を確認します。接続自体の問題はシステム運用者へ連絡してください。
 
 ## Bot権限
 
