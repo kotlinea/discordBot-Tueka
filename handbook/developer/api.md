@@ -1,6 +1,6 @@
 # API
 
-Swagger UIは `/api/docs`、OpenAPI JSONは `/api/openapi.json` です。Dashboard APIは `/api/v1` 配下です。このバージョンは廃止済みDashboard V1とは別で、Router分割後もURLを維持します。
+Dashboard APIは `/api/v1` 配下です。`TUEKA_ENV=dev` と `TUEKA_API_DOCS_ENABLED=true` を設定した環境では、Swagger UIを `/api/docs`、OpenAPI JSONを `/api/openapi.json` で参照できます。それ以外の環境では両方404です。オフラインの型生成は下記のComposeタスクを使用します。
 
 ## 認証とCSRF
 

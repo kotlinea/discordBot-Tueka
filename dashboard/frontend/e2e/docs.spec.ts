@@ -5,6 +5,7 @@ test('documentation is responsive, searchable and accessible', async ({ page }, 
   await page.goto('./')
   await expect(page.getByRole('heading', { name: 'Tueka Docs' })).toBeVisible()
   await expect(page.getByRole('button', { name: /ドキュメントを検索/ })).toBeVisible()
+  await expect(page.locator('a.dashboard-link').first()).toHaveAttribute('href', '/servers')
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false)
 
   if (testInfo.project.name !== 'docs-desktop' && testInfo.project.name !== 'docs-768') {
@@ -30,6 +31,7 @@ test('long feature pages do not overflow', async ({ page }) => {
 test('bilingual commands and search stay within public documentation', async ({ page }) => {
   await page.goto('./en/reference/commands')
   await expect(page.getByRole('heading', { name: /^All Discord commands/, level: 1 })).toBeVisible()
+  await expect(page.locator('a.dashboard-link').first()).toHaveAttribute('href', '/servers')
   await expect(page.getByRole('heading', { name: /^\/ticket open/, level: 2 })).toBeAttached()
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false)
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze()

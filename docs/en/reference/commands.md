@@ -1,6 +1,6 @@
 # All Discord commands
 
-Argument names, types and requirements are checked against the registered command tree. Replace example IDs and targets with your server resources. Try sanction/deletion examples only in a test server.
+Find each command’s purpose, arguments, permissions and response visibility. Replace example IDs and targets with your server resources. Try sanction/deletion examples only in a test server.
 
 ## /ban
 

@@ -33,10 +33,13 @@ const AppearanceControl = defineComponent({
   },
 })
 
+// This route belongs to the Dashboard, outside VitePress's /docs/ base.
+const dashboardLink = () => h('a', { href: '/servers', target: '_self', class: 'dashboard-link' }, 'Dashboard')
+
 export default {
   extends: DefaultTheme,
   Layout: () => h(DefaultTheme.Layout, null, {
-    'nav-bar-content-after': () => h('div', { class: 'appearance-top' }, [h(AppearanceControl)]),
-    'nav-screen-content-after': () => h('div', { class: 'appearance-mobile' }, [h(AppearanceControl)]),
+    'nav-bar-content-after': () => h('div', { class: 'appearance-top' }, [dashboardLink(), h(AppearanceControl)]),
+    'nav-screen-content-after': () => h('div', { class: 'appearance-mobile' }, [dashboardLink(), h(AppearanceControl)]),
   }),
 }

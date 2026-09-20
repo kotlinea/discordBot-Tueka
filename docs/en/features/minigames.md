@@ -5,6 +5,12 @@ title: Minigames
 
 # Minigames
 
-Use `/help` to find available games, including `/rps`. The Bot needs View Channel, Send Messages and Embed Links. Game buttons act only on their own session and expire with it.
+Play rock-paper-scissors against the Bot with `/rps`. Choose a hand; both hands and the result appear in the channel where you run the command.
 
-Administrators can disable new sessions. Previously sent messages are not automatically deleted.
+```text
+/rps hand:rock
+```
+
+The server manager must enable Minigames. The Bot needs View Channel and Send Messages. When the feature is disabled, the caller receives a private notice.
+
+See the [command reference](../reference/commands) for arguments and response visibility.

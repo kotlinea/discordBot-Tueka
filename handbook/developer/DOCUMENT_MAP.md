@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `README.md` | `README.md` | 継続。公開資料は利用者向けに編集 |
 | `ROADMAP.md` | `ROADMAP.md` | リポジトリ内の方針正本。公開Docsには含めない |
-| `deploy/README.md` | `deploy/README.md` | 既存Host直接起動の補足。正規入口はOperator handbook |
+| `deploy/README.md` | `deploy/README.md` | Compose配布設定の入口。導入・管理手順はOperator handbook |
 | `design.md` | `handbook/developer/design.md` | 内部資料へ移管、旧URLは404 |
 | `docs/EXECUTION_PLAN.md` | `handbook/developer/history/EXECUTION_PLAN-2026-09-19.md` | 内部資料へ移管、旧URLは404 |
 | `docs/PROGRESS0910.md` | `handbook/developer/PROGRESS0910.md` | 内部資料へ移管、旧URLは404 |
@@ -17,7 +17,7 @@
 | `docs/en/features.md` | `docs/en/features.md` | 継続。公開資料は利用者向けに編集 |
 | `docs/en/getting-started.md` | `docs/en/getting-started.md` | 継続。公開資料は利用者向けに編集 |
 | `docs/en/index.md` | `docs/en/index.md` | 継続。公開資料は利用者向けに編集 |
-| `docs/en/operations.md` | `handbook/operator/legacy-english-operations.md` | 内部資料へ移管、旧URLは404 |
+| `docs/en/operations.md` | `handbook/developer/history/docs-before-role-split/legacy-english-operations.md` | 内部資料へ移管、旧URLは404 |
 | `docs/en/troubleshooting.md` | `docs/en/troubleshooting.md` | 継続。公開資料は利用者向けに編集 |
 | `docs/features/anti-raid.md` | `docs/features/anti-raid.md` | 継続。公開資料は利用者向けに編集 |
 | `docs/features/anti-spam.md` | `docs/features/anti-spam.md` | 継続。公開資料は利用者向けに編集 |
@@ -117,17 +117,17 @@
 | `handbook/operator/README.md` | 運用者・非公開 |
 | `handbook/operator/application-setup.md` | 運用者・非公開 |
 | `handbook/operator/commands.md` | 運用者・非公開 |
-| `handbook/operator/legacy-mixed-pages/features-moderation.md` | 運用者・非公開 |
-| `handbook/operator/legacy-mixed-pages/features-reaction-roles.md` | 運用者・非公開 |
-| `handbook/operator/legacy-mixed-pages/features-tickets.md` | 運用者・非公開 |
-| `handbook/operator/legacy-mixed-pages/guide-permissions.md` | 運用者・非公開 |
-| `handbook/operator/legacy-mixed-pages/social-index.md` | 運用者・非公開 |
-| `handbook/operator/legacy-mixed-pages/social-instagram.md` | 運用者・非公開 |
-| `handbook/operator/legacy-mixed-pages/social-tiktok.md` | 運用者・非公開 |
-| `handbook/operator/legacy-mixed-pages/social-twitch.md` | 運用者・非公開 |
-| `handbook/operator/legacy-mixed-pages/social-x.md` | 運用者・非公開 |
-| `handbook/operator/legacy-mixed-pages/social-youtube.md` | 運用者・非公開 |
-| `handbook/operator/legacy-mixed-pages/troubleshooting-index.md` | 運用者・非公開 |
+| `handbook/developer/history/docs-before-role-split/legacy-mixed-pages/features-moderation.md` | 開発者・歴史資料 |
+| `handbook/developer/history/docs-before-role-split/legacy-mixed-pages/features-reaction-roles.md` | 開発者・歴史資料 |
+| `handbook/developer/history/docs-before-role-split/legacy-mixed-pages/features-tickets.md` | 開発者・歴史資料 |
+| `handbook/developer/history/docs-before-role-split/legacy-mixed-pages/guide-permissions.md` | 開発者・歴史資料 |
+| `handbook/developer/history/docs-before-role-split/legacy-mixed-pages/social-index.md` | 開発者・歴史資料 |
+| `handbook/developer/history/docs-before-role-split/legacy-mixed-pages/social-instagram.md` | 開発者・歴史資料 |
+| `handbook/developer/history/docs-before-role-split/legacy-mixed-pages/social-tiktok.md` | 開発者・歴史資料 |
+| `handbook/developer/history/docs-before-role-split/legacy-mixed-pages/social-twitch.md` | 開発者・歴史資料 |
+| `handbook/developer/history/docs-before-role-split/legacy-mixed-pages/social-x.md` | 開発者・歴史資料 |
+| `handbook/developer/history/docs-before-role-split/legacy-mixed-pages/social-youtube.md` | 開発者・歴史資料 |
+| `handbook/developer/history/docs-before-role-split/legacy-mixed-pages/troubleshooting-index.md` | 開発者・歴史資料 |
 | `handbook/operator/setup.md` | 運用者・非公開 |
 
 ## 2026-09-20 設定方式の統一

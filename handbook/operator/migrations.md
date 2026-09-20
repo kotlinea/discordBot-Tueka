@@ -1,49 +1,26 @@
-# PostgreSQL Migration
+# PostgreSQLのSchema更新
 
-現行RuntimeはPostgreSQLを使用します。`migrations/postgresql/0001_initial.sql` が66テーブルとIndex・外部キーを作成し、適用履歴を加えた67テーブルが初期構成です。SQLite用の `migrations/0001_*.sql`〜`0010_*.sql` は過去の履歴であり、新しいCLIでは実行しません。
+Tuekaの保存先はPostgreSQLです。Schemaの定義と更新SQLは `migrations/postgresql/`、適用履歴はDBの `schema_migrations` に保存されます。
 
-## 初期化
+## 導入時
 
-[導入フロー](setup.md)のstartが、選択したapp.envを使いDB readinessの後でMigrationを実行します。Host側で別のDATABASE_URLを設定して直接実行しません。
+[導入フロー](setup.md)のstartは、対象環境のapp.envにあるDBへ接続し、DB readinessの後にMigrationを実行します。Bot・Dashboard・Social Workerは同じDBを使用します。
 
-Bot・Dashboard・Workerは同じ `DATABASE_URL` を使用します。未適用またはChecksum不一致のSchemaでは起動できません。Repositoryが起動時にテーブルを作成することはありません。
+アプリの起動には、必要なMigrationがすべて適用済みで、履歴のChecksumがSQLファイルと一致していることが必要です。
 
-## 更新
+## 更新時
 
-1. 対象環境と接続先DBを確認し、Stageで適用・復元を検証します。
-2. Bot・Dashboard・Workerを停止します。
-3. [論理BackupとTranscript・鍵の保全](backup.md)を実施します。Migration CLIは自動Backupを作りません。
-4. [更新手順](upgrade.md)のCLIでMigrationとサービス起動を実行します。
+1. 対象ImageをStageで受入し、適用と復元の結果を確認します。
+2. [Backup手順](backup.md)でDB・Transcript・対応Imageを保全し、同じ世代の暗号鍵を確保します。
+3. [更新手順](upgrade.md)で対象Imageを設定し、upを実行します。
+4. Migration成功、サービス起動、healthを確認します。
 
-MigrationはDB・Schema単位のTransaction Advisory Lockを取得します。同時実行者は拒否され、未適用SQLと履歴更新は一つのTransactionで処理されます。途中失敗時はDDL・データ・履歴がRollbackされます。再適用は変更を行いません。適用済みファイルの改変、未知の履歴、番号欠落は拒否します。
+upは稼働中のアプリを停止してからMigrationを実行します。未適用SQLと履歴更新は一つのTransactionで処理され、途中で失敗した場合はRollbackされます。既に適用済みの状態で再実行すると、適用履歴を確認して起動へ進みます。
 
-履歴には番号・ファイル名・LF正規化後のSHA256・UTC epoch秒を記録します。SQL内からのTransaction・Session制御は認めません。通常のDDL/DMLを使い、各文をセミコロンで終えます。条件付き列追加はPostgreSQLの `ADD COLUMN IF NOT EXISTS` を使用します。
+## 失敗した場合
 
-## 開発DBの切替
+対象環境のログとMigrationファイルを確認します。適用済みファイルのChecksum不一致、未知の履歴、番号の欠落、同時適用はエラーになります。アプリを停止した状態で原因を解消し、同じupコマンドを再実行してください。
 
-今回の原SQLite DBは破棄可能な開発データです。ETL・Dual Write・旧DBへの逆移送は実装しません。元ファイルを残していてもRuntimeは読み込みません。この例外は将来のStage・本番データには適用しません。
+DBとImageを更新前へ戻す場合は、[別Projectへの復元](backup.md)を使用します。Discord上のメッセージやRoleも合わせて照合します。
 
-DBの再作成はDiscord上のPanel・Role・Channelを削除しません。空DBではそれらの所有記録も存在しないため、旧PanelからのInteractionで自動復旧・再作成せず、管理者が対象を確認して新しい設定を登録してください。暗号鍵、Transcriptファイル、S3オブジェクトはDBとは別管理です。
-
-## Docker DevのDB
-
-[導入フロー](setup.md)のDev設定を使います。app.envのDATABASE_URLとComposeのPostgreSQLサービスが同じ環境に属することを導入CLIが検証します。ルート.envや.env.postgres-devを新規作成する必要はありません。既存の別ProjectのDBを自動移送・削除することはありません。
-
-## テスト専用PostgreSQL
-
-```sh
-docker compose --env-file tests/postgres.env -p tueka-test -f compose.postgres-test.yaml up -d --wait
-```
-
-テスト専用URLを `TUEKA_TEST_DATABASE_URL` に設定します。例は `postgresql://tueka_test:tueka_test_local_only@127.0.0.1:55432/tueka_test` です。このServiceはlocalhostのみ公開し、データはtmpfs上にあります。停止・再作成でテストデータは失われます。アプリの開発DBや本番DBには使わないでください。
-
-各テストと型生成はUUID付きSchemaを作り、終了時に削除します。アプリの `DATABASE_URL` はテスト接続先に流用しません。
-
-```sh
-docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build test-python
-docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build api-check
-docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build verify-restore
-docker compose --env-file tests/postgres.env -p tueka-test -f compose.postgres-test.yaml down
-```
-
-復元検証だけは同じテストServer上にUUID付きDBを3個作成し、実pg_dump/pg_restoreで復元・採番・Queue・失敗時Rollbackを検証して削除します。DB作成権限が必要です。PostgreSQLクライアントがPATHにある場合は `--client-container` を省略できます。
+SQLの追加とテストは[開発者ガイド](../developer/extending.md)、専用DBでの自動検証は[共通タスク](../developer/TOOLS.md)を参照してください。

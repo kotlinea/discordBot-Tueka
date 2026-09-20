@@ -8,7 +8,7 @@ keywords: 禁止ワード 正規表現 URL ドメイン Discord招待 Safe Brows
 
 メッセージ内容を検査し、削除、Warning、通知、Timeoutなどを組み合わせます。時間窓の連投対策は[Anti-Spam](anti-spam.md)を使用します。
 
-禁止語はDashboardのKeyword Ruleへ設定してください。起動時の禁止語CSV読込みと旧ルールの自動Importは廃止しています。Point閾値による処置はInfractions設定を使用し、Infractionsが無効なら旧設定へFallbackしません。
+禁止語はDashboardのKeyword Ruleへ設定します。pointsの累計に応じた処置を使う場合は、[Warnings / Infractions](infractions.md)を有効にして閾値と処置を設定してください。
 
 ## Trigger
 

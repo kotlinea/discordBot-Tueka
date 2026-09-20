@@ -1,72 +1,66 @@
 # 環境別Compose
 
-共通定義は`deploy/compose.yaml`、差分は`compose.dev.yaml`・`compose.stage.yaml`・`compose.prod.yaml`。アプリは同じ本番Imageを使い、DevのViteだけNodeを含むdevelopment targetを使う。現在のHost用`compose.postgres-dev.yaml`とは別のProjectであり、既存の開発DBを自動移送・削除しない。
+Dev、Stage、Prodは環境ごとの設定ディレクトリとCompose Projectで管理します。初回導入は[check・configure・build・start](setup.md)、起動後の操作は[管理コマンド](commands.md)を使用します。
 
-## 環境の作成
-
-Repositoryルートで実行する。GitとDocker／Composeだけを準備する。
-
-```sh
-docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build build-image
-docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy init --environment dev --config-dir data/environments/dev --image tueka:tools
-```
-
-initは新しいディレクトリだけを作成し、上書きしない。ファイルの役割は次のとおり。
+## 設定ファイル
 
 | ファイル | 内容 |
 | --- | --- |
-| deployment.json | 環境名、Image、Project、Dashboard/ViteのHost port |
-| app.env | 環境専用のDiscord/OAuth/Session設定、DATABASE_URL、必要なProvider/暗号鍵設定 |
+| setup.json | ビルド前の環境名・Project・公開ポート |
+| deployment.json | 起動に使うImage・環境名・Project・公開ポート |
+| app.env | Discord、OAuth、DB、通知Provider、暗号鍵などのアプリ設定 |
 | database-password | アプリDB Roleのパスワード |
-| postgres-admin-password | PostgreSQL管理者の別パスワード |
+| postgres-admin-password | PostgreSQL管理者のパスワード |
 
-DB/Session用の乱数は生成するが、Discord資格情報と公開Originは設定者がapp.envへ入力する。Devは専用Botを使い、OAuth callbackの初期値は`http://127.0.0.1:5173/oauth/callback`。Vite portを変えた場合はOrigin/callbackとDiscord Developer Portalも揃える。Stage/本番ではHTTPS OriginとHTTPS Cookieを必須とする。
+configureはDBとSessionなどの秘密値を生成します。Discord資格情報と公開URLは運用者がapp.envへ入力します。DevのURLは `http://127.0.0.1:5173`、callbackは `/oauth/callback` です。ポートを変える場合はURLとDiscord Developer PortalのRedirectsも合わせて更新します。
 
-設定ディレクトリはGit対象外のdata配下または保護された外部ディレクトリに置く。Unixでは親ディレクトリ0700、秘密ファイル0644として、Host上の親ディレクトリでアクセスを制限しつつ、Composeで個別にmountしたファイルを非rootアプリが読めるようにする。Windowsでは設定ディレクトリのACLを運用者に限定する。Composeのfile secretはbind mountであり、Swarmの暗号化Secret保管ではない。DBパスワードは一行で保存し、CRLFを含めない。生成時はOSによらずLF/改行なしとする。
+Linuxでは設定ディレクトリ0700、個別の秘密ファイル0644を使用します。Hostでは親ディレクトリでアクセスを制限し、コンテナでは読取り専用で渡したファイルをUID 10001のアプリが参照します。WindowsではディレクトリのACLを運用者に限定します。パスワードファイルは生成された1行の形式を保ちます。
 
-## 起動・停止・更新
+## 起動と停止
 
-```sh
-docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy check --config-dir data/environments/dev
-docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy up --config-dir data/environments/dev
-docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy status --config-dir data/environments/dev
-docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy stop --config-dir data/environments/dev
-```
+以下はStageの例です。Devでは設定ディレクトリを `data/environments/dev` にします。
 
-upは設定を検査し、必要なImageを解決してから旧Bot/Dashboard/Workerを停止する。DBのreadinessを待ち、前回のmigrateコンテナを除去して今回のMigrationを実行する。成功後だけ3Serviceを起動する。失敗時は旧Writerを止めたまま終了し、自動的に旧Imageで再開しない。原因を直して同じupを再実行する。更新前BackupとRollback判断は[更新手順](upgrade.md)に従う。
-
-単なる`docker compose restart`はImage更新やMigrationを行わないため、リリースには使用しない。Compose定義にもDB healthy→migrate completed successfully→3Serviceの依存を設定するが、稼働中Writer停止と毎回のMigration再実行を保証するのは上記launcherである。
-
-stopはコンテナを停止するだけで、Volumeを消さない。通常運用のlauncherにはVolume削除コマンドを設けない。DB資格情報のファイル変更だけでは既存DB Roleのパスワードは変わらない。初期化SQLは空Volumeでのみ実行されるため、既存DBの資格情報変更は別途Role変更とサービス更新を合わせて実施する。
-
-## Stageから本番へ
-
-Stage/本番のimageには`registry.example/tueka@sha256:...`の完全なdigestを指定する。ローカル検証では`sha256:...`のImage IDも受け付けるが、別Hostへ配布できるRegistry参照ではない。
-
-```sh
-docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy init --environment stage --config-dir data/environments/stage --image REGISTRY_IMAGE_AT_DIGEST
-docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy init --environment prod --config-dir data/environments/prod --image REGISTRY_IMAGE_AT_DIGEST
-# それぞれのapp.envへ別のDiscord/OAuth/Session情報と公開Originを設定する
+```text
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy check --config-dir data/environments/stage
 docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy up --config-dir data/environments/stage
-# Stageで実Discord/OAuth/Webhookの受入を完了してから実行する
-docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy up --config-dir data/environments/prod --stage-config data/environments/stage
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy status --config-dir data/environments/stage
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy health --config-dir data/environments/stage
 ```
 
-本番upはStage/本番の指定digest一致、別Token/Client ID/Client Secret/Session Secret/callback、Stageの3Serviceが起動中で実際に同じImage IDであることを確認する。これはStageの機能受入を代行しない。両環境が別Docker Hostの場合は、Stageの稼働状態を照合できる運用経路が必要であり、現launcherは同一Docker Hostでの照合を対象とする。遠隔環境への昇格は未実施。
+upは設定とImageを確認し、稼働中のBot・Dashboard・Workerを停止します。DB readiness、Migration、サービス起動の順に進みます。Migration失敗時は停止状態を保ちます。ログの原因を解消し、同じupコマンドを再実行してください。
 
-## 分離と永続化
+停止する場合:
 
-- Projectは`tueka-dev`・`tueka-stage`・`tueka-prod`。Network、Secret mount、VolumeはProjectごとに分かれる。
-- PostgreSQLは内部Networkだけに接続し、Host portを公開しない。DB名とアプリRoleは`tueka_ENV`。アプリRoleにsuperuser/createdb/createroleを付けない。
-- DBはpostgres-data Volume、Transcriptはtranscripts Volume。BotはTranscriptを書込み、Dashboardは同じVolumeを読取り専用で参照する。Worker/MigrationにはTranscriptをmountしない。
-- アプリはUID/GID 10001、read-only root filesystem、cap-drop ALL、no-new-privileges、/tmp tmpfsで動く。各Serviceは当初1 Replica。
-- Dashboard公開はlocalhostのみ。既定は本番8000、Stage8001、Dev8002。HostのCaddy/TLSを維持し、それぞれの公開Originへ転送する。
-- Devだけ必要なソースファイル/ディレクトリを読取り専用bind mountする。Repository全体や.env/dataをmountしない。Uvicorn reloadを有効にし、Viteは5173でSPAを配信し、API/OAuth等をDashboardへ同一Originでproxyする。Bot/WorkerのPython変更はupで再起動する。
-- Devの`up`は、読取り専用Frontend内のVolume mount先としてHostの`dashboard/frontend/node_modules`を事前作成する。既存内容は変更せず、依存のインストールはコンテナ内のnamed volumeへ行う。Composeを直接操作する場合も先にこのディレクトリを作成する。
-- ImageのSPA/Docsは/opt/tueka-assetsへ配置し、Devのソースmountで隠れない。明示したTUEKA_ENV_FILEから秘密値を読み、ソースの.envへのfallbackや`${...}`展開を行わない。
+```text
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy stop --config-dir data/environments/stage
+```
 
-## ローカル受入の再現
+stopはDBを含むコンテナを停止し、データVolumeを保持します。更新時は[Backup](backup.md)を取得してからupを使用します。DBパスワードを変更する場合は、DB Roleと設定ファイルを同じ値へ更新する作業が必要です。
 
-Backup/Restore用の`recovery-db`と`recovery-data`はoperations profileのone-shot Serviceです。通常upでは起動せず、[復旧CLI](backup.md)から明示実行します。復元元のfence、復元先のpending、実行中lockがある設定は通常upを拒否します。設定ディレクトリを複製してこの制御を迂回しないでください。
+## StageからProdへの配布
 
-`docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build verify-compose` はUUID付きの専用Projectを作る。空Volume、非管理者DB Role、同一Image、秘密情報/Network/Volume分離、再起動後のDB/Transcript保持、Schema更新、Migration失敗時のRollback/起動拒否、DevのVite/reloadを確認する。検証Botは実Cogを読み込むがDiscord LoginとCommand同期をMockし、実Guildを変更しない。最後にこの検証で作成したProjectのVolumeだけを削除する。実Stage受入の成功とは区別する。
+同じHostでは[導入フローのProd昇格](setup.md#prodへの昇格)を使用します。Prodの起動時にはStageとImageが一致し、Stageの3サービスが稼働していること、環境ごとの資格情報が分離されていることを確認します。機能と公開経路は[Stage受入](stage-acceptance.md)で確認します。
+
+別HostへImageを配布する場合は、Registryの完全なdigest参照（`REGISTRY/IMAGE@sha256:DIGEST`）をdeployment.jsonのimageへ指定します。値は配布担当者から取得してください。新しい設定ディレクトリには、受け取った参照へ `IMAGE_REFERENCE` を置き換えて次を実行します。
+
+```text
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy init --environment stage --config-dir data/environments/stage --image IMAGE_REFERENCE
+```
+
+生成されたapp.envを編集してからcheck・upへ進みます。initの対象は新しいディレクトリです。Registryへの認証は[共通タスクのRegistry手順](../developer/TOOLS.md#private-registry)を参照してください。Prod昇格の照合対象は同じDocker Host上のStageです。
+
+## ポートと永続化
+
+| 対象 | 配置・既定値 |
+| --- | --- |
+| Project | tueka-dev / tueka-stage / tueka-prod |
+| PostgreSQL | Project専用の内部Network、postgres-data Volume |
+| Transcript | transcripts Volume。Botが書込み、Dashboardが読取り |
+| アプリ | UID/GID 10001、読取り専用ファイル領域、一時領域は/tmp |
+| Dashboard | localhost。Prod 8000、Stage 8001、Dev 8002 |
+| Dev Vite | localhost:5173。API・OAuthをDashboardへ転送 |
+| Stage／Prodの公開 | Host CaddyでHTTPSへ接続 |
+
+Devではソースを読取り専用で接続し、DashboardのPythonとFrontendを変更すると再読込みします。Bot・Workerの変更はupで反映します。Frontendの依存は専用Volumeへ導入し、upがmount先ディレクトリを準備します。
+
+Backup・Restoreは[recoveryタスク](backup.md)を使用します。復元元のfence、復元先のpending、実行中lockがある環境は起動保留になります。照合と解放は復旧手順に沿って行います。

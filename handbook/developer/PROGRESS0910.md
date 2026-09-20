@@ -640,3 +640,13 @@
 - Remote CIのRun URL/Commit、別Linux Hostのclean checkout、実StageのDNS/OAuth/Webhook/公開証明書/systemd/配布受入は未実施。既存のCaddy変更を保持し、commit/pushや実環境配布は行っていない。
 - 最終python/web群の再実行はDocker Desktopが応答しなくなり中断した（tools-ci-python-final.log / tools-ci-web-final.log）。docker psもAPI 500を返した。Cドライブ空き約2.4GBを観測したが原因は未確定。Docker再起動・一括pruneは行っていない。初回python群は終了0（369件＋API/103コマンド/Docs/Restore、tools-ci-python.log）。最終差分のtools単体8件は補助的に既存Host venvで7成功/所有権1skip、文書リンク検査成功。全体の最終成功とは扱わない。
 - Docker回復後はTOOLS.mdのciコマンドで再検証する。残る可能性がある資源はtueka-tools、tueka-tools-clean-20260920と最後のUUID付きtueka-tools-ciプロジェクト。まずdocker compose lsで確認し、これらテストプロジェクトだけを対象にdownする。既存tueka-dev/tueka-p27や実運用Volumeは対象外。個別Compose/Recovery/Caddy/所有権受入の専用資源は成功時のfinallyで削除済み。
+
+### 2026-09-20 全文書の仕様・読み手・表現点検
+
+- Markdown 125件をDOCUMENTATION_AUDIT.mdへ一覧化した。公開Docs、運用者資料、開発者資料、履歴を分類し、登録コマンド、機能モデル/Cog、Composeタスク、配布CLI、app.envテンプレート、Dockerfile、Caddy手順と照合した。
+- 利用者・運用者資料の変更前を前提にした文言と実装者視点の説明を、操作・設定・確認結果を紹介する文体へ修正した。廃止機能との比較、HostテストDBの手順、削除済みDockerfileの参照、無条件のAPI docs公開説明を整理した。SQL移行の履歴と原稿は開発者向け履歴に保存した。
+- 投票はコマンド引数、ミニゲームはrpsの応答であることをコードで確認し、Modalや進行ボタンの案内を訂正。Suggestionsの受付待ちと配送失敗では、再投稿前の照合を日英で案内した。DocsからDashboardへのリンクが生成HTMLで/docs/serversとなる問題を修正し、/serversを日英のブラウザーテストで検査する。
+- DOCUMENTATION.mdに編集基準を定義。check_documentation.pyへ利用者・運用者向けの禁止表現と削除済みタスク入口の検査を追加し、deploy/READMEもリンク検査へ含めた。意味の正確さは自動文字列検査だけに依存せず、コードとの点検で確認する。
+- Composeのcommands-check成功: 103件の実登録・引数・日英ページ一致（.venv-p0/docs-editorial-commands.log、artifacts/commands-check/20260920T134121-1683121a）。API契約とコマンド登録そのものは変更していない。
+- 最終日英build・リンク・公開境界成功: docs-editorial-build-final.log、artifacts/build-docs/20260920T134338-3c10e377。Dashboardリンク修正後のDocsブラウザー15件成功: docs-editorial-browser-final.log、artifacts/test-docs-a11y/20260920T134200-6dfa0d0a。モバイル幅、英語コマンドページ、検索、内部資料の検索除外、Axeを確認。その後のSuggestions説明等の文言調整は最終buildで検査した。
+- 既存の文書関連8テストはHostの補助実行とComposeのtest-python -p test_docs.pyで成功（docs-editorial-unit.log）。git diff --check成功。CaddyとComposeの外部仕様は公式ページも参照した。文書・Docsナビゲーション・検査の変更であり、実環境の配布/設定/DB操作は実施していない。Remote CI・実Stageの成功を追加したものではない。

@@ -6,12 +6,12 @@ keywords: モデレーション, Event Trigger Condition Exemption Action Case L
 
 # Moderation
 
-Moderationは保護・処置・履歴・ログの共通基盤です。各機能は独立した処置を直接実行せず、次の流れを共有します。
+Moderationでは、検知条件、対象外にするメンバーやチャンネル、検知後の処置を設定できます。検知から履歴の確認まで、次の流れで利用します。
 
 ```text
 Discord Event
-  → Trigger
   → Conditions / Exemptions
+  → Trigger
   → monitor または enforce
   → Actions
   → Case / Moderation Log
@@ -46,8 +46,8 @@ BotとWebhookは既定で除外されます。ルールで明示的に対象化�
 
 ## monitorとenforce
 
-monitorは検知とイベント保存だけを行い、削除や制裁を実行しません。新規ルールはmonitorで検証し、誤検知がないことを確認してからenforceへ切り替えます。
+monitorでは検知結果をイベント履歴で確認できます。削除や制裁を適用する場合はenforceを選びます。新規ルールはmonitorで検証し、誤検知がないことを確認してからenforceへ切り替えます。
 
 ## 編集イベントと重複
 
-メッセージ編集ではキーワードやURLなど内容系Triggerだけを再評価し、投稿レートへ再加算しません。イベント種別、対象ID、ルールIDを使って再送を冪等化します。
+メッセージ編集ではキーワードやURLなどの内容を再評価し、投稿数のカウントを維持します。同じイベントの再受信による重複処置は抑止されます。

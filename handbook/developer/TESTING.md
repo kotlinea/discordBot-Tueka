@@ -1,6 +1,6 @@
 # テストと検証
 
-実行方法の正本は[共通Composeタスク](TOOLS.md)です。Host Python／Node／npmや専用venvは不要です。旧Dockerfile.test／Dockerfile.web-testの処理はDockerfile.toolsへ統合しました。
+実行方法の正本は[共通Composeタスク](TOOLS.md)です。Host Python／Node／npmや専用venvは不要です。実行環境はDockerfile.toolsの用途別ターゲットで構築します。
 
 ```text
 docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build ci

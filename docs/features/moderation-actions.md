@@ -16,6 +16,6 @@ Warn、Timeout、Timeout解除、Kick、Ban、Unban、Tempban、Softban、メッ
 
 ## Discordコマンド
 
-日常操作は`/mod`グループにまとまっています。既存の`/warn`、`/timeout`、`/kick`、`/ban`、`/clear`は互換コマンドとして同じServiceへ委譲されます。
+処置は`/mod`グループから実行できます。`/warn`、`/timeout`、`/kick`、`/ban`、`/clear`からも対応する処置を実行できます。引数と必要権限は[コマンド一覧](../reference/commands.md)を確認してください。
 
 SoftbanはBan後にUnbanします。前半だけ成功した場合もAction結果へ記録されるため、ケースとログを確認して手動復旧してください。

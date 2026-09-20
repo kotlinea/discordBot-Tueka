@@ -1,6 +1,6 @@
 # Phase 3のStage受入
 
-ローカルの隔離Compose受入は実Guild、OAuth、Provider、Registry配布、Hostの公開経路を代行しません。次の証拠を揃えてからPhase 3の運用出口を判定します。Token・Cookie・Webhook本文・秘密鍵を記録へ貼り付けないでください。
+Stageの公開環境でGuild、OAuth、通知Provider、Registry配布、Hostの公開経路を確認します。対象・日時・結果を記録し、受入表を満たしてからProdへ昇格します。記録にはOrigin、識別子、検証結果を使用し、資格情報や個人情報は秘密管理先で保管します。
 
 ## 対象を固定する
 
@@ -20,17 +20,17 @@
 | Webhook/Worker | 検証Providerのイベント受信、署名拒否、正常配送、重複抑止 | Eventの識別情報を必要範囲だけ記録し本文は除外 |
 | 監視閾値 | 通常負荷と合意した障害注入でHTTPエラー率、Pool/lock/deadlock、Queue遅延、Heartbeatを収集 | 負荷条件、測定期間、分布、採用閾値と理由、通知到達結果 |
 | 実データ復旧 | 検証Transcript/添付/Tokenの復旧セット作成、S3使用時は実オブジェクト取得、別Volumeへ復元・復号 | Snapshot時刻、Image、鍵世代指紋、復号件数、Queue照合結果 |
-| Rollback | 更新前Snapshotと対応旧Imageへ別Projectで復元し、外部副作用照合後に転送先を切替 | 元/復元先Project、停止/解放記録、旧Schema/Image、Health |
+| Rollback | 更新前Snapshotと対応Imageへ別Projectで復元し、外部副作用照合後に転送先を切替 | 元/復元先Project、停止/解放記録、復元したSchema/Image、Health |
 | 運用継続 | Backup Timer、失敗通知、保存先権限、Host外保管、鍵/Image保持、Caddy journal管理 | Timer最終成功、通知結果、Restore実施記録 |
 | 本番昇格 | 上記Stage結果と同じRegistry digestを本番へ渡し、別秘密情報で起動 | Stage/本番digest照合、変更記録、切戻し先 |
 
 ## 復旧検証の順序
 
 1. 検証用Transcriptと添付を保存し、S3使用時はbackendと実オブジェクトの存在を確認する。
-2. `scripts/recovery.py backup`でセットを取得する。実鍵や既存Objectを再生成しない。
+2. [Backup手順](backup.md)のrecovery backupコマンドでセットを取得する。実鍵や既存Objectを再生成しない。
 3. 同じStage環境の別Project・未使用ポートへ`restore --source-config ...`する。元Writer停止と両側の起動抑止を確認する。
 4. DB/Blob/暗号文の検証結果を確認し、Snapshot前後のDiscord Receiptと未確定処理を突合する。照合ができなければ保留を維持する。
 5. `release --reconciled`後に復元先を起動し、転送先を切り替える。元Projectは停止状態を保持する。
 6. 失敗時は復元先を起動せず`abort`を使う。元環境が安全に再開できることを確認してから起動する。
 
-実行コマンド、鍵・S3の扱い、部分失敗時の制限は[Backup/Restore](backup.md)と[更新・Rollback](upgrade.md)を参照してください。今回の開発環境での結果は[進捗](../developer/PROGRESS0910.md)に記録し、この実Stage受入表の成功とは区別します。
+実行コマンド、鍵・S3の扱い、部分失敗時の制限は[Backup/Restore](backup.md)と[更新・Rollback](upgrade.md)を参照してください。受入記録にはStageの設定識別情報・Image digest・実施日時・担当者・結果を記載します。

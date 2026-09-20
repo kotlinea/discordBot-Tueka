@@ -6,7 +6,7 @@ keywords: Reaction Roles normal unique verify binding drop reversed temp lock li
 
 # リアクションロール
 
-EmojiへのリアクションでMemberがRoleを取得・解除できます。設定はネイティブリアクション方式です。旧ボタンPanel・旧公開コマンド・移行Wizardは廃止しています。現行設定はDashboardまたは `/reactionrole` コマンドから管理してください。
+メッセージのEmojiへリアクションすると、設定に応じてRoleを取得・解除できます。サーバー管理者はDashboardまたは `/reactionrole` コマンドで、対象メッセージとEmoji・Roleの対応を設定します。`/r` は短縮コマンドです。
 
 ## 動作Type
 

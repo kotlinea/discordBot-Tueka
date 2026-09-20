@@ -1,14 +1,14 @@
 # Host CaddyによるHTTPS
 
-Linux HostのsystemdでCaddyを動かし、Stage／Prodの別ドメインを公開します。Docker内のDashboardはloopbackだけに公開し、Devのlocalhost HTTPは変更しません。公開ドメインの正本は各app.envの `DASHBOARD_BASE_URL`、転送先ポートはdeployment.jsonです。Caddyへapp.envやDB資格情報を渡しません。
+Linux HostのsystemdでCaddyを動かし、Stage／Prodの別ドメインを公開します。Docker内のDashboardはloopbackだけに公開し、Devはlocalhost HTTPで利用します。公開ドメインの正本は各app.envの `DASHBOARD_BASE_URL`、転送先ポートはdeployment.jsonです。Caddyには生成したサイト設定ファイルを配置します。
 
-以下のShellコマンドはBashで、リポジトリルートから実行します。GitとDocker／Composeを[導入手順](setup.md)で準備します。Stage／Prodのbuild・start・healthが成功し、app.envに実ドメイン・対応するOAuth callback・`DASHBOARD_HTTPS_ONLY=true`を設定済みであることが前提です。CLIは公開切替を自動実行しません。
+以下のShellコマンドはBashで、リポジトリルートから実行します。GitとDocker／Composeを[導入手順](setup.md)で準備します。Stage／Prodのbuild・start・healthが成功し、app.envに実ドメイン・対応するOAuth callback・`DASHBOARD_HTTPS_ONLY=true`を設定済みであることが前提です。公開切替は、設定の検証・配置・reloadの順に行います。
 
 ## HostとDNSを準備する
 
-DNSのAをHostの公開IPv4に向けます。AAAAを作る場合はIPv6でもHostへ到達できることを確認します。Host Firewall・ルーター・Cloud側のFirewallでTCP 80／443を許可し、転送が必要ならCaddy Hostへ転送します。Dashboardの8000／8001は外部公開しません。Caddyの自動HTTPSが証明書の取得・更新とHTTPからの転送を担当します。[公式仕様](https://caddyserver.com/docs/automatic-https)
+DNSのAをHostの公開IPv4に向けます。AAAAを作る場合はIPv6でもHostへ到達できることを確認します。Host Firewall・ルーター・Cloud側のFirewallでTCP 80／443を許可し、転送が必要ならCaddy Hostへ転送します。Dashboardの8000／8001はlocalhostから接続します。Caddyの自動HTTPSが証明書の取得・更新とHTTPからの転送を担当します。[公式仕様](https://caddyserver.com/docs/automatic-https)
 
-使用ドメインをapp.envから安全に確認し、DNSを照合します（秘密値は表示しません）。
+ドメインと転送先を記載したサイト設定を生成し、DNSを照合します。
 
 ```sh
 docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy caddy-config --config-dir data/environments/stage --config-dir data/environments/prod --output artifacts/caddy/dns-check.caddy --overwrite
@@ -28,7 +28,7 @@ dig +short AAAA "$TUEKA_PUBLIC_DOMAIN"
 
 ## Caddyの導入（Debian／Ubuntu）
 
-未導入のHostで管理者が実行します。Tuekaのcheck/configureはOSパッケージをインストールしません。他のLinuxでは[公式インストール手順](https://caddyserver.com/docs/install)の該当ディストリビューションを使用します。
+未導入のHostで管理者が実行します。OSパッケージはHost管理者が管理します。他のLinuxでは[公式インストール手順](https://caddyserver.com/docs/install)の該当ディストリビューションを使用します。
 
 ```sh
 sudo apt-get update
@@ -49,7 +49,7 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 caddy validate --config data/caddy/tueka.caddy --adapter caddyfile
 ```
 
-StageだけのHostではProdの `--config-dir` を省略します。再生成する場合は同じコマンド末尾へ `--overwrite` を付けます。ドメインはHTTPS・通常のDNS名・標準443番・Originのみを受け付け、環境違い、重複、callback不一致を拒否します。既存の管理操作は引き続きconfig-dirを1件だけ受け付けます。
+StageだけのHostではProdの `--config-dir` を省略します。再生成する場合は同じコマンド末尾へ `--overwrite` を付けます。ドメインはHTTPS・通常のDNS名・標準443番・Originのみを受け付け、環境違い、重複、callback不一致を拒否します。caddy-configでは複数環境の設定をまとめて生成できます。
 
 Stageだけの初回生成:
 
@@ -64,7 +64,7 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 caddy validate --config data/caddy/tueka.caddy --adapter caddyfile
 ```
 
-生成ファイルは `/internal`・`/internal/*` を404にし、それ以外を環境別Dashboardへ転送します。アクセスログは既定で有効にしません。Caddyの通常のHost／転送ヘッダー処理を利用し、Uvicornの全接続元信頼設定は追加しません。
+生成ファイルは `/internal`・`/internal/*` を404にし、それ以外を環境別Dashboardへ転送します。アクセスログの既定値は無効です。Hostと転送ヘッダーはCaddyの標準動作を使用します。
 
 ## Backup・配置・reload
 
@@ -80,7 +80,7 @@ sudo install -m 0644 data/caddy/tueka.caddy /etc/caddy/sites/tueka.caddy
 sudoedit /etc/caddy/Caddyfile
 ```
 
-エディタでは、他のサイトとグローバル設定を残し、トップレベルへ次の1行を追加します。既に同じファイルを読み込むimportや同じドメインのサイトがある場合は二重追加しません。新規Hostの配布初期設定にある汎用 `:80` サイトは削除し、意図したドメインだけを公開します。
+エディタでは、他のサイトとグローバル設定を残し、トップレベルへ次の1行を追加します。同じファイルのimportと同じドメインのサイト設定は、それぞれ1件に揃えます。新規Hostの配布初期設定にある汎用 `:80` サイトは削除し、意図したドメインだけを公開します。
 
 ```caddyfile
 import /etc/caddy/sites/tueka.caddy
@@ -94,7 +94,7 @@ systemctl status caddy --no-pager
 sudo journalctl -u caddy -n 50 --no-pager
 ```
 
-設定の配置だけでは稼働中サービスは変更されません。journalにエラーがないことと外部からの応答を確認します。[公式systemd運用](https://caddyserver.com/docs/running)
+reloadが成功すると設定が稼働中サービスへ反映されます。journalにエラーがないことと外部からの応答を確認します。[公式systemd運用](https://caddyserver.com/docs/running)
 
 ## 公開確認・Rollback
 
@@ -110,7 +110,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' "$TUEKA_PUBLIC_ORIGIN/api/openapi.json
 
 期待値はHTTPが308、Docsが成功、後半2件が404です。ブラウザーで公開証明書・OAuth Login/Logout・Secure Cookieを確認し、実Webhookは[Stage受入票](stage-acceptance.md)で確認します。code/tokenを含むURLやCookieを記録へ貼り付けません。
 
-設定を戻す場合は、上で表示したBackupのパスを入力します。初回導入時だけTueka専用ファイルを取り除き、既存ファイルがあった場合はそれも復元します。他サイトのファイルを一括削除しません。
+設定を戻す場合は、上で表示したBackupのパスを入力します。初回導入時だけTueka専用ファイルを取り除き、既存ファイルがあった場合はそれも復元します。復元対象はCaddyfileとTueka専用サイト設定です。他サイトのファイルを保全してください。
 
 ```sh
 (
@@ -127,16 +127,16 @@ sudo -u caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile &
 )
 ```
 
-## 旧Nginxからの切替
+## Nginxが稼働しているHostでの切替
 
-既存Nginx設定・証明書を保管し、Nginx上の他サイトも移すか別Hostへ分離する段取りを先に決めます。切替時間に `sudo systemctl stop nginx` を実行して80／443を解放し、Caddyの起動・公開確認を行います。失敗時は `sudo systemctl stop caddy` の後に `sudo systemctl start nginx` で旧経路へ戻します。成功を確認するまで旧設定・証明書は削除しません。CaddyとNginxを同じポートで同時起動しません。
+既存Nginx設定・証明書を保管し、Nginx上の他サイトも移すか別Hostへ分離する段取りを先に決めます。切替時間に `sudo systemctl stop nginx` を実行して80／443を解放し、Caddyの起動・公開確認を行います。失敗時は `sudo systemctl stop caddy` の後に `sudo systemctl start nginx` でNginxの経路へ戻します。公開確認が完了するまでNginxの設定と証明書を保管します。80／443は切替先のサービスだけが使用する構成にします。
 
 ## 証明書と日常運用
 
 公式systemdサービスのCaddyユーザーのデータ領域は通常 `/var/lib/caddy/.local/share/caddy` です。証明書・ACMEアカウント鍵を含むためアクセスを制限し、サービス更新で削除しないでください。Hostの暗号化Backup対象に含め、復元時は同じ所有者・権限を維持します。カスタムunitではHOME/XDG設定を確認して実際の保存先を記録します。
 
-証明書更新失敗時はjournal、DNSのA/AAAA、80/443到達、システム時刻、データ領域の空き容量・所有者を確認します。繰り返しデータ領域を削除して再発行しないでください。journalの保持期間・閲覧権限をHost側で設定し、エラーに含まれるリクエスト情報は共有前に確認します。admin APIの2019番を外部公開しません。
+証明書更新失敗時はjournal、DNSのA/AAAA、80/443到達、システム時刻、データ領域の空き容量・所有者を確認します。繰り返しデータ領域を削除して再発行しないでください。journalの保持期間・閲覧権限をHost側で設定し、エラーに含まれるリクエスト情報は共有前に確認します。admin APIの2019番はHost内の管理用として扱います。
 
-## ローカル受入
+## 公開前の確認
 
-CIの `Dockerfile.caddy-test` は検証専用です。製品ImageへCaddyを追加せず、実運用のHost Caddyをコンテナ化するものでもありません。専用DBと内部CAで実Dashboardの経路を検証し、Hostの信頼ストア・公開ACME・実Discordへ接続しません。実DNS・公開証明書・systemd常駐の成功とは区別します。
+DNS、公開証明書、systemd常駐、OAuth、Webhookは[Stage受入票](stage-acceptance.md)に沿って確認します。内部CAを用いた経路の自動検証は[開発者のテスト手順](../developer/TESTING.md)を参照してください。

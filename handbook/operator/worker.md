@@ -24,4 +24,4 @@ Workerは`social_targets`をリース取得します。二重起動しても同�
 | unavailable | 必要設定不足 | 環境変数を設定して再起動 |
 | failed | 継続不能 | Errorと対象IDを修正して再確認 |
 
-Heartbeat、最終成功、遅延件数、Provider Error、Delivery失敗をDashboardと構造化Logで確認します。外部応答全文、Webhook本文、Tokenはログへ残しません。
+Heartbeat、最終成功、遅延件数、Provider Error、Delivery失敗をDashboardと構造化Logで確認します。ログには時刻、サービス名、イベント種別、コード位置、HTTPステータスなどの調査用情報が表示されます。

@@ -22,4 +22,4 @@ Inspect message content and combine removal, warnings, notifications and timeout
 
 Whitelist mode includes selected roles/users/channels/categories; blacklist mode excludes them. Conflicting allow/deny entries are rejected. Actions execute in order: removal, warning/points, public/DM/moderator notice, log, timeout, kick, ban or temporary ban. A failed action does not prevent other possible actions; inspect their results.
 
-Use only variables displayed in the template editor. Preview regex matches, nonmatches and timeout behavior; avoid ambiguous nested repetitions. Point escalation uses Infractions and does not fall back to retired settings.
+Use the variables displayed in the template editor. Preview regex matches, nonmatches and timeout behavior; avoid ambiguous nested repetitions. For sanctions based on accumulated points, enable [Infractions](./infractions) and configure thresholds and actions.

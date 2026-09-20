@@ -1,6 +1,6 @@
 # 監視と障害時の確認
 
-Bot、Dashboard、Social Workerは5秒ごとにPostgreSQLへHeartbeatと数値メトリクスを保存します。監視の導入前に`0002_observability.sql`までMigrationを適用してください。各Serviceは単一Replicaを前提とします。
+Bot、Dashboard、Social Workerは5秒ごとにPostgreSQLへHeartbeatと数値メトリクスを保存します。導入・更新時にMigrationの成功を確認してください。各Serviceは単一Replicaを前提とします。
 
 ## Healthとメトリクス
 
@@ -18,9 +18,9 @@ BotのGateway切断中とHeartbeat保存失敗時はreadyになりません。�
 docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy health --config-dir data/environments/stage
 ```
 
-対象環境のImageを使う一時コンテナから集計JSONを表示します。`alerts`が空なら終了0、異常やDB取得失敗なら非0です。アプリDBの本文・接続秘密は出力しません。Composeの`status`でコンテナのhealth状態も確認してください。Dockerのunhealthy判定だけではコンテナは自動再起動しません。
+対象環境のImageを使う一時コンテナから集計JSONを表示します。`alerts`が空なら終了0、異常やDB取得失敗なら非0です。出力にはサービス状態、QueueとDBの集計値、アラートが含まれます。Composeの`status`でコンテナのhealth状態も確認してください。unhealthyになった場合はログと依存サービスを調べ、原因の解消後にupで起動を確認します。
 
-`deploy.py init`は環境ごとに`MONITORING_TOKEN`を生成します。既存の`app.env`には32文字以上のランダムな専用Tokenを追加し、Dashboardを再起動します。収集側は保護した資格情報ファイルから`Authorization: Bearer ...`を送信します。TokenをURLやコマンド履歴に記載しないでください。[生成Caddy設定](caddy.md)は外部の`/internal`と`/internal/*`を404にするため、Host上の収集器はlocalhostのDashboardポートへ直接接続します。
+新規configureは環境ごとに`MONITORING_TOKEN`を生成します。app.envの値が空欄の場合は、32文字以上のランダムな専用Tokenを設定し、Dashboardを更新します。収集側は保護した資格情報ファイルから`Authorization: Bearer ...`を送信します。TokenをURLやコマンド履歴に記載しないでください。[生成Caddy設定](caddy.md)は外部の`/internal`と`/internal/*`を404にするため、Host上の収集器はlocalhostのDashboardポートへ直接接続します。
 
 ## 収集対象と初期閾値
 
@@ -40,17 +40,17 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 
 初期値はHeartbeat **30秒**、Queue遅延 **300秒**です。`HEARTBEAT_MAX_AGE_SECONDS`（5～3600）と`OUTBOX_MAX_AGE_SECONDS`（1～86400）を`app.env`に設定できます。HTTPとCLIは同じ値を使用し、メトリクスにも閾値を出力します。ローカルprobeの30秒とComposeのprobe間隔は独立した固定値です。
 
-Stage実測による運用閾値はまだ確定していません。通常負荷と障害注入の応答時間・Pool待ち・Queue配送時間を記録し、許容遅延を決めてください。収集器の接続失敗、`tueka_database_up == 0`、`tueka_service_ready == 0`、Dead Letter、失効Lease、閾値を超えるQueue遅延を通知対象にします。HTTPエラー率は5分間の5xx増分を全リクエスト増分で割り、トラフィック量と合わせて判断します。
+運用閾値はStageでの実測をもとに設定します。通常負荷と障害注入の応答時間・Pool待ち・Queue配送時間を記録し、許容遅延を決めてください。収集器の接続失敗、`tueka_database_up == 0`、`tueka_service_ready == 0`、Dead Letter、失効Lease、閾値を超えるQueue遅延を通知対象にします。HTTPエラー率は5分間の5xx増分を全リクエスト増分で割り、トラフィック量と合わせて判断します。
 
 プロセス内Counterは再起動でResetし、Heartbeatを通じた公開は最大約5秒遅れます。欠落・古いHeartbeatのCounterを現在値とみなさず、Service readinessも合わせて確認します。DB停止中はこのDB経由の集計自体も取得できないため、HTTP/probeと収集失敗の監視が必要です。
 
 ## ログとResource制限
 
-アプリ標準出力はJSONで、時刻・Service・level・event・コード位置・HTTP status/時間・例外型だけを出します。メッセージ引数、例外本文、リクエストURL/query、Header、Ticket本文、SQL本文は出しません。コード位置と例外型で調査し、秘密値の出力を有効化せずテスト環境で再現します。Uvicornの既定access logはコンテナ入口で無効化します。起動は共通Composeのdeployタスクを使用してください。
+アプリログはJSON形式です。時刻・Service・level・event・コード位置・HTTPステータス・所要時間・例外型を確認できます。コード位置と例外型から発生箇所を調べ、テスト環境で再現します。起動とログの確認には[管理コマンド](commands.md)を使用します。
 
 Composeの各アプリとPostgreSQLはCPU 1、Memory 768 MiB、PID 128、Dockerログ10 MiB×3世代です。Dev ViteはMemory 1 GiBです。これは初期の上限であり、Stageの負荷・OOM・起動時間を測って環境別overrideで調整します。PostgreSQLはSQL/パラメータのログを抑制し、エラーはアプリの分類Counterで確認します。
 
-Host Caddyはアクセスログを既定で有効にしません。サービスログはjournalで管理します。エラーログにはリクエスト情報が含まれる場合があるため閲覧を制限し、共有前に確認してください。保持期間はHostのjournald運用で定めます。DockerのログローテーションはHost Caddyには適用されません。確認コマンドは[Caddy手順](caddy.md)を参照してください。
+Host Caddyのサービスログはjournalで管理します。アクセスログの既定値は無効です。エラーログにはリクエスト情報が含まれる場合があるため閲覧を制限し、共有前に確認してください。保持期間はHostのjournald運用で定めます。DockerのログローテーションはHost Caddyには適用されません。確認コマンドは[Caddy手順](caddy.md)を参照してください。
 
 ## 障害検証と復旧
 
@@ -59,4 +59,4 @@ Host Caddyはアクセスログを既定で有効にしません。サービス�
 3. DBを停止し、livenessは200、readinessは503になることを確認。DB復旧後のHeartbeat・readiness・Queue再開を確認する。
 4. Pool枯渇、行lock、deadlockを隔離DBで再現し、待ち時間と分類Counterを確認する。
 
-自動回帰は`tests/test_observability.py`、`tests/test_database.py`と`docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build verify-compose --image <検証用Image>`です。Compose検証は専用の一時Project/VolumeとオフラインBotを使います。実Discord/OAuth/WebhookによるStage判定は別途必要です。運用DBで障害注入は行わないでください。
+障害注入は専用の検証環境で行います。Composeによる検証方法は[開発者のテスト手順](../developer/TESTING.md)、実Discord・OAuth・Webhookの確認は[Stage受入](stage-acceptance.md)を参照してください。

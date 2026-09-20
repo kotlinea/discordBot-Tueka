@@ -38,7 +38,7 @@ Staffは上限とCooldownの対象外です。Support Hours外では次回受付
 
 ## 対応とClose
 
-Channel ModeではClaim、Unclaim、Transfer、Staff Notesを利用できます。回答待ちへ移すと専用Categoryへ移動し、作成者の返信で元Categoryへ戻ります。Discord移動失敗時はDB状態を確定しません。
+Channel ModeではClaim、Unclaim、Transfer、Staff Notesを利用できます。回答待ちへ移すと専用Categoryへ移動し、作成者の返信で元Categoryへ戻ります。移動に失敗した場合は、チャンネルの権限と移動先Categoryを確認します。
 
 Close Requestは24時間有効です。理由付きCloseは理由入力を必須にできます。Thread ModeはArchive後にReopenできます。
 
@@ -46,9 +46,9 @@ Close Requestは24時間有効です。理由付きCloseは理由入力を必須
 
 Form回答、全Message、編集・削除状態、Staff操作、Close理由、添付Metadataを時系列で生成します。本文は保存用の鍵で暗号化します。
 
-S3互換設定があればアップロード後の整合性確認に成功したS3を正本にし、失敗時は暗号化Localへ保存して再送します。保持期間は既定365日、1～3650日です。添付は1件25MB、Ticket合計100MBまでです。
+Transcriptは暗号化して保管されます。保管先の障害が続く場合は、Ticket番号と発生時刻を運用者へ伝えてください。保持期間は既定365日、1～3650日です。添付は1件25MB、Ticket合計100MBまでです。
 
-閲覧者は作成者本人、Manage Guild保持者、Ticket管理者、担当Teamに限定されます。任意HTMLや任意Mentionは送信しません。
+閲覧者は作成者本人、Manage Guild保持者、Ticket管理者、担当Teamに限定されます。共有する場合は、閲覧者の権限を確認してください。
 
 ## テンプレート変数
 

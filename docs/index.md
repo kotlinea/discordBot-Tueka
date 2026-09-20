@@ -6,7 +6,7 @@ keywords: Tueka, Discord Bot, モデレーション, チケット, リアクシ�
 
 # Tueka Docs
 
-Tuekaの導入、サーバー設定、日常運用、障害対応をまとめた公式ドキュメントです。設定名や必要権限は現在の実装に合わせています。
+Tuekaのコマンド、ダッシュボードの操作、Discordサーバーの機能設定を案内します。一般メンバーは使いたい機能から、サーバー管理者・モデレーターは導入と権限の確認から読み進めてください。
 
 <div class="doc-index">
   <a href="./guide/getting-started"><span><strong>Botを導入する</strong><br>招待、ログイン、サーバー設定</span></a>

@@ -2,7 +2,7 @@
 
 前提はGitとLinuxコンテナ対応Docker／Composeです。WindowsはDocker Desktop、LinuxはローカルDocker Engineを使います。remote Docker contextは対象外です。Host Python・Node・npm・Playwright・PostgreSQLを導入しません。
 
-リポジトリルートで実行します。空の `deploy/compose.env` を明示することで旧ルート.envを補間へ読み込ませません。
+リポジトリルートで実行します。Composeの補間設定には空の `deploy/compose.env` を指定します。アプリの値は環境別app.envで管理します。
 
 ```text
 docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build check

@@ -17,11 +17,11 @@ export default defineConfig({
   locales: {
     root: { label: '日本語', lang: 'ja-JP', themeConfig: { sidebar: sidebar(''), nav: [
       { text: 'はじめに', link: '/guide/getting-started' }, { text: 'Dashboard操作', link: '/dashboard/' },
-      { text: '全コマンド', link: '/reference/commands' }, { text: 'Dashboard', link: '/servers' }
+      { text: '全コマンド', link: '/reference/commands' }
     ] } },
     en: { label: 'English', lang: 'en-US', link: '/en/', themeConfig: { sidebar: sidebar('en'), nav: [
       { text: 'Get started', link: '/en/guide/getting-started' }, { text: 'Dashboard guide', link: '/en/dashboard/' },
-      { text: 'All commands', link: '/en/reference/commands' }, { text: 'Dashboard', link: '/servers' }
+      { text: 'All commands', link: '/en/reference/commands' }
     ] } }
   },
   themeConfig: {

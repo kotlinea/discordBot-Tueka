@@ -1,6 +1,6 @@
 # Operations
 
-> Historical material only. Do not use these host startup instructions for Docker. Dev/Stage/Prod use the selected app.env; see [current setup](setup.md).
+> Historical material only. Do not use these host startup instructions for Docker. Dev/Stage/Prod use the selected app.env; see [setup guide](../../../operator/setup.md).
 
 Run the Discord Bot, Dashboard, and Social Worker as separate services sharing one PostgreSQL database. Keep the database, transcripts, backups, `.env`, and encryption keys outside the public web root.
 

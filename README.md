@@ -8,9 +8,9 @@ Discordのモデレーション、チケット、リアクションロール、�
 | システム構築・保守担当 | [運用者ガイド](handbook/operator/README.md)：クローン、設定、build、起動、監視、復旧 |
 | コード修正・リリース担当 | [開発者ガイド](handbook/developer/README.md)：設計、テスト、実行計画、進捗 |
 
-本番ImageはBot/Dashboard/Social Worker/Migrationで共用し、PostgreSQLへ接続します。導入の正本は[Windows/Linuxの導入フロー](handbook/operator/setup.md)です。Dev／Stage／Prodのアプリ設定は各設定ディレクトリの `app.env` に統一し、ルート `.env` は読み込みません。
+Bot、Dashboard、Social Worker、Migrationは共通のアプリImageとPostgreSQLを使用します。[Windows/Linuxの導入フロー](handbook/operator/setup.md)に沿って設定・ビルド・起動を行います。Dev／Stage／Prodのアプリ設定は、各設定ディレクトリの `app.env` で管理します。
 
-開発順序は[ROADMAP](ROADMAP.md)と[現行実行計画](handbook/developer/EXECUTION_PLAN.md)を参照してください。運用・開発資料は公開Docsおよび本番Imageに含めません。
+開発順序は[ROADMAP](ROADMAP.md)と[実行計画](handbook/developer/EXECUTION_PLAN.md)を参照してください。利用者DocsはDashboardの `/docs/`、運用・開発資料はリポジトリの `handbook/` で読めます。
 
 通常の開発・検証・運用はGitとLinuxコンテナ対応Docker／Composeだけで実行します。[共通Composeタスク一覧](handbook/developer/TOOLS.md)からWindows／Linuxで同じタスクを使えます。Host Python・Node・npm・Playwright・PostgreSQLは不要です。
 
