@@ -41,6 +41,16 @@ def main():
         with patch('deploy.compose.command', side_effect=command):
             try:
                 metadata = setup.build(directory)
+                # Exercise additive upgrades on an already image-pinned deployment.
+                original_env = path.read_bytes()
+                legacy = b''.join(line for line in original_env.splitlines(keepends=True)
+                                  if not line.startswith(b'HEARTBEAT_MAX_AGE_SECONDS='))
+                assert legacy != original_env
+                path.write_bytes(legacy)
+                setup.configure(directory, 'stage')
+                assert path.read_bytes().startswith(legacy)
+                assert b'HEARTBEAT_MAX_AGE_SECONDS=30' in path.read_bytes().splitlines()
+                preserved['app.env'] = path.read_bytes()
                 setup.configure(directory, 'stage')
                 assert setup.build(directory) == metadata
                 setup.start(directory)

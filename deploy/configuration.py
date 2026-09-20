@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
 
 from dotenv import dotenv_values
+from . import env_template
 
 ENVIRONMENTS = ('dev', 'stage', 'prod')
 IMMUTABLE_IMAGE = re.compile(r'(?:[a-zA-Z0-9./:_-]+@)?sha256:[0-9a-f]{64}\Z')
@@ -37,7 +38,7 @@ def initialize(directory, environment, image, project=None, *, draft=False):
         'SOCIAL_X_MODE': 'poll',
     }
     for filename, content in (
-        ('app.env', ''.join(f'{key}={value}\n' for key, value in values.items())),
+        ('app.env', env_template.render({**env_template.defaults(environment, password), **values})),
         ('database-password', password),
         ('postgres-admin-password', secrets.token_hex(32)),
     ):
@@ -74,12 +75,17 @@ def read_metadata(directory, *, draft=False):
 def read(directory, *, require_credentials=True, draft=False):
     directory = Path(directory).resolve()
     metadata = read_metadata(directory, draft=draft)
-    environment = metadata['environment']
     app_file = directory / 'app.env'
-    metadata_file = directory / ('setup.json' if draft else 'deployment.json')
     if not app_file.is_file():
         raise ValueError(f'{app_file}: app.env is missing. Select the intended --config-dir or restore this environment configuration; do not copy another environment file.')
     values = dotenv_values(app_file, interpolate=False, encoding='utf-8-sig')
+    return validate_values(directory, metadata, values, require_credentials=require_credentials, draft=draft)
+
+
+def validate_values(directory, metadata, values, *, require_credentials=True, draft=False):
+    environment = metadata['environment']
+    app_file = directory / 'app.env'
+    metadata_file = directory / ('setup.json' if draft else 'deployment.json')
     if values.get('TUEKA_ENV') != environment:
         actual = values.get('TUEKA_ENV')
         actual_label = actual if actual in ENVIRONMENTS else ('<missing or empty>' if not actual else '<invalid value; expected dev/stage/prod>')

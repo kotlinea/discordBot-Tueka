@@ -1,6 +1,6 @@
 # 環境変数
 
-DockerのDev／Stage／Prodでは、対象設定ディレクトリの `app.env` だけをアプリ設定の正本とします。ルート `.env` は読み込みません。`setup configure` が生成したファイルを編集し、秘密値をGitへCommitしないでください。設定項目の見本は `deploy/app.env.example` ですが、既存app.envへ丸ごと上書きしないでください。
+DockerのDev／Stage／Prodでは、対象設定ディレクトリの `app.env` だけをアプリ設定の正本とします。ルート `.env` は読み込みません。`setup configure` が生成したファイルを編集し、秘密値をGitへCommitしないでください。全項目の生成元は `deploy/app.env.example` です。configureが新規app.envへ全項目を生成し、再実行時は不足キーだけを補完します。既存値（空欄・コメント・独自項目を含む）は保持します。ファイルを丸ごと上書きしないでください。
 
 ## 基本・Dashboard
 
@@ -12,9 +12,8 @@ DockerのDev／Stage／Prodでは、対象設定ディレクトリの `app.env` 
 | `DISCORD_REDIRECT_URI` | Dashboard必須 | Dashboard | Developer Portalと完全一致するCallback |
 | `SESSION_SECRET` | Dashboard必須 | Dashboard | Session署名鍵。秘密 |
 | `DASHBOARD_BASE_URL` | 公開機能で推奨 | 全Process | 例：`https://bot.example.com` |
-| `BOT_INVITE_URL` | 空 | 未使用 | `deploy/app.env.example` に存在するが、現在のRuntimeには読取り処理がない。設定しても招待先は変わらない。 |
 | `DASHBOARD_HTTPS_ONLY` | `true` | Dashboard | Secure Cookieを要求 |
-| `DATA_DIR` | `data` | 全Process | Data Directory |
+| `DATA_DIR` | Dockerでは`/data` | 全Process | Data Directory |
 | `DATABASE_URL` | 必須 | 全Process | 共通PostgreSQL接続URL。秘密値として管理 |
 | `LOG_LEVEL` | `INFO` | 全Process | Log Level |
 
@@ -39,7 +38,7 @@ DockerのDev／Stage／Prodでは、対象設定ディレクトリの `app.env` 
 | `X_BEARER_TOKEN` | 空 | X API。秘密 |
 | `SOCIAL_TOKEN_ENCRYPTION_KEY` | 空 | OAuth Token暗号化鍵。秘密 |
 | `SOCIAL_WEBHOOK_SECRET` | 必須 | Webhook検証鍵。秘密 |
-| `SOCIAL_X_MODE` | `stream` | `stream`または`poll` |
+| `SOCIAL_X_MODE` | configureは`poll` | `stream`または`poll` |
 | `SOCIAL_MAX_SUBSCRIPTIONS_PER_PROVIDER` | `10` | 1 Guild・1 Providerの上限。1～100 |
 | `SOCIAL_POLL_INTERVAL_SECONDS` | `120` | 基本Polling間隔。30～3600秒 |
 | `INSTAGRAM_RSS_URL_TEMPLATE` | 空 | `{account}`を含む運用者管理URL |
@@ -70,6 +69,9 @@ Provider資格情報を変更した場合はDashboardとSocial Workerを再起�
 
 | 変数 | 既定値 | 内容 |
 | --- | --- | --- |
+| `TUEKA_ENV` | 環境別 | configureで選択したdev/stage/prod。配布メタデータと一致させる |
+| `TUEKA_FRONTEND_DIST` | `/opt/tueka-assets/ui` | Image内のFrontend配信先。通常変更しない |
+| `TUEKA_DOCS_DIST` | `/opt/tueka-assets/docs` | Image内の公開Docs配信先。通常変更しない |
 | `MONITORING_TOKEN` | 空 | 内部メトリクスの専用Bearer Token。32文字以上。未設定時は公開しない。秘密 |
 | `HEARTBEAT_MAX_AGE_SECONDS` | `30` | HTTP/CLI集計のHeartbeat許容秒。5～3600 |
 | `OUTBOX_MAX_AGE_SECONDS` | `300` | 期限超過Queueの遅延閾値。1～86400 |
@@ -85,3 +87,9 @@ Project/Image/Portと環境専用の接続秘密の生成・検査は[環境別C
 ## 開発用API資料
 
 `TUEKA_API_DOCS_ENABLED` は既定false。`TUEKA_ENV=dev` かつtrueの場合のみSwagger UIとOpenAPIを公開します。Stage/本番では公開しません。
+
+## 再configureでの補完
+
+欠落したDB接続URLは、選択環境のメタデータと既存database-passwordから復元します。DBパスワードファイル・暗号鍵・Session/Monitoringの既存値は再発行しません。既存設定で欠落している秘密項目は空欄で追加し、必要な値は保存済みの正しい値を確認して入力します。空欄の既存項目も上書きしません。必須値の不足はbuild前の検証で通知します。
+
+構文不正・重複キー・環境不一致は、app.envを書き換える前に停止します。生成元に新しい項目が追加された後も、同じconfigureコマンドで安全に不足分を補完できます。追記後は通常の起動・更新手順でコンテナを再作成し、設定を反映してください。`TUEKA_ENV_FILE`・サービス名・テスト専用DBなど起動基盤用の値と、未使用の `BOT_INVITE_URL` は新規生成の対象外です。既存の独自項目は削除しません。

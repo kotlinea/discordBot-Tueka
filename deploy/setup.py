@@ -7,12 +7,13 @@ import subprocess
 import sys
 
 from . import compose
-from .configuration import initialize, read
+from .configuration import initialize, read, read_metadata, validate_values
+from . import env_template
 from .locking import locked
 from .recovery import image_id, write_json
 
 
-def check(directory=None):
+def check(directory=None, *, validate_config=True):
     if sys.version_info[:2] != (3, 13):
         raise ValueError('Python 3.13 is required; see handbook/operator/setup.md')
     for name in ('git', 'docker'):
@@ -30,7 +31,7 @@ def check(directory=None):
             ancestor = ancestor.parent
         if not ancestor.is_dir():
             raise ValueError('Configuration parent must be a directory')
-        if (path / 'setup.json').exists() or (path / 'deployment.json').exists():
+        if validate_config and ((path / 'setup.json').exists() or (path / 'deployment.json').exists()):
             metadata, _ = read(path, require_credentials=False, draft=not (path / 'deployment.json').exists())
             if (path / 'deployment.json').exists() and compose.execute(path, 'ps', '-a', '-q', capture=True).stdout.strip():
                 return
@@ -54,10 +55,24 @@ def check_ports(metadata):
 def configure(directory, environment, project=None):
     directory = Path(directory).resolve()
     if directory.exists():
-        metadata, _ = read(directory, require_credentials=False, draft=not (directory / 'deployment.json').exists())
-        if metadata['environment'] != environment or (project and metadata['project'] != project):
-            raise ValueError('Existing configuration belongs to another environment/project')
-        return metadata
+        with locked(directory):
+            draft = not (directory / 'deployment.json').exists()
+            metadata = read_metadata(directory, draft=draft)
+            if metadata['environment'] != environment or (project and metadata['project'] != project):
+                raise ValueError('Existing configuration belongs to another environment/project')
+            path = directory / 'app.env'
+            if not path.is_file():
+                raise ValueError(f'{path}: existing app.env is missing; restore it before configure. Secrets will not be regenerated.')
+            original = path.read_bytes()
+            existing = env_template.parse(original.decode('utf-8-sig'), path)
+            password = (directory / 'database-password').read_bytes().decode('utf-8').rstrip('\n')
+            defaults = env_template.defaults(environment, password)
+            missing = defaults.keys() - existing.keys()
+            candidate = {**defaults, **existing}
+            validate_values(directory, metadata, candidate, require_credentials=False, draft=draft)
+            if missing:
+                env_template.append_missing(path, original, '# Added by configure (existing values preserved)\n' + env_template.render(defaults, missing))
+            return metadata
     return initialize(directory, environment, None, project, draft=True)
 
 

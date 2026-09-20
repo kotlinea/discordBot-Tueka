@@ -17,12 +17,12 @@ def main():
     parser.add_argument('--stage-config', type=Path)
     args = parser.parse_args()
     try:
-        setup.check(args.config_dir)
+        setup.check(args.config_dir, validate_config=args.action != 'configure')
         if args.action == 'configure':
             if not args.environment:
                 parser.error('configure requires --environment')
             setup.configure(args.config_dir, args.environment, args.project)
-            print('Edit app.env in the private configuration directory, then run build. Existing values are preserved.')
+            print('app.env is ready with all supported settings. Missing keys were added; existing values and keys were preserved. Edit required values, then run build.')
         elif args.action == 'build':
             setup.build(args.config_dir, stage_directory=args.stage_config)
             print('Image fixed. Next: start (production also requires --stage-config).')

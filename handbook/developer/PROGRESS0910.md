@@ -605,3 +605,12 @@
 - 作業ディレクトリ直下でのCompose受入はStage/Prod・監視・Migration失敗時停止/回復を通過。Devの起動とVite応答確認後、Uvicorn source reload検出が30秒でタイムアウトした（app-env-compose.log）。この実行を全体成功とは扱わない。専用Projectのcleanup完了。クリーンコピーでの切り分け結果は下記に追記する。
 
 - クリーンコピー `.venv-p0/app-env-clean` でのCompose再検証は終了0（`app-env-compose-clean.log`）。Dev／Stage／Prodの起動、環境分離、監視、Migration失敗と回復、Vite API proxy、Uvicorn reloadが成功。専用Project `982152185b47` とVolumeのcleanupも完了。最初のタイムアウト原因を設定読込み変更と断定せず、作業ツリー上の再読み込み制限として記録する。Remote CI・実Stage受入は未実施。
+
+
+### 2026-09-20 configureの全項目生成・不足項目補完
+
+- deploy/app.env.exampleを45項目の生成元に統一。新規configureは環境別のDB/URL/資格情報初期値と全任意項目を生成。未使用BOT_INVITE_URLと起動基盤・テスト専用値は生成対象外とし、コード内の環境変数読取りに対するテンプレート漏れをテストで検出する。
+- 既存configureは排他ロック下でメタデータと構文を確認し、不足キーだけを追記する。既存値（空欄・独自項目・引用符・コメント）、元のバイト列・BOM/改行形式を保持。欠落した環境名/DB接続先は保存済みメタデータ/DBパスワードから補完し、Session/Monitoring/暗号鍵などの欠落値は空欄とする。秘密値を再発行せず、DB・Volume・配布Image・パスワードファイルも変更しない。
+- 不正構文・重複キー・環境不一致・編集競合は書換え前に拒否。一時ファイルから原子的に反映し、POSIX modeまたはWindowsの既存ACLを保持する。必須値の空欄は従来どおりbuild前の検証で拒否。再実行で差分がなければapp.envを書き換えない。
+- WindowsとLinux Imageで関連37件が成功（.venv-p0/configure-all-tests.log / configure-all-linux.log）。Image build成功（configure-all-build.log）。文書リンク検査・git diff --check成功。
+- scripts/verify_setup.pyに既存deploymentへの不足キー補完と再実行を追加。初回の受入スクリプト内変数名衝突を修正後、専用Project 49a72fc6dca2で設定生成→build→既存app.env補完→再実行→Migration→オフライン起動→healthが終了0（configure-all-startup-final.log）。専用Project/Volume/Imageのcleanup完了。初回に残った専用Imageタグも削除済み。実環境のapp.env・秘密値・DBは変更していない。Remote CI/実Stage受入は未実施。

@@ -36,6 +36,26 @@ class DocumentationTests(unittest.TestCase):
         missing = [key for key in keys if f"`{key}`" not in reference]
         self.assertEqual(missing, [])
 
+    def test_configure_template_covers_runtime_configuration_reads(self):
+        from deploy.env_template import TEMPLATE, parse
+        keys = set(parse(TEMPLATE.read_text(encoding='utf-8'), TEMPLATE))
+        # These are selected by the launcher or test harness, not app.env settings.
+        managed = {'TUEKA_ENV_FILE', 'TUEKA_SERVICE', 'TUEKA_TEST_DATABASE_URL'}
+        missing = set()
+        paths = [*ROOT.glob('*.py')]
+        for directory in ('dashboard', 'database', 'runtime', 'observability', 'cogs', 'social', 'ticketing'):
+            paths.extend((ROOT / directory).rglob('*.py'))
+        for path in paths:
+            for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.args:
+                    owner = ast.unparse(node.func.value)
+                    if (owner, node.func.attr) not in {('os', 'getenv'), ('os.environ', 'get')}:
+                        continue
+                    key = node.args[0]
+                    if isinstance(key, ast.Constant) and isinstance(key.value, str) and key.value not in keys | managed:
+                        missing.add(key.value)
+        self.assertEqual(missing, set(), 'Add new application settings to deploy/app.env.example')
+
     def test_application_commands_are_present_in_reference(self):
         reference = (DOCS / "reference" / "commands.md").read_text(encoding="utf-8")
         names: set[str] = set()

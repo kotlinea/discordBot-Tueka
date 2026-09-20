@@ -13,4 +13,4 @@ def load_environment():
     path = Path(explicit)
     if not path.is_file():
         raise RuntimeError('Configured TUEKA_ENV_FILE is unavailable')
-    load_dotenv(path, override=True, interpolate=False)
+    load_dotenv(path, override=True, interpolate=False, encoding='utf-8-sig')

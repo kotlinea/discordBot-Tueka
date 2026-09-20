@@ -55,7 +55,9 @@ bash scripts/setup.sh configure --environment stage --config-dir data/environmen
 
 `setup.json` は起動できないドラフトです。ここで一度止まり、生成された `data/environments/stage/app.env` をローカルエディタで編集・保存してからbuildへ進みます。専用Discord Bot Token、Client ID/Secret、公開HTTPS originと完全一致するOAuth callbackを設定してください。[Application手順](application-setup.md)を参照します。Ticketを使う場合の暗号鍵・Socialの資格情報は[環境変数](environment.md)を確認してください。
 
-生成されたDB用秘密値、Session/Monitoringの値は環境ごとに別です。既存ディレクトリの再configureは秘密値・鍵を再生成しません。設定はGitへ追加しないでください。Linuxでは親ディレクトリ0700、Windowsでは運用者だけが参照できるACLをHost側で設定します。コンテナへ渡すfile secretの読取りはUID 10001に必要です。
+生成されたDB用秘密値、Session/Monitoringの値は環境ごとに別です。configureは利用可能な全設定項目をapp.envへ生成します。既存ディレクトリで再実行すると不足キーだけを補完し、空欄を含む既存値・コメント・独自項目は保持します。秘密値・鍵を再生成しません。設定はGitへ追加しないでください。Linuxでは親ディレクトリ0700、Windowsでは運用者だけが参照できるACLをHost側で設定します。コンテナへ渡すfile secretの読取りはUID 10001に必要です。
+
+不足項目を補完する場合も、上記の環境に対応したconfigureコマンドをそのまま再実行します。生成元は `deploy/app.env.example` です。ファイル全体をコピーして置き換えず、補完された空欄を確認してください。
 
 ## 3. build
 

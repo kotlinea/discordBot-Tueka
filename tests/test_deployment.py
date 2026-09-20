@@ -132,7 +132,7 @@ class DeploymentTests(unittest.TestCase):
 
     def test_explicit_app_env_is_authoritative_and_does_not_expand(self):
         secret = self.root / 'secret.env'
-        secret.write_text('SECRET=literal${OTHER}\nDATA_DIR=/wrong\n')
+        secret.write_text('SECRET=literal${OTHER}\nDATA_DIR=/wrong\n', encoding='utf-8-sig')
         with patch.dict(os.environ, {'TUEKA_ENV_FILE': str(secret), 'DATA_DIR': '/data'}, clear=True):
             load_environment()
             self.assertEqual(os.environ['SECRET'], 'literal${OTHER}')
