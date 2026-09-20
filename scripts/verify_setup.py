@@ -13,9 +13,9 @@ from verify_compose import free_port, ready, docker
 
 
 def main():
-    (ROOT / '.venv-p0').mkdir(exist_ok=True)
+    (ROOT / '.tools-runs').mkdir(exist_ok=True)
     unique = uuid.uuid4().hex[:12]
-    with tempfile.TemporaryDirectory(prefix='setup-', dir=ROOT / '.venv-p0') as temporary:
+    with tempfile.TemporaryDirectory(prefix='setup-', dir=ROOT / '.tools-runs') as temporary:
         root = Path(temporary)
         directory = root / 'stage'
         setup.check(directory)

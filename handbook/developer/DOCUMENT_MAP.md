@@ -134,3 +134,14 @@
 
 - ルート `.env.example` は `deploy/app.env.example` へ移転（項目参照用）。Dev／Stage／Prodの設定の正本は生成された環境別app.env。
 - `deploy/tueka-bot.service`・`tueka-dashboard.service`・`tueka-social-worker.service` は `handbook/developer/history/host-services/` へ移転。旧Host直接起動の履歴であり、現行導入では使用しない。
+
+## Host Caddy採用
+
+- `deploy/nginx.conf` は `handbook/developer/history/nginx.conf` へ移管。現行Stage／ProdのHTTPS手順は `handbook/operator/caddy.md` に統一。
+- Caddyの生成物はapp.envとdeployment.jsonから導出し、別の設定正本を追加しない。
+
+## Composeタスク統一
+
+- `handbook/developer/TOOLS.md` を共通実行仕様として追加。TESTING.md、Operator setup.md、各OS手順とCIを同じComposeタスクへ統一。
+- `Dockerfile.test` と `Dockerfile.web-test` を `Dockerfile.tools` の用途別targetへ統合。旧Host依存の `runDashboard.bat` は削除。
+- `scripts/setup.ps1`／`scripts/setup.sh` はDocker起動確認だけを担当。設定生成や依存導入をラッパーへ戻さない。

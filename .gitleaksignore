@@ -4,3 +4,5 @@ fd930d3cb3581f4effb6933ec0c659f89b7680c4:deploy/configuration.py:discord-client-
 fd930d3cb3581f4effb6933ec0c659f89b7680c4:deploy/configuration.py:discord-client-secret:30
 # SQL UPSERT expression token=excluded.token, not an API key.
 8cdd280e12388d44ab5bf33b285de3375fb2a923:jobs/repository.py:generic-api-key:96
+# Empty MONITORING_TOKEN followed by HEARTBEAT_MAX_AGE_SECONDS; multiline false positive.
+867b35f09119851ec9327d826191fba5dd2a579b:deploy/app.env.example:generic-api-key:51

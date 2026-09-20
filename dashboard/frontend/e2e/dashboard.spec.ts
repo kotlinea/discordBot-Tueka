@@ -171,6 +171,11 @@ test('ticket panel editor keeps one draft across six responsive tabs', async ({ 
     saved = route.request().postDataJSON()
     await route.fulfill({ status: 201, json: { ...saved, panel: { ...saved?.panel, id: 9, revision: 1 }, deployment: { ...saved?.deployment, id: 3, panel_ids: [9], revision: 1 }, deployments: [] } })
   })
+  // Saving navigates to the persisted editor; keep that follow-up request offline too.
+  await page.route('**/api/v1/guilds/1/tickets/panels/9/editor', route => route.fulfill({
+    json: { ...saved, panel: { ...saved?.panel, id: 9, revision: 1 },
+      deployment: { ...saved?.deployment, id: 3, panel_ids: [9], revision: 1 }, deployments: [] },
+  }))
   await page.route('**/api/v1/guilds/1/tickets/panels/preview', route => route.fulfill({ json: { panel_message: { title: 'サポートチケット', description: '下のボタンからお問い合わせください。', content: '' }, button: { style: 'primary', label: 'チケットを作成', emoji: '' }, welcome_message: { title: 'ようこそ', description: '受付しました', fields: [] } } }))
   await page.goto('/servers/1/tickets/panels/new')
   await page.getByLabel('設定名').fill('請求サポート')

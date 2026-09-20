@@ -12,4 +12,11 @@ Discordのモデレーション、チケット、リアクションロール、�
 
 開発順序は[ROADMAP](ROADMAP.md)と[現行実行計画](handbook/developer/EXECUTION_PLAN.md)を参照してください。運用・開発資料は公開Docsおよび本番Imageに含めません。
 
+通常の開発・検証・運用はGitとLinuxコンテナ対応Docker／Composeだけで実行します。[共通Composeタスク一覧](handbook/developer/TOOLS.md)からWindows／Linuxで同じタスクを使えます。Host Python・Node・npm・Playwright・PostgreSQLは不要です。
+
+```text
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build check
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build ci
+```
+
 資格情報、DB、暗号鍵、Transcript、Backupは公開ディレクトリやGitへ置かないでください。Swagger UI/OpenAPIは明示的に有効化したDevだけで公開します。

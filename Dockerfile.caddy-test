@@ -1,0 +1,9 @@
+ARG APP_IMAGE=tueka:ci
+FROM caddy:2@sha256:14a9c00d4e833ebc2b65d36515b37bde3b73f0b323a2663aaafc88953d8c4e3f AS caddy
+FROM ${APP_IMAGE}
+COPY --from=caddy /usr/bin/caddy /usr/local/bin/caddy
+USER root
+# Tests bind high ports only; strip the upstream binary's file capabilities.
+RUN cat /usr/local/bin/caddy > /usr/local/bin/caddy-test && chmod 0755 /usr/local/bin/caddy-test && mv /usr/local/bin/caddy-test /usr/local/bin/caddy
+USER 10001:10001
+ENTRYPOINT ["python", "scripts/verify_caddy.py"]

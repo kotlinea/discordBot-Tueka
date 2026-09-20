@@ -1,25 +1,15 @@
+# Optional Docker readiness check only. Run tasks with compose.tools.yaml.
 $ErrorActionPreference = 'Stop'
-Push-Location (Join-Path $PSScriptRoot '..')
-try {
-    foreach ($tool in @('git', 'docker')) {
-        if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "$tool is required; see handbook/operator/setup.md" }
-    }
-    $setupPython = $env:TUEKA_SETUP_PYTHON
-    $setupPythonArgs = @()
-    if (-not $setupPython) {
-        if (Get-Command py -ErrorAction SilentlyContinue) { $setupPython = 'py'; $setupPythonArgs = @('-3.13') }
-        else { $setupPython = 'python' }
-    }
-    & $setupPython @setupPythonArgs -c 'import sys; assert sys.version_info[:2] == (3, 13), "Python 3.13 required; see handbook/operator/setup.md"'
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    if (-not (Test-Path '.venv-operator/Scripts/python.exe')) {
-        & $setupPython @setupPythonArgs -m venv .venv-operator
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    }
-    & .venv-operator/Scripts/python.exe -c 'import sys; assert sys.version_info[:2] == (3, 13)'
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    & .venv-operator/Scripts/python.exe -m pip install --require-hashes -r requirements.lock
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    & .venv-operator/Scripts/python.exe scripts/setup.py @args
-    exit $LASTEXITCODE
-} finally { Pop-Location }
+if ($args.Count -gt 0) { throw 'This script only checks Docker. Use: docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build setup <action> <arguments>' }
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    throw 'Install Docker Desktop with Compose, start it, and select Linux containers. See handbook/operator/setup.md.'
+}
+docker compose version
+if ($LASTEXITCODE -ne 0) { throw 'Docker Compose is required.' }
+$endpoint = if ($env:DOCKER_HOST) { $env:DOCKER_HOST } else { docker context inspect --format '{{.Endpoints.docker.Host}}' }
+if ($endpoint -match '^(ssh|tcp)://') { throw 'Select a local Docker Engine/Desktop context. Remote Docker is unsupported.' }
+$containerOS = docker info --format '{{.OSType}}'
+if ($LASTEXITCODE -ne 0 -or $containerOS -ne 'linux') {
+    throw 'Start Docker Desktop and select Linux containers, then rerun this check.'
+}
+Write-Output 'Docker is ready. Run: docker compose -f compose.tools.yaml run --rm --build check'

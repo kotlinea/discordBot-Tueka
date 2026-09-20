@@ -36,7 +36,7 @@ Locked multi-page design system. `tokens.css` is canonical; page-specific raw co
 - shadcn/ui · map paper→background/card, ink→foreground, accent→primary, rule→border; the application does not ship shadcn styling.
 
 ## Build and release
-- Install and build the SPA from `dashboard/frontend` with `npm install` and `npm run build`.
+- Build the SPA with `docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build build-web` from the repository root.
 - The generated `dist`, dependency tree, and Playwright artifacts are intentionally not tracked.
 
 ## Discord permissions

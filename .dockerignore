@@ -1,4 +1,6 @@
 .git
+artifacts
+.tools-runs
 handbook
 .idea
 .hallmark

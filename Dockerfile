@@ -1,6 +1,7 @@
 FROM node:24-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553 AS web
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+RUN rm /etc/apt/sources.list.d/debian.sources && printf 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260901T000000Z bookworm main\n' > /etc/apt/sources.list \
+    && apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 COPY dashboard/frontend/package*.json dashboard/frontend/
 COPY docs/package*.json docs/
 RUN npm --prefix dashboard/frontend ci --no-audit --no-fund && npm --prefix docs ci --no-audit --no-fund

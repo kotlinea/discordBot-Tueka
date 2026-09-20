@@ -2,11 +2,11 @@
 
 ## 起動
 
-```powershell
-.venv\Scripts\python.exe social_worker.py
+```text
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy up --config-dir data/environments/stage
 ```
 
-Linuxでは`deploy/tueka-social-worker.service`を使用します。Bot、Dashboard、Workerを独立して再起動できる構成にしてください。
+Bot、Dashboard、Workerは環境別Composeで管理します。上記はWriter停止とMigrationを伴う起動・更新です。設定とhealthの確認は[運用コマンド](commands.md)を参照してください。
 
 ## リースと復旧
 

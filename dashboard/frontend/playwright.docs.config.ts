@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
+  workers: 2,
+  timeout: 90_000, // Axe audits the full 103-command page on each viewport.
   testDir: './e2e',
   testMatch: 'docs.spec.ts',
   use: { baseURL: 'http://127.0.0.1:4174/docs/', trace: 'retain-on-failure' },

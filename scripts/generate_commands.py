@@ -37,10 +37,30 @@ async def registered():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true')
+    parser.add_argument('--write', action='store_true', help='Refresh contracts and pages; require existing bilingual descriptions')
     args = parser.parse_args()
     actual = asyncio.run(registered())
     path = ROOT / 'docs/reference/commands.json'
-    if args.check:
+    if args.write:
+        catalog = json.loads(path.read_text(encoding='utf-8'))
+        if set(catalog) != set(actual):
+            raise SystemExit('Add/remove entries and complete ja/en descriptions in docs/reference/commands.json before --write')
+        for name in actual:
+            catalog[name]['contract'] = actual[name]
+            for lang in ('ja', 'en'):
+                for field in ('usage', 'permissions', 'response', 'disabled', 'example'):
+                    if not catalog[name][lang].get(field):
+                        raise SystemExit(f'Missing {lang}/{field}: {name}')
+        pages = {}
+        for lang in ('ja', 'en'):
+            page = ROOT / ('docs' if lang == 'ja' else 'docs/en') / 'reference/commands.md'
+            prefix = page.read_text(encoding='utf-8').split('## /', 1)[0]
+            pages[page] = prefix + '\n'.join(render_entry(name, entry, lang) for name, entry in catalog.items())
+        path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        for page, text in pages.items():
+            page.write_text(text, encoding='utf-8')
+        print('Updated command contracts and bilingual pages')
+    elif args.check:
         catalog = json.loads(path.read_text(encoding='utf-8'))
         if {k: v['contract'] for k, v in catalog.items()} != actual:
             raise SystemExit('Command contract changed; update bilingual commands.json and command pages')

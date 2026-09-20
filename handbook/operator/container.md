@@ -4,7 +4,7 @@
 
 ## ビルドと起動
 
-Repositoryルートで `docker build -t tueka:local .` を実行する。Node stageはnpm LockからSPAとDocsを構築し、Python builderはhash付きrequirements.lockから仮想環境を構築する。RuntimeにはNode・npm・gitを導入しない。ベースImageはdigestで固定する。
+Repositoryルートで `docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build build-image` を実行する。Node stageはnpm LockからSPAとDocsを構築し、Python builderはhash付きrequirements.lockから仮想環境を構築する。RuntimeにはNode・npm・gitを導入しない。ベースImageはdigestで固定する。
 
 起動は[導入フロー](setup.md)の各OSの完全なコマンドを使用します。アプリ設定は対象環境のapp.envのみとし、別の `docker run --env-file` 用設定ファイルは作成しません。ComposeがDB readiness→Migration→サービス起動を管理します。
 

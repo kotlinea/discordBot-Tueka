@@ -1,1 +1,2 @@
 *.sh text eol=lf
+scripts/docker_proxy.py text eol=lf

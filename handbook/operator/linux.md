@@ -1,18 +1,16 @@
 # Linuxの実行環境
 
 1. 利用するディストリビューションの管理手順でGitを導入し、`git --version` を確認します。
-2. Python 3.13とvenvサポートを導入し、`python3.13 --version` を確認します。別名の実行ファイルを使う場合は `TUEKA_SETUP_PYTHON` に絶対パスを設定します。
+2. GitとDocker Engine／Compose pluginを導入します。Python・Node・npm・PostgreSQL clientはツールImage内に固定されるためHost導入は不要です。
 3. Host管理者がDocker EngineとDocker Compose pluginを導入し、Docker daemonを起動します。Dockerを操作できる運用アカウントを準備します。Docker権限の付与はHost管理者が行います。
 4. `docker info --format '{{.OSType}}'` が `linux`、`docker compose version` が成功することを確認します。daemon接続・権限エラーはHost側で修正します。
-5. [共通導入フロー](setup.md)のクローンと `bash scripts/setup.sh check --config-dir data/environments/stage` から進めます。Node.jsはHostに不要です。
+5. [共通導入フロー](setup.md)のクローンと `docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build check` から進めます。Node.jsはHostに不要です。
 
 ディストリビューションごとにパッケージ名・導入元が異なるため、スクリプトはOSパッケージを自動変更しません。設定・鍵・BackupはWeb ServerのDocument Root外へ置き、親ディレクトリの権限を0700にします。
 
-## NginxとTLS
+## CaddyとTLS
 
-`deploy/nginx.conf` のDomainと証明書Pathを変更し、対象環境のloopback DashboardポートへProxyします。`X-Forwarded-Proto` と `Host` を渡し、HTTPをHTTPSへRedirectします。設定反映前に `nginx -t` で確認します。
-
-Discord Developer PortalのRedirect URIと `DISCORD_REDIRECT_URI` を公開HTTPS URLへ完全一致させます。[Application設定](application-setup.md)でToken・Intentsを設定します。
+Linux HostのsystemdでCaddyを動かし、Stage／Prodを別ドメインで公開します。Devはlocalhost HTTPを維持します。導入・DNS・設定生成・検証・reload・Rollbackは[Host Caddy手順](caddy.md)に集約しています。
 
 ## Registry・定期運用
 

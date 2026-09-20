@@ -614,3 +614,29 @@
 - 不正構文・重複キー・環境不一致・編集競合は書換え前に拒否。一時ファイルから原子的に反映し、POSIX modeまたはWindowsの既存ACLを保持する。必須値の空欄は従来どおりbuild前の検証で拒否。再実行で差分がなければapp.envを書き換えない。
 - WindowsとLinux Imageで関連37件が成功（.venv-p0/configure-all-tests.log / configure-all-linux.log）。Image build成功（configure-all-build.log）。文書リンク検査・git diff --check成功。
 - scripts/verify_setup.pyに既存deploymentへの不足キー補完と再実行を追加。初回の受入スクリプト内変数名衝突を修正後、専用Project 49a72fc6dca2で設定生成→build→既存app.env補完→再実行→Migration→オフライン起動→healthが終了0（configure-all-startup-final.log）。専用Project/Volume/Imageのcleanup完了。初回に残った専用Imageタグも削除済み。実環境のapp.env・秘密値・DBは変更していない。Remote CI/実Stage受入は未実施。
+
+
+### 2026-09-20 Host CaddyによるStage／Prod HTTPS
+
+- Linux/systemdのHost Caddyを標準Reverse Proxyへ変更。Devはlocalhost HTTPを維持。旧deploy/nginx.confを履歴へ移管し、導入・管理・監視・更新・Stage受入・ROADMAPを同期した。実Hostのインストール、DNS、公開証明書、公開切替は行っていない。
+- scripts/deploy.py caddy-configを追加。複数config-dirからapp.envのOriginとdeployment.jsonのHostポートを取得し、秘密値を含まないサイト設定を出力。Stage/Prod、HTTPS通常ドメイン/443、callback/HTTPS Cookie、重複を検査。既存操作のconfig-dirは1件。出力上書きには明示overwriteが必要で、選択した設定ディレクトリ内への出力も拒否する。
+- 生成設定は127.0.0.1へ転送し、/internalと/internal/*をCaddyで404にする。アクセスログは既定無効。既存Caddyfileを保持したimport、validate、Backup、systemd reload、Rollback、ACMEデータ保全をoperator/caddy.mdへ記載。アプリ設定の正本はapp.envのままで、Caddyへ秘密ファイルを渡さない。
+- Windows関連44件成功（8.812秒、.venv-p0/caddy-unit.log）、Linux Image内でも44件成功（1.509秒、caddy-linux-unit.log）。文書リンク検査とgit diff --check成功。新しいHTTP APIは追加していない。
+- Dockerfile.caddy-testは公式Caddy Image digest sha256:14a9c00d4e833ebc2b65d36515b37bde3b73f0b323a2663aaafc88953d8c4e3fの実行ファイルを検証Imageにのみ導入。高位ポートで動かすためfile capabilityを除去し、非root/read-only/cap-drop ALL/no-new-privilegesで検証した。本番ImageへCaddyを追加していない。
+- scripts/verify_caddy.py終了0（caddy-https.log）。内部CA証明書をそのテストのSSL contextだけで信頼し、HTTP→HTTPS、Stage/Prod転送分離、Docs/API、OAuth redirect/callback、Webhook経路、Secure Cookie、Caddy側internal404、通常Swagger/OpenAPI404を確認。Host信頼ストア・公開ACME・実Discordに触れず、専用DBの一時Schemaとプロセス・CAデータを片付けた。検証実装中のcapability制約と高位ポートのリダイレクト期待値を修正してから再実行した。
+- クリーンコピーで既存Compose受入も終了0（caddy-compose.log、専用Project 54566aea8c94）。監視、環境分離、永続化、Migration失敗/回復、Devのsource mount/Uvicorn reload/Vite proxyが成功し、専用Volume等をcleanupした。
+- CI runtime-image jobへCaddy HTTPS受入を追加。Remote CIの成功・実DNS/公開証明書/実OAuth・Webhook/systemd常駐は未確認であり、実Stage受入票の未完了Gateとして残す。
+
+### 2026-09-20 Composeによる開発・CI・運用タスク統一
+
+- compose.tools.yamlとDockerfile.toolsを共通入口にした。Python、Web、ブラウザー、Docker管理、Gitleaksを用途別ターゲットに分け、Image digestとLockで固定。通常の検査・生成にはDocker socketを渡さず、Gitleaksはネットワークも無効。生成以外は一時コピーで実行し、artifacts配下へログ・結果・ブラウザー証拠を保存する。
+- Docker管理CLIは自分のbind mount情報からdaemon側パスを求め、子Composeのbindとfile secretを変換する。秘密値入りCompose全文は保存しない。API/コマンド生成・Lock更新の書戻し対象を限定し、Linuxの所有者・modeを維持。Lock更新専用WebターゲットはmanifestとLock不一致でも起動でき、修復後の再buildを可能にした。
+- setup/deploy/recoveryを既存CLIへ委譲し、app.envの正本・不足項目補完・既存鍵保持・Prod再build禁止・Recovery保留を維持。OSラッパーはDocker確認だけに縮小。CIはLinux runnerのpython/web/runtime/secrets群から同じciタスクを呼ぶ。README、開発・運用手順、Backup Jobを完全なComposeコマンドへ置換し、旧テストDockerfile・Host起動入口を除去した。
+- ローカル受入でCompose profile展開、socketのsymlink、単独Recoveryの一時親ディレクトリ、Docker Desktopの空ポート割当情報を修正。ポート競合では既存listenerを停止せず拒否する。ブラウザー検査でTicket import入力のラベル不足と保存後GET fixture漏れを修正した。Gitleaksの過去履歴1件は空のMONITORING_TOKENから次行への誤検出を確認し、commit/file/rule/line限定で除外した。
+- Windows Docker Desktop上で本番Image build、Runtimeのread-only/nonroot/公開境界と370件のImage内回帰、オフラインsetup受入、Restoreが成功。最終Compose/Recovery/Caddy受入も個別に終了0（.venv-p0/tools-compose-final.log、tools-recovery-final.log、tools-caddy-final.log）。Caddyは内部CAのみ。実app.env・運用Volume・公開DNS・Host信頼ストアは変更していない。
+- Windowsの空白・日本語パス下のクリーンなソースコピーでconfigure、未入力拒否、再実行時の鍵/設定保持、API/コマンド生成、両Lock更新を確認。元の8生成対象ファイルとの一致を確認し、コピー内だけでmanifestを変更したLock修復も成功。これはGit cloneからの全タスク受入とは区別する。
+- Linux専用Volume上でuid1001の設定生成・不足項目補完・鍵と所有権保持、DockerのHostポート競合拒否を確認（tools-linux-accepted.log）。これはLinuxファイルシステムでの証拠であり、別Linux Hostの受入ではない。dev-web/dev-docsはlocalhostでHTTP200、停止後のcleanupを確認。
+- 最終秘密値検査は全44 commitsで検出0（tools-secrets-isolated.log）。Dashboardブラウザー48件、Docsブラウザー15件の成功ログはtools-a11y-fixed.log、tools-docs-a11y-fixed.log。検証はHost開発ツールを使わずCompose経由で実行したが、Hostに開発ツールが存在しない端末そのものの証拠とは区別する。
+- Remote CIのRun URL/Commit、別Linux Hostのclean checkout、実StageのDNS/OAuth/Webhook/公開証明書/systemd/配布受入は未実施。既存のCaddy変更を保持し、commit/pushや実環境配布は行っていない。
+- 最終python/web群の再実行はDocker Desktopが応答しなくなり中断した（tools-ci-python-final.log / tools-ci-web-final.log）。docker psもAPI 500を返した。Cドライブ空き約2.4GBを観測したが原因は未確定。Docker再起動・一括pruneは行っていない。初回python群は終了0（369件＋API/103コマンド/Docs/Restore、tools-ci-python.log）。最終差分のtools単体8件は補助的に既存Host venvで7成功/所有権1skip、文書リンク検査成功。全体の最終成功とは扱わない。
+- Docker回復後はTOOLS.mdのciコマンドで再検証する。残る可能性がある資源はtueka-tools、tueka-tools-clean-20260920と最後のUUID付きtueka-tools-ciプロジェクト。まずdocker compose lsで確認し、これらテストプロジェクトだけを対象にdownする。既存tueka-dev/tueka-p27や実運用Volumeは対象外。個別Compose/Recovery/Caddy/所有権受入の専用資源は成功時のfinallyで削除済み。

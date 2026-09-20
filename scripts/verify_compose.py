@@ -27,6 +27,9 @@ def docker(*args, check=True):
 
 
 def free_port():
+    if os.environ.get('TUEKA_DOCKER_MANAGER') == '1':
+        from deploy.docker_bridge import port_probe
+        return port_probe()
     with socket.socket() as connection:
         connection.bind(('127.0.0.1', 0))
         return connection.getsockname()[1]
@@ -123,8 +126,8 @@ def main():
     original_command = compose.command
     directories = []
     overrides = {}
-    (ROOT / '.venv-p0').mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix='p32-', dir=ROOT / '.venv-p0') as temporary:
+    (ROOT / '.tools-runs').mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='p32-', dir=ROOT / '.tools-runs') as temporary:
         temporary = Path(temporary)
         bot_override = temporary / 'offline.json'
         bot_override.write_text(json.dumps({'services': {'bot': {
@@ -268,6 +271,8 @@ def main():
                     metadata = json.loads((directory / 'deployment.json').read_text())
                     assert metadata['project'].endswith('-check-' + unique)
                     compose.execute(directory, 'down', '-v', '--remove-orphans')
+                    if metadata['environment'] == 'dev':
+                        docker('image', 'rm', metadata['project'] + '-development:local', check=False)
 
 
 if __name__ == '__main__':

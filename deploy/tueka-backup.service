@@ -8,6 +8,6 @@ Type=oneshot
 User=tueka-operator
 SupplementaryGroups=docker
 WorkingDirectory=/srv/tueka
-ExecStart=/srv/tueka/.venv/bin/python scripts/recovery.py backup --config-dir /srv/tueka-config/prod --backup-root /srv/tueka-backups --resume-source
+ExecStart=/usr/bin/docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm -T recovery backup --config-dir data/environments/prod --backup-root data/backups --resume-source
 UMask=0077
 TimeoutStartSec=1h

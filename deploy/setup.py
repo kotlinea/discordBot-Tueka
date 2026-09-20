@@ -1,5 +1,6 @@
 """Resumable first installation; delegates all database operations to Compose."""
 import json
+import os
 from pathlib import Path
 import shutil
 import socket
@@ -45,6 +46,13 @@ def check_ports(metadata):
     if len(set(ports)) != len(ports):
         raise ValueError('Dashboard and Vite ports must differ')
     for port in ports:
+        if os.environ.get('TUEKA_DOCKER_MANAGER') == '1':
+            from .docker_bridge import port_probe
+            try:
+                port_probe(port)
+            except subprocess.CalledProcessError:
+                raise ValueError(f'Host port {port} is unavailable; stop its owner or change dashboard_port/vite_port in the selected deployment.json or setup.json') from None
+            continue
         try:
             with socket.socket() as probe:
                 probe.bind(('127.0.0.1', port))

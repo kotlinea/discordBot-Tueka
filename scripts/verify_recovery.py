@@ -28,7 +28,8 @@ def main():
     upgraded_tag = 'tueka-recovery-upgrade:' + unique
     base_tag = 'tueka-recovery-base:' + unique
     original = compose.command
-    with tempfile.TemporaryDirectory(prefix='p34-', dir=ROOT / '.venv-p0') as temporary:
+    (ROOT / '.tools-runs').mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='p34-', dir=ROOT / '.tools-runs') as temporary:
         root = Path(temporary)
         offline = root / 'offline.json'
         offline.write_text(json.dumps({'services': {'bot': {'entrypoint': ['python', '-c', "exec(open('tests/fixtures/offline_bot.py').read())"], 'command': [], 'restart': 'no'}}}))

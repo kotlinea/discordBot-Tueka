@@ -4,4 +4,4 @@ Dev／Stage／Prodの導入は[運用者の導入手順](../handbook/operator/se
 
 アプリ設定の正本は各設定ディレクトリの `app.env` です。ルート `.env` は読み込みません。`app.env.example` が全項目の生成元です。configureは新規作成時に全項目を生成し、既存設定には不足キーだけを追記します。空欄を含め既存値は上書きしません。環境別Composeがapp.envをfile secretとしてマウントします。
 
-Host直接実行用のsystemdサービスは[履歴](../handbook/developer/history/host-services/README.md)へ移管しました。Docker導入ではインストール・起動せず、Composeと二重起動しないでください。NginxとBackup Jobは[Linux運用](../handbook/operator/linux.md)と[Backup](../handbook/operator/backup.md)を参照してください。
+Host直接実行用のsystemdサービスは[履歴](../handbook/developer/history/host-services/README.md)へ移管しました。Docker導入ではインストール・起動せず、Composeと二重起動しないでください。CaddyとBackup Jobは[Linux運用](../handbook/operator/linux.md)と[Backup](../handbook/operator/backup.md)を参照してください。

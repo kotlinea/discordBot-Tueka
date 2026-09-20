@@ -1,0 +1,191 @@
+name: tueka-tools
+
+x-python: &python
+  image: tueka-tools-python:local
+  profiles: [tasks]
+  build: {context: ., dockerfile: Dockerfile.tools, target: python}
+  init: true
+  working_dir: /workspace
+  volumes:
+    - .:/workspace:ro
+    - ./artifacts:/workspace/artifacts
+  environment: &database
+    TUEKA_HOST_DOCKER_HOST: "${DOCKER_HOST:-}"
+    TUEKA_TEST_DATABASE_URL: postgresql://tueka_test:tueka_test_local_only@postgres-test:5432/tueka_test
+    TUEKA_CONTAINER_DATABASE_URL: postgresql://tueka_test:tueka_test_local_only@postgres-test:5432/tueka_test
+  depends_on:
+    postgres-test: {condition: service_healthy}
+
+x-manager: &manager
+  <<: *python
+  image: tueka-tools-manager:local
+  build: {context: ., dockerfile: Dockerfile.tools, target: manager}
+  volumes:
+    - .:/workspace
+    - /var/run/docker.sock:/var/run/docker.sock
+
+x-web: &web
+  <<: *python
+  image: tueka-tools-web:local
+  build: {context: ., dockerfile: Dockerfile.tools, target: web}
+  depends_on: {}
+  shm_size: 1gb
+
+services:
+  postgres-test:
+    image: postgres:18-bookworm@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af
+    environment:
+      POSTGRES_USER: tueka_test
+      POSTGRES_PASSWORD: tueka_test_local_only
+      POSTGRES_DB: tueka_test
+    tmpfs: [/var/lib/postgresql]
+    shm_size: 256mb
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U tueka_test -d tueka_test]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  check:
+    <<: *manager
+    depends_on: {}
+    entrypoint: [python, /opt/tools.py, check]
+    command: []
+  test-python:
+    <<: *python
+    entrypoint: [python, /opt/tools.py, test-python]
+    command: []
+  api-check:
+    <<: *python
+    entrypoint: [python, /opt/tools.py, api-check]
+    command: []
+  commands-check:
+    <<: *python
+    entrypoint: [python, /opt/tools.py, commands-check]
+    command: []
+  check-docs:
+    <<: *python
+    depends_on: {}
+    entrypoint: [python, /opt/tools.py, check-docs]
+    command: []
+  api-generate:
+    <<: *python
+    volumes: [.:/workspace]
+    entrypoint: [python, /opt/tools.py, api-generate]
+    command: []
+  commands-generate:
+    <<: *python
+    volumes: [.:/workspace]
+    entrypoint: [python, /opt/tools.py, commands-generate]
+    command: []
+  lock-python:
+    <<: *python
+    depends_on: {}
+    volumes: [.:/workspace]
+    entrypoint: [python, /opt/tools.py, lock-python]
+    command: []
+  lock-web:
+    <<: *web
+    image: tueka-tools-web-lock:local
+    build: {context: ., dockerfile: Dockerfile.tools, target: web-lock}
+    volumes: [.:/workspace]
+    entrypoint: [python3, /opt/tools.py, lock-web]
+    command: []
+  typecheck:
+    <<: *web
+    entrypoint: [python3, /opt/tools.py, typecheck]
+    command: []
+  test-web:
+    <<: *web
+    entrypoint: [python3, /opt/tools.py, test-web]
+    command: []
+  build-web:
+    <<: *web
+    entrypoint: [python3, /opt/tools.py, build-web]
+    command: []
+  build-docs:
+    <<: *web
+    entrypoint: [python3, /opt/tools.py, build-docs]
+    command: []
+  test-a11y:
+    <<: *web
+    entrypoint: [python3, /opt/tools.py, test-a11y]
+    command: []
+  test-docs-a11y:
+    <<: *web
+    entrypoint: [python3, /opt/tools.py, test-docs-a11y]
+    command: []
+  dev-web:
+    <<: *web
+    entrypoint: [python3, /opt/tools.py, dev-web]
+    command: []
+    ports: [127.0.0.1:5173:5173]
+  dev-docs:
+    <<: *web
+    entrypoint: [python3, /opt/tools.py, dev-docs]
+    command: []
+    ports: [127.0.0.1:5174:5174]
+  build-image:
+    <<: *manager
+    depends_on: {}
+    entrypoint: [python, /opt/tools.py, build-image]
+    command: []
+  verify-runtime:
+    <<: *manager
+    entrypoint: [python, /opt/tools.py, verify-runtime]
+    command: []
+  verify-compose:
+    <<: *manager
+    depends_on: {}
+    entrypoint: [python, /opt/tools.py, verify-compose]
+    command: []
+  verify-setup:
+    <<: *manager
+    depends_on: {}
+    entrypoint: [python, /opt/tools.py, verify-setup]
+    command: []
+  verify-recovery:
+    <<: *manager
+    depends_on: {}
+    entrypoint: [python, /opt/tools.py, verify-recovery]
+    command: []
+  verify-restore:
+    <<: *manager
+    entrypoint: [python, /opt/tools.py, verify-restore]
+    command: []
+  verify-tools:
+    <<: *manager
+    depends_on: {}
+    entrypoint: [python, /opt/tools.py, verify-tools]
+    command: []
+  verify-caddy:
+    <<: *manager
+    entrypoint: [python, /opt/tools.py, verify-caddy]
+    command: []
+  secrets:
+    <<: *python
+    image: tueka-tools-secrets:local
+    build: {context: ., dockerfile: Dockerfile.tools, target: secrets}
+    depends_on: {}
+    network_mode: none
+    entrypoint: [python, /opt/tools.py, secrets]
+    command: []
+  setup:
+    <<: *manager
+    depends_on: {}
+    entrypoint: [python, /opt/tools.py, setup]
+    command: [--help]
+  deploy:
+    <<: *manager
+    depends_on: {}
+    entrypoint: [python, /opt/tools.py, deploy]
+    command: [--help]
+  recovery:
+    <<: *manager
+    depends_on: {}
+    entrypoint: [python, /opt/tools.py, recovery]
+    command: [--help]
+  ci:
+    <<: *manager
+    depends_on: {}
+    entrypoint: [python, /opt/tools.py, ci]
+    command: []

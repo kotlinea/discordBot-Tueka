@@ -15,12 +15,12 @@ Bot、Dashboard、Social Workerは5秒ごとにPostgreSQLへHeartbeatと数値�
 BotのGateway切断中とHeartbeat保存失敗時はreadyになりません。ファイルの有効期間は30秒です。Dashboard readinessは他のService停止とは独立し、全体の状態はメトリクスまたは次のコマンドで確認します。
 
 ```sh
-python scripts/deploy.py health --config-dir /srv/tueka-config/stage
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy health --config-dir data/environments/stage
 ```
 
 対象環境のImageを使う一時コンテナから集計JSONを表示します。`alerts`が空なら終了0、異常やDB取得失敗なら非0です。アプリDBの本文・接続秘密は出力しません。Composeの`status`でコンテナのhealth状態も確認してください。Dockerのunhealthy判定だけではコンテナは自動再起動しません。
 
-`deploy.py init`は環境ごとに`MONITORING_TOKEN`を生成します。既存の`app.env`には32文字以上のランダムな専用Tokenを追加し、Dashboardを再起動します。収集側は保護した資格情報ファイルから`Authorization: Bearer ...`を送信します。TokenをURLやコマンド履歴に記載しないでください。`deploy/nginx.conf`は外部の`/internal/`を404にするため、Host上の収集器はlocalhostのDashboardポートへ直接接続します。
+`deploy.py init`は環境ごとに`MONITORING_TOKEN`を生成します。既存の`app.env`には32文字以上のランダムな専用Tokenを追加し、Dashboardを再起動します。収集側は保護した資格情報ファイルから`Authorization: Bearer ...`を送信します。TokenをURLやコマンド履歴に記載しないでください。[生成Caddy設定](caddy.md)は外部の`/internal`と`/internal/*`を404にするため、Host上の収集器はlocalhostのDashboardポートへ直接接続します。
 
 ## 収集対象と初期閾値
 
@@ -46,11 +46,11 @@ Stage実測による運用閾値はまだ確定していません。通常負荷
 
 ## ログとResource制限
 
-アプリ標準出力はJSONで、時刻・Service・level・event・コード位置・HTTP status/時間・例外型だけを出します。メッセージ引数、例外本文、リクエストURL/query、Header、Ticket本文、SQL本文は出しません。コード位置と例外型で調査し、秘密値の出力を有効化せずテスト環境で再現します。Uvicornの既定access logはコンテナ入口で無効化します。Host起動も`python -m runtime dashboard`を使用してください。
+アプリ標準出力はJSONで、時刻・Service・level・event・コード位置・HTTP status/時間・例外型だけを出します。メッセージ引数、例外本文、リクエストURL/query、Header、Ticket本文、SQL本文は出しません。コード位置と例外型で調査し、秘密値の出力を有効化せずテスト環境で再現します。Uvicornの既定access logはコンテナ入口で無効化します。起動は共通Composeのdeployタスクを使用してください。
 
 Composeの各アプリとPostgreSQLはCPU 1、Memory 768 MiB、PID 128、Dockerログ10 MiB×3世代です。Dev ViteはMemory 1 GiBです。これは初期の上限であり、Stageの負荷・OOM・起動時間を測って環境別overrideで調整します。PostgreSQLはSQL/パラメータのログを抑制し、エラーはアプリの分類Counterで確認します。
 
-Host Nginx/TLSは継続使用し、Dashboardはlocalhostに限定します。サンプルaccess logはqueryやIPを保存しません。HostのNginx error logにはリクエスト情報が含まれる場合があるため閲覧を制限し、共有前に確認してください。Host側のlogrotateで`/var/log/nginx/tueka-access.log`を対象に含め、保持期間を運用側で決めます。DockerのローテーションはHost Nginxには適用されません。
+Host Caddyはアクセスログを既定で有効にしません。サービスログはjournalで管理します。エラーログにはリクエスト情報が含まれる場合があるため閲覧を制限し、共有前に確認してください。保持期間はHostのjournald運用で定めます。DockerのログローテーションはHost Caddyには適用されません。確認コマンドは[Caddy手順](caddy.md)を参照してください。
 
 ## 障害検証と復旧
 
@@ -59,4 +59,4 @@ Host Nginx/TLSは継続使用し、Dashboardはlocalhostに限定します。サ
 3. DBを停止し、livenessは200、readinessは503になることを確認。DB復旧後のHeartbeat・readiness・Queue再開を確認する。
 4. Pool枯渇、行lock、deadlockを隔離DBで再現し、待ち時間と分類Counterを確認する。
 
-自動回帰は`tests/test_observability.py`、`tests/test_database.py`と`python scripts/verify_compose.py --image <検証用Image>`です。Compose検証は専用の一時Project/VolumeとオフラインBotを使います。実Discord/OAuth/WebhookによるStage判定は別途必要です。運用DBで障害注入は行わないでください。
+自動回帰は`tests/test_observability.py`、`tests/test_database.py`と`docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build verify-compose --image <検証用Image>`です。Compose検証は専用の一時Project/VolumeとオフラインBotを使います。実Discord/OAuth/WebhookによるStage判定は別途必要です。運用DBで障害注入は行わないでください。

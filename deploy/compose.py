@@ -16,6 +16,7 @@ def command(directory):
     config = read_metadata(directory)
     env = {key: value for key, value in os.environ.items() if not key.startswith('COMPOSE_')}
     env.update(TUEKA_ENV=config['environment'], APP_IMAGE=config['image'], TUEKA_CONFIG_DIR=str(directory),
+               DEV_IMAGE=config['project'] + '-development:local',
                DASHBOARD_PORT=str(config['dashboard_port']), VITE_PORT=str(config['vite_port']))
     args = ['docker', 'compose', '--env-file', str(ROOT / 'deploy/compose.env'), '--project-directory', str(ROOT),
             '-p', config['project'], '-f', str(ROOT / 'deploy/compose.yaml'),

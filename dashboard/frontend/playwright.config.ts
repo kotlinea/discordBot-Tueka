@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 export default defineConfig({
+  workers: 2,
   testDir: './e2e',
   testIgnore: 'docs.spec.ts',
   use: { baseURL: 'http://127.0.0.1:4173', trace: 'retain-on-failure' },

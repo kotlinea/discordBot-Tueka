@@ -15,12 +15,13 @@
 | --- | --- | --- |
 | 起動・権限 | DB readiness→Migration成功→3Service起動、非root/read-only、Volume/秘密情報の環境分離 | 構成識別情報、Image ID、health結果。秘密値なし |
 | Discord | 専用GuildへBot接続、Command同期、権限不足時の診断、再起動後の応答 | 実施日時・対象機能・結果・必要なら非公開のMessage参照 |
+| Host Caddy / TLS | A/AAAA・80/443到達、公開証明書と更新、HTTP→HTTPS、Stage/Prod転送先、internal/API docs 404、systemd再起動・reload・Rollback | Caddy version、証明書期限、秘匿済み検証結果。ローカル内部CA検証と区別 |
 | Dashboard OAuth | 公開TLS経由でLogin/Logout、callback、CSRF、Guild所属、保存と再読込 | URLのOrigin、画面とAPI結果。query/code/tokenを記録しない |
 | Webhook/Worker | 検証Providerのイベント受信、署名拒否、正常配送、重複抑止 | Eventの識別情報を必要範囲だけ記録し本文は除外 |
 | 監視閾値 | 通常負荷と合意した障害注入でHTTPエラー率、Pool/lock/deadlock、Queue遅延、Heartbeatを収集 | 負荷条件、測定期間、分布、採用閾値と理由、通知到達結果 |
 | 実データ復旧 | 検証Transcript/添付/Tokenの復旧セット作成、S3使用時は実オブジェクト取得、別Volumeへ復元・復号 | Snapshot時刻、Image、鍵世代指紋、復号件数、Queue照合結果 |
 | Rollback | 更新前Snapshotと対応旧Imageへ別Projectで復元し、外部副作用照合後に転送先を切替 | 元/復元先Project、停止/解放記録、旧Schema/Image、Health |
-| 運用継続 | Backup Timer、失敗通知、保存先権限、Host外保管、鍵/Image保持、Nginxログ管理 | Timer最終成功、通知結果、Restore実施記録 |
+| 運用継続 | Backup Timer、失敗通知、保存先権限、Host外保管、鍵/Image保持、Caddy journal管理 | Timer最終成功、通知結果、Restore実施記録 |
 | 本番昇格 | 上記Stage結果と同じRegistry digestを本番へ渡し、別秘密情報で起動 | Stage/本番digest照合、変更記録、切戻し先 |
 
 ## 復旧検証の順序

@@ -51,11 +51,11 @@ Domain Routerは `dashboard/api/`、合成入口は `dashboard/api_v1.py` です
 
 `dashboard/api/schemas/` が公開DTOと入力制約を定義します。`body.py` は同じ入力ModelからOpenAPIを構築し、実際のJSONも検証します。作成・更新の部分入力は未指定の項目をDomainへ渡さず、既定値・組合せ・Guild Resource検査はDomainとRouterで行います。明示的なnullはnullable項目に限ります。
 
-Python 3.13の依存導入済み環境で、Repositoryルートから実行します。
+GitとDocker／Composeを用意し、Repositoryルートから実行します。
 
 ```sh
-python scripts/generate_api.py
-python scripts/generate_api.py --check
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build api-generate
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build api-check
 ```
 
 生成物は `dashboard/api/openapi.json` と `dashboard/frontend/src/generated/api.ts` です。生成時は一時DBにMigrationを適用し、実Routerから公開契約を取り出します。運用DB、環境変数、Discord接続は不要です。生成物を直接編集せず、Schemaを変更して再生成してください。CIは差分検査で更新漏れを失敗にします。

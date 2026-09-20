@@ -5,7 +5,7 @@
 Stage/本番の運用Composeでは次のコマンドで、対応Image・Migration・Queue集計・鍵世代の指紋・PostgreSQL dump・暗号化Transcript/添付を一つのディレクトリへ保存します。既存の保存先を上書きしません。Devは可変Source mountを使うためImageと一致する復旧セットの作成を拒否します。開発DBだけの保全は本ページ後半のDB単体操作を使い、運用復旧は構築済みImageのStageで検証します。
 
 ```sh
-python scripts/recovery.py backup --config-dir /srv/tueka-config/prod --bundle /srv/tueka-backups/before-update
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build recovery backup --config-dir data/environments/prod --bundle data/backups/before-update
 ```
 
 3Serviceを停止して接続が残っていないことを確認し、同じ環境のone-shot `recovery-db`と`recovery-data`を起動します。前者はServerと同じPostgreSQL 18のpg_dump/pg_restore、後者は対象アプリImageの復号/保存処理です。DB・Blob・鍵の検証に失敗した場合はWriterを停止したままにし、自動で再開しません。
@@ -23,7 +23,7 @@ python scripts/recovery.py backup --config-dir /srv/tueka-config/prod --bundle /
 3. 次を実行します。既存DBや非空Transcript保存先への上書きは拒否します。
 
 ```sh
-python scripts/recovery.py restore --config-dir /srv/tueka-config/prod-recovery --bundle /srv/tueka-backups/before-update --source-config /srv/tueka-config/prod
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build recovery restore --config-dir data/environments/prod-recovery --bundle data/backups/before-update --source-config data/environments/prod
 ```
 
 元のWriterを停止し、元設定へ`recovery-fence.json`、復元先へ`recovery-pending.json`を残します。通常の`deploy.py up`は両方を拒否します。元Hostを失った場合だけ、外部から旧Writerが起動しないことを確認して`--source-config`の代わりに`--source-fenced`を指定します。これは操作者による隔離済みの明示であり、自動で旧Hostを停止する機能ではありません。直接のDocker操作はこの制御を迂回するため使用しないでください。
@@ -34,8 +34,8 @@ DBを単一Transactionで復元し、全参照BlobとTicketの回答/Message/Fee
 5. 照合後に解放し、対応Imageで起動します。
 
 ```sh
-python scripts/recovery.py release --config-dir /srv/tueka-config/prod-recovery --reconciled
-python scripts/deploy.py up --config-dir /srv/tueka-config/prod-recovery --stage-config /srv/tueka-config/stage
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build recovery release --config-dir data/environments/prod-recovery --reconciled
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build deploy up --config-dir data/environments/prod-recovery --stage-config data/environments/stage
 ```
 
 `release`は復号とImage/鍵世代を再検査して記録を保存します。外部状態の照合自体は操作者の判断です。実Discordへの送信や自動起動は行いません。元Projectはfenceを保持し、二重Writerの再開を防ぎます。Health確認後の転送先切替とRollbackは[更新手順](upgrade.md)を参照してください。
@@ -44,20 +44,13 @@ python scripts/deploy.py up --config-dir /srv/tueka-config/prod-recovery --stage
 
 ## 定期Backup Job
 
-`deploy/tueka-backup.service`と`.timer`はLinux systemd用のテンプレートです。運用アカウント`tueka-operator`、Dockerへのアクセス、仮想環境、設定/Backupディレクトリの所有権を用意し、絶対パスと毎日04:00（HostのTimezone）の停止許容時間帯を調整してから導入します。サービスは`--backup-root`で時刻/UUID付きの保存先を作り、成功時だけ元Serviceを再開します。今回の開発作業ではTimerを登録・有効化していません。
+`deploy/tueka-backup.service`と`.timer`はLinux systemd用のテンプレートです。運用アカウント`tueka-operator`、Dockerへのアクセス、Docker／Compose、設定/Backupディレクトリの所有権を用意し、絶対パスと毎日04:00（HostのTimezone）の停止許容時間帯を調整してから導入します。サービスは`--backup-root`で時刻/UUID付きの保存先を作り、成功時だけ元Serviceを再開します。今回の開発作業ではTimerを登録・有効化していません。
 
 失敗終了を運用通知へ接続し、最終成功時刻、空き容量、別Hostへの転送、定期Restoreを確認します。世代削除は自動化していません。対応するImage/鍵世代を含めて必要な保持期間を決め、復元可能な世代を残してください。
 
 ## DB単体の操作
 
-PostgreSQLの論理Backupには、Serverと同じMajor版または互換性を確認済みの新しい `pg_dump` / `pg_restore` を使用します。対象DBの `DATABASE_URL` を設定し、Bot・Dashboard・Workerを停止してから実行します。外部Discord操作の途中状態はDB Snapshotだけでは保護できません。
-
-```sh
-python scripts/db_inventory.py --backup data/backups/pre-upgrade.dump
-python scripts/db_inventory.py --output data/backups/pre-upgrade-inventory.json
-```
-
-Backupはcustom形式です。既存ファイルを上書きせず、失敗時は今回作成した部分ファイルを削除します。CLIは認証情報や行内容を表示しません。Inventoryはテーブル・列・件数を一つのread-only Snapshotから取得します。別時点のBackupとInventoryが一致する必要がある場合は、取得中の書込みを停止してください。
+通常運用のBackup／Restoreは上記の `recovery` タスクに統一します。PostgreSQL clientは固定Image内で実行され、HostのDATABASE_URLやpg_dumpは不要です。DB単体の検証は `verify-restore` タスクで専用テストDBだけに実行します。
 
 ## 保全するもの
 
@@ -70,21 +63,4 @@ Backupはcustom形式です。既存ファイルを上書きせず、失敗時�
 
 ## 別DBへの復元
 
-1. 書込み元Serviceを停止し、現DBを保全します。
-2. 専用の空PostgreSQL DBを作成し、そのDBを `DATABASE_URL` に設定します。
-3. 次のコマンドを実行します。
-
-```sh
-python scripts/db_inventory.py --restore data/backups/pre-upgrade.dump
-python scripts/db_inventory.py --output data/backups/restored-inventory.json
-```
-
-Restoreは空DBだけを許可し、`--single-transaction --exit-on-error` で適用します。失敗時は変更がRollbackされます。接続先の取り違えや書込み競合を防ぐため、復元先へ他Serviceを接続しないでください。
-
-4. 対応するTranscript・S3オブジェクト・暗号鍵を用意し、復号と参照を確認します。
-5. 必要に応じて[Migration](migrations.md)を適用します。旧VersionへのRollbackではアプリとDB Snapshotを同じVersionに合わせます。
-6. 設定、Social Cursor、Ticket Transcript参照、期限Schedule、Outboxを確認してから各Serviceを起動します。
-
-DBの復元はDiscord上のメッセージ・Role・Channelを巻き戻しません。配送済み副作用は保存済みReceiptと照合し、不明な結果を無条件に再実行しないでください。DB Snapshot後の更新は復元先に含まれません。
-
-空DB・大きなID・採番・Queueと破損dumpのRollbackはテスト環境で検証します。実Transcript/S3と鍵を組み合わせたStage／本番の復旧確認は、別の運用ゲートです。
+上記の別Projectへの `recovery restore` を使用します。元Writerを停止し、鍵・Image・Transcriptを同じ世代に揃えてください。Discord上の副作用は巻き戻らないため、Receiptを照合するまで `release --reconciled` を実行しません。実S3を含む復旧は実Stage受入で確認します。

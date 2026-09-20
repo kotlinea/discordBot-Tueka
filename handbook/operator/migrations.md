@@ -40,9 +40,9 @@ docker compose --env-file tests/postgres.env -p tueka-test -f compose.postgres-t
 各テストと型生成はUUID付きSchemaを作り、終了時に削除します。アプリの `DATABASE_URL` はテスト接続先に流用しません。
 
 ```sh
-python -m unittest discover -s tests -p 'test_*.py'
-python scripts/generate_api.py --check
-python scripts/verify_postgres_restore.py --client-container tueka-test-postgres-test-1
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build test-python
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build api-check
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build verify-restore
 docker compose --env-file tests/postgres.env -p tueka-test -f compose.postgres-test.yaml down
 ```
 

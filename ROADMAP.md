@@ -140,7 +140,7 @@ Phase 0のテスト用コンテナを、本番運用可能な構成へ発展さ�
 - PostgreSQLの準備完了後に`migrate`を実行し、Migrationが正常完了した後だけ3Serviceを起動する。
 - DashboardへLiveness／Readiness、BotとWorkerへHeartbeat検査を追加する。
 - PostgreSQLの論理Backup/RestoreとTranscript・暗号鍵世代の対応を扱うone-shot serviceを用意し、別DB/Volumeへ復元して検証する。
-- 最初の本番移行ではNginxとTLSをHost側に残し、Dashboardだけを`127.0.0.1:8000`へ公開する。
+- 最初の本番移行ではCaddyとTLSをHost側で運用し、Dashboardだけを`127.0.0.1:8000`へ公開する。
 
 完了条件：同じImage digestがStageと本番で動き、空環境への導入、Upgrade、Backup、Restore、Rollbackを運用手順だけで完遂できること。
 
@@ -198,10 +198,10 @@ Phase 0のテスト用コンテナを、本番運用可能な構成へ発展さ�
 - README、`deploy/app.env.example`、公式Docsが実装と一致している。
 - Rollback方法と、Rollbackで失われるデータが明記されている。
 
-## 次に着手する作業（2026-09-19更新）
+## 次に着手する作業（2026-09-20更新）
 
-1. 利用者DocsとOperator/Developer handbookを分離し、日英全コマンドと公開境界を検証する。
-2. check/configure/build/startと運用一覧を整え、クリーン環境で受入する。
+1. 共通Composeタスクへの統一実装を追加済み。Docker Desktopの応答回復後に最終CI群を再確認する（個別検証と未完了項目は進捗記録参照）。
+2. 既存の役割別Docs・Caddy・check/configure/build/startを維持してWindows／Linuxのクリーン環境で受入する。
 3. 最新CommitのCI成功を確認し、Stage準備後に実機受入する。
 4. Phase 3出口を満たしてから既存機能の完成度判定・UX、続いて新機能へ進む。
 
