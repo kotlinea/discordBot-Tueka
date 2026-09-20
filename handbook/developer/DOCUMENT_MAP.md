@@ -133,11 +133,11 @@
 ## 2026-09-20 設定方式の統一
 
 - ルート `.env.example` は `deploy/app.env.example` へ移転（項目参照用）。Dev／Stage／Prodの設定の正本は生成された環境別app.env。
-- `deploy/tueka-bot.service`・`tueka-dashboard.service`・`tueka-social-worker.service` は `handbook/developer/history/host-services/` へ移転。旧Host直接起動の履歴であり、現行導入では使用しない。
+- Bot・Dashboard・Social Workerの起動定義は `deploy/compose.yaml`。Host直接起動用serviceファイルの削除根拠は[未使用資産の点検](UNUSED_CODE_AUDIT.md)を参照。
 
 ## Host Caddy採用
 
-- `deploy/nginx.conf` は `handbook/developer/history/nginx.conf` へ移管。現行Stage／ProdのHTTPS手順は `handbook/operator/caddy.md` に統一。
+- Stage／ProdのHTTPS手順は `handbook/operator/caddy.md`。Caddy設定は `deploy caddy-config` で生成する。
 - Caddyの生成物はapp.envとdeployment.jsonから導出し、別の設定正本を追加しない。
 
 ## Composeタスク統一

@@ -240,7 +240,7 @@ def run(task, args, root, log):
         selected = parser.parse_args(args).group
         tasks = GROUPS[selected] if selected else sum(GROUPS.values(), [])
         project = 'tueka-tools-ci-' + uuid.uuid4().hex[:12]
-        base = ['docker', 'compose', '--env-file', 'tests/postgres.env', '-p', project, '-f', 'compose.tools.yaml']
+        base = ['docker', 'compose', '--env-file', 'deploy/compose.env', '-p', project, '-f', 'compose.tools.yaml']
         # All tasks use a run-specific image tag and isolated Compose project.
         env = dict(os.environ, TUEKA_TOOLS_IMAGE='tueka-tools-ci:' + project)
         try:

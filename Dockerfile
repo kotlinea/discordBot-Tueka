@@ -49,7 +49,7 @@ COPY social social
 COPY suggestions suggestions
 COPY tests tests
 COPY ticketing ticketing
-COPY *.py requirements.lock tokens.css tueka-icon.png banned_words.csv ./
+COPY *.py requirements.lock tokens.css tueka-icon.png ./
 COPY --from=web /app/dashboard/frontend/dist /opt/tueka-assets/ui
 COPY --from=web /app/docs/.vitepress/dist /opt/tueka-assets/docs
 USER 10001:10001

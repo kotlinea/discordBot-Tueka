@@ -10,12 +10,7 @@ from difflib import SequenceMatcher
 from typing import Any, Awaitable, Callable
 from urllib.parse import urlparse
 
-try:
-    import regex
-    REGEX_TIMEOUT_AVAILABLE = True
-except ImportError:  # Production installs use requirements.txt; this preserves upgrade compatibility.
-    import re as regex
-    REGEX_TIMEOUT_AVAILABLE = False
+import regex
 
 from .models import RATE_TRIGGERS
 
@@ -194,10 +189,7 @@ class AutoModEngine:
         elif trigger == "regex":
             for pattern in config.get("patterns", []):
                 try:
-                    if REGEX_TIMEOUT_AVAILABLE:
-                        found = regex.search(pattern, content[:4000], regex.IGNORECASE, timeout=0.02)
-                    else:
-                        found = regex.search(pattern, content[:4000], regex.IGNORECASE)
+                    found = regex.search(pattern, content[:4000], regex.IGNORECASE, timeout=0.02)
                 except TimeoutError:
                     continue
                 if found:

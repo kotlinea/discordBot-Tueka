@@ -120,7 +120,7 @@
 | `handbook/developer/history/docs-before-role-split/legacy-mixed-pages/troubleshooting-index.md` | 開発者・履歴 | 記録時点を保持。現行操作の入口から分離 |
 | `handbook/developer/history/docs-before-role-split/README.md` | 開発者・履歴 | 記録時点を保持。現行操作の入口から分離 |
 | `handbook/developer/history/EXECUTION_PLAN-2026-09-19.md` | 開発者・履歴 | 記録時点を保持。現行操作の入口から分離 |
-| `handbook/developer/history/host-services/README.md` | 開発者・履歴 | 記録時点を保持。現行操作の入口から分離 |
+| `handbook/developer/UNUSED_CODE_AUDIT.md` | 開発者 | 未使用資産の削除根拠と保持対象 |
 | `handbook/developer/history/ROADMAP-2026-09-20.md` | 開発者・履歴 | 記録時点を保持。現行操作の入口から分離 |
 | `handbook/developer/inventory/V1_INVENTORY.md` | 開発者・履歴 | 記録時点を保持。現行操作の入口から分離 |
 | `handbook/developer/PROGRESS0910.md` | 開発者・履歴 | 記録時点を保持。現行操作の入口から分離 |

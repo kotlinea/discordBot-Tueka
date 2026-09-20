@@ -4,10 +4,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-try:
-    import regex
-except ImportError:  # Existing installations remain bootable until requirements are refreshed.
-    import re as regex
+import regex
 
 
 TRIGGER_TYPES = {
@@ -129,8 +126,6 @@ def validate_rule(raw: dict[str, Any]) -> dict[str, Any]:
                 regex.compile(pattern, regex.IGNORECASE)
             except regex.error as exc:
                 raise ValueError(f"Invalid regular expression: {exc}") from exc
-            if regex.__name__ == "re" and __import__("re").search(r"\([^)]*[+*][^)]*\)[+*{]", pattern):
-                raise ValueError("Nested quantifiers require the timeout-capable regex dependency")
         config = {"patterns": patterns}
     elif trigger == "domain":
         mode_value = str(config.get("mode", "blacklist"))
