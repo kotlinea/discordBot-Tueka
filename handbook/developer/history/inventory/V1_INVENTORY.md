@@ -1,5 +1,7 @@
 # V1削除Inventory（2026-09-10）
 
+> 履歴資料：記録時点の調査・判断・検証証拠です。現在の作業は[開発者ガイド](../../README.md)から開始してください。
+
 対象はローカル設定先 `data/tueka.sqlite3` のBackup Snapshot。遠隔本番DBの存在・一致は未確認。行内容・Guild/User ID・Tokenは含めない。列、外部キー、Index、静的参照位置の全一覧は `schema-0910.json`。
 
 ## テーブル単位の判定

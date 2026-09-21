@@ -1,48 +1,35 @@
-# Design — Tueka Dashboard
+# Dashboardの視覚仕様
 
-Locked multi-page design system. `tokens.css` is canonical; page-specific raw colours and fonts are not permitted.
+共通Tokenの正本は `tokens.css`。ページ固有の色・フォントを直接追加せず、既存Tokenとコンポーネントを使う。以下は画面変更時に維持する設計基準であり、全画面の受入済みを意味しない。
 
-## System
-- Genre · modern-minimal operations workbench
-- Macrostructure · Workbench
-- Navigation · persistent application rail + visible N13 command search
-- Theme · custom variants: Precision / Community / Atmosphere
-- Axes · light or dark tinted paper / geometric sans / restrained cool accent
-- Typography · Space Grotesk display · Noto Sans JP body · Geist Mono identifiers
-- Icons · Lucide only
+## 構成
 
-## Interaction
-- Every mutation uses an explicit Save or confirmation action.
-- Motion communicates overlays and state changes only; 120–240 ms exponential easing.
-- Reduced motion removes spatial transitions and keeps ≤150 ms opacity changes.
-- Focus is immediate, 2 px, and never animated. Touch targets are at least 44 px.
-- Reversible rule edits are staged until Save. Ban and Lockdown require typed confirmation.
+- 操作領域とナビゲーションを分けたWorkbench構成。Desktopはサイドナビゲーション、Mobileはトップバーと全高のナビゲーションを使う。
+- 外観はPrecision / Community / Atmosphere、色調はlight / dark。
+- 見出しはSpace Grotesk、本文はNoto Sans JP、識別子はGeist Mono。IconはLucide。
+- 認証後の画面はReact SPA。起動前にFrontendをbuildする。
 
-## Layout
-- Mobile-first at 320 / 375 / 414 / 768 px; content breakpoints at 40 / 60 / 90 rem.
-- One containment boundary per region; no card-in-card or equal three-card feature grids.
-- Desktop uses an asymmetric rail/content workbench. Mobile uses a top bar and full-height navigation sheet.
-- Moderation rule editing is a four-step task flow, never a single field wall.
+## 操作・表示の基準
 
-## Voice
-- Japanese is concise and formal; English is a complete peer locale.
-- Labels name the object; buttons use a specific verb; errors state what happened and how to recover.
-- Do not invent metrics, testimonials, protection claims, or Discord state.
+- 更新は明示的な保存または確認操作で確定する。ルール編集は保存まで編集中として扱う。Ban・Lockdownは入力確認を要求する。
+- MotionはOverlayと状態変化の説明に用い、120〜240msを基準とする。Reduced motionでは空間移動を抑え、Opacity変化は150ms以内にする。
+- Focusは2pxで即時表示し、アニメーションしない。Touch targetは44px以上とする。
+- Mobile-firstで320 / 375 / 414 / 768pxを確認し、Content breakpointは40 / 60 / 90remを使う。
+- 領域ごとの囲いは一層にし、Cardの入れ子や均等な3枚Cardの機能説明を避ける。
+- Moderationルール編集は4段階の操作として構成する。
 
-## Exports
-- Canonical CSS · `tokens.css`
-- Tailwind v4 · map canonical names directly in `@theme`; the application does not depend on Tailwind.
-- DTCG · map each canonical token to `$value` / `$type` when exporting `tokens.json`.
-- shadcn/ui · map paper→background/card, ink→foreground, accent→primary, rule→border; the application does not ship shadcn styling.
+## 文言と権限
 
-## Build and release
-- Build the SPA with `docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build build-web` from the repository root.
-- The generated `dist`, dependency tree, and Playwright artifacts are intentionally not tracked.
+- 日本語は簡潔で丁寧にし、英語も同等の情報を提供する。Labelは対象、Buttonは具体的な動作、Errorは原因と復帰方法を示す。
+- 実測していない指標、利用者の声、保護効果、Discordの状態を創作しない。
+- Lockdown/Channel lockはManage Channels、Reaction削除/PurgeはManage Messages、監査照合はView Audit Logを確認する。
+- Timeout/Kick/Banは対応権限とRole階層を実行時にも検査する。
 
-## Discord permissions
-- Lockdown and channel lock require Manage Channels.
-- Reaction cleanup and purge require Manage Messages.
-- Audit-log actor correlation requires View Audit Log.
-- Timeout, Kick, and Ban require their corresponding Discord permissions and still respect role hierarchy at execution time.
+## 検証
 
-The authenticated dashboard always uses the React SPA. Build assets before startup; there is no Jinja administration fallback.
+```text
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build build-web
+docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build test-a11y
+```
+
+生成dist、依存ツリー、Playwright成果物は追跡ファイルに追加しない。APIと状態遷移の変更は[Web作業指示](tasks/WEB.md)に従う。

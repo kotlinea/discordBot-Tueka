@@ -12,7 +12,7 @@
 
 DashboardのSession・Discord OAuth state・ユーザー個人設定は `dashboard/repository.py` が保存します。Web画面とJSON APIはこのRepositoryを直接使用します。
 
-Guild Moduleの汎用CRUD・有効Guild一覧は `guild_settings/repository.py`、既定値・正規化は `guild_settings/models.py` が担当します。APIとCogは設定Repositoryと各DomainのRepositoryを直接使用します。旧 `storage.py` とGuildStorageの委譲窓口はありません。
+Guild Moduleの汎用CRUD・有効Guild一覧は `guild_settings/repository.py`、既定値・正規化は `guild_settings/models.py` が担当します。APIとCogは設定Repositoryと各DomainのRepositoryを直接使用します。
 
 | ディレクトリ | 責務 |
 | --- | --- |
@@ -29,17 +29,17 @@ Guild Moduleの汎用CRUD・有効Guild一覧は `guild_settings/repository.py`�
 
 Moderationのルール更新と設定のrules_revision更新、CaseとTrustイベントの記録は同じTransactionを維持するため `moderation/repository.py` がまとめて扱います。一般的な設定保存をこの経路へ集約しません。TicketのBlacklist・当番・Tag・Panel移動・自動Close除外・削除記録もRepositoryが扱い、ServiceやCogから直接SQLを実行しません。
 
-`social_worker.py` は従来の起動コマンドを保つ薄い入口で、処理本体は `social/worker.py` です。APIの内部生成関数はPostgreSQL接続URLを受け取り、DomainごとのRepositoryを生成します。HTTP URLと認可の契約は維持します。共通Outbox/Runnerは `jobs/` にあります。Discord操作はDomainのAdapterへ分離済みです。API Routerは `dashboard/api/` に配置し、`dashboard/api_v1.py` はContextの生成とRouterの合成だけを担当します。
+`social_worker.py` はWorkerのProcess起動入口で、処理本体は `social/worker.py` です。APIの内部生成関数はPostgreSQL接続URLを受け取り、DomainごとのRepositoryを生成します。HTTP URLと認可の契約は維持します。共通Outbox/Runnerは `jobs/` にあります。Discord操作はDomainのAdapterへ分離済みです。API Routerは `dashboard/api/` に配置し、`dashboard/api_v1.py` はContextの生成とRouterの合成だけを担当します。
 
-P2-7ではPostgreSQL専用の接続・Migration・テスト基盤へ切り替えています。原開発データは移送しません。
+Runtime・Migration・テスト基盤はPostgreSQLを使用します。
 
 `database/connections.py` がpsycopg接続・有界Pool・Transaction、`database/migrations.py` が適用と履歴検査、`database/operations.py` が棚卸し・論理Backup/Restoreを担当します。Poolは接続先ごとに最大4接続、取得待ち10秒、SQL30秒、lock待ち10秒です。UTC epoch秒を保存し、JSONはTEXT、既存の真偽値は0/1、Discord IDはBIGINT、内部IDはIdentity列を使います。
 
 Schemaは番号付きMigration CLIだけが作成・変更します。RepositoryのコンストラクタはDDLを実行せず、未適用・不一致の履歴を検出すると `SchemaNotReady` で失敗します。BotはDiscord接続前、Dashboard / Workerは保存層の作成時に確認します。現行Ticketの未完了Close復旧やReaction Rolesの不足設定修復は、Schema変更とは別のDomain処理として保持しています。
 
-認証後の管理画面はReact SPAを常時配信します。Dashboard切替Flagや旧管理フォームはありません。公開ランディングと404画面のみJinjaを使用します。Frontendをbuildしていない場合、管理画面は503を返します。
+認証後の管理画面はReact SPAを常時配信します。公開ランディングと404画面のみJinjaを使用します。Frontendをbuildしていない場合、管理画面は503を返します。
 
-設定APIの `/api/v1` は現行APIのバージョンです。Social OAuthの開始は `POST /social/oauth/{provider}/connect/{guild_id}`（セッション、フォームの `csrf_token`、Guild管理権限が必要）、外部Providerのcallbackは `/social/oauth/{provider}/callback` です。旧管理フォームの `/servers/{guild_id}/social/connect/{provider}` は廃止しています。
+設定APIの `/api/v1` は現行APIのバージョンです。Social OAuthの開始は `POST /social/oauth/{provider}/connect/{guild_id}`（セッション、フォームの `csrf_token`、Guild管理権限が必要）、外部Providerのcallbackは `/social/oauth/{provider}/callback` です。
 
 更新はrevisionで競合を検知します。長時間処理と配送はOutboxまたはScheduleへ保存し、Leaseを取得したProcessが実行します。期限切れLeaseは再取得でき、外部Event IDやInteraction IDの一意制約で重複処理を防ぎます。
 
@@ -68,7 +68,7 @@ Actionの部分失敗は成功扱いに丸めず、各結果と復旧可能性�
 - TicketのClose確定時に `close_resource` Outboxを同じTransactionで作ります。Transcriptがあり、Ticketが閉じた状態でrevisionも一致する場合だけ、Adapterが削除またはThreadのArchiveを実行します。再開後の古い削除ジョブは拒否します。
 - Social Provider監視は取得ごとに一意な所有者値を発行します。完了・削除は有効なLeaseだけが可能で、取得したEventの保存とCursor更新も同じTransactionです。
 
-これらは実装済みの境界です。P2-4全体の完了判定と検証結果は、実行計画と進捗記録で管理します。
+受入状態と検証結果は[実行計画](EXECUTION_PLAN.md)で管理します。
 
 
 Ticketの返信・Staff NoteはServiceが復号・配送Intent・記録を担当し、AdapterがDiscordへ投稿します。配送KeyはOutbox IDと作成日時の組で、保持期限後に数値IDが再使用されても以前の配送と混同しません。結果不明の場合は識別印を照合し、明確な未送信エラーだけ新規送信として再試行します。内部Noteは同じ配送Keyの保存済み行を再利用します。

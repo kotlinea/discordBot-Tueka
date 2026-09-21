@@ -1,6 +1,8 @@
 # 機能を追加する
 
-新しい機能はFeature RegistryへMetadataを登録し、Storage／Repository、Service、Discord Cog、API、Dashboard、Docs、Testを同じ変更で追加します。
+新しい機能はFeature RegistryへMetadataを登録し、Repository、Service、Discord Cog、API、Dashboard、Docs、Testを同じ変更で追加します。
+
+最初に[設計原則](ENGINEERING.md)と[Backend作業指示](tasks/BACKEND.md)を確認してください。
 
 ## Feature Registry
 

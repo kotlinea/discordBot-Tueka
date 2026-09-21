@@ -18,7 +18,7 @@ def main():
     parser.add_argument('--built', action='store_true')
     args = parser.parse_args()
     errors = []
-    pages = [ROOT / 'README.md', ROOT / 'ROADMAP.md', ROOT / 'deploy/README.md', *(ROOT / 'docs').rglob('*.md'), *(ROOT / 'handbook').rglob('*.md')]
+    pages = [ROOT / 'AGENTS.md', ROOT / 'README.md', ROOT / 'ROADMAP.md', ROOT / 'deploy/README.md', *(ROOT / 'docs').rglob('*.md'), *(ROOT / 'handbook').rglob('*.md')]
     for page in pages:
         if any(part in ('node_modules', '.vitepress', 'history', 'inventory') for part in page.parts) or page.name in ('PROGRESS0910.md', 'DOCUMENT_MAP.md'):
             continue

@@ -1,6 +1,6 @@
 # Tueka 開発ロードマップ
 
-Tuekaの基盤整備、運用受入、機能改善を進める順序と完了条件を定めます。項目ごとの担当・依存・証拠は[実行計画](handbook/developer/EXECUTION_PLAN.md)、実施記録は[進捗](handbook/developer/PROGRESS0910.md)を参照してください。
+Tuekaの基盤整備、運用受入、機能改善を進める順序と完了条件を定めます。項目ごとの担当・依存・証拠は[実行計画](handbook/developer/EXECUTION_PLAN.md)、実施記録は[進捗](handbook/developer/history/PROGRESS0910.md)を参照してください。
 
 ## 構成
 

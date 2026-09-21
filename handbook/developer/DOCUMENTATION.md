@@ -45,4 +45,4 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 
 check-docsはリンク、公開境界、利用者・運用者向けの禁止表現、削除済みタスク入口を検査します。意味や機能の正確さはコードとのレビューで確認します。
 
-過去の記録はhistory、inventory、PROGRESS0910.mdへ保存し、記録時点を明示します。現行ガイドから古い操作手順へ誘導しないようにします。全Markdownの点検対象は[文書点検台帳](DOCUMENTATION_AUDIT.md)を参照してください。
+過去の記録は `history/` へ保存し、記録時点を明示します。現行ガイドから古い操作手順へ誘導しないようにします。全Markdownの点検対象は[文書点検台帳](history/DOCUMENTATION_AUDIT.md)を参照してください。
