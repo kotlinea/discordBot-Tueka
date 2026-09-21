@@ -17,6 +17,8 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 
 ## 現在地と次の作業
 
+- 追加依頼の機能中心の構造改善は[専用計画](../../goal.md)で進める。2026-09-21にG0の全入口対応表と変更前baselineを完了し、次はG1のRegistry契約。Python374件、Frontend14件、型/API/103コマンド照合成功。[G0の範囲・証拠](history/FEATURE_STRUCTURE_G0-2026-09-21.md)を比較元とし、一会話につきG段階を一つ完了させる。
+
 - Phase 0〜2、P3-1〜4、役割別Docs・導入CLIはローカル検証済み。実Stageは未準備。
 - Compose基盤の最終全群検証、別Linux Hostのクリーン受入、最新CommitのRemote CI結果の確認が残る。その後Stage受入、Phase 4、Phase 5の順に進める。実害のある不具合は優先する。
 - 直近のコード検証は2026-09-20のWindows Docker Desktop/Linuxコンテナ。`ci --group python`、`build-image`、`verify-runtime` が成功。Python374件、Image内374件、103コマンド、API・Docs・Restore・ツール受入を確認。[証拠と削除判定](history/UNUSED_CODE_AUDIT.md)を参照する。全群CIや独立したLinux Hostの成功を示すものではない。

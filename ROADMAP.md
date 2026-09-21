@@ -22,10 +22,13 @@ Tuekaの基盤整備、運用受入、機能改善を進める順序と完了条
 | C1 Remote CI | 未確認 | 最新Commitの全Job結果とRun URL |
 | P3-G Stage受入 | 外部環境待ち | 専用Host、Guild、OAuth、Webhook、Registry、公開証明書 |
 | Phase 4・5 | 未着手 | Stage受入後に機能ごとの仕様と受入を進める |
+| G 機能中心の構造改善 | 進行中 | G0の全入口棚卸し・変更前baseline完了。G1〜G6は未着手 |
 
 ローカル成功、Remote CI成功、実Stage受入はそれぞれの証拠で判定します。Stage環境は未準備です。
 
 ## 次の作業
+
+追加依頼の構造改善は [goal.md](goal.md) のG0〜G6で進めます。[G0対応表と検証証拠](handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.md)を固定し、次はG1の機能・カテゴリーRegistry契約です。既存機能を対象とする追加作業であり、以下の実環境受入や新機能のゲートは維持します。
 
 1. **Docsと共通タスクの確認**：読み手ごとの説明と実行コマンドを点検し、日英Docs、生成物、テスト、Image、Compose、Recovery、Caddyの検証を完了します。
 2. **クリーン環境・CI受入**：Windows Docker DesktopとLinuxのcheckoutで共通タスクを実行し、所有権、空白・日本語パス、並列実行、失敗からの再実行を確認します。Remote CIのCommitとRun URLを記録します。
