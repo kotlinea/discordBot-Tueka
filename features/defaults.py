@@ -11,6 +11,10 @@ def validate_settings(enabled: bool, settings: Settings) -> None:
     """Default has no feature-specific combination rules."""
 
 
+def additional_permissions(settings: Settings) -> tuple[str, ...]:
+    return ()
+
+
 class ModuleStore(Protocol):
     def get_module(self, guild_id: int, module_id: str) -> Settings: ...
     def set_module(self, guild_id: int, module_id: str, *, enabled: bool,
@@ -21,6 +25,7 @@ class SettingsAccess(Protocol):
     """A feature may supply a dedicated store with this same contract."""
     def read(self, guild_id: int) -> Settings: ...
     def validate(self, enabled: bool, settings: Settings) -> None: ...
+    def additional_permissions(self, settings: Settings) -> tuple[str, ...]: ...
     def save(self, guild_id: int, *, enabled: bool, settings: Settings,
              expected_revision: int | None) -> Settings: ...
 
@@ -31,6 +36,7 @@ class ModuleSettingsAccess:
     feature_id: str
     normalize: Normalizer = deepcopy
     validate: Callable[[bool, Settings], None] = validate_settings
+    additional_permissions: Callable[[Settings], tuple[str, ...]] = additional_permissions
 
     def read(self, guild_id: int) -> Settings:
         value = deepcopy(self.store.get_module(guild_id, self.feature_id))
@@ -41,3 +47,31 @@ class ModuleSettingsAccess:
         return self.store.set_module(guild_id, self.feature_id, enabled=enabled,
                                      settings=self.normalize(deepcopy(settings)),
                                      expected_revision=expected_revision)
+
+
+class DedicatedStore(Protocol):
+    def settings(self, guild_id: int) -> Settings: ...
+    def save_settings(self, guild_id: int, value: Settings, expected_revision: int | None) -> Settings: ...
+
+
+@dataclass(frozen=True)
+class RepositorySettingsAccess:
+    """Use a domain-owned settings repository without changing its transaction."""
+    store: DedicatedStore | None
+    validate: Callable[[bool, Settings], None] = validate_settings
+    additional_permissions: Callable[[Settings], tuple[str, ...]] = additional_permissions
+
+    @staticmethod
+    def _module(value: Settings) -> Settings:
+        return {'enabled': value['enabled'], 'revision': value['revision'], 'settings': value}
+
+    def read(self, guild_id: int) -> Settings:
+        value = self.store.settings(guild_id) if self.store else {'enabled': False, 'revision': 0}
+        return self._module(deepcopy(value))
+
+    def save(self, guild_id: int, *, enabled: bool, settings: Settings,
+             expected_revision: int | None) -> Settings:
+        if self.store is None:
+            raise RuntimeError('settings_store_unavailable')
+        value = self.store.save_settings(guild_id, {**deepcopy(settings), 'enabled': enabled}, expected_revision)
+        return self._module(value)

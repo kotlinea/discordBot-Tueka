@@ -16,7 +16,4 @@ CATEGORY = Category('community', 'nav.community', (
     LIVE_STATS,
     TEMPORARY_VOICE,
     TICKETS,
-), bindings=(
-    Binding('community_bot', 'bot', 'cogs.community:setup', 8),
 ))
-

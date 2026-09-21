@@ -11,7 +11,7 @@ from . import schemas
 from .schemas import inputs
 from .body import read_body, request_schema
 from .dependencies import ApiDependencies
-from .ticket_dependencies import team_member
+from .community.ticket_support.dependencies import team_member
 
 def create_router(context: ApiContext) -> APIRouter:
     router = APIRouter(route_class=ApiRoute, responses=ERROR_RESPONSES)

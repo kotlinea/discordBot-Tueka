@@ -35,10 +35,11 @@ def create_router(context: ApiContext) -> APIRouter:
 
     @router.put('/guilds/{guild_id}/modules/{module_id}', dependencies=[Depends(auth.csrf)], response_model=schemas.ModuleValue, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.ModuleInput))
     async def save_module(request: Request, guild_id: int, module_id: str, _access: str=Depends(auth.write)) -> dict[str, Any]:
-        if module_id in {'tickets', 'reaction_roles'}:
-            raise api_error(404, 'module_not_found', '機能専用の設定APIを使用してください。')
         try:
             feature = get_feature(module_id)
+            if not feature.module_write:
+                raise api_error(404, 'module_not_found', '機能専用の設定APIを使用してください。')
+            access = context.feature_settings[module_id]
             body = await read_body(request, inputs.ModuleInput)
             snapshot = await GuildResources.fetch(discord, guild_id)
             permissions = snapshot.permissions
@@ -47,19 +48,11 @@ def create_router(context: ApiContext) -> APIRouter:
                 raise ValueError('settings')
             validate_resource_ids(values, snapshot.channel_ids(), snapshot.role_ids)
             if bool(body.get('enabled')):
-                required = set(feature.required_bot_permissions)
+                required = set(feature.required_bot_permissions) | set(access.additional_permissions(values))
                 if any((not values.get(field) for field in feature.required_fields)):
                     raise ValueError('required_settings')
-                if module_id == 'audit_log' and values.get('log_member'):
-                    required.add('view_audit_log')
-                if module_id == 'leveling':
-                    if values.get('voice_enabled') and (not values.get('voice_notification_channel_id')):
-                        raise ValueError('voice_notification_channel_id')
-                    if values.get('text_role_rewards') or values.get('voice_role_rewards'):
-                        required.add('manage_roles')
                 if not permissions & ADMINISTRATOR and any((not permissions & PERMISSION_BITS[name] for name in required)):
                     raise ValueError('missing_permissions')
-            access = context.feature_settings[module_id]
             access.validate(bool(body.get('enabled')), values)
             saved = access.save(guild_id, enabled=bool(body.get('enabled')), settings=_normalize_resource_ids(values), expected_revision=int(body['revision']) if body.get('revision') is not None else None)
             return {**saved, 'settings': _serialize_resource_ids(saved['settings'])}

@@ -21,7 +21,7 @@ CATEGORY = Category('moderation', 'nav.moderation', (
     AUDIT_LOG,
     TRUST_SCORE,
 ), bindings=(
-    Binding('moderation_runtime', 'bot', 'cogs.automod:setup', 6),
-    Binding('moderation_api', 'api', 'dashboard.api.moderation:create_router', 8),
+    Binding('moderation_runtime', 'bot', 'cogs.moderation.runtime:setup', 6),
+    Binding('moderation_api', 'api', 'dashboard.api.moderation.rules:create_router', 8),
 ))
 

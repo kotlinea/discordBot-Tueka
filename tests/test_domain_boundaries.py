@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import discord
 
-from cogs.audit_log import AuditLogCog
+from cogs.moderation.audit_log import AuditLogCog
 from db_support import prepare_database
 from engagement import EngagementRepository
 from guild_settings import GuildSettingsRepository
@@ -31,7 +31,8 @@ class DomainBoundaryTests(unittest.TestCase):
         external = {'send', 'edit', 'delete', 'ban', 'unban', 'kick', 'timeout', 'purge', 'add_roles',
                     'remove_roles', 'set_permissions', 'create_text_channel', 'create_thread', 'fetch_message'}
         allowed = ('interaction.', 'self.service.', 'self.discord.', 'self.moderation.', 'self.transcripts.')
-        for name in ('automod', 'moderation_commands', 'safety', 'tickets', 'reaction_roles', 'social_updates', 'suggestions'):
+        for name in ('moderation/runtime', 'moderation/moderation_actions', 'moderation/action_support/direct_commands',
+                     'community/tickets', 'community/reaction_roles', 'social/delivery', 'engagement/suggestions'):
             path = Path('cogs') / (name + '.py')
             for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
                 if isinstance(node, ast.Await) and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Attribute):
@@ -45,7 +46,7 @@ class DomainBoundaryTests(unittest.TestCase):
         files.extend((root / 'dashboard' / 'api').glob('*.py'))
         for folder in ('cogs', 'dashboard', 'community', 'engagement', 'social',
                        'jobs', 'moderation', 'ticketing', 'suggestions', 'reaction_roles', 'guild_settings'):
-            files.extend((root / folder).glob('*.py'))
+            files.extend((root / folder).rglob('*.py'))
         for path in files:
             if path.name in {'database.py', 'migrate.py', 'repository.py'}:
                 continue

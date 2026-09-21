@@ -1,6 +1,6 @@
 import unittest
 
-from cogs.leveling import calculate_level, required_xp
+from cogs.community.leveling import calculate_level, required_xp
 
 
 class LevelingMathTests(unittest.TestCase):

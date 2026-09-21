@@ -14,13 +14,13 @@
 
 Botは登録された拡張を一度だけ初期化し、登録失敗時は読み込んだ拡張を解除します。APIはアプリごとにContextを生成し、各Router factoryへ同じContextを一度ずつ渡します。重複Binding、親の循環、API経路・operation IDの衝突を拒否します。
 
-Frontendは `features/<category>/<id>.feature.tsx` に経路、画面loader、Namespace、表示権限を定義します。RegistryはID・親・経路を検査し、同じloaderの並行呼出しをまとめます。Backend Metadataと生成API型を使い、認可はAPI境界で確認します。`modules/:moduleId` は `routing/RegisteredModule.tsx` が登録された画面を読み込み、Guild・機能単位で編集状態を分離します。残るDomain画面とShell全体の移行は[構造改善計画](../../goal.md)のG3〜G4で行います。
+Frontendは `features/<category>/<id>.feature.tsx` に経路、画面loader、Namespace、表示権限を定義します。RegistryはID・親・経路を検査し、同じloaderの並行呼出しをまとめます。Backend Metadataと生成API型を使い、認可はAPI境界で確認します。`modules/:moduleId` は `routing/RegisteredModule.tsx` が登録された画面を読み込み、Guild・機能単位で編集状態を分離します。残るDomain画面とShell全体の移行は[構造改善計画](../../goal.md)のG4で行います。
 
 `welcome` の入力は `cogs/community/welcome.py`、設定モデルは `guild_settings/community/welcome.py`、API設定Factoryは `dashboard/api/community/welcome.py` が担当します。参加ロールは独立した `cogs/community/autorole.py` が担当します。Featureの `settings_factory` はアプリのContextへ `SettingsAccess` を一度生成し、共通Routerが認可・CSRF・Resource確認後に検証と保存を呼びます。既定の `ModuleSettingsAccess` は正規化とrevision付き保存を提供します。
 
 DashboardのSession・Discord OAuth state・ユーザー個人設定は `dashboard/repository.py` が保存します。Web画面とJSON APIはこのRepositoryを直接使用します。
 
-Guild Moduleの汎用CRUD・有効Guild一覧は `guild_settings/repository.py`、既定値・正規化は `guild_settings/models.py` とカテゴリー配下のモデルが担当します。APIとCogは設定アクセス契約・設定Repositoryと各DomainのRepositoryを使用します。
+Guild Moduleの汎用CRUD・有効Guild一覧は `guild_settings/repository.py`、既定値・正規化は `guild_settings/<category>/<feature>.py` が担当します。Domain内の `guild_settings/registry.py` で明示登録し、実行機能のRegistryには依存しません。APIとCogは設定アクセス契約・設定Repositoryと各DomainのRepositoryを使用します。
 
 | ディレクトリ | 責務 |
 | --- | --- |
@@ -37,7 +37,7 @@ Guild Moduleの汎用CRUD・有効Guild一覧は `guild_settings/repository.py`�
 
 Moderationのルール更新と設定のrules_revision更新、CaseとTrustイベントの記録は同じTransactionを維持するため `moderation/repository.py` がまとめて扱います。一般的な設定保存をこの経路へ集約しません。TicketのBlacklist・当番・Tag・Panel移動・自動Close除外・削除記録もRepositoryが扱い、ServiceやCogから直接SQLを実行しません。
 
-`social_worker.py` はWorkerのProcess起動入口で、処理本体は `social/worker.py` です。APIの内部生成関数はPostgreSQL接続URLを受け取り、DomainごとのRepositoryを生成します。HTTP URLと認可の契約は維持します。共通Outbox/Runnerは `jobs/` にあります。Discord操作はDomainのAdapterへ分離済みです。API Routerは `dashboard/api/` に配置し、`dashboard/api_v1.py` はContextの生成とRouterの合成だけを担当します。
+`social_worker.py` は登録されたWorker Bindingを事前検証し、TaskGroupで一度ずつ起動します。処理本体は `social/worker.py`、Provider別取得は `social/providers/<provider>.py`、構築は同フォルダーの `registry.py` が担当します。APIの内部生成関数はPostgreSQL接続URLを受け取り、DomainごとのRepositoryを生成します。HTTP URLと認可の契約は維持します。共通Outbox/Runnerは `jobs/` にあります。Discord操作はDomainのAdapterへ分離済みです。API Routerは `dashboard/api/<category>/` に配置し、`dashboard/api_v1.py` はContextの生成とRouterの合成だけを担当します。
 
 Runtime・Migration・テスト基盤はPostgreSQLを使用します。
 
@@ -119,15 +119,15 @@ Lockdownは全対象の復元情報を保存してから権限を変更します
 | ファイル（`dashboard/api/`） | 責務 |
 | --- | --- |
 | `session.py` / `guilds.py` | Session・個人設定・利用可能Guild、Guild概要・機能・Resource一覧 |
-| `modules.py` / `suggestions.py` | 汎用ModuleとSuggestions専用API |
-| `social.py` / `moderation.py` / `reaction_roles.py` | 各DomainのHTTP入力・応答・Repository/Service呼出し |
-| `ticket_configuration.py` | Ticket設定・Form・Team・Panel・Tag・統計 |
-| `tickets.py` | Ticket Inbox・操作・返信・Transcript・添付・Feedback |
+| `modules.py` / `engagement/suggestions.py` | 汎用ModuleとSuggestions専用API |
+| `social/providers.py` / `moderation/` / `community/reaction_roles.py` | 各機能のHTTP入力・応答・Repository/Service呼出し。ProviderとルールFamilyの共通経路はカテゴリーで一度登録 |
+| `community/ticket_support/configuration.py` | Ticket設定・Form・Team・Panel・Tag・統計 |
+| `community/tickets.py` | Ticket Inbox・操作・返信・Transcript・添付・Feedback |
 | `dependencies.py` | サーバー側Session、Guild管理権限、CSRF。公開OAuth開始も同じ検証を利用 |
-| `ticket_dependencies.py` | Ticket Staff、担当Team、Guild所属の認可 |
-| `resources.py` / `ticket_resources.py` | Guild Resourceの共通Indexと所属・権限検査、Ticket固有制約 |
+| `community/ticket_support/dependencies.py` | Ticket Staff、担当Team、Guild所属の認可 |
+| `resources.py` / `community/ticket_support/resources.py` | Guild Resourceの共通Indexと所属・権限検査、Ticket固有制約 |
 | `errors.py` | HTTPエラー・revision競合・If-Matchの検査 |
-| `serialization.py` / `ticket_presentation.py` / `features.py` | 公開ID・Ticket・Featureの表示用変換 |
+| `serialization.py` / `community/ticket_support/presentation.py` / `features.py` | 公開ID・Ticket・Featureの表示用変換 |
 
 FastAPI `Depends` はSession、管理権限、Ticket Staff、CSRFの入口を表します。既存のエラー優先順が必要なRouteは同じDependencyのメソッドを明示呼出しします。更新時のGuild管理権限とResourceはキャッシュを使わず取得します。Ticket操作では担当Teamの所属も再確認します。明示的なTeam user IDが残っていても、Guild所属を取得できないユーザーにはStaff権限を与えません。Transcript/添付の申請者本人の閲覧権限は別経路として維持します。
 

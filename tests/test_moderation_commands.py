@@ -13,7 +13,7 @@ from moderation import ModerationRepository
 
 class ModerationCommandLoadTests(unittest.IsolatedAsyncioTestCase):
     async def test_message_match_converts_to_value_context_before_execution(self):
-        from cogs.automod import AutoModCog
+        from cogs.moderation.runtime import AutoModCog
         from moderation.contracts import ActionContext
         cog = AutoModCog.__new__(AutoModCog)
         cog._locks = {}
@@ -47,9 +47,9 @@ class ModerationCommandLoadTests(unittest.IsolatedAsyncioTestCase):
             before = snapshot(storage.database_url)
             async with commands.Bot(command_prefix='!', intents=discord.Intents.none()) as bot:
                 bot.settings = SimpleNamespace(database_url=prepare_database(path, self.addCleanup))
-                await bot.load_extension('cogs.automod')
-                await bot.load_extension('cogs.moderation')
-                await bot.load_extension('cogs.safety')
+                await bot.load_extension('cogs.moderation.runtime')
+                await bot.load_extension('cogs.moderation.moderation')
+                await bot.load_extension('cogs.moderation.action_support.direct_commands')
                 self.assertEqual(snapshot(storage.database_url), before)
                 cog = bot.get_cog('AutoModCog')
                 self.assertIn('on_message', {name for name, _ in cog.get_listeners()})
@@ -59,7 +59,7 @@ class ModerationCommandLoadTests(unittest.IsolatedAsyncioTestCase):
             bot = commands.Bot(command_prefix="/", intents=discord.Intents.none())
             bot.settings = SimpleNamespace(database_url=prepare_database(Path(directory) / "moderation.sqlite3", self.addCleanup))
             async with bot:
-                await bot.load_extension("cogs.moderation_commands")
+                await bot.load_extension("cogs.moderation.moderation_actions")
                 group = bot.tree.get_command("mod")
                 self.assertIsNotNone(group)
                 self.assertEqual(

@@ -1,43 +1,8 @@
-import ast
-import json
-import math
-import operator
-import random
-from datetime import datetime, timezone
-from urllib.parse import urlparse
-
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from guild_settings import GuildSettingsRepository
-
-
-MAX_EMBED_TOTAL_LENGTH = 6_000
-MAX_EXPRESSION_LENGTH = 200
-MAX_EXPRESSION_NODES = 50
-MAX_POWER_EXPONENT = 12
-MAX_ROLL_SIDES = 1_000_000
-_OPERATORS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv, ast.Mod: operator.mod, ast.Pow: operator.pow, ast.USub: operator.neg, ast.UAdd: operator.pos}
-_CATEGORY_NAMES = {
-    "GeneralCog": "基本",
-    "AICog": "AI",
-    "LevelingCog": "レベリング",
-    "ModerationCog": "モデレーション",
-    "ModerationCommandsCog": "モデレーション",
-    "TicketsCog": "チケット",
-    "AuditLogCog": "サーバーログ",
-    "WelcomeCog": "入退室",
-}
-_COG_MODULES = {
-    "AICog": None,
-    "LevelingCog": "leveling",
-    "ModerationCog": "moderation",
-    "ModerationCommandsCog": "moderation",
-    "TicketsCog": "tickets",
-    "AuditLogCog": "audit_log",
-    "WelcomeCog": "welcome",
-}
 
 
 def _leaf_commands(command: app_commands.Command | app_commands.Group) -> list[app_commands.Command]:
@@ -90,6 +55,8 @@ class HelpView(discord.ui.View):
 
 
 class GeneralCog(commands.Cog):
+    help_category = "基本"
+
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.guild_settings = GuildSettingsRepository(bot.settings.database_url)
@@ -99,22 +66,23 @@ class GeneralCog(commands.Cog):
         for top_level_command in self.bot.tree.get_commands():
             for command in _leaf_commands(top_level_command):
                 binding = getattr(command, "binding", None)
-                cog_name = type(binding).__name__ if binding else "GeneralCog"
                 if not include_all:
-                    module_id = _COG_MODULES.get(cog_name)
+                    module_id = getattr(binding, "help_module", None)
                     if module_id and interaction.guild and not self.guild_settings.module_enabled(interaction.guild.id, module_id):
                         continue
-                    if cog_name == "AICog" and not getattr(binding, "client", None):
+                    if not getattr(binding, "help_available", True):
                         continue
                     try:
                         if not await command._check_can_run(interaction):
                             continue
                     except app_commands.AppCommandError:
                         continue
-                categories.setdefault(_CATEGORY_NAMES.get(cog_name, "その他"), []).append(command)
+                categories.setdefault(getattr(binding, "help_category", "その他" if binding else "基本"), []).append(command)
+        for commands_for_page in categories.values():
+            commands_for_page.sort(key=lambda command: command.extras.get('help_order', 100))
         return list(categories.items())
 
-    @app_commands.command(name="help", description="利用できるコマンド一覧を表示します。")
+    @app_commands.command(name="help", description="利用できるコマンド一覧を表示します。", extras={'help_order': 0})
     async def help_command(self, interaction: discord.Interaction, all: bool = False) -> None:
         pages = await self._available_commands(interaction, include_all=all)
         if not pages:
@@ -123,53 +91,14 @@ class GeneralCog(commands.Cog):
         view = HelpView(interaction.user.id, pages, self.bot.settings.dashboard_base_url)
         await interaction.response.send_message(embed=view.embed(), view=view, ephemeral=not all)
 
-    @app_commands.command(description="Botの応答速度を計測します。")
+    @app_commands.command(description="Botの応答速度を計測します。", extras={'help_order': 1})
     async def ping(self, interaction: discord.Interaction) -> None:
         await interaction.response.send_message(f"Pong!🏓 {round(self.bot.latency * 1000)}ms")
 
-    @app_commands.command(description="自由にEmbedを組み立てて送信します。")
-    async def echo(
-        self,
-        interaction: discord.Interaction,
-        title: str | None = None,
-        description: str | None = None,
-        color: str | None = None,
-        url: str | None = None,
-        author_name: str | None = None,
-        author_url: str | None = None,
-        author_icon_url: str | None = None,
-        footer_text: str | None = None,
-        footer_icon_url: str | None = None,
-        thumbnail_url: str | None = None,
-        image_url: str | None = None,
-        fields_json: str | None = None,
-        timestamp: bool = False,
-        ephemeral: bool = False,
-    ) -> None:
-        try:
-            embed = _build_embed(title, description, color, url, author_name, author_url, author_icon_url, footer_text, footer_icon_url, thumbnail_url, image_url, fields_json, timestamp)
-        except ValueError as exc:
-            await interaction.response.send_message(f"Embedを作成できません: {exc}", ephemeral=True)
-            return
-        await interaction.response.send_message(embed=embed, ephemeral=ephemeral, allowed_mentions=discord.AllowedMentions.none())
 
-    @app_commands.command(description="四則演算と累乗を計算します。")
-    async def calculate(self, interaction: discord.Interaction, expression: str) -> None:
-        try:
-            await interaction.response.send_message(f"{expression} = {_safe_calculate(expression)}")
-        except (SyntaxError, ValueError, ZeroDivisionError, OverflowError, RecursionError):
-            await interaction.response.send_message("計算式が無効か、計算上限を超えています。数値と + - * / % ** ( ) のみ使用できます。", ephemeral=True)
 
-    @app_commands.command(description="指定された乱数を振ります。")
-    async def roll(self, interaction: discord.Interaction, sides: float = 6.0) -> None:
-        if not math.isfinite(sides) or sides <= 0 or sides > MAX_ROLL_SIDES:
-            await interaction.response.send_message(f"1 から {MAX_ROLL_SIDES:,} までの有限な正の数を指定してください。", ephemeral=True)
-        elif sides.is_integer():
-            await interaction.response.send_message(f"({int(sides)}面)の出目: {random.randint(1, int(sides))}")
-        else:
-            await interaction.response.send_message(f"範囲: 0～{sides}、結果: {random.uniform(0, sides):.2f}")
 
-    @app_commands.command(description="ユーザー情報を表示します。")
+    @app_commands.command(description="ユーザー情報を表示します。", extras={'help_order': 5})
     async def userinfo(self, interaction: discord.Interaction, member: discord.Member | None = None) -> None:
         member = member or interaction.user
         embed = discord.Embed(title=f"ユーザー情報 · {member}", color=getattr(member, "color", discord.Color.blue()))
@@ -199,7 +128,7 @@ class GeneralCog(commands.Cog):
         embed.set_thumbnail(url=member.display_avatar.url)
         await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
-    @app_commands.command(description="サーバー情報を表示します。")
+    @app_commands.command(description="サーバー情報を表示します。", extras={'help_order': 6})
     @app_commands.guild_only()
     async def serverinfo(self, interaction: discord.Interaction) -> None:
         guild = interaction.guild
@@ -213,84 +142,10 @@ class GeneralCog(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
 
-def _safe_calculate(expression: str) -> float | int:
-    if len(expression) > MAX_EXPRESSION_LENGTH:
-        raise ValueError("Expression too long")
-    tree = ast.parse(expression, mode="eval")
-    if sum(1 for _ in ast.walk(tree)) > MAX_EXPRESSION_NODES:
-        raise ValueError("Expression too complex")
-
-    def evaluate(node: ast.AST) -> float | int:
-        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
-            if not math.isfinite(float(node.value)) or abs(node.value) > 1_000_000_000_000:
-                raise ValueError("Number out of range")
-            return node.value
-        if isinstance(node, ast.UnaryOp) and type(node.op) in _OPERATORS:
-            result = _OPERATORS[type(node.op)](evaluate(node.operand))
-        elif isinstance(node, ast.BinOp) and type(node.op) in _OPERATORS:
-            left, right = evaluate(node.left), evaluate(node.right)
-            if isinstance(node.op, ast.Pow) and (not float(right).is_integer() or abs(right) > MAX_POWER_EXPONENT):
-                raise ValueError("Power out of range")
-            result = _OPERATORS[type(node.op)](left, right)
-        else:
-            raise ValueError("Unsupported expression")
-        if isinstance(result, float) and not math.isfinite(result):
-            raise ValueError("Result out of range")
-        if isinstance(result, int) and result.bit_length() > 256:
-            raise ValueError("Result out of range")
-        return result
-
-    return evaluate(tree.body)
 
 
-def _valid_url(value: str | None, field: str) -> str | None:
-    if value is None:
-        return None
-    if urlparse(value).scheme not in {"http", "https"}:
-        raise ValueError(f"{field} は http:// または https:// URLにしてください")
-    return value
 
 
-def _build_embed(title, description, color, url, author_name, author_url, author_icon_url, footer_text, footer_icon_url, thumbnail_url, image_url, fields_json, timestamp) -> discord.Embed:
-    if title and len(title) > 256:
-        raise ValueError("title は256文字以内です")
-    if description and len(description) > 4096:
-        raise ValueError("description は4096文字以内です")
-    if author_name and len(author_name) > 256:
-        raise ValueError("author_name は256文字以内です")
-    if footer_text and len(footer_text) > 2048:
-        raise ValueError("footer_text は2048文字以内です")
-    colour = discord.Color.default()
-    if color:
-        try:
-            colour = discord.Color(int(color.removeprefix("#"), 16))
-        except ValueError as exc:
-            raise ValueError("color は #5865F2 のような6桁の16進数です") from exc
-    embed = discord.Embed(title=title, description=description, color=colour, url=_valid_url(url, "url"), timestamp=datetime.now(timezone.utc) if timestamp else None)
-    if author_name:
-        embed.set_author(name=author_name, url=_valid_url(author_url, "author_url"), icon_url=_valid_url(author_icon_url, "author_icon_url"))
-    if footer_text:
-        embed.set_footer(text=footer_text, icon_url=_valid_url(footer_icon_url, "footer_icon_url"))
-    if thumbnail_url:
-        embed.set_thumbnail(url=_valid_url(thumbnail_url, "thumbnail_url"))
-    if image_url:
-        embed.set_image(url=_valid_url(image_url, "image_url"))
-    if fields_json:
-        try:
-            fields = json.loads(fields_json)
-        except json.JSONDecodeError as exc:
-            raise ValueError('fields_json は [{"name":"項目","value":"内容","inline":true}] のJSON配列です') from exc
-        if not isinstance(fields, list) or len(fields) > 25:
-            raise ValueError("fields_json は最大25件の配列です")
-        for field in fields:
-            if not isinstance(field, dict) or not isinstance(field.get("name"), str) or not isinstance(field.get("value"), str):
-                raise ValueError("各fieldには文字列の name と value が必要です")
-            if len(field["name"]) > 256 or len(field["value"]) > 1024:
-                raise ValueError("field nameは256文字、valueは1024文字以内です")
-            embed.add_field(name=field["name"], value=field["value"], inline=bool(field.get("inline", False)))
-    if len(embed) > MAX_EMBED_TOTAL_LENGTH:
-        raise ValueError(f"Embed全体は {MAX_EMBED_TOTAL_LENGTH:,} 文字以内です")
-    return embed
 
 
 async def setup(bot: commands.Bot) -> None:

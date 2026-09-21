@@ -13,8 +13,8 @@ CATEGORY = Category('social', 'nav.social', (
     X_UPDATES,
     INSTAGRAM_UPDATES,
 ), bindings=(
-    Binding('social_delivery', 'bot', 'cogs.social_updates:setup', 15),
-    Binding('social_api', 'api', 'dashboard.api.social:create_router', 3),
+    Binding('social_delivery', 'bot', 'cogs.social.delivery:setup', 15),
+    Binding('social_api', 'api', 'dashboard.api.social.providers:create_router', 3),
     Binding('social_worker', 'worker', 'social.worker:main', 0),
 ))
 

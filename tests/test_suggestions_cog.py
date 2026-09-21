@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import discord
-from cogs.suggestions import SuggestionsCog
+from cogs.engagement.suggestions import SuggestionsCog
 
 
 class SuggestionsCogTests(unittest.IsolatedAsyncioTestCase):

@@ -13,7 +13,8 @@ from typing import Any
 import httpx
 
 from config import Settings
-from social.providers import PollResult, build_adapters
+from social.providers.contracts import PollResult
+from social.providers.registry import build_adapters
 from social import SocialRepository
 from observability.heartbeat import ServiceHeartbeat
 from observability.logging import configure_logging

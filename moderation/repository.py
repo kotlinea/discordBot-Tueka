@@ -6,7 +6,7 @@ from typing import Any
 from jobs import QueueRepository, QueueSpec
 from jobs.catalog import QUEUE_SPECS
 from database import lock_resource, require_current, transaction
-from guild_settings.models import moderation_settings
+from guild_settings.moderation.moderation import normalize as moderation_settings
 
 
 class ModerationRepository:

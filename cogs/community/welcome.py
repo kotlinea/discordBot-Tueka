@@ -13,6 +13,9 @@ VARIABLE_HELP = "{user}, {username}, {displayname}, {server}, {membercount}"
 
 
 class WelcomeCog(commands.Cog):
+    help_category = '入退室'
+    help_module = 'welcome'
+
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.guild_settings = GuildSettingsRepository(bot.settings.database_url)

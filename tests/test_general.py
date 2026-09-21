@@ -1,11 +1,34 @@
 import unittest
+import asyncio
+from types import SimpleNamespace
 
 from discord import app_commands
 
-from cogs.general import HelpView, MAX_ROLL_SIDES, _build_embed, _leaf_commands, _safe_calculate
+from cogs.general import GeneralCog, HelpView, _leaf_commands
+from cogs.engagement.roll import MAX_ROLL_SIDES
+from cogs.engagement.echo import _build_embed
+from cogs.engagement.calculate import _safe_calculate
 
 
 class GeneralCommandTests(unittest.TestCase):
+    def test_split_utility_cogs_preserve_basic_help_order(self):
+        import discord
+        from discord.ext import commands
+        from cogs.engagement.echo import EchoCog
+        from cogs.engagement.calculate import CalculateCog
+        from cogs.engagement.roll import RollCog
+        async def check():
+            async with commands.Bot(command_prefix='!', intents=discord.Intents.none()) as bot:
+                general = GeneralCog.__new__(GeneralCog)
+                general.bot = bot
+                await bot.add_cog(general)
+                for cog in (EchoCog(), CalculateCog(), RollCog()):
+                    await bot.add_cog(cog)
+                pages = await general._available_commands(SimpleNamespace(), include_all=True)
+                self.assertEqual([(category, [command.name for command in commands]) for category, commands in pages],
+                    [('基本', ['help', 'ping', 'echo', 'calculate', 'roll', 'userinfo', 'serverinfo'])])
+        asyncio.run(check())
+
     def test_calculator_accepts_basic_expression(self):
         self.assertEqual(_safe_calculate("2 * (3 + 4)"), 14)
 

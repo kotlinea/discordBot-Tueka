@@ -10,7 +10,7 @@ import discord
 
 from cryptography.fernet import Fernet
 
-from cogs.social_updates import SocialUpdatesCog
+from cogs.social.delivery import SocialUpdatesCog
 from social.service import SocialDeliveryService
 from social.discord_adapter import DiscordSocialAdapter
 from social.crypto import SocialTokenCipher

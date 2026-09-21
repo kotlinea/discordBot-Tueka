@@ -11,7 +11,7 @@ def create_settings_access(context) -> dict[str, SettingsAccess]:
     access = {feature.id: ModuleSettingsAccess(context.guild_settings_repository, feature.id) for feature in FEATURES}
     for feature, factory in zip(custom, factories):
         value = factory(context)
-        if not all(callable(getattr(value, name, None)) for name in ('read', 'validate', 'save')):
+        if not all(callable(getattr(value, name, None)) for name in ('read', 'validate', 'save', 'additional_permissions')):
             raise ValueError(f'Invalid settings access: {feature.id}')
         access[feature.id] = value
     return access

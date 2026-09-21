@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock
 
 import discord
 from discord.ext import commands
-from cogs.community import CommunityCog
-from cogs.tickets import TicketsCog
+from cogs.community.live_stats import LiveStatsCog
+from cogs.community.tickets import TicketsCog
 from database import connect
 from db_support import prepare_database
 
@@ -43,7 +43,7 @@ class TicketStartupTests(unittest.TestCase):
         asyncio.run(awaitable)
         cog.show_open.assert_not_awaited()
         interaction.response.send_message.assert_awaited_once()
-        self.assertEqual(CommunityCog.__cog_app_commands__, [])
+        self.assertEqual(LiveStatsCog.__cog_app_commands__, [])
         self.assertIn('open', {command.name for command in cog.ticket.commands})
 
     def test_bot_loads_current_ticket_commands_without_rollout_settings(self):
@@ -53,8 +53,8 @@ class TicketStartupTests(unittest.TestCase):
                     ticket_encryption_key=None, ticket_s3_endpoint_url=None, ticket_s3_region=None,
                     ticket_s3_bucket=None, ticket_s3_access_key_id=None, ticket_s3_secret_access_key=None,
                     ticket_s3_prefix='tickets')
-                await bot.load_extension('cogs.community')
-                await bot.load_extension('cogs.tickets')
+                await bot.load_extension('cogs.community.live_stats')
+                await bot.load_extension('cogs.community.tickets')
                 self.assertEqual({command.name for command in bot.tree.get_commands()}, {'ticket', 't'})
                 self.assert_no_legacy()
         asyncio.run(load())

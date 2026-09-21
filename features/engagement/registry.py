@@ -16,7 +16,4 @@ CATEGORY = Category('engagement', 'nav.engagement', (
     CALCULATE,
     ROLL,
     GEMINI,
-), bindings=(
-    Binding('engagement_bot', 'bot', 'cogs.engagement:setup', 10),
 ))
-

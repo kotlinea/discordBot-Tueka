@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from cogs.audit_log import AuditLogCog
+from cogs.moderation.audit_log import AuditLogCog
 
 
 class AuditLogCogTests(unittest.TestCase):

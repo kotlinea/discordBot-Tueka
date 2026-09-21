@@ -30,6 +30,7 @@ class Feature:
     dashboard: bool = True
     bindings: tuple[Binding, ...] = ()
     settings_factory: str | None = None  # API-scoped SettingsAccess factory.
+    module_write: bool = True  # Dedicated configuration routes may own writes.
 
 
 @dataclass(frozen=True)

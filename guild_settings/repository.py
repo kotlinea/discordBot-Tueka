@@ -4,10 +4,7 @@ from typing import Any
 
 from contextlib import nullcontext
 from database import require_current, transaction, lock_resource
-from suggestions import normalize_settings as normalize_suggestion_settings
-from .community.welcome import normalize as welcome_settings
-from .models import (template_module_settings, audit_log_settings,
-                     leveling_settings, automod_settings, moderation_settings, moderation_submodule_settings)
+from .registry import normalize
 
 
 class GuildSettingsRepository:
@@ -22,26 +19,9 @@ class GuildSettingsRepository:
         with (nullcontext(_conn) if _conn is not None else self._connection()) as connection:
             row = connection.execute("SELECT enabled, settings_json, revision FROM guild_modules WHERE guild_id = %s AND module_id = %s", (guild_id, module_id)).fetchone()
         if row:
-            settings = json.loads(row["settings_json"])
-            if module_id == "welcome":
-                settings = welcome_settings(settings)
-            elif module_id in {"live_stats", "temporary_voice"}:
-                settings = template_module_settings(module_id, settings)
-            elif module_id == "audit_log":
-                settings = audit_log_settings(settings)
-            elif module_id == "leveling":
-                settings = leveling_settings(settings)
-            elif module_id == "automod":
-                settings = automod_settings(settings)
-            elif module_id == "moderation":
-                settings = moderation_settings(settings)
-            elif module_id in {"anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"}:
-                settings = moderation_submodule_settings(module_id, settings)
-            elif module_id == "suggestions":
-                settings = normalize_suggestion_settings(settings)
+            settings = normalize(module_id, json.loads(row["settings_json"]))
             return {"enabled": bool(row["enabled"]), "settings": settings, "revision": int(row["revision"])}
-        defaults = {"welcome": welcome_settings({}), "leveling": leveling_settings({}), "autorole": {"default_role_id": None}, "audit_log": audit_log_settings({}), "automod": automod_settings({}), "moderation": moderation_settings({}), "live_stats": template_module_settings("live_stats", {}), "temporary_voice": template_module_settings("temporary_voice", {}), "suggestions": normalize_suggestion_settings({})}.get(module_id, moderation_submodule_settings(module_id, {}) if module_id in {"anti_spam", "anti_raid", "infractions", "moderation_actions", "moderation_logs"} else {})
-        return {"enabled": False, "settings": defaults, "revision": 0}
+        return {"enabled": False, "settings": normalize(module_id, None), "revision": 0}
 
     def set_module(self, guild_id: int, module_id: str, *, enabled: bool, settings: dict[str, Any] | None = None,
                    expected_revision: int | None = None) -> dict[str, Any]:
@@ -64,4 +44,3 @@ class GuildSettingsRepository:
         with self._connection() as connection:
             rows = connection.execute("SELECT guild_id FROM guild_modules WHERE module_id=%s AND enabled=1", (module_id,)).fetchall()
         return [row["guild_id"] for row in rows]
-

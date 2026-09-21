@@ -4,7 +4,7 @@ from pathlib import Path
 
 from db_support import prepare_database
 from guild_settings import GuildSettingsRepository
-from guild_settings.models import moderation_settings
+from guild_settings.moderation.moderation import normalize as moderation_settings
 from guild_settings.community.welcome import normalize as welcome_settings
 
 

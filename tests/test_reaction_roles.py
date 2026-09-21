@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import discord
 from discord.ext import commands
-from cogs.reaction_roles import ReactionRolesCog
+from cogs.community.reaction_roles import ReactionRolesCog
 from dashboard.discord_api import PERMISSION_BITS, effective_channel_permissions
 from reaction_roles.models import ReactionRoleValidationError, normalize_emoji, validate_message
 from reaction_roles.repository import ReactionRoleRepository
@@ -243,7 +243,7 @@ class ReactionRoleCogTests(unittest.IsolatedAsyncioTestCase):
         cog.delivery = ReactionRoleDeliveryService(cog.repository, DiscordReactionRoleAdapter(cog.bot))
         cog.owner = "test-worker"
 
-        with patch("cogs.reaction_roles.discord.TextChannel", FakeChannel), patch("cogs.reaction_roles.discord.Thread", FakeChannel):
+        with patch("cogs.community.reaction_roles.discord.TextChannel", FakeChannel), patch("cogs.community.reaction_roles.discord.Thread", FakeChannel):
             outcome = await ReactionRolesCog._process_outbox_item(cog, item)
             self.assertTrue(outcome.retry)
             self.assertEqual(config["message_id"], 900)
@@ -293,7 +293,7 @@ class ReactionRoleCogTests(unittest.IsolatedAsyncioTestCase):
             bot = commands.Bot(command_prefix="/", intents=discord.Intents.none())
             bot.settings = SimpleNamespace(database_url=prepare_database(Path(directory) / "rr.sqlite3", self.addCleanup), reaction_role_max_mappings_per_message=20)
             async with bot:
-                await bot.load_extension("cogs.reaction_roles")
+                await bot.load_extension("cogs.community.reaction_roles")
                 root = bot.tree.get_command("reactionrole")
                 short = bot.tree.get_command("r")
                 self.assertIsNotNone(root)

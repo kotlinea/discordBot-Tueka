@@ -1,6 +1,6 @@
 # 機能中心の疎結合化ロードマップ
 
-制定日: 2026-09-21。今回専用の一時計画。**G0〜G2完了、次はG3**。
+制定日: 2026-09-21。今回専用の一時計画。**G0〜G3完了、次はG4**。
 調査対象: `2b7050cb26acc85ea6edba080d5bf2af55458a18`。開始時の作業ツリーは変更なし。
 
 ## 目的と適用範囲
@@ -120,7 +120,7 @@ G0で、Help/Ping/ユーザー・Guild情報を基盤、Echo/計算/Dice/Gemini�
 | G0 完了（ローカル検証済み） | [全入口対応表と固定baseline](handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.md) | 24機能/16拡張/8 Queue/59 APIパス・77操作/103コマンドを対応付け、指定6タスク成功。G0残作業なし |
 | G1 完了（ローカル検証済み） | Backend/UIの型、カテゴリーRegistry、明示Binding、既定値・override境界 | 重複・循環・衝突・不正参照、副作用のないMetadata読込、Bot/API/UIの初期化を検証。[記録](handbook/developer/history/FEATURE_STRUCTURE_G1-2026-09-21.md)。G1残作業なし |
 | G2 完了（ローカル検証済み） | `welcome`をBot→設定API→UIまで試験移行。Button/EmbedEditorと共通設定を整理 | 保存/再読込/失敗時入力保持/無効化と登録接続を確認。[記録](handbook/developer/history/FEATURE_STRUCTURE_G2-2026-09-21.md)。G2残作業なし |
-| G3 未着手 | communityの残り→engagement→moderation→socialの順でBackendを移行。各カテゴリーは機能ごとに検証 | Cog/API/Workerの登録漏れ・重複なし。専用Repositoryのoverrideを確認。認可・revision・配送/復旧・Transaction回帰が成功 |
+| G3 完了（ローカル検証済み） | community→engagement→moderation→socialのCog/API、設定モデル、Providerを機能別へ移行。専用保存Factoryと登録Workerを接続 | Python401件・API・103コマンド・Restore/ツール・Image内401件成功。認可・revision・配送/復旧・Transactionを維持。[記録](handbook/developer/history/FEATURE_STRUCTURE_G3-2026-09-21.md)。G3残作業なし |
 | G4 未着手 | G3と同じ順でDashboardを移行。汎用Moduleの機能分岐、Shell/Navigation/Breadcrumbの個別分岐を登録へ集約 | 全既存Routeと直リンク、Staff専用表示、遅延読込、日英、入力保持、モバイル/keyboardを維持 |
 | G5 未着手 | 拡張性と境界の受入。テスト専用の仮機能・仮カテゴリーで登録手順を検証 | 共通Bot起動/API合成/Shellを編集せず追加・除去できる。未登録/重複は検出。共通基盤と他機能への逆依存なし |
 | G6 未着手 | 旧登録・未使用経路の削除、現行開発資料・同梱指定の更新、最終回帰 | 静的参照だけでなく動的起動・生成・Image・運用入口を確認。全群CIとImage内動作の証拠を記録 |

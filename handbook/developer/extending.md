@@ -12,15 +12,17 @@ Bot/APIの入口は `Binding(id, process, "module:callable", order)` で指定�
 
 UIは `features/<category>/<id>.feature.tsx` で `defineFeature` の既定画面・経路・Namespace・表示権限を必要な範囲で差し替え、カテゴリーRegistryへ登録します。`.feature.tsx` は既存画面との名前衝突を避ける入口の命名です。設定アクセスは `features/defaults.py` の `SettingsAccess` 契約を使い、汎用Module保存は `ModuleSettingsAccess` を既定とします。revisionを保存先へ渡し、認可・CSRF・TransactionはAdapterとRepositoryで維持します。
 
-設定アクセスを差し替える場合はFeatureの `settings_factory` に `module:callable` を指定し、Contextを受け取って `read / validate / save` を持つオブジェクトを返します。`features/community/welcome.py` と `dashboard/api/community/welcome.py` が実例です。共通Routerへ機能名の条件分岐を追加せず、正規化・組合せ検証をモデルへ置きます。
+設定アクセスを差し替える場合はFeatureの `settings_factory` に `module:callable` を指定し、Contextを受け取って `read / validate / save / additional_permissions` を持つオブジェクトを返します。`dashboard/api/community/welcome.py` が既定保存の実例、`dashboard/api/community/tickets.py` が専用Repository接続の実例です。専用設定APIが書込みを所有する場合は `module_write=False` を宣言します。追加権限は基礎権限へ加算し、認可・Resource検査・revisionを共通境界から外しません。
 
 UIの実例は `features/community/welcome.feature.tsx` と配下の `welcome/Settings.tsx` です。共通 `components/feature/ModuleSettings` に項目描画・見出し・追加操作を渡し、保存と状態表示を再利用します。Buttonは `components/ui/`、EmbedEditorは `components/editors/` を使用します。Embedの制約は生成API型から呼出元で渡します。
 
-welcomeの試験移行を完了しました。他機能とShell全体の移行は[専用計画](../../goal.md)のG3〜G4です。登録テストに加え、`tests/test_welcome_feature.py` とFrontendの `src/test/welcome.test.tsx`、`e2e/welcome.spec.ts` が保存・表示の実例を検証します。
+BackendのCog/API、設定モデル、Providerの移行を完了しました。UIの残るDomain画面とShell全体の移行は[専用計画](../../goal.md)のG4です。登録テストに加え、`tests/test_welcome_feature.py` とFrontendの `src/test/welcome.test.tsx`、`e2e/welcome.spec.ts` が保存・表示の実例を検証します。
 
 ## 設定
 
 Guild設定は型、初期値、上限、Discord Resource種別をServer側でも検証します。UIだけに検証を依存させません。複数管理者が編集する設定にはrevisionを付けます。
+
+保存時の既定値・正規化は `guild_settings/<category>/<feature>.py` に置き、同カテゴリーの `registry.py` に `SettingsModel` を登録します。Repositoryへ機能IDの分岐を追加しません。専用の保存Domainを持つ機能は、そのRepositoryを設定Factoryへ渡します。Social Providerは `social/providers/registry.py` へAdapterを明示登録します。
 
 ## 非同期処理
 

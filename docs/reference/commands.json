@@ -24,7 +24,7 @@
           "max": null
         }
       ],
-      "module": "cogs.safety"
+      "module": "cogs.moderation.action_support.direct_commands"
     },
     "ja": {
       "usage": "メンバーを追放します。",
@@ -56,7 +56,7 @@
           "max": null
         }
       ],
-      "module": "cogs.general"
+      "module": "cogs.engagement.calculate"
     },
     "ja": {
       "usage": "四則演算と累乗を計算します。",
@@ -88,7 +88,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation"
+      "module": "cogs.moderation.moderation"
     },
     "ja": {
       "usage": "このチャネルのメッセージを削除します。",
@@ -120,7 +120,7 @@
           "max": null
         }
       ],
-      "module": "cogs.trust"
+      "module": "cogs.moderation.trust_score"
     },
     "ja": {
       "usage": "メンバーの信頼度イベントを手動で解除します。制裁履歴は残ります。",
@@ -282,7 +282,7 @@
           "max": null
         }
       ],
-      "module": "cogs.general"
+      "module": "cogs.engagement.echo"
     },
     "ja": {
       "usage": "自由にEmbedを組み立てて送信します。",
@@ -314,7 +314,7 @@
           "max": null
         }
       ],
-      "module": "cogs.ai"
+      "module": "cogs.engagement.gemini"
     },
     "ja": {
       "usage": "Gemini APIから質問します。",
@@ -388,7 +388,7 @@
           "max": null
         }
       ],
-      "module": "cogs.safety"
+      "module": "cogs.moderation.action_support.direct_commands"
     },
     "ja": {
       "usage": "メンバーをキックします。",
@@ -409,7 +409,7 @@
     "contract": {
       "description": "テキストXPランキングを表示します。",
       "parameters": [],
-      "module": "cogs.leveling"
+      "module": "cogs.community.leveling"
     },
     "ja": {
       "usage": "テキストXPランキングを表示します。",
@@ -451,7 +451,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation_commands"
+      "module": "cogs.moderation.moderation_actions"
     },
     "ja": {
       "usage": "メンバーをBanします。",
@@ -493,7 +493,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation_commands"
+      "module": "cogs.moderation.moderation_actions"
     },
     "ja": {
       "usage": "メンバーをKickします。",
@@ -535,7 +535,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation_commands"
+      "module": "cogs.moderation.moderation_actions"
     },
     "ja": {
       "usage": "チャンネルをロックします。",
@@ -577,7 +577,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation_commands"
+      "module": "cogs.moderation.moderation_actions"
     },
     "ja": {
       "usage": "サーバーを期限付きでLockdownします。",
@@ -619,7 +619,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation_commands"
+      "module": "cogs.moderation.moderation_actions"
     },
     "ja": {
       "usage": "最近のメッセージを削除します。",
@@ -661,7 +661,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation_commands"
+      "module": "cogs.moderation.moderation_actions"
     },
     "ja": {
       "usage": "メンバーをSoftbanします。",
@@ -713,7 +713,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation_commands"
+      "module": "cogs.moderation.moderation_actions"
     },
     "ja": {
       "usage": "Timeoutを設定します。",
@@ -755,7 +755,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation_commands"
+      "module": "cogs.moderation.moderation_actions"
     },
     "ja": {
       "usage": "ユーザーIDを指定してBanを解除します。",
@@ -797,7 +797,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation_commands"
+      "module": "cogs.moderation.moderation_actions"
     },
     "ja": {
       "usage": "チャンネルのロックを解除します。",
@@ -829,7 +829,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation_commands"
+      "module": "cogs.moderation.moderation_actions"
     },
     "ja": {
       "usage": "有効なLockdownを解除します。",
@@ -871,7 +871,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation_commands"
+      "module": "cogs.moderation.moderation_actions"
     },
     "ja": {
       "usage": "Timeoutを解除します。",
@@ -913,7 +913,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation_commands"
+      "module": "cogs.moderation.moderation_actions"
     },
     "ja": {
       "usage": "Warningを追加します。",
@@ -996,7 +996,7 @@
           "max": null
         }
       ],
-      "module": "cogs.engagement"
+      "module": "cogs.engagement.advanced_polls"
     },
     "ja": {
       "usage": "最大10択のボタン投票を作成します。選択肢は | で区切ります。",
@@ -1048,7 +1048,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。EmojiとRoleの対応を追加します。",
@@ -1080,7 +1080,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。フォームから複数のEmojiとRole対応を追加します。",
@@ -1132,7 +1132,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。投稿と対応を一括作成します。",
@@ -1184,7 +1184,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。binding方式で投稿と対応を一括作成します。",
@@ -1236,7 +1236,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。unique方式で投稿と対応を一括作成します。",
@@ -1288,7 +1288,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。verify方式で投稿と対応を一括作成します。",
@@ -1320,7 +1320,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。binding方式へ変更します。",
@@ -1352,7 +1352,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。drop方式へ変更します。",
@@ -1384,7 +1384,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。Messageのリアクションと設定を再同期します。",
@@ -1416,7 +1416,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。Role変更を停止します。",
@@ -1448,7 +1448,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。normal方式へ変更します。",
@@ -1490,7 +1490,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。Roleの対応を削除します。",
@@ -1522,7 +1522,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。reversed方式へ変更します。",
@@ -1554,7 +1554,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。設定を表示します。",
@@ -1596,7 +1596,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。期限付きRoleへ変更します。",
@@ -1628,7 +1628,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。unique方式へ変更します。",
@@ -1660,7 +1660,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。Role変更を再開します。",
@@ -1692,7 +1692,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "短縮コマンド。verify方式へ変更します。",
@@ -1713,7 +1713,7 @@
     "contract": {
       "description": "現在のテキストレベルを確認します。",
       "parameters": [],
-      "module": "cogs.leveling"
+      "module": "cogs.community.leveling"
     },
     "ja": {
       "usage": "現在のテキストレベルを確認します。",
@@ -1765,7 +1765,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "EmojiとRoleの対応を追加します",
@@ -1797,7 +1797,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "複数のEmojiとRoleをまとめて追加します",
@@ -1869,7 +1869,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "投稿とEmoji→Role対応を一括作成します",
@@ -1911,7 +1911,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "対象Roleをリストへ追加します。",
@@ -1943,7 +1943,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "対象リストを空にします。",
@@ -1985,7 +1985,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "対象Roleをリストから削除します。",
@@ -2017,7 +2017,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "Reaction Roles専用チャンネルを作成します",
@@ -2089,7 +2089,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "Bot投稿または既存メッセージへReaction Rolesを作成します",
@@ -2131,7 +2131,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "メッセージのLinkグループを作成します。",
@@ -2152,7 +2152,7 @@
     "contract": {
       "description": "…",
       "parameters": [],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "Linkグループを一覧表示します。",
@@ -2184,7 +2184,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "Linkを解除します。",
@@ -2226,7 +2226,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "Embed色を変更します。",
@@ -2278,7 +2278,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "Embedを編集します。",
@@ -2310,7 +2310,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "設定を修復します。",
@@ -2342,7 +2342,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "外部絵文字のリアクションロール設定を修復します。",
@@ -2394,7 +2394,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "設定先Messageを変更します。",
@@ -2436,7 +2436,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "利用者のBinding記録を解除します。",
@@ -2478,7 +2478,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "設定の削除を予約します。",
@@ -2510,7 +2510,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "設定を表示します。",
@@ -2552,7 +2552,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "ユーザーごとの選択上限を変更します",
@@ -2584,7 +2584,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "Role変更を停止します",
@@ -2636,7 +2636,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "Roleの実人数上限を変更します",
@@ -2696,7 +2696,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "動作Typeを変更します",
@@ -2728,7 +2728,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "Role変更を再開します",
@@ -2760,7 +2760,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "Reaction Role設定を削除します",
@@ -2802,7 +2802,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "Roleの対応を削除します",
@@ -2844,7 +2844,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "対象Roleをリストへ追加します。",
@@ -2876,7 +2876,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "対象リストを空にします。",
@@ -2918,7 +2918,7 @@
           "max": null
         }
       ],
-      "module": "cogs.reaction_roles"
+      "module": "cogs.community.reaction_roles"
     },
     "ja": {
       "usage": "対象Roleをリストから削除します。",
@@ -2950,7 +2950,7 @@
           "max": null
         }
       ],
-      "module": "cogs.general"
+      "module": "cogs.engagement.roll"
     },
     "ja": {
       "usage": "指定された乱数を振ります。",
@@ -2986,7 +2986,7 @@
           "max": null
         }
       ],
-      "module": "cogs.engagement"
+      "module": "cogs.engagement.minigames"
     },
     "ja": {
       "usage": "じゃんけんでBotと対戦します。",
@@ -3039,7 +3039,7 @@
           "max": null
         }
       ],
-      "module": "cogs.moderation"
+      "module": "cogs.moderation.moderation"
     },
     "ja": {
       "usage": "サーバーログチャネルを設定します。",
@@ -3060,7 +3060,7 @@
     "contract": {
       "description": "サーバーへアイデアや改善案を投稿します。",
       "parameters": [],
-      "module": "cogs.suggestions"
+      "module": "cogs.engagement.suggestions"
     },
     "ja": {
       "usage": "サーバーへアイデアや改善案を投稿します。",
@@ -3092,7 +3092,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "TicketをCloseします。",
@@ -3124,7 +3124,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "Ticketを作成します。",
@@ -3156,7 +3156,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "Ticketへユーザーを追加します。",
@@ -3208,7 +3208,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "ユーザーのTicket作成制限を変更します。",
@@ -3229,7 +3229,7 @@
     "contract": {
       "description": "現在のTicketをClaimします。",
       "parameters": [],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "現在のTicketをClaimします。",
@@ -3261,7 +3261,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "TicketをCloseしてTranscriptを保存します。",
@@ -3293,7 +3293,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "StaffへCloseの承認を依頼します。",
@@ -3325,7 +3325,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "Thread TicketへStaffとして参加します。",
@@ -3357,7 +3357,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "作成者には見えないStaff Noteを追加します。",
@@ -3399,7 +3399,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "Thread Ticketへの自動参加を切り替えます。",
@@ -3431,7 +3431,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "Ticketを作成します。",
@@ -3463,7 +3463,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "Ticketからユーザーを削除します。",
@@ -3495,7 +3495,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "Ticket名を変更します。",
@@ -3527,7 +3527,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "Closed Thread Ticketを再開します。",
@@ -3548,7 +3548,7 @@
     "contract": {
       "description": "Ticket設定画面を開きます。",
       "parameters": [],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "Ticket設定画面を開きます。",
@@ -3569,7 +3569,7 @@
     "contract": {
       "description": "Ticketの概要を表示します。",
       "parameters": [],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "Ticketの概要を表示します。",
@@ -3601,7 +3601,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "同じModeの別Panelへ切り替えます。",
@@ -3633,7 +3633,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "定型文を送信します。",
@@ -3665,7 +3665,7 @@
           "max": null
         }
       ],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "Claim担当者を変更します。",
@@ -3686,7 +3686,7 @@
     "contract": {
       "description": "Claimを解除します。",
       "parameters": [],
-      "module": "cogs.tickets"
+      "module": "cogs.community.tickets"
     },
     "ja": {
       "usage": "Claimを解除します。",
@@ -3738,7 +3738,7 @@
           "max": null
         }
       ],
-      "module": "cogs.safety"
+      "module": "cogs.moderation.action_support.direct_commands"
     },
     "ja": {
       "usage": "メンバーを一時的にタイムアウトします。",
@@ -3770,7 +3770,7 @@
           "max": null
         }
       ],
-      "module": "cogs.trust"
+      "module": "cogs.moderation.trust_score"
     },
     "ja": {
       "usage": "メンバーの信頼度スコアと算出理由を表示します。",
@@ -3823,7 +3823,7 @@
     "contract": {
       "description": "VC XPランキングを表示します。",
       "parameters": [],
-      "module": "cogs.leveling"
+      "module": "cogs.community.leveling"
     },
     "ja": {
       "usage": "VC XPランキングを表示します。",
@@ -3844,7 +3844,7 @@
     "contract": {
       "description": "現在のVCレベルを確認します。",
       "parameters": [],
-      "module": "cogs.leveling"
+      "module": "cogs.community.leveling"
     },
     "ja": {
       "usage": "現在のVCレベルを確認します。",
@@ -3886,7 +3886,7 @@
           "max": null
         }
       ],
-      "module": "cogs.safety"
+      "module": "cogs.moderation.action_support.direct_commands"
     },
     "ja": {
       "usage": "メンバーに警告を与えます。",

@@ -10,7 +10,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from social.models import default_templates, normalize_account, render_template, validate_subscription
-from social.providers import YouTubeAdapter, _entries_from_atom, _entries_from_rss, _youtube_channel_id_from_html
+from social.providers.youtube import YouTubeAdapter, _entries_from_atom, _youtube_channel_id_from_html
+from social.providers.instagram import _entries_from_rss
 from social import SocialRepository
 from social.webhooks import verify_twitch_signature, verify_youtube_signature
 

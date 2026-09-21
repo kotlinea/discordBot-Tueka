@@ -30,8 +30,26 @@ def catalog(*items, bindings=()):
 class FeatureRegistrationTests(unittest.TestCase):
     def test_existing_public_metadata_order_and_extension_order_are_preserved(self):
         baseline = json.loads((ROOT / 'dashboard/frontend/src/test/fixtures/feature_metadata.json').read_text())
-        expected_extensions = [value if value != 'cogs.welcome' else 'cogs.community.welcome' for value in baseline['extensions']]
-        expected_extensions.insert(expected_extensions.index('cogs.community.welcome') + 1, 'cogs.community.autorole')
+        # Explicit relocation/split map; the immutable public baseline stays unchanged.
+        relocation = {
+            'cogs.general': ('cogs.general', 'cogs.engagement.echo', 'cogs.engagement.calculate', 'cogs.engagement.roll'),
+            'cogs.ai': ('cogs.engagement.gemini',),
+            'cogs.leveling': ('cogs.community.leveling',),
+            'cogs.moderation': ('cogs.moderation.moderation',),
+            'cogs.safety': ('cogs.moderation.action_support.direct_commands',),
+            'cogs.reaction_roles': ('cogs.community.reaction_roles',),
+            'cogs.automod': ('cogs.moderation.runtime',),
+            'cogs.moderation_commands': ('cogs.moderation.moderation_actions',),
+            'cogs.community': ('cogs.community.live_stats', 'cogs.community.temporary_voice'),
+            'cogs.tickets': ('cogs.community.tickets',),
+            'cogs.engagement': ('cogs.engagement.advanced_polls', 'cogs.engagement.minigames'),
+            'cogs.suggestions': ('cogs.engagement.suggestions',),
+            'cogs.trust': ('cogs.moderation.trust_score',),
+            'cogs.audit_log': ('cogs.moderation.audit_log',),
+            'cogs.welcome': ('cogs.community.welcome', 'cogs.community.autorole'),
+            'cogs.social_updates': ('cogs.social.delivery',),
+        }
+        expected_extensions = [target for old in baseline['extensions'] for target in relocation[old]]
         self.assertEqual(list(BOT_EXTENSIONS), expected_extensions)
         self.assertEqual([item.id for item in FEATURES], [item['id'] for item in baseline['features']])
         for actual, expected in zip(FEATURES, baseline['features']):

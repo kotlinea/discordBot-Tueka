@@ -186,7 +186,7 @@ class TicketV2Tests(unittest.TestCase):
             asyncio.run(self.service.change_participant(port, ticket, 10, 30, add=False))
 
     def test_close_resource_is_durable_and_old_revision_cannot_delete(self):
-        from cogs.tickets import TicketsCog
+        from cogs.community.tickets import TicketsCog
         from types import SimpleNamespace
         ticket, _ = self.service.reserve(1, self.panel['id'], 10, 'durable-close', set())
         ticket = self.repository.activate_ticket(ticket['id'], 700, 100)
