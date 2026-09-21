@@ -1,0 +1,7 @@
+import { defineFeature } from '../defaults'
+
+export const feature = defineFeature({
+  id: 'autorole', category: 'community',
+  path: 'modules/autorole', namespaces: ['common'],
+})
+

@@ -5,7 +5,8 @@ from typing import Any
 from contextlib import nullcontext
 from database import require_current, transaction, lock_resource
 from suggestions import normalize_settings as normalize_suggestion_settings
-from .models import (welcome_settings, template_module_settings, audit_log_settings,
+from .community.welcome import normalize as welcome_settings
+from .models import (template_module_settings, audit_log_settings,
                      leveling_settings, automod_settings, moderation_settings, moderation_submodule_settings)
 
 

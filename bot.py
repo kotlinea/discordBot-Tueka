@@ -1,5 +1,6 @@
 """Discord bot entry point."""
 import logging
+import asyncio
 
 import discord
 from discord import app_commands
@@ -10,6 +11,7 @@ from database import require_current
 from runtime.lifecycle import run
 from observability.heartbeat import ServiceHeartbeat
 from observability.logging import configure_logging
+from features.loading import validate_extensions
 
 
 class TuekaBot(commands.Bot):
@@ -22,14 +24,28 @@ class TuekaBot(commands.Bot):
         super().__init__(command_prefix="/", intents=intents)
         self.settings = settings
         self.heartbeat = None
+        self._setup_lock = asyncio.Lock()
+        self._features_ready = False
 
     async def setup_hook(self) -> None:
-        self.tree.on_error = self.on_app_command_error
-        for extension in self.settings.extensions:
-            await self.load_extension(extension)
-        synced = await self.tree.sync()
-        logging.info("Synced %s application commands", len(synced))
-        self.heartbeat = await ServiceHeartbeat('bot', self.settings.database_url, ready=self.is_ready).start()
+        async with self._setup_lock:
+            if self._features_ready:
+                return
+            validate_extensions(self.settings.extensions)
+            self.tree.on_error = self.on_app_command_error
+            loaded = []
+            try:
+                for extension in self.settings.extensions:
+                    await self.load_extension(extension)
+                    loaded.append(extension)
+                synced = await self.tree.sync()
+                logging.info("Synced %s application commands", len(synced))
+                self.heartbeat = await ServiceHeartbeat('bot', self.settings.database_url, ready=self.is_ready).start()
+            except BaseException:
+                for extension in reversed(loaded):
+                    await self.unload_extension(extension)
+                raise
+            self._features_ready = True
 
     async def close(self) -> None:
         if self.heartbeat:

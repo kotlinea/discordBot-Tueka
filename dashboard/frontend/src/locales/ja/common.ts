@@ -1,4 +1,6 @@
 export default {
+module: { state:'状態',basic:'基本設定',targets:'対象',notifications:'通知',permissions:'権限・診断',enable:'機能を有効化',guide:'この機能の使い方' },
+welcome: { title:'入退室',description:'歓迎・退出メッセージを管理します。',text:'テキスト',embed:'埋め込み',fields:{welcome_enabled:'ウェルカムメッセージ',welcome_channel_id:'ウェルカム送信先',welcome_format:'ウェルカム表示形式',welcome_content:'ウェルカム本文',leave_enabled:'退出メッセージ',leave_channel_id:'退出メッセージ送信先',leave_format:'退出メッセージの表示形式',leave_content:'退出メッセージ本文'} },
 overview: { description:'保護機能の状態と直近のモデレーション履歴を確認できます。',check:'保護設定を確認',activity:'AutoMod、Spam、Raid、手動処置',enabled:'有効な機能',enabledDescription:'現在有効になっているサーバー機能',emptyEvents:'検知または処置が発生すると、ここへ時系列で表示されます。',docs:'使い方',docsFor:'{{title}}の使い方' },
 embed: {embedColor:'埋め込みカラー',welcomeTitle:'タイトル',titleUrl:'タイトルURL',welcomeDescription:'説明',imageUrl:'大きな画像のURL',thumbnailUrl:'小さな画像のURL',author:'著者を表示',authorName:'著者名',authorIcon:'著者アイコンのURL',authorUrl:'著者URL',footer:'フッターを表示',footerText:'フッターテキスト',footerIcon:'フッターアイコンのURL',timestamp:'タイムスタンプを表示',fields:'Embedフィールド',addField:'フィールドを追加',fieldName:'フィールド名',fieldValue:'フィールド本文',inline:'横並びで表示'},
 schedule: {start:'開始',end:'終了',timezone:'タイムゾーン',alwaysOpen:'24時間365日',copyAll:'他曜日へコピー',clearHours:'すべてクリア',days:{monday:'月曜日',tuesday:'火曜日',wednesday:'水曜日',thursday:'木曜日',friday:'金曜日',saturday:'土曜日',sunday:'日曜日'}},

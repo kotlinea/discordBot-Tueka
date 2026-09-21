@@ -3918,7 +3918,7 @@
           "max": null
         }
       ],
-      "module": "cogs.welcome"
+      "module": "cogs.community.welcome"
     },
     "ja": {
       "usage": "ウェルカムメッセージを送信します。",

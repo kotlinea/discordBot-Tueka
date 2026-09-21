@@ -36,6 +36,7 @@ COPY deploy deploy
 COPY discord_io discord_io
 COPY docs docs
 COPY engagement engagement
+COPY features features
 COPY guild_settings guild_settings
 COPY jobs jobs
 COPY migrations migrations

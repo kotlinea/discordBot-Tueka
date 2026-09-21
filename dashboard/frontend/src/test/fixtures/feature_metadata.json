@@ -1,0 +1,543 @@
+{
+  "source_commit": "2b7050cb26acc85ea6edba080d5bf2af55458a18",
+  "features": [
+    {
+      "id": "welcome",
+      "category": "community",
+      "title_key": "feature.welcome",
+      "description_key": "feature.welcome.description",
+      "icon": "door-open",
+      "docs_path": "/docs/features/welcome",
+      "fields": [
+        "welcome_enabled",
+        "welcome_channel_id",
+        "welcome_format",
+        "welcome_content",
+        "leave_enabled",
+        "leave_channel_id",
+        "leave_format",
+        "leave_content"
+      ],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "send_messages"
+      ],
+      "docs_files": [
+        "docs/features/welcome.md",
+        "docs/en/features/welcome.md"
+      ]
+    },
+    {
+      "id": "autorole",
+      "category": "community",
+      "title_key": "field.default_role",
+      "description_key": "settings.enable.description",
+      "icon": "badge-check",
+      "docs_path": "/docs/features/autorole",
+      "fields": [
+        "default_role_id"
+      ],
+      "required_fields": [
+        "default_role_id"
+      ],
+      "required_bot_permissions": [
+        "manage_roles"
+      ],
+      "docs_files": [
+        "docs/features/autorole.md",
+        "docs/en/features/autorole.md"
+      ]
+    },
+    {
+      "id": "leveling",
+      "category": "community",
+      "title_key": "feature.leveling",
+      "description_key": "feature.leveling.description",
+      "icon": "trophy",
+      "docs_path": "/docs/features/leveling",
+      "fields": [
+        "text_notification_channel_id",
+        "text_role_rewards",
+        "voice_enabled",
+        "voice_notification_channel_id",
+        "voice_role_rewards",
+        "voice_xp_per_minute",
+        "voice_allow_solo",
+        "voice_allow_muted"
+      ],
+      "required_fields": [
+        "text_notification_channel_id"
+      ],
+      "required_bot_permissions": [
+        "send_messages"
+      ],
+      "docs_files": [
+        "docs/features/leveling.md",
+        "docs/en/features/leveling.md"
+      ]
+    },
+    {
+      "id": "moderation",
+      "category": "moderation",
+      "title_key": "feature.moderation",
+      "description_key": "feature.moderation.description",
+      "icon": "shield-alert",
+      "docs_path": "/docs/features/moderation",
+      "fields": [
+        "default_log_channel_id",
+        "immune_role_ids",
+        "immune_user_ids",
+        "immune_channel_ids",
+        "evidence_excluded_channel_ids",
+        "evidence_retention_days",
+        "exclude_bots",
+        "exclude_webhooks"
+      ],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "manage_messages",
+        "send_messages"
+      ],
+      "docs_files": [
+        "docs/features/moderation.md",
+        "docs/en/features/moderation.md"
+      ]
+    },
+    {
+      "id": "automod",
+      "category": "moderation",
+      "title_key": "feature.automod",
+      "description_key": "feature.automod.description",
+      "icon": "shield-ban",
+      "docs_path": "/docs/features/automod",
+      "fields": [
+        "log_channel_id",
+        "immune_role_ids",
+        "immune_user_ids",
+        "immune_channel_ids"
+      ],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "manage_messages",
+        "send_messages"
+      ],
+      "parent": "moderation",
+      "docs_files": [
+        "docs/features/automod.md",
+        "docs/en/features/automod.md"
+      ]
+    },
+    {
+      "id": "anti_spam",
+      "category": "moderation",
+      "title_key": "feature.anti_spam",
+      "description_key": "feature.anti_spam.description",
+      "icon": "shield-ban",
+      "docs_path": "/docs/features/anti-spam",
+      "fields": [
+        "log_channel_id",
+        "immune_role_ids",
+        "immune_user_ids",
+        "immune_channel_ids"
+      ],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "manage_messages",
+        "moderate_members"
+      ],
+      "parent": "moderation",
+      "docs_files": [
+        "docs/features/anti-spam.md",
+        "docs/en/features/anti-spam.md"
+      ]
+    },
+    {
+      "id": "anti_raid",
+      "category": "moderation",
+      "title_key": "feature.anti_raid",
+      "description_key": "feature.anti_raid.description",
+      "icon": "shield-alert",
+      "docs_path": "/docs/features/anti-raid",
+      "fields": [
+        "log_channel_id",
+        "notify_channel_id",
+        "default_lockdown_minutes",
+        "immune_role_ids",
+        "immune_user_ids",
+        "immune_channel_ids"
+      ],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "manage_channels",
+        "moderate_members",
+        "kick_members",
+        "ban_members"
+      ],
+      "parent": "moderation",
+      "docs_files": [
+        "docs/features/anti-raid.md",
+        "docs/en/features/anti-raid.md"
+      ]
+    },
+    {
+      "id": "infractions",
+      "category": "moderation",
+      "title_key": "feature.infractions",
+      "description_key": "feature.infractions.description",
+      "icon": "shield-check",
+      "docs_path": "/docs/features/infractions",
+      "fields": [
+        "point_thresholds",
+        "log_channel_id"
+      ],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "moderate_members",
+        "kick_members",
+        "ban_members"
+      ],
+      "parent": "moderation",
+      "docs_files": [
+        "docs/features/infractions.md",
+        "docs/en/features/infractions.md"
+      ]
+    },
+    {
+      "id": "moderation_actions",
+      "category": "moderation",
+      "title_key": "feature.moderation_actions",
+      "description_key": "feature.moderation_actions.description",
+      "icon": "hand",
+      "docs_path": "/docs/features/moderation-actions",
+      "fields": [],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "manage_messages",
+        "manage_channels",
+        "moderate_members",
+        "kick_members",
+        "ban_members"
+      ],
+      "parent": "moderation",
+      "docs_files": [
+        "docs/features/moderation-actions.md",
+        "docs/en/features/moderation-actions.md"
+      ]
+    },
+    {
+      "id": "moderation_logs",
+      "category": "moderation",
+      "title_key": "feature.moderation_logs",
+      "description_key": "feature.moderation_logs.description",
+      "icon": "scroll-text",
+      "docs_path": "/docs/features/moderation-logs",
+      "fields": [
+        "log_channel_id"
+      ],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "send_messages",
+        "view_audit_log"
+      ],
+      "parent": "moderation",
+      "docs_files": [
+        "docs/features/moderation-logs.md",
+        "docs/en/features/moderation-logs.md"
+      ]
+    },
+    {
+      "id": "audit_log",
+      "category": "moderation",
+      "title_key": "feature.audit_log",
+      "description_key": "feature.audit_log.description",
+      "icon": "scroll-text",
+      "docs_path": "/docs/features/audit-log",
+      "fields": [
+        "management_channel_id",
+        "log_message",
+        "log_voice",
+        "log_channel",
+        "log_member",
+        "log_role",
+        "log_server"
+      ],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "send_messages"
+      ],
+      "parent": "moderation",
+      "docs_files": [
+        "docs/features/audit-log.md",
+        "docs/en/features/audit-log.md"
+      ]
+    },
+    {
+      "id": "reaction_roles",
+      "category": "community",
+      "title_key": "feature.reaction_roles",
+      "description_key": "feature.reaction_roles.description",
+      "icon": "hand",
+      "docs_path": "/docs/features/reaction-roles",
+      "fields": [],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "manage_roles",
+        "send_messages",
+        "add_reactions",
+        "read_message_history",
+        "manage_messages"
+      ],
+      "docs_files": [
+        "docs/features/reaction-roles.md",
+        "docs/en/features/reaction-roles.md"
+      ]
+    },
+    {
+      "id": "live_stats",
+      "category": "community",
+      "title_key": "feature.live_stats",
+      "description_key": "feature.live_stats.description",
+      "icon": "chart-line",
+      "docs_path": "/docs/features/live-stats",
+      "fields": [
+        "stats_channel_id",
+        "stats_template"
+      ],
+      "required_fields": [
+        "stats_channel_id"
+      ],
+      "required_bot_permissions": [
+        "manage_channels"
+      ],
+      "docs_files": [
+        "docs/features/live-stats.md",
+        "docs/en/features/live-stats.md"
+      ]
+    },
+    {
+      "id": "temporary_voice",
+      "category": "community",
+      "title_key": "feature.temporary_voice",
+      "description_key": "feature.temporary_voice.description",
+      "icon": "microphone",
+      "docs_path": "/docs/features/temporary-voice",
+      "fields": [
+        "temp_voice_trigger_id",
+        "temp_voice_category_id",
+        "temp_voice_name"
+      ],
+      "required_fields": [
+        "temp_voice_trigger_id"
+      ],
+      "required_bot_permissions": [
+        "manage_channels",
+        "move_members"
+      ],
+      "docs_files": [
+        "docs/features/temporary-voice.md",
+        "docs/en/features/temporary-voice.md"
+      ]
+    },
+    {
+      "id": "tickets",
+      "category": "community",
+      "title_key": "feature.tickets",
+      "description_key": "feature.tickets.description",
+      "icon": "ticket",
+      "docs_path": "/docs/features/tickets",
+      "fields": [],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "manage_channels",
+        "manage_threads",
+        "create_private_threads",
+        "send_messages_in_threads",
+        "send_messages",
+        "read_message_history",
+        "manage_messages",
+        "embed_links",
+        "attach_files"
+      ],
+      "docs_files": [
+        "docs/features/tickets.md",
+        "docs/en/features/tickets.md"
+      ]
+    },
+    {
+      "id": "advanced_polls",
+      "category": "engagement",
+      "title_key": "feature.advanced_polls",
+      "description_key": "feature.advanced_polls.description",
+      "icon": "chart-bar",
+      "docs_path": "/docs/features/polls",
+      "fields": [],
+      "docs_files": [
+        "docs/features/polls.md",
+        "docs/en/features/polls.md"
+      ]
+    },
+    {
+      "id": "suggestions",
+      "category": "engagement",
+      "title_key": "feature.suggestions",
+      "description_key": "feature.suggestions.description",
+      "icon": "lightbulb",
+      "docs_path": "/docs/features/suggestions",
+      "fields": [
+        "channel_id",
+        "log_channel_id",
+        "review_role_ids",
+        "allow_voting",
+        "show_author",
+        "form_title",
+        "form_fields"
+      ],
+      "required_fields": [
+        "channel_id"
+      ],
+      "required_bot_permissions": [
+        "send_messages",
+        "embed_links"
+      ],
+      "docs_files": [
+        "docs/features/suggestions.md",
+        "docs/en/features/suggestions.md"
+      ]
+    },
+    {
+      "id": "minigames",
+      "category": "engagement",
+      "title_key": "feature.minigames",
+      "description_key": "feature.minigames.description",
+      "icon": "gamepad",
+      "docs_path": "/docs/features/minigames",
+      "fields": [],
+      "docs_files": [
+        "docs/features/minigames.md",
+        "docs/en/features/minigames.md"
+      ]
+    },
+    {
+      "id": "trust_score",
+      "category": "moderation",
+      "title_key": "feature.trust_score",
+      "description_key": "feature.trust_score.description",
+      "icon": "shield-check",
+      "docs_path": "/docs/features/trust-score",
+      "fields": [
+        "trust_retention_days",
+        "trust_flag_threshold"
+      ],
+      "required_fields": [],
+      "required_bot_permissions": [],
+      "parent": "moderation",
+      "docs_files": [
+        "docs/features/trust-score.md",
+        "docs/en/features/trust-score.md"
+      ]
+    },
+    {
+      "id": "youtube_updates",
+      "category": "social",
+      "title_key": "feature.youtube_updates",
+      "description_key": "feature.youtube_updates.description",
+      "icon": "youtube",
+      "docs_path": "/docs/social/youtube",
+      "fields": [],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "send_messages"
+      ],
+      "docs_files": [
+        "docs/social/youtube.md",
+        "docs/en/social/youtube.md"
+      ]
+    },
+    {
+      "id": "twitch_updates",
+      "category": "social",
+      "title_key": "feature.twitch_updates",
+      "description_key": "feature.twitch_updates.description",
+      "icon": "twitch",
+      "docs_path": "/docs/social/twitch",
+      "fields": [],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "send_messages"
+      ],
+      "docs_files": [
+        "docs/social/twitch.md",
+        "docs/en/social/twitch.md"
+      ]
+    },
+    {
+      "id": "tiktok_updates",
+      "category": "social",
+      "title_key": "feature.tiktok_updates",
+      "description_key": "feature.tiktok_updates.description",
+      "icon": "tiktok",
+      "docs_path": "/docs/social/tiktok",
+      "fields": [],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "send_messages"
+      ],
+      "docs_files": [
+        "docs/social/tiktok.md",
+        "docs/en/social/tiktok.md"
+      ]
+    },
+    {
+      "id": "x_updates",
+      "category": "social",
+      "title_key": "feature.x_updates",
+      "description_key": "feature.x_updates.description",
+      "icon": "x-twitter",
+      "docs_path": "/docs/social/x",
+      "fields": [],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "send_messages"
+      ],
+      "docs_files": [
+        "docs/social/x.md",
+        "docs/en/social/x.md"
+      ]
+    },
+    {
+      "id": "instagram_updates",
+      "category": "social",
+      "title_key": "feature.instagram_updates",
+      "description_key": "feature.instagram_updates.description",
+      "icon": "instagram",
+      "docs_path": "/docs/social/instagram",
+      "fields": [],
+      "required_fields": [],
+      "required_bot_permissions": [
+        "send_messages"
+      ],
+      "docs_files": [
+        "docs/social/instagram.md",
+        "docs/en/social/instagram.md"
+      ]
+    }
+  ],
+  "extensions": [
+    "cogs.general",
+    "cogs.ai",
+    "cogs.leveling",
+    "cogs.moderation",
+    "cogs.safety",
+    "cogs.reaction_roles",
+    "cogs.automod",
+    "cogs.moderation_commands",
+    "cogs.community",
+    "cogs.tickets",
+    "cogs.engagement",
+    "cogs.suggestions",
+    "cogs.trust",
+    "cogs.audit_log",
+    "cogs.welcome",
+    "cogs.social_updates"
+  ]
+}

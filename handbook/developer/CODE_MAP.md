@@ -6,10 +6,12 @@
 | --- | --- |
 | `runtime/__main__.py`、`runtime/lifecycle.py` | bot/dashboard/social-worker/migrate/testの実行、Process終了とSignal |
 | `bot.py`、`cogs/` | Discord接続、拡張登録、Event/Interactionの入力と応答 |
-| `config.py`、`feature_registry.py` | アプリ設定の型、機能MetadataとDocs対応 |
+| `config.py`、`features/` | アプリ設定の型、カテゴリー別の機能Metadata・Binding・Docs対応 |
+| `cogs/community/welcome.py`、`guild_settings/community/welcome.py`、`dashboard/api/community/welcome.py` | welcomeのDiscord入力、設定モデル、登録用設定Factory。参加ロールは隣接するautorole Cog |
 | `dashboard/app.py`、`dashboard/api_v1.py`、`dashboard/api/` | Web配信、OAuth、API Router合成、認可・入力検証 |
 | `dashboard/repository.py` | Session、OAuth state、個人設定 |
 | `dashboard/frontend/src/` | React UI。`routing/catalog.ts` は画面経路、`locales/` は翻訳 |
+| `dashboard/frontend/src/components/{feature,ui,editors}/` | 共通設定画面、標準Button、値・制約を受け取るEmbedEditor |
 | `tokens.css`、`design.md`（本書と同階層） | 共通視覚TokenとUI設計契約 |
 | `guild_settings/` | Guild機能設定の正規化・保存・revision |
 | `moderation/`、`ticketing/`、`reaction_roles/`、`suggestions/` | 各Domainのモデル、Repository、Service、Discord Adapter |

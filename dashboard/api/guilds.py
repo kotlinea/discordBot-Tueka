@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Any
 from fastapi import APIRouter, Request
-from feature_registry import FEATURES
+from features.registry import FEATURES
 from .context import ApiContext
 from .route import ApiRoute, ERROR_RESPONSES
 from . import schemas

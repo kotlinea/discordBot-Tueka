@@ -54,15 +54,6 @@ class WelcomeCog(commands.Cog):
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
         await self._send_configured_message(member, "welcome")
-        autorole = self.guild_settings.get_module(member.guild.id, "autorole")
-        role_id = autorole["settings"].get("default_role_id") if autorole["enabled"] else None
-        role = member.guild.get_role(role_id) if role_id else None
-        if role:
-            try:
-                await member.add_roles(role, reason="Default role on join")
-            except discord.Forbidden:
-                pass
-
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member) -> None:
         await self._send_configured_message(member, "leave")

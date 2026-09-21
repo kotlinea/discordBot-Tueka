@@ -5,6 +5,7 @@ x-source: &source
   - ./database:/app/database:ro
   - ./discord_io:/app/discord_io:ro
   - ./engagement:/app/engagement:ro
+  - ./features:/app/features:ro
   - ./guild_settings:/app/guild_settings:ro
   - ./jobs:/app/jobs:ro
   - ./migrations:/app/migrations:ro
@@ -19,7 +20,6 @@ x-source: &source
   - ./config.py:/app/config.py:ro
   - ./migrate.py:/app/migrate.py:ro
   - ./social_worker.py:/app/social_worker.py:ro
-  - ./feature_registry.py:/app/feature_registry.py:ro
   - ./template_defaults.py:/app/template_defaults.py:ro
 services:
   migrate:

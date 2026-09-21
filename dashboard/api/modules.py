@@ -5,7 +5,7 @@ from fastapi import Depends
 from typing import Any
 from fastapi import APIRouter, Request
 from dashboard.discord_api import ADMINISTRATOR, PERMISSION_BITS
-from feature_registry import get_feature
+from features.registry import get_feature
 from .context import ApiContext
 from .route import ApiRoute, ERROR_RESPONSES
 from . import schemas
@@ -22,7 +22,6 @@ def create_router(context: ApiContext) -> APIRouter:
     router = APIRouter(route_class=ApiRoute, responses=ERROR_RESPONSES)
     auth = ApiDependencies(context.dashboard_repository, context.discord)
     discord = context.discord
-    guild_settings_repository = context.guild_settings_repository
     feature_payload = FeaturePresenter(context).feature_payload
 
     @router.get('/guilds/{guild_id}/modules/{module_id}', response_model=schemas.Feature, response_model_exclude_unset=True)
@@ -58,15 +57,11 @@ def create_router(context: ApiContext) -> APIRouter:
                         raise ValueError('voice_notification_channel_id')
                     if values.get('text_role_rewards') or values.get('voice_role_rewards'):
                         required.add('manage_roles')
-                if module_id == 'welcome':
-                    for prefix in ('welcome', 'leave'):
-                        if values.get(f'{prefix}_enabled'):
-                            content = str(values.get(f'{prefix}_content') or '').strip()
-                            if not values.get(f'{prefix}_channel_id') or not content or (values.get(f'{prefix}_format', 'text') == 'text' and len(content) > 2000):
-                                raise ValueError('welcome_settings')
                 if not permissions & ADMINISTRATOR and any((not permissions & PERMISSION_BITS[name] for name in required)):
                     raise ValueError('missing_permissions')
-            saved = guild_settings_repository.set_module(guild_id, module_id, enabled=bool(body.get('enabled')), settings=_normalize_resource_ids(values), expected_revision=int(body['revision']) if body.get('revision') is not None else None)
+            access = context.feature_settings[module_id]
+            access.validate(bool(body.get('enabled')), values)
+            saved = access.save(guild_id, enabled=bool(body.get('enabled')), settings=_normalize_resource_ids(values), expected_revision=int(body['revision']) if body.get('revision') is not None else None)
             return {**saved, 'settings': _serialize_resource_ids(saved['settings'])}
         except RuntimeError as exc:
             raise revision_conflict('別の管理者が設定を更新しました。再読み込みしてください。') from exc

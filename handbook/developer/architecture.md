@@ -10,9 +10,17 @@
 
 ## 共通パターン
 
+`features/<category>/<feature>.py` が機能MetadataとProcess別Bindingを宣言し、各カテゴリーの `registry.py` と最上位Registryで明示登録します。宣言のImportはSDK・HTTP・DBを読み込みません。`features/loading.py` は起動対象Processの参照だけを解決します。カテゴリーは表示・登録単位で、DomainのTransaction所有境界は維持します。
+
+Botは登録された拡張を一度だけ初期化し、登録失敗時は読み込んだ拡張を解除します。APIはアプリごとにContextを生成し、各Router factoryへ同じContextを一度ずつ渡します。重複Binding、親の循環、API経路・operation IDの衝突を拒否します。
+
+Frontendは `features/<category>/<id>.feature.tsx` に経路、画面loader、Namespace、表示権限を定義します。RegistryはID・親・経路を検査し、同じloaderの並行呼出しをまとめます。Backend Metadataと生成API型を使い、認可はAPI境界で確認します。`modules/:moduleId` は `routing/RegisteredModule.tsx` が登録された画面を読み込み、Guild・機能単位で編集状態を分離します。残るDomain画面とShell全体の移行は[構造改善計画](../../goal.md)のG3〜G4で行います。
+
+`welcome` の入力は `cogs/community/welcome.py`、設定モデルは `guild_settings/community/welcome.py`、API設定Factoryは `dashboard/api/community/welcome.py` が担当します。参加ロールは独立した `cogs/community/autorole.py` が担当します。Featureの `settings_factory` はアプリのContextへ `SettingsAccess` を一度生成し、共通Routerが認可・CSRF・Resource確認後に検証と保存を呼びます。既定の `ModuleSettingsAccess` は正規化とrevision付き保存を提供します。
+
 DashboardのSession・Discord OAuth state・ユーザー個人設定は `dashboard/repository.py` が保存します。Web画面とJSON APIはこのRepositoryを直接使用します。
 
-Guild Moduleの汎用CRUD・有効Guild一覧は `guild_settings/repository.py`、既定値・正規化は `guild_settings/models.py` が担当します。APIとCogは設定Repositoryと各DomainのRepositoryを直接使用します。
+Guild Moduleの汎用CRUD・有効Guild一覧は `guild_settings/repository.py`、既定値・正規化は `guild_settings/models.py` とカテゴリー配下のモデルが担当します。APIとCogは設定アクセス契約・設定Repositoryと各DomainのRepositoryを使用します。
 
 | ディレクトリ | 責務 |
 | --- | --- |
@@ -146,6 +154,8 @@ FastAPI `Depends` はSession、管理権限、Ticket Staff、CSRFの入口を表
 RootとDomain Routerは `React.lazy` / `Suspense` で画面を遅延読込みします。画面からメタデータだけをImportして依存DomainのUIまで読み込まないよう、catalogを分離しています。翻訳はNamespaceごとにファイルを分け、現時点では初期化時に全Namespaceを登録します。Namespaceのネットワーク遅延取得は行いません。
 
 共通UIは値・変更コールバック・見出し等を受け取り、Domainの保存処理を持ちません。例えばEmbedのTicket変数案内とScheduleの見出しはTicket画面から渡します。SaveBarは通常の保存CallbackとHTML form属性によるsubmitの両方に対応し、必須入力のブラウザー検証を維持します。409や権限喪失で編集内容を破棄せず、再試行・再読込を利用者が判断できます。
+
+`components/feature/ModuleSettings.tsx` は共通Module APIの保存・状態表示を担当し、項目描画・説明・追加操作をpropsで受け取ります。成功時は応答のrevisionを次回保存へ渡し、失敗時と編集中の再取得では入力を保持します。`components/ui/Button.tsx` は既存Tokenのvariant、loading、disabled、form/type、aria/refを扱います。`components/editors/EmbedEditor.tsx` は値と制約・変数候補を受け取り、Ticket側が生成API制約と保存を所有します。共有部品から機能モジュールへ依存しません。
 
 視覚仕様は `design.md` と既存Tokenを維持します。Playwrightは別の一時出力先へbuildしたSPAをpreviewで配信し、開発サーバーの初回変換時間と画面の動作を切り分けます。本番の `/ui/` buildとは出力先を分け、4画面幅、日英、3外観×light/dark、保存・再読込・競合・権限・キーボード・Accessibilityを検証します。
 

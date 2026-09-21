@@ -1,6 +1,6 @@
 import unittest
 
-from feature_registry import FEATURES, get_feature, japanese_copy
+from features.registry import FEATURES, get_feature, japanese_copy
 from dashboard.icon_registry import ICONS, get_icon
 
 

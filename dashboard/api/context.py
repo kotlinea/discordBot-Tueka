@@ -8,7 +8,8 @@ from moderation import ModerationRepository
 from ticketing import TicketRepository, TicketService, TranscriptStorage
 from reaction_roles import ReactionRoleRepository, ReactionRoleService
 from suggestions import SuggestionRepository
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from features.defaults import SettingsAccess
 
 @dataclass(frozen=True)
 class ApiContext:
@@ -24,6 +25,7 @@ class ApiContext:
     reaction_role_repository: ReactionRoleRepository | None
     reaction_role_service: ReactionRoleService | None
     suggestion_repository: SuggestionRepository
+    feature_settings: dict[str, SettingsAccess] = field(default_factory=dict)
 
 def create_context(database_url: str, discord: Any, settings: Any | None=None) -> ApiContext:
     social_repository = SocialRepository(database_url)
@@ -36,4 +38,8 @@ def create_context(database_url: str, discord: Any, settings: Any | None=None) -
     reaction_role_repository = ReactionRoleRepository(settings.database_url) if settings is not None else None
     reaction_role_service = ReactionRoleService(reaction_role_repository, max_mappings=settings.reaction_role_max_mappings_per_message) if reaction_role_repository and settings else None
     suggestion_repository = SuggestionRepository(database_url)
-    return ApiContext(discord=discord, settings=settings, social_repository=social_repository, moderation_repository=moderation_repository, dashboard_repository=dashboard_repository, guild_settings_repository=guild_settings_repository, ticket_repository=ticket_repository, ticket_transcripts=ticket_transcripts, ticket_service=ticket_service, reaction_role_repository=reaction_role_repository, reaction_role_service=reaction_role_service, suggestion_repository=suggestion_repository)
+    context = ApiContext(discord=discord, settings=settings, social_repository=social_repository, moderation_repository=moderation_repository, dashboard_repository=dashboard_repository, guild_settings_repository=guild_settings_repository, ticket_repository=ticket_repository, ticket_transcripts=ticket_transcripts, ticket_service=ticket_service, reaction_role_repository=reaction_role_repository, reaction_role_service=reaction_role_service, suggestion_repository=suggestion_repository)
+
+    from .settings import create_settings_access
+    context.feature_settings.update(create_settings_access(context))
+    return context

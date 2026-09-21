@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import unittest
 
-from feature_registry import FEATURES
+from features.registry import FEATURES
 
 
 ROOT = Path(__file__).resolve().parents[1]

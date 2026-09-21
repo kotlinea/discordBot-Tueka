@@ -6,7 +6,17 @@
 
 ## Feature Registry
 
-`id`、category、翻訳Key、Icon、`docs_path`、設定Field、必須Field、必要Bot権限、親Categoryを定義します。`docs_path`に対応する日本語MarkdownはCIで必須です。
+`features/<category>/<id>.py` に `Feature` を定義し、同カテゴリーの `registry.py` へ明示登録します。`id`、category、翻訳Key、Icon、`docs_path`、設定Field、必須Field、必要Bot権限、親機能を定義します。親機能とカテゴリーは別の関係です。日英DocsとUI定義を揃えます。
+
+Bot/APIの入口は `Binding(id, process, "module:callable", order)` で指定します。Botは非同期setup、APIはContextを受け取る同期Router factoryです。共有の実行基盤はカテゴリーBindingへ一度だけ登録します。宣言ファイルからCog・Router・DBをImportせず、DomainからRegistryへ依存させません。
+
+UIは `features/<category>/<id>.feature.tsx` で `defineFeature` の既定画面・経路・Namespace・表示権限を必要な範囲で差し替え、カテゴリーRegistryへ登録します。`.feature.tsx` は既存画面との名前衝突を避ける入口の命名です。設定アクセスは `features/defaults.py` の `SettingsAccess` 契約を使い、汎用Module保存は `ModuleSettingsAccess` を既定とします。revisionを保存先へ渡し、認可・CSRF・TransactionはAdapterとRepositoryで維持します。
+
+設定アクセスを差し替える場合はFeatureの `settings_factory` に `module:callable` を指定し、Contextを受け取って `read / validate / save` を持つオブジェクトを返します。`features/community/welcome.py` と `dashboard/api/community/welcome.py` が実例です。共通Routerへ機能名の条件分岐を追加せず、正規化・組合せ検証をモデルへ置きます。
+
+UIの実例は `features/community/welcome.feature.tsx` と配下の `welcome/Settings.tsx` です。共通 `components/feature/ModuleSettings` に項目描画・見出し・追加操作を渡し、保存と状態表示を再利用します。Buttonは `components/ui/`、EmbedEditorは `components/editors/` を使用します。Embedの制約は生成API型から呼出元で渡します。
+
+welcomeの試験移行を完了しました。他機能とShell全体の移行は[専用計画](../../goal.md)のG3〜G4です。登録テストに加え、`tests/test_welcome_feature.py` とFrontendの `src/test/welcome.test.tsx`、`e2e/welcome.spec.ts` が保存・表示の実例を検証します。
 
 ## 設定
 

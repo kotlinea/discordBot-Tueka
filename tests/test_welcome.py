@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 
-from cogs.welcome import WelcomeCog
+from cogs.community.welcome import WelcomeCog
 
 
 class WelcomeTemplateTests(unittest.TestCase):

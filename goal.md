@@ -1,6 +1,6 @@
 # 機能中心の疎結合化ロードマップ
 
-制定日: 2026-09-21。今回専用の一時計画。**G0完了、次はG1。実装変更は未着手**。
+制定日: 2026-09-21。今回専用の一時計画。**G0〜G2完了、次はG3**。
 調査対象: `2b7050cb26acc85ea6edba080d5bf2af55458a18`。開始時の作業ツリーは変更なし。
 
 ## 目的と適用範囲
@@ -13,7 +13,7 @@ Bot・APIとDashboardを、カテゴリーのフォルダーと機能ごとの�
 
 全体の順序・受入状態は [ROADMAP](ROADMAP.md) と [EXECUTION_PLAN](handbook/developer/EXECUTION_PLAN.md) が正本。本計画は追加の構造改善Gとして登録した。Phase 0〜2を未完了に戻さず、T1/C1/P3-Gの残作業やPhase 4・5の受入条件を置き換えない。
 
-## 現状と変更の起点
+## G0時点の構造と変更の起点
 
 | 現在の場所 | 確認した構造・課題 | 計画上の扱い |
 | --- | --- | --- |
@@ -69,12 +69,12 @@ dashboard/frontend/src/
     registry.ts
     community/
       registry.ts
-      welcome.tsx
-      tickets.tsx                  # 機能の入口
+      welcome.feature.tsx
+      tickets.feature.tsx          # 機能の入口
       tickets/                     # Inbox、Panel等の専用画面
-    engagement/registry.ts         # 配下にsuggestions.tsx等
-    moderation/registry.ts         # 配下にautomod.tsx等
-    social/registry.ts             # 配下にyoutube_updates.tsx等
+    engagement/registry.ts         # 配下にsuggestions.feature.tsx等
+    moderation/registry.ts         # 配下にautomod.feature.tsx等
+    social/registry.ts             # 配下にyoutube_updates.feature.tsx等
   components/
     ui/Button.tsx
     editors/EmbedEditor.tsx
@@ -118,8 +118,8 @@ G0で、Help/Ping/ユーザー・Guild情報を基盤、Echo/計算/Dice/Gemini�
 | ID・状態 | 作業・成果物 | 完了条件 |
 | --- | --- | --- |
 | G0 完了（ローカル検証済み） | [全入口対応表と固定baseline](handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.md) | 24機能/16拡張/8 Queue/59 APIパス・77操作/103コマンドを対応付け、指定6タスク成功。G0残作業なし |
-| G1 未着手 | Backend/UIの型、カテゴリーRegistry、明示Binding、既定値・override境界 | 重複・循環・衝突・不正参照を拒否。Importに副作用なし。Bot/API/UIの依存方向と一度だけの初期化を検証 |
-| G2 未着手 | `welcome`をBot→設定API→UIまで試験移行。Button/EmbedEditorと共通設定の既定実装を整理 | 機能ファイル＋登録で既存動作を構成でき、追加分岐不要。保存/再読込/失敗時入力保持/無効化を確認 |
+| G1 完了（ローカル検証済み） | Backend/UIの型、カテゴリーRegistry、明示Binding、既定値・override境界 | 重複・循環・衝突・不正参照、副作用のないMetadata読込、Bot/API/UIの初期化を検証。[記録](handbook/developer/history/FEATURE_STRUCTURE_G1-2026-09-21.md)。G1残作業なし |
+| G2 完了（ローカル検証済み） | `welcome`をBot→設定API→UIまで試験移行。Button/EmbedEditorと共通設定を整理 | 保存/再読込/失敗時入力保持/無効化と登録接続を確認。[記録](handbook/developer/history/FEATURE_STRUCTURE_G2-2026-09-21.md)。G2残作業なし |
 | G3 未着手 | communityの残り→engagement→moderation→socialの順でBackendを移行。各カテゴリーは機能ごとに検証 | Cog/API/Workerの登録漏れ・重複なし。専用Repositoryのoverrideを確認。認可・revision・配送/復旧・Transaction回帰が成功 |
 | G4 未着手 | G3と同じ順でDashboardを移行。汎用Moduleの機能分岐、Shell/Navigation/Breadcrumbの個別分岐を登録へ集約 | 全既存Routeと直リンク、Staff専用表示、遅延読込、日英、入力保持、モバイル/keyboardを維持 |
 | G5 未着手 | 拡張性と境界の受入。テスト専用の仮機能・仮カテゴリーで登録手順を検証 | 共通Bot起動/API合成/Shellを編集せず追加・除去できる。未登録/重複は検出。共通基盤と他機能への逆依存なし |
@@ -152,7 +152,7 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 - [x] 機能名からBackend/API/UIの入口と所有Domainを辿れる対応表がある（G0）。
 - [ ] 新機能・カテゴリーの接続が登録に集約され、中央の機能別条件分岐を追加しない。
 - [ ] 共通基礎要素の既定実装からoverrideで開始でき、専用処理が共通基盤へ漏れない。
-- [ ] Button/EmbedEditor等の共有部品が共通フォルダーにあり、業務保存を持たない。
+- [x] Button/EmbedEditor等の共有部品が共通フォルダーにあり、業務保存を持たない（G2）。
 - [ ] URL・コマンド・認可・データ・冪等性・復旧・見た目を維持した証拠がある。
 - [ ] `CODE_MAP.md`、`architecture.md`、`extending.md`、必要な作業指示と全体実行計画を更新する。
 - [ ] 確定した設計は現行handbookへ、実施結果・未検証は日付付きhistoryへ移す。本ファイルを参照するリンクを整理してから`goal.md`を削除する。

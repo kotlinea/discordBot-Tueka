@@ -5,6 +5,7 @@ from pathlib import Path
 
 from database import database_url
 from runtime.environment import load_environment
+from features.registry import BOT_EXTENSIONS
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -51,24 +52,7 @@ class Settings:
     data_dir: Path
     database_url: str
     log_level: str = "INFO"
-    extensions: tuple[str, ...] = (
-        "cogs.general",
-        "cogs.ai",
-        "cogs.leveling",
-        "cogs.moderation",
-        "cogs.safety",
-        "cogs.reaction_roles",
-        "cogs.automod",
-        "cogs.moderation_commands",
-        "cogs.community",
-        "cogs.tickets",
-        "cogs.engagement",
-        "cogs.suggestions",
-        "cogs.trust",
-        "cogs.audit_log",
-        "cogs.welcome",
-        "cogs.social_updates",
-    )
+    extensions: tuple[str, ...] = BOT_EXTENSIONS
 
     @classmethod
     def from_env(cls) -> "Settings":

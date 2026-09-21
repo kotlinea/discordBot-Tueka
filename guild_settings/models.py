@@ -3,28 +3,6 @@ from typing import Any
 from template_defaults import TEMPLATE_DEFAULTS
 
 
-def welcome_settings(settings: dict[str, Any]) -> dict[str, Any]:
-    """Apply defaults without silently enabling messages."""
-    defaults = {
-        "welcome_enabled": False,
-        "welcome_channel_id": None,
-        "welcome_format": "text",
-        "welcome_content": TEMPLATE_DEFAULTS["welcome_content"],
-        "leave_enabled": False,
-        "leave_channel_id": None,
-        "leave_format": "text",
-        "leave_content": TEMPLATE_DEFAULTS["leave_content"],
-    }
-    defaults.update(settings)
-    for field in ("welcome_content", "leave_content"):
-        if not str(defaults.get(field) or "").strip():
-            defaults[field] = TEMPLATE_DEFAULTS[field]
-    if defaults["welcome_format"] not in {"text", "embed"}:
-        defaults["welcome_format"] = "text"
-    if defaults["leave_format"] not in {"text", "embed"}:
-        defaults["leave_format"] = "text"
-    return defaults
-
 def template_module_settings(module_id: str, settings: dict[str, Any]) -> dict[str, Any]:
     defaults = {
         "live_stats": {"stats_channel_id": None, "stats_template": TEMPLATE_DEFAULTS["stats_template"]},

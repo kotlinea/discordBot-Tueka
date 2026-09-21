@@ -87,7 +87,7 @@ class SuggestionsApiTests(unittest.TestCase):
 
     def test_audit_member_category_requires_permission_in_v2_api(self):
         from dashboard.discord_api import PERMISSION_BITS
-        from feature_registry import get_feature
+        from features.registry import get_feature
         permissions = sum(PERMISSION_BITS[name] for name in get_feature('audit_log').required_bot_permissions)
         self.discord.guild_resources.return_value = ([{'id': '10', 'type': 0}], [], permissions)
         self.url = '/api/v1/guilds/1/modules/audit_log'

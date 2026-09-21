@@ -6,7 +6,7 @@
 
 | 順序・ID | 担当 | 状態 | 依存・成果物 | 受入条件・証拠 | 阻害要因 |
 | --- | --- | --- | --- | --- | --- |
-| G 機能中心の構造改善 | 開発者 | 進行中 | [専用計画](../../goal.md)。G0完了、次はG1 | [G0全入口対応表・baseline](history/FEATURE_STRUCTURE_G0-2026-09-21.md)。24機能、16拡張、8 Queue、59 APIパス/77操作、103コマンド。指定6タスク成功 | G0なし。G1〜G6は未着手、実環境受入はC1/P3-Gで別管理 |
+| G 機能中心の構造改善 | 開発者 | 進行中 | [専用計画](../../goal.md)。G0〜G2完了、次はG3 | [G2試験移行・検証](history/FEATURE_STRUCTURE_G2-2026-09-21.md)。Python393件、Frontend32件、ブラウザー56件、API/103コマンド維持 | G2なし。G3〜G6は未着手、実環境受入はC1/P3-Gで別管理 |
 | D1 役割別Docs・公開境界 | 開発者 | ローカル検証済み | 日英利用者Docs、Operator/Developer handbook、全コマンド対応表 | 日英build/リンク/検索/表示・103コマンド照合・内部資料404・Image不在 | なし |
 | D3 文書の仕様・文体点検 | 開発者 | ローカル検証済み | D1。[125件の点検台帳](history/DOCUMENTATION_AUDIT.md)、編集基準、表現・リンク検査 | 日英build、103コマンド照合、Docsブラウザー15件、文書8テスト成功。証拠は進捗 | Remote CI・実StageはC1/P3-G |
 | D2 導入・運用CLI | 開発者→運用者 | ローカル検証済み | D1。Windows/Linuxのcheck/configure/build/start、運用一覧 | クリーン設定・固定Image・失敗時停止・秘密値/Volume保持・Compose/Recovery受入 | Linux Host上の共通Composeタスク通し実行はC1で確認 |

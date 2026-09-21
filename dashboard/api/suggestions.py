@@ -5,7 +5,7 @@ from fastapi import Depends
 from typing import Any
 from fastapi import APIRouter, Request
 from dashboard.discord_api import ADMINISTRATOR, PERMISSION_BITS
-from feature_registry import get_feature
+from features.registry import get_feature
 from suggestions import SuggestionValidationError, normalize_settings as normalize_suggestion_settings
 from .context import ApiContext
 from .route import ApiRoute, ERROR_RESPONSES

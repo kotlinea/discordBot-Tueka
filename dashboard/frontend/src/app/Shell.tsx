@@ -23,7 +23,7 @@ const ModerationRoutes = lazy(() => import("../features/moderation/Routes").then
 const SocialRoutes = lazy(() => import("../features/social/Routes").then(module => ({ default: module.SocialRoutes })))
 const TicketRoutes = lazy(() => import("../features/tickets/Routes").then(module => ({ default: module.TicketRoutes })))
 const ServerSettings = lazy(() => import("../features/guilds/Settings").then(module => ({ default: module.ServerSettings })))
-const ModuleSettings = lazy(() => import("../features/modules/Settings").then(module => ({ default: module.ModuleSettings })))
+const ModuleSettings = lazy(() => import("../routing/RegisteredModule").then(module => ({ default: module.RegisteredModule })))
 
 export function Shell({ session }: { session: Session }) {
   const { guildId = '' } = useParams(); const { t } = useTranslation(['social', 'tickets', 'reactionRoles', 'suggestions', 'common']); const location = useLocation(); const [mobileOpen, setMobileOpen] = useState(false)

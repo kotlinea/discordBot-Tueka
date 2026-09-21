@@ -11,7 +11,7 @@ class ApiArchitectureTests(unittest.TestCase):
         self.assertFalse(any(isinstance(node, ast.AsyncFunctionDef) for node in ast.walk(tree)))
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-                self.assertEqual(node.func.attr, 'include_router' if node.func.value.id == 'router' else 'create_router')
+                self.assertIn(ast.unparse(node.func), {'router.include_router', 'REGISTRY.for_process'})
 
     def test_api_modules_do_not_import_application_or_create_global_dependencies(self):
         root = Path(__file__).resolve().parents[1] / 'dashboard' / 'api'

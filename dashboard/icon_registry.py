@@ -36,6 +36,12 @@ ICONS: dict[str, DashboardIcon] = {
 ICON_IDS = frozenset(ICONS)
 
 
+def validate_feature_icons(features) -> None:
+    unknown = {feature.icon for feature in features} - ICON_IDS
+    if unknown:
+        raise ValueError(f"Unregistered dashboard icons: {', '.join(sorted(unknown))}")
+
+
 def get_icon(icon_id: str) -> DashboardIcon:
     try:
         return ICONS[icon_id]

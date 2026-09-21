@@ -96,7 +96,7 @@ async def server_picker():
 @app.get('/servers/{guild_id}/{route:path}', include_in_schema=False)
 async def dashboard_page(guild_id: int, route: str = ''):
     # Only current SPA routes receive the shell. Obsolete form/JSON URLs are gone.
-    from feature_registry import get_feature
+    from features.registry import get_feature
     valid = route in {'', 'settings', 'suggestions'}
     valid |= bool(re.fullmatch(r'moderation(?:/(?:automod|anti_spam|anti_raid|infractions|moderation_actions|moderation_logs)(?:/rules(?:/(?:new|\d+))?)?)?', route))
     valid |= bool(re.fullmatch(r'social(?:/(?:youtube|twitch|x|tiktok|instagram))?', route))

@@ -3,19 +3,17 @@ from typing import Any
 
 from fastapi import APIRouter
 from dashboard.api.context import create_context
-from dashboard.api import session, guilds, suggestions, social, ticket_configuration, tickets, reaction_roles, modules, moderation
+from dashboard.api.composition import build_routers
+from dashboard.icon_registry import validate_feature_icons
+from features.loading import resolve_bindings
+from features.registry import REGISTRY, FEATURES
 
 
 def create_api_router(database_url: str, discord: Any, settings: Any | None = None) -> APIRouter:
+    validate_feature_icons(FEATURES)
+    factories = resolve_bindings(REGISTRY.for_process('api'))
     context = create_context(database_url, discord, settings)
     router = APIRouter(prefix="/api/v1")
-    router.include_router(session.create_router(context))
-    router.include_router(guilds.create_router(context))
-    router.include_router(suggestions.create_router(context))
-    router.include_router(social.create_router(context))
-    router.include_router(ticket_configuration.create_router(context))
-    router.include_router(tickets.create_router(context))
-    router.include_router(reaction_roles.create_router(context))
-    router.include_router(modules.create_router(context))
-    router.include_router(moderation.create_router(context))
+    for child in build_routers(factories, context):
+        router.include_router(child)
     return router
