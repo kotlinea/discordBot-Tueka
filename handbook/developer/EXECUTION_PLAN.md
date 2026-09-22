@@ -1,12 +1,12 @@
 # 現行実行計画
 
-更新: 2026-09-21。方針の正本は[ROADMAP](../../ROADMAP.md)。過去の調査・完了経緯は[旧計画](history/EXECUTION_PLAN-2026-09-19.md)と[進捗](history/PROGRESS0910.md)へ分離する。旧P番号は履歴との対応を保つ。
+更新: 2026-09-23。方針の正本は[ROADMAP](../../ROADMAP.md)。過去の調査・完了経緯は[旧計画](history/EXECUTION_PLAN-2026-09-19.md)と[進捗](history/PROGRESS0910.md)へ分離する。旧P番号は履歴との対応を保つ。
 
 状態は **未着手 / 進行中 / ローカル検証済み / 外部環境待ち / 受入完了**。コードの存在、ローカル成功、GitHub CI成功、実機受入を混同しない。
 
 | 順序・ID | 担当 | 状態 | 依存・成果物 | 受入条件・証拠 | 阻害要因 |
 | --- | --- | --- | --- | --- | --- |
-| G 機能中心の構造改善 | 開発者 | 進行中 | [専用計画](../../goal.md)。G0〜G4完了、次はG5 | [G4 Dashboard移行・検証](history/FEATURE_STRUCTURE_G4-2026-09-23.md)。単体106件・ブラウザー80件・型検査/本番build成功 | G4なし。G5〜G6は未着手、実環境受入はC1/P3-Gで別管理 |
+| G 機能中心の構造改善 | 開発者 | 進行中 | [専用計画](../../goal.md)。G0〜G5完了、次はG6 | [G5 拡張性・境界受入](history/FEATURE_STRUCTURE_G5-2026-09-23.md)。Python405件・UI118件・対象ブラウザー12件・API/103コマンド・型/build成功 | G5なし。G6は未着手、実環境受入はC1/P3-Gで別管理 |
 | D1 役割別Docs・公開境界 | 開発者 | ローカル検証済み | 日英利用者Docs、Operator/Developer handbook、全コマンド対応表 | 日英build/リンク/検索/表示・103コマンド照合・内部資料404・Image不在 | なし |
 | D3 文書の仕様・文体点検 | 開発者 | ローカル検証済み | D1。[125件の点検台帳](history/DOCUMENTATION_AUDIT.md)、編集基準、表現・リンク検査 | 日英build、103コマンド照合、Docsブラウザー15件、文書8テスト成功。証拠は進捗 | Remote CI・実StageはC1/P3-G |
 | D2 導入・運用CLI | 開発者→運用者 | ローカル検証済み | D1。Windows/Linuxのcheck/configure/build/start、運用一覧 | クリーン設定・固定Image・失敗時停止・秘密値/Volume保持・Compose/Recovery受入 | Linux Host上の共通Composeタスク通し実行はC1で確認 |

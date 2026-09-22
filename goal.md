@@ -1,6 +1,6 @@
 # 機能中心の疎結合化ロードマップ
 
-制定日: 2026-09-21。今回専用の一時計画。**G0〜G4完了、次はG5**。
+制定日: 2026-09-21。今回専用の一時計画。**G0〜G5完了、次はG6**。
 調査対象: `2b7050cb26acc85ea6edba080d5bf2af55458a18`。開始時の作業ツリーは変更なし。
 
 ## 目的と適用範囲
@@ -122,7 +122,7 @@ G0で、Help/Ping/ユーザー・Guild情報を基盤、Echo/計算/Dice/Gemini�
 | G2 完了（ローカル検証済み） | `welcome`をBot→設定API→UIまで試験移行。Button/EmbedEditorと共通設定を整理 | 保存/再読込/失敗時入力保持/無効化と登録接続を確認。[記録](handbook/developer/history/FEATURE_STRUCTURE_G2-2026-09-21.md)。G2残作業なし |
 | G3 完了（ローカル検証済み） | community→engagement→moderation→socialのCog/API、設定モデル、Providerを機能別へ移行。専用保存Factoryと登録Workerを接続 | Python401件・API・103コマンド・Restore/ツール・Image内401件成功。認可・revision・配送/復旧・Transactionを維持。[記録](handbook/developer/history/FEATURE_STRUCTURE_G3-2026-09-21.md)。G3残作業なし |
 | G4 完了（ローカル検証済み） | Dashboardをカテゴリー・機能別へ移行。Module項目、Shell/Navigation/Breadcrumbを登録へ集約。24機能のModule URLと専用保存を保持 | 単体106件・ブラウザー80件・型検査/本番build成功。直リンク/404/Staff/lazy/日英/入力保持/モバイル/keyboardを検証。[記録](handbook/developer/history/FEATURE_STRUCTURE_G4-2026-09-23.md)。G4残作業なし |
-| G5 未着手 | 拡張性と境界の受入。テスト専用の仮機能・仮カテゴリーで登録手順を検証 | 共通Bot起動/API合成/Shellを編集せず追加・除去できる。未登録/重複は検出。共通基盤と他機能への逆依存なし |
+| G5 完了（ローカル検証済み） | 仮機能・仮カテゴリーの登録/解除を実Bot/API/Shellで検証。依存境界検査を追加し、Session/権限表示の逆参照を解消 | 共通Bot起動/API合成/Shellの編集不要。未登録/重複・逆依存を拒否。Python405件、UI118件、対象ブラウザー12件、API/103コマンド・型/build成功。[記録](handbook/developer/history/FEATURE_STRUCTURE_G5-2026-09-23.md)。G5残作業なし |
 | G6 未着手 | 旧登録・未使用経路の削除、現行開発資料・同梱指定の更新、最終回帰 | 静的参照だけでなく動的起動・生成・Image・運用入口を確認。全群CIとImage内動作の証拠を記録 |
 
 G3のTicket移行前にG2のoverride契約を専用保存で再評価し、必要最小限の修正を行う。大きい機能の一括移設は避け、登録・入力境界・画面単位で差分を区切る。作業中の橋渡しImportが必要なら所有者と削除段階を記録し、G6で残さない。
@@ -150,8 +150,8 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 ## 最終受入と一時ファイルの終了
 
 - [x] 機能名からBackend/API/UIの入口と所有Domainを辿れる対応表がある（G0）。
-- [ ] 新機能・カテゴリーの接続が登録に集約され、中央の機能別条件分岐を追加しない。
-- [ ] 共通基礎要素の既定実装からoverrideで開始でき、専用処理が共通基盤へ漏れない。
+- [x] 新機能・カテゴリーの接続が登録に集約され、中央の機能別条件分岐を追加しない（G5）。
+- [x] 共通基礎要素の既定実装からoverrideで開始でき、専用処理が共通基盤へ漏れない（G2〜G5）。
 - [x] Button/EmbedEditor等の共有部品が共通フォルダーにあり、業務保存を持たない（G2）。
 - [ ] URL・コマンド・認可・データ・冪等性・復旧・見た目を維持した証拠がある。
 - [ ] `CODE_MAP.md`、`architecture.md`、`extending.md`、必要な作業指示と全体実行計画を更新する。

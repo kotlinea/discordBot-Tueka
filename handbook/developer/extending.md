@@ -22,6 +22,14 @@ UIの実例は `features/community/welcome.feature.tsx` と配下の `welcome/Se
 
 登録テストに加え、`tests/test_welcome_feature.py`、Frontendの `src/test/welcome.test.tsx`、`src/test/routing.test.tsx`、`e2e/features.spec.ts` が保存・直リンク・表示の実例を検証します。全体の段階・受入状態は[専用計画](../../goal.md)を参照してください。
 
+## 登録経路の受入
+
+`tests/test_feature_extension.py` は独立Processでテスト専用機能を既存カテゴリーへ追加し、新カテゴリーの登録・解除も確認します。実Registryの宣言だけをメモリ上で差し替え、通常のSettings、全Bot拡張の起動/終了、API合成、既定設定の保存・revision・CSRFを通します。作業ツリーの起動・合成ファイルは編集しません。
+
+Frontendの `src/test/featureExtension.test.tsx` はRegistryとHTTP応答だけをテスト用に差し替え、実Shellで既定編集・保存、専用画面override、Navigation・検索・パンくず、登録解除後の404を確認します。仮機能は公開Registryや配布機能へ追加しません。
+
+`tests/test_feature_boundaries.py` とFrontendの `src/test/featureBoundaries.test.ts` はDomainからSDK/HTTP、共有基盤から機能、カテゴリー間の内部Importを検査します。相対Import・再Export・文字列による動的Importも対象とし、UIは中間モジュールを辿ります。拒否例のテストも維持してください。これらは通常の `test-python` / `test-web` に含まれます。
+
 ## 設定
 
 Guild設定は型、初期値、上限、Discord Resource種別をServer側でも検証します。UIだけに検証を依存させません。複数管理者が編集する設定にはrevisionを付けます。

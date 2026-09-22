@@ -10,6 +10,8 @@ CIも同じ入口をpython／web／runtime／secretsの4群に分けて実行し
 
 変更箇所に応じた単独タスクと終了後の片付けはTOOLS.mdを参照してください。ログとブラウザtraceはartifacts配下へ保存します。生成物の更新には明示的なgenerateタスクを使います。
 
+機能追加では `test-python` / `test-web` に含まれる登録統合・依存境界テストを通します。テスト専用の機能/カテゴリーを実構成へ追加・解除し、起動・API・Shellへの機能別分岐追加が不要なことを確認します。[拡張手順](extending.md)に検査範囲を記載しています。
+
 Windows／Linuxのクリーンcheckoutでcheck、生成、build、setup受入を実行し、Hostの開発ツールを使わないことを確認します。Linux所有権、空白・日本語パス、ポート競合、Migration失敗、再実行、鍵・Volume保持も受入対象です。Remote CIと実Stageの証拠は[実行計画](EXECUTION_PLAN.md)へ別々に記録します。
 
 過去のbaseline・ネイティブ環境での結果は[進捗履歴](history/PROGRESS0910.md)を参照してください。

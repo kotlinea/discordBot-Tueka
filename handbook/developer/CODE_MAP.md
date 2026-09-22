@@ -18,6 +18,7 @@
 | `tokens.css`、`design.md`（本書と同階層） | 共通視覚TokenとUI設計契約 |
 | `guild_settings/<category>/<feature>.py`、`registry.py`、`repository.py` | 機能別の既定値・正規化、Domain内の明示登録、共通の保存・revision |
 | `moderation/`、`ticketing/`、`reaction_roles/`、`suggestions/` | 各Domainのモデル、Repository、Service、Discord Adapter |
+| `ticketing/access.py` | SessionとTicket APIで共有するTeam所属判定の公開契約 |
 | `social/providers/<provider>.py`、`social/`、`social_worker.py` | Provider別取得と明示Registry、Token、Webhook、監視Workerと登録起動入口 |
 | `community/`、`engagement/` | VC/XP/ランキング、Pollの保存と処理 |
 | `database/`、`migrate.py`、`migrations/postgresql/` | PostgreSQL接続、明示Migration、論理Backup/Restore |
@@ -27,6 +28,7 @@
 | `compose.tools.yaml`、`Dockerfile.tools`、`scripts/tools.py`、`scripts/docker_proxy.py` | 共通タスク、固定依存、成果物、Host/daemonパス対応 |
 | `Dockerfile`、`Dockerfile.caddy-test` | 本番ImageとローカルHTTPS受入用Image |
 | `tests/`、`.github/workflows/` | 専用DBのテスト、共通ComposeタスクのCI実行 |
+| `tests/test_feature_extension.py`、`tests/test_feature_boundaries.py`、Frontend `src/test/feature{Extension,Boundaries}.test.*` | 仮機能・カテゴリーの登録/解除、実起動・Shell、依存境界の受入 |
 | `docs/` | Dashboardから配信する日英利用者Docs |
 | `handbook/operator/` | 導入・運用・保守手順 |
 | `handbook/developer/`、`history/`（本書と同階層） | 現行開発仕様・作業指示、記録時点の証拠 |

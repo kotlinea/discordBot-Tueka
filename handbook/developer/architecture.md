@@ -22,6 +22,10 @@ Frontendは `features/<category>/<id>.feature.tsx` に経路、画面loader、Na
 
 DashboardのSession・Discord OAuth state・ユーザー個人設定は `dashboard/repository.py` が保存します。Web画面とJSON APIはこのRepositoryを直接使用します。
 
+TicketのTeam所属判定は `ticketing/access.py` が所有し、SessionのGuild一覧とTicket APIが同じ関数を利用します。共通SessionからTicket Router内部へ依存させません。Guild所属が失われた利用者には、明示Team割当が残っていても権限を与えません。
+
+依存境界はPython/TypeScriptの構文木で検査します。Domainのモデル・Repository・ServiceはSDK/HTTPと実行Registryに依存せず、外部Adapterを明示分離します。共有UIから機能への逆依存と、カテゴリー間の内部Importを拒否します。権限の表示は `components/PermissionDiagnostics.tsx` に文言を渡し、機能画面から全体のNavigation合成へ依存させません。登録追加・解除の統合検査は[拡張手順](extending.md)を参照してください。
+
 Guild Moduleの汎用CRUD・有効Guild一覧は `guild_settings/repository.py`、既定値・正規化は `guild_settings/<category>/<feature>.py` が担当します。Domain内の `guild_settings/registry.py` で明示登録し、実行機能のRegistryには依存しません。APIとCogは設定アクセス契約・設定Repositoryと各DomainのRepositoryを使用します。
 
 | ディレクトリ | 責務 |

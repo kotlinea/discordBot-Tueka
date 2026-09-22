@@ -92,6 +92,26 @@ test('resource selections preserve snowflake IDs and module labels are Japanese'
   await expect(page.getByLabel('ウェルカム表示形式')).toBeVisible()
 })
 
+for (const locale of ['ja', 'en'] as const) {
+  test(`shared permission diagnostics survive feature isolation (${locale})`, async ({ page }) => {
+    const copy = locale === 'ja' ? ja : en
+    await page.route('**/api/v1/session', route => route.fulfill({ json: { ...session, preferences: { ...session.preferences, locale } } }))
+    await page.route('**/api/v1/guilds/1/overview', route => route.fulfill({ json: {
+      guild_id: '1', features: [{ ...feature('moderation', 'moderation'), missing_permissions: ['Manage Roles required', 'Manage Roles required'] }],
+      moderation: { summary: {}, events: [], lockdown: null },
+    } }))
+    for (const path of ['/servers/1', '/servers/1/moderation']) {
+      await page.goto(path)
+      const notice = page.getByRole('status').filter({ hasText: 'Manage Roles required' })
+      await expect(notice).toContainText(copy.moderation.moderation.permissions)
+      await expect(notice.locator('p')).toHaveText('Manage Roles required')
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
+      const audit = await new AxeBuilder({ page }).analyze()
+      expect(audit.violations.filter(item => ['critical', 'serious'].includes(item.impact || ''))).toEqual([])
+    }
+  })
+}
+
 test('overview is responsive and accessible', async ({ page }) => {
   await page.goto('/servers/1')
   await expect(page.getByRole('heading', { name: '概要' })).toBeVisible()
