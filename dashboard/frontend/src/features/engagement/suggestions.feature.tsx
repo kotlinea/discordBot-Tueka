@@ -1,8 +1,10 @@
 import { defineFeature } from '../defaults'
 
+const loadSettings = () => import('./suggestions/Settings')
+
 export const feature = defineFeature({
   id: 'suggestions', category: 'engagement',
   path: 'suggestions', namespaces: ['suggestions', 'common'],
-  load: () => import('../suggestions/Settings'),
+  titleKey: 'suggestions.title',
+  load: loadSettings, settingsPath: 'modules/suggestions', settingsLoad: loadSettings,
 })
-

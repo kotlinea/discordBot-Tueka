@@ -100,5 +100,31 @@ describe('feature registration', () => {
       const module = await featureRegistry.load(item.id)
       expect(typeof module.default, item.id).toBe('function')
     }
+    for (const category of featureRegistry.categories.filter(item => item.hub)) {
+      expect(typeof (await featureRegistry.loadCategory(category.id)).default).toBe('function')
+    }
+    for (const feature of featureRegistry.features) {
+      for (const route of feature.standalone ?? []) expect(typeof (await route.load()).default).toBe('function')
+    }
+  })
+
+  it('declares every default settings field with bilingual presentation owned by that feature', () => {
+    for (const definition of featureRegistry.features.filter(item => item.load === loadModuleSettings || (item.settingsPath && !item.settingsLoad))) {
+      const source = baseline.features.find(item => item.id === definition.id)!
+      expect(Object.keys(definition.fields ?? {}).sort(), definition.id).toEqual([...source.fields].sort())
+      for (const field of Object.values(definition.fields ?? {})) {
+        for (const language of [ja, en]) {
+          const key = field.labelKey.replace('settingsFields.', '') as keyof typeof language.common.settingsFields
+          expect(language.common.settingsFields[key], field.labelKey).toBeTruthy()
+        }
+      }
+    }
+  })
+
+  it('rejects category hub and standalone route collisions before screen loading', () => {
+    const load = vi.fn(async () => ({ default: screen }))
+    expect(() => createRegistry([{ ...category(feature('sample', { path: 'hub' })), hub: { path: 'hub', load, namespaces: ['common'], paletteKey: 'nav.example' } }])).toThrow('Duplicate feature route')
+    expect(() => createRegistry([category(feature('one', { standalone: [{ path: '/files/:id', load }] }), feature('two', { standalone: [{ path: '/files/:name', load }] }))])).toThrow('Duplicate standalone route')
+    expect(load).not.toHaveBeenCalled()
   })
 })

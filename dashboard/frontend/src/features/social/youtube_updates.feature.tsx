@@ -1,9 +1,3 @@
-import { defineFeature } from '../defaults'
-import { loadProvider } from './screens'
+import { defineProvider } from './providerScreen'
 
-export const feature = defineFeature({
-  id: 'youtube_updates', category: 'social',
-  path: 'social/youtube', namespaces: ['social', 'common'],
-  load: loadProvider,
-})
-
+export const feature = defineProvider({ id: 'youtube', name: 'YouTube', accountPlaceholder: '@日本語ハンドル / UC… / youtube.com/c/…' })

@@ -1,7 +1,7 @@
 import type { FeatureDefinition, ScreenLoader } from './contracts'
 
 /** No screen code is evaluated when the catalog is imported. */
-export const loadModuleSettings: ScreenLoader = () => import('./modules/Settings').then(module => ({ default: module.ModuleSettings }))
+export const loadModuleSettings: ScreenLoader = () => import('./DefaultSettings')
 
 type Definition = Pick<FeatureDefinition, 'id' | 'category'> & Partial<Omit<FeatureDefinition, 'id' | 'category'>>
 

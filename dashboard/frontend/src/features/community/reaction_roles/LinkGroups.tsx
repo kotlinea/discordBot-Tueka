@@ -1,0 +1,15 @@
+
+
+import { useState } from 'react'
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link2 } from 'lucide-react'
+
+import { useTranslation } from 'react-i18next'
+import { request, encodeBody } from "../../../api"
+
+import type { ReactionRoleMessage } from "../../../types"
+import s from "../../../styles/App.module.css"
+import { Failure } from '../../../components/Feedback'
+
+export function LinkGroups({guildId,items}:{guildId:string;items:ReactionRoleMessage[]}){const {t}=useTranslation(['tickets', 'reactionRoles', 'common']);const queryClient=useQueryClient();const [name,setName]=useState('');const [selected,setSelected]=useState<string[]>([]);const groups=useQuery({queryKey:['reactionRoleLinks',guildId],queryFn:()=>request("GET /api/v1/guilds/{guild_id}/reaction-roles/link-groups", `/guilds/${guildId}/reaction-roles/link-groups`)});const create=useMutation({mutationFn:()=>request("POST /api/v1/guilds/{guild_id}/reaction-roles/link-groups", `/guilds/${guildId}/reaction-roles/link-groups`, {method:'POST',body:encodeBody("POST /api/v1/guilds/{guild_id}/reaction-roles/link-groups", {name,message_ids:selected.map(Number)})}),onSuccess:async()=>{setName('');setSelected([]);await queryClient.invalidateQueries({queryKey:['reactionRoleLinks',guildId]});await queryClient.invalidateQueries({queryKey:['reactionRoles',guildId]})}});const remove=useMutation({mutationFn:(id:number)=>request("DELETE /api/v1/guilds/{guild_id}/reaction-roles/link-groups/{group_id}", `/guilds/${guildId}/reaction-roles/link-groups/${id}`, {method:'DELETE'}),onSuccess:()=>queryClient.invalidateQueries({queryKey:['reactionRoleLinks',guildId]})});const eligible=items.filter(item=>['normal','unique','temp'].includes(item.behavior_type)&&!item.link_group_id);return <section className={s.featureIndex}><div className={s.panelHead}><Link2/><div><h2>{t('reactionRoles.linkGroups')}</h2><p>{t('reactionRoles.linkBody')}</p></div></div>{groups.data?.items.map(group=><div className={s.rrLinkRow} key={group.id}><strong>{group.name}</strong><span>{group.message_ids.join(' · ')}</span><button className={s.secondaryButton} onClick={()=>remove.mutate(group.id)}>{t('reactionRoles.unlink')}</button></div>)}<div className={s.rrLinkCreate}><label className={s.field}><span>{t('reactionRoles.groupName')}</span><input value={name} onChange={e=>setName(e.target.value)}/></label><fieldset className={s.resourcePicker}><legend>{t('reactionRoles.messages')}</legend><div className={s.resourceOptions}>{eligible.map(item=><label key={item.id}><input type="checkbox" checked={selected.includes(String(item.id))} onChange={()=>setSelected(old=>old.includes(String(item.id))?old.filter(id=>id!==String(item.id)):[...old,String(item.id)])}/><span>{item.name}</span></label>)}</div></fieldset><button className={s.secondaryButton} disabled={!name.trim()||selected.length<2||create.isPending} onClick={()=>create.mutate()}><Link2/>{t('reactionRoles.createLink')}</button></div>{create.error&&<Failure error={create.error}/>}</section>}

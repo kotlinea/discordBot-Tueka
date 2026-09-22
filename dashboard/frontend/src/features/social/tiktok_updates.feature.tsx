@@ -1,9 +1,3 @@
-import { defineFeature } from '../defaults'
-import { loadProvider } from './screens'
+import { defineProvider } from './providerScreen'
 
-export const feature = defineFeature({
-  id: 'tiktok_updates', category: 'social',
-  path: 'social/tiktok', namespaces: ['social', 'common'],
-  load: loadProvider,
-})
-
+export const feature = defineProvider({ id: 'tiktok', name: 'TikTok', unofficial: true })

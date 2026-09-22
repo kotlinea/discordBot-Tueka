@@ -6,7 +6,7 @@ import { I18nextProvider } from 'react-i18next'
 import { createInstance } from 'i18next'
 import en from "../locales/en"
 import ja from "../locales/ja"
-import Suggestions from "../features/suggestions/Settings"
+import Suggestions from "../features/engagement/suggestions/Settings"
 import { api } from "../api"
 
 vi.mock('../api', async importOriginal => { const original = await importOriginal<typeof import('../api')>(); const api = vi.fn(); return { ...original, api, request: (_operation: string, path: string, init?: RequestInit) => api(path, init), encodeBody: (_operation: string, body: unknown) => JSON.stringify(body) } })

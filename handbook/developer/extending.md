@@ -16,7 +16,11 @@ UIは `features/<category>/<id>.feature.tsx` で `defineFeature` の既定画面
 
 UIの実例は `features/community/welcome.feature.tsx` と配下の `welcome/Settings.tsx` です。共通 `components/feature/ModuleSettings` に項目描画・見出し・追加操作を渡し、保存と状態表示を再利用します。Buttonは `components/ui/`、EmbedEditorは `components/editors/` を使用します。Embedの制約は生成API型から呼出元で渡します。
 
-BackendのCog/API、設定モデル、Providerの移行を完了しました。UIの残るDomain画面とShell全体の移行は[専用計画](../../goal.md)のG4です。登録テストに加え、`tests/test_welcome_feature.py` とFrontendの `src/test/welcome.test.tsx`、`e2e/welcome.spec.ts` が保存・表示の実例を検証します。
+単純設定は `community/leveling.feature.tsx` のように `fields` のラベルKey・Resource種別・テンプレート候補を指定します。編集対象の項目一覧はAPI Metadataを使用します。専用保存は `community/tickets.feature.tsx` のように `load` を差し替え、同カテゴリーの専用フォルダーへ画面を置きます。子画面には `nested`、別設定画面には `settingsPath`、Guild外の経路には `standalone` を使います。別設定経路でも専用保存が必要なら `settingsLoad` で画面を指定します。必要な翻訳は `namespaces`、表示名とパンくずは `titleKey / label / breadcrumbs` で指定します。
+
+カテゴリーにはIconと、必要なら `hub` の一覧画面・経路を登録します。Shell、共通Route、Navigation、検索に機能名の分岐を追加しません。`access: 'ticket_staff'` はStaffに見せる入口、`overview: false` は管理者用Overviewを必要としない画面の宣言です。APIの認可を代替しません。ModerationのRule初期値は `defineRuleFeature`、Socialの表示名・注意書き・入力例は `defineProvider` の引数で所有します。
+
+登録テストに加え、`tests/test_welcome_feature.py`、Frontendの `src/test/welcome.test.tsx`、`src/test/routing.test.tsx`、`e2e/features.spec.ts` が保存・直リンク・表示の実例を検証します。全体の段階・受入状態は[専用計画](../../goal.md)を参照してください。
 
 ## 設定
 

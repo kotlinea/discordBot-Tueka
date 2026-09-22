@@ -1,9 +1,3 @@
-import { defineFeature } from '../defaults'
-import { loadProvider } from './screens'
+import { defineProvider } from './providerScreen'
 
-export const feature = defineFeature({
-  id: 'instagram_updates', category: 'social',
-  path: 'social/instagram', namespaces: ['social', 'common'],
-  load: loadProvider,
-})
-
+export const feature = defineProvider({ id: 'instagram', name: 'Instagram', unofficial: true })

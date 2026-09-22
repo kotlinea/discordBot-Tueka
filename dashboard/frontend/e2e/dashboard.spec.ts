@@ -61,6 +61,9 @@ test('reaction roles overview uses the native contract without legacy fields', a
   expect(audit.violations.filter(item => ['critical', 'serious'].includes(item.impact || ''))).toEqual([])
   await page.getByRole('link', { name: 'Reaction Roleを作成', exact: true }).first().click()
   await expect(page.getByRole('heading', { name: 'Reaction Roleを作成', exact: true })).toBeVisible()
+  await page.goto('/servers/1/reaction-roles/unknown/child')
+  await expect(page).toHaveURL(/\/servers\/1\/reaction-roles$/)
+  await expect(page.getByRole('heading', { name: 'リアクションロール', exact: true })).toBeVisible()
 })
 
 test('resource selections preserve snowflake IDs and module labels are Japanese', async ({ page }) => {

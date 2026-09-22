@@ -7,7 +7,7 @@ import { I18nextProvider } from 'react-i18next'
 import { createInstance } from 'i18next'
 import en from '../locales/en'
 import ja from '../locales/ja'
-import { RegisteredModule } from '../routing/RegisteredModule'
+import { RegisteredFeatures } from '../routing/RegisteredFeatures'
 import { Button } from '../components/ui/Button'
 import { EmbedEditor } from '../components/editors/EmbedEditor'
 import { api, ApiError } from '../api'
@@ -24,7 +24,7 @@ async function mount(locale = 'en', feature = initial()) {
   const i18n = createInstance()
   await i18n.init({ lng: locale, resources: { en, ja }, interpolation: { escapeValue: false } })
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
-  const tree = (value: Feature) => <I18nextProvider i18n={i18n}><QueryClientProvider client={client}><MemoryRouter initialEntries={['/servers/1/modules/welcome']}><Link to="/servers/2/modules/welcome">Other server</Link><Suspense fallback="Loading"><Routes><Route path="/servers/:guildId/modules/:moduleId" element={<RegisteredModule features={[value]}/>}/></Routes></Suspense></MemoryRouter></QueryClientProvider></I18nextProvider>
+  const tree = (value: Feature) => <I18nextProvider i18n={i18n}><QueryClientProvider client={client}><MemoryRouter initialEntries={['/servers/1/modules/welcome']}><Link to="/servers/2/modules/welcome">Other server</Link><Suspense fallback="Loading"><Routes><Route path="/servers/:guildId/*" element={<RegisteredFeatures features={[value]}/>}/></Routes></Suspense></MemoryRouter></QueryClientProvider></I18nextProvider>
   const view = render(tree(feature))
   return { client, update: (value: Feature) => view.rerender(tree(value)) }
 }

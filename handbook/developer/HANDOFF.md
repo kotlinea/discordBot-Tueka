@@ -1,6 +1,6 @@
 # 作業開始
 
-更新: 2026-09-21。現行仕様は[構成](CODE_MAP.md)と[設計](architecture.md)、実施順序・状態は[実行計画](EXECUTION_PLAN.md)を正本とする。
+更新: 2026-09-23。現行仕様は[構成](CODE_MAP.md)と[設計](architecture.md)、実施順序・状態は[実行計画](EXECUTION_PLAN.md)を正本とする。
 
 ## 最初の手順
 
@@ -17,7 +17,7 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 
 ## 現在地と次の作業
 
-- 追加依頼の機能中心の構造改善は[専用計画](../../goal.md)で進める。G0〜G3完了、次はG4のDashboard移行。Python/Image内各401件、API/103コマンド、Restore/ツール受入成功。[G3の範囲・証拠](history/FEATURE_STRUCTURE_G3-2026-09-21.md)を参照し、一会話につきG段階を一つ完了させる。作業記録は簡潔にする。
+- 追加依頼の機能中心の構造改善は[専用計画](../../goal.md)で進める。G0〜G4完了、次はG5の拡張性・境界受入。Dashboard単体106件・ブラウザー80件・型検査/本番build成功。[G4の範囲・証拠](history/FEATURE_STRUCTURE_G4-2026-09-23.md)を参照し、一会話につきG段階を一つ完了させる。作業記録は簡潔にする。
 
 - Phase 0〜2、P3-1〜4、役割別Docs・導入CLIはローカル検証済み。実Stageは未準備。
 - Compose基盤の最終全群検証、別Linux Hostのクリーン受入、最新CommitのRemote CI結果の確認が残る。その後Stage受入、Phase 4、Phase 5の順に進める。実害のある不具合は優先する。

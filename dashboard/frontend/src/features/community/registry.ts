@@ -1,4 +1,5 @@
 import type { CategoryDefinition } from '../contracts'
+import { Users } from 'lucide-react'
 import { feature as welcome } from './welcome.feature'
 import { feature as autorole } from './autorole.feature'
 import { feature as leveling } from './leveling.feature'
@@ -8,7 +9,6 @@ import { feature as temporary_voice } from './temporary_voice.feature'
 import { feature as tickets } from './tickets.feature'
 
 export const category: CategoryDefinition = {
-  id: 'community', titleKey: 'nav.community',
+  id: 'community', titleKey: 'nav.community', icon: Users,
   features: [welcome, autorole, leveling, reaction_roles, live_stats, temporary_voice, tickets],
 }
-

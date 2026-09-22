@@ -6,8 +6,8 @@ import { api, request, encodeBody } from "../../api"
 import type { Feature } from "../../types"
 import s from "../../styles/App.module.css"
 import { Loading, SectionHead, Status } from "../../components/Feedback"
-import { PermissionNotice } from "../guilds/FeatureNavigation"
-import { moderationItems } from '../../routing/catalog'
+import { PermissionNotice } from "../../routing/FeatureNavigation"
+import { moderationItems } from './navigation'
 import { EventList } from "./Events"
 
 

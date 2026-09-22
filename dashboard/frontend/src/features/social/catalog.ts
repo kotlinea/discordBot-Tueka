@@ -1,1 +1,3 @@
-export const socialNames: Record<string,string> = { youtube: 'YouTube', twitch: 'Twitch', tiktok: 'TikTok', x: 'X', instagram: 'Instagram' }
+import { providers } from './registry'
+
+export const socialNames: Record<string, string> = Object.fromEntries(providers.map(feature => [feature.provider.id, feature.provider.name]))

@@ -8,7 +8,6 @@ import { api, request, encodeBody } from "../../api"
 import type { Resource, Rule } from "../../types"
 import s from "../../styles/App.module.css"
 import { toForm, defaultAction, ids, fromForm, RULE_ACTION_TYPES, actionConfigurable } from "./ruleForm"
-import { familyDefaults } from "./catalog"
 import type { RuleForm } from "./ruleForm"
 import { Loading, Failure, SectionHead } from "../../components/Feedback"
 import { ScopePolicyPicker } from "../../components/AccessPolicy"
@@ -18,12 +17,12 @@ import { SaveBar } from "../../components/SaveBar"
 
 
 
-export function RuleEditor() {
-  const { t } = useTranslation(['moderation', 'common']); const { guildId = '', family = '', ruleId } = useParams(); const navigate = useNavigate(); const queryClient = useQueryClient(); const [step, setStep] = useState(0); const [preview, setPreview] = useState<{matched: boolean; reason: string; trace: string[]} | null>(null); const [editingAction,setEditingAction] = useState<number | null>(null)
+export function RuleEditor({ family, defaultTrigger }: { family: string; defaultTrigger: string }) {
+  const { t } = useTranslation(['moderation', 'common']); const { guildId = '', ruleId } = useParams(); const navigate = useNavigate(); const queryClient = useQueryClient(); const [step, setStep] = useState(0); const [preview, setPreview] = useState<{matched: boolean; reason: string; trace: string[]} | null>(null); const [editingAction,setEditingAction] = useState<number | null>(null)
   const list = useQuery({ queryKey: ['rules', guildId, family], queryFn: () => request("GET /api/v1/guilds/{guild_id}/moderation/{family}/rules", `/guilds/${guildId}/moderation/${family}/rules`) })
   const resources = useQuery({ queryKey: ['resources', guildId], queryFn: () => request("GET /api/v1/guilds/{guild_id}/resources", `/guilds/${guildId}/resources`) })
   const current = ruleId ? list.data?.items.find(item => String(item.id) === ruleId) : undefined
-  const initial = useMemo(() => toForm(current || { family, event_type: 'message_create', name: '', enabled: true, mode: 'enforce', priority: 100, stop_on_match: false, trigger_type: familyDefaults[family] || 'keyword', trigger_config: {}, conditions: {}, exemptions: {}, actions: [defaultAction('delete'), defaultAction('log')] }), [current, family])
+  const initial = useMemo(() => toForm(current || { family, event_type: 'message_create', name: '', enabled: true, mode: 'enforce', priority: 100, stop_on_match: false, trigger_type: defaultTrigger, trigger_config: {}, conditions: {}, exemptions: {}, actions: [defaultAction('delete'), defaultAction('log')] }), [current, family, defaultTrigger])
   const form = useForm<RuleForm>({ values: initial, mode: 'onBlur' }); const trigger = form.watch('trigger_type'); const actions = form.watch('actions') || []; const actionTypes = actions.map(action => String(action.type))
   const save = useMutation({ mutationFn: (rule: Rule) => request(ruleId ? 'PUT /api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}' : 'POST /api/v1/guilds/{guild_id}/moderation/{family}/rules', `/guilds/${guildId}/moderation/${family}/rules${ruleId ? `/${ruleId}` : ''}`, { method: ruleId ? 'PUT' : 'POST', body: encodeBody(ruleId ? 'PUT /api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}' : 'POST /api/v1/guilds/{guild_id}/moderation/{family}/rules', rule) }), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['rules', guildId, family] }); navigate(`/servers/${guildId}/moderation/${family}`) } })
   const test = useMutation({ mutationFn: (rule: Rule) => request("POST /api/v1/guilds/{guild_id}/moderation/{family}/preview", `/guilds/${guildId}/moderation/${family}/preview`, { method: 'POST', body: encodeBody("POST /api/v1/guilds/{guild_id}/moderation/{family}/preview", { rule, input: { content: form.getValues('previewContent') } }) }), onSuccess: setPreview })
