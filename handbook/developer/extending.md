@@ -8,6 +8,8 @@
 
 `features/<category>/<id>.py` に `Feature` を定義し、同カテゴリーの `registry.py` へ明示登録します。`id`、category、翻訳Key、Icon、`docs_path`、設定Field、必須Field、必要Bot権限、親機能を定義します。親機能とカテゴリーは別の関係です。日英DocsとUI定義を揃えます。
 
+新カテゴリーはBackend/UIそれぞれのカテゴリーRegistryを作り、最上位の `features/registry.py` とFrontendの `features/registry.ts` へ一度登録します。Bot専用機能は `dashboard=False` としてUIを省略できます。Help/Ping等のGuild非依存入口は `features/core.py` が所有します。Bot起動・API合成・Shellに機能別分岐を追加しません。
+
 Bot/APIの入口は `Binding(id, process, "module:callable", order)` で指定します。Botは非同期setup、APIはContextを受け取る同期Router factoryです。共有の実行基盤はカテゴリーBindingへ一度だけ登録します。宣言ファイルからCog・Router・DBをImportせず、DomainからRegistryへ依存させません。
 
 UIは `features/<category>/<id>.feature.tsx` で `defineFeature` の既定画面・経路・Namespace・表示権限を必要な範囲で差し替え、カテゴリーRegistryへ登録します。`.feature.tsx` は既存画面との名前衝突を避ける入口の命名です。設定アクセスは `features/defaults.py` の `SettingsAccess` 契約を使い、汎用Module保存は `ModuleSettingsAccess` を既定とします。revisionを保存先へ渡し、認可・CSRF・TransactionはAdapterとRepositoryで維持します。
@@ -20,7 +22,9 @@ UIの実例は `features/community/welcome.feature.tsx` と配下の `welcome/Se
 
 カテゴリーにはIconと、必要なら `hub` の一覧画面・経路を登録します。Shell、共通Route、Navigation、検索に機能名の分岐を追加しません。`access: 'ticket_staff'` はStaffに見せる入口、`overview: false` は管理者用Overviewを必要としない画面の宣言です。APIの認可を代替しません。ModerationのRule初期値は `defineRuleFeature`、Socialの表示名・注意書き・入力例は `defineProvider` の引数で所有します。
 
-登録テストに加え、`tests/test_welcome_feature.py`、Frontendの `src/test/welcome.test.tsx`、`src/test/routing.test.tsx`、`e2e/features.spec.ts` が保存・直リンク・表示の実例を検証します。全体の段階・受入状態は[専用計画](../../goal.md)を参照してください。
+Guild内の `settings` と最上位の `/servers` 配下はアプリ基盤が所有します。機能・カテゴリー一覧やStandalone経路として重複登録するとRegistryが拒否します。
+
+登録テストに加え、`tests/test_welcome_feature.py`、Frontendの `src/test/welcome.test.tsx`、`src/test/routing.test.tsx`、`e2e/features.spec.ts` が保存・直リンク・表示の実例を検証します。全体の段階・受入状態は[実行計画](EXECUTION_PLAN.md)を参照してください。
 
 ## 登録経路の受入
 

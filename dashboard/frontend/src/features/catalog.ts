@@ -7,7 +7,8 @@ const namespaces = new Set(['common', 'moderation', 'tickets', 'reactionRoles', 
 export function createRegistry(categories: readonly CategoryDefinition[]) {
   const categoryIds = new Set<string>()
   const features = new Map<string, FeatureDefinition>()
-  const routes = new Set<string>()
+  // Shell owns the guild settings route outside feature composition.
+  const routes = new Set<string>(['settings'])
   const standaloneRoutes = new Set<string>()
   function registerRoute(path: string, owner: string) {
     if (!path || path.startsWith('/') || /[?#*]/.test(path) || path.split('/').some(part => !part || part === '.' || part === '..')) throw new Error(`Invalid route: ${owner}`)
@@ -38,6 +39,7 @@ export function createRegistry(categories: readonly CategoryDefinition[]) {
       for (const route of feature.standalone ?? []) {
         if (!route.path.startsWith('/') || /[?#*]/.test(route.path) || route.path.slice(1).split('/').some(part => !part || part === '.' || part === '..')) throw new Error(`Invalid standalone route: ${feature.id}`)
         const shape = route.path.toLowerCase().replace(/:[^/]+/g, ':_')
+        if (shape === '/servers' || shape.startsWith('/servers/')) throw new Error(`Reserved application route: ${route.path}`)
         if (standaloneRoutes.has(shape)) throw new Error(`Duplicate standalone route: ${route.path}`)
         if (typeof route.load !== 'function') throw new Error(`Missing screen loader: ${feature.id}`)
         standaloneRoutes.add(shape)

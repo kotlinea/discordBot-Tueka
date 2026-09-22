@@ -27,6 +27,7 @@
 | `deploy/`、`scripts/setup.py`、`scripts/deploy.py`、`scripts/recovery.py` | 環境設定、Compose構成、導入・配布・復旧CLI、Caddy生成 |
 | `compose.tools.yaml`、`Dockerfile.tools`、`scripts/tools.py`、`scripts/docker_proxy.py` | 共通タスク、固定依存、成果物、Host/daemonパス対応 |
 | `Dockerfile`、`Dockerfile.caddy-test` | 本番ImageとローカルHTTPS受入用Image |
+| `scripts/verify_runtime_image.py` | Image内の機能Binding・同梱境界、Migration、配信、Worker起動・終了の受入 |
 | `tests/`、`.github/workflows/` | 専用DBのテスト、共通ComposeタスクのCI実行 |
 | `tests/test_feature_extension.py`、`tests/test_feature_boundaries.py`、Frontend `src/test/feature{Extension,Boundaries}.test.*` | 仮機能・カテゴリーの登録/解除、実起動・Shell、依存境界の受入 |
 | `docs/` | Dashboardから配信する日英利用者Docs |

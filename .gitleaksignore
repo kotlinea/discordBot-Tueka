@@ -6,3 +6,26 @@ fd930d3cb3581f4effb6933ec0c659f89b7680c4:deploy/configuration.py:discord-client-
 8cdd280e12388d44ab5bf33b285de3375fb2a923:jobs/repository.py:generic-api-key:96
 # Empty MONITORING_TOKEN followed by HEARTBEAT_MAX_AGE_SECONDS; multiline false positive.
 867b35f09119851ec9327d826191fba5dd2a579b:deploy/app.env.example:generic-api-key:51
+# G0 inventory SHA-256 digests, not credentials (21 source hashes and OpenAPI components).
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:discord-api-token:15421
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:discord-api-token:15594
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:discord-api-token:15610
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:discord-api-token:15642
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:discord-api-token:15652
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:discord-api-token:15708
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:discord-api-token:15719
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15396
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15419
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15426
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15431
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15484
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15504
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15627
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15658
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15660
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15664
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15665
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15666
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15706
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:15711
+b4f8484babf755355bf727d404f29f779a1af80a:handbook/developer/history/FEATURE_STRUCTURE_G0-2026-09-21.json:generic-api-key:5693

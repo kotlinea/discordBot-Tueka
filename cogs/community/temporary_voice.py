@@ -1,4 +1,4 @@
-"""Community automation: statistics voice channels and temporary voice."""
+"""Create and remove member-owned temporary voice channels."""
 import logging
 
 import discord

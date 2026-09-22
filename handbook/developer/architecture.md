@@ -14,6 +14,8 @@
 
 Botは登録された拡張を一度だけ初期化し、登録失敗時は読み込んだ拡張を解除します。APIはアプリごとにContextを生成し、各Router factoryへ同じContextを一度ずつ渡します。重複Binding、親の循環、API経路・operation IDの衝突を拒否します。
 
+Session・Guild選択・healthはアプリ基盤として機能登録から独立させます。UIのGuild内 `settings` と最上位 `/servers` 配下は基盤の予約経路です。機能の既存URLと優先順位を保持し、機能経路・カテゴリー一覧・Standaloneから基盤への衝突も登録時に拒否します。
+
 Frontendは `features/<category>/<id>.feature.tsx` に経路、画面loader、Namespace、表示権限、設定項目の表示、パンくずを定義します。RegistryはID・親・経路を検査し、同じloaderの並行呼出しをまとめます。Backend Metadataと生成API型を使い、認可はAPI境界で確認します。`routing/RegisteredFeatures.tsx` がGuild内の画面を、`StandaloneFeatures.tsx` がTranscript等を読み込み、Guild・機能経路単位で編集状態を分離します。カテゴリーRegistryは一覧画面とナビゲーションのIconも所有し、Shellは機能IDの分岐を持ちません。
 
 汎用設定は `features/DefaultSettings.tsx` が登録された項目表示を共通Formへ渡します。機能定義の `fields` はラベル・Resource種別・テンプレート候補の表示指定であり、保存対象や必須条件はAPI Metadataを使います。ルール画面は `settingsPath` で別の設定経路を登録します。カテゴリー内の `defineRuleFeature` と `defineProvider` は実在する共通画面を組み立て、初期Trigger・Provider名等を機能別に受け取ります。

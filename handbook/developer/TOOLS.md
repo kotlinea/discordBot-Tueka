@@ -42,6 +42,8 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 
 単独のImage受入前には `build-image` を実行します。別Imageは `run -e TUEKA_TOOLS_IMAGE=tueka:ci verify-compose` の形式で指定できます。一括ciは実行ごとに専用Image tagとCompose projectを使います。
 
+`verify-runtime` はImage内のBot/API/Worker Binding解決、移設前ソースの不在、非root/read-only、SPA/Docs配信、Migration・Worker起動終了とPython全件を確認します。実Discordへのログインや運用DBへの接続は行いません。
+
 ## 開発サーバー
 
 ```text

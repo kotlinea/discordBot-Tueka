@@ -18,19 +18,19 @@ Tuekaの基盤整備、運用受入、機能改善を進める順序と完了条
 | P3-1〜4 | ローカル検証済み | Image、Compose、監視、Backup/Restore |
 | D1・D2 | ローカル検証済み | 役割別Docs、導入・管理CLI |
 | D3 文書点検 | ローカル検証済み | 125件の点検、日英の利用者向け表現、運用手順、リンク・検索・表示 |
-| T1 Composeタスク | 進行中 | 統一実装と個別受入済み。最終一括検証と別Linux Host受入が残る |
+| T1 Composeタスク | 進行中 | ローカル全群の項目を検証済み。別Linux Host受入が残る |
 | C1 Remote CI | 未確認 | 最新Commitの全Job結果とRun URL |
 | P3-G Stage受入 | 外部環境待ち | 専用Host、Guild、OAuth、Webhook、Registry、公開証明書 |
 | Phase 4・5 | 未着手 | Stage受入後に機能ごとの仕様と受入を進める |
-| G 機能中心の構造改善 | 進行中 | G0〜G5完了。次はG6の最終整理・回帰 |
+| G 機能中心の構造改善 | ローカル検証済み | G0〜G6完了。カテゴリー・機能別配置、登録/override、共有UI、最終回帰 |
 
 ローカル成功、Remote CI成功、実Stage受入はそれぞれの証拠で判定します。Stage環境は未準備です。
 
 ## 次の作業
 
-追加依頼の構造改善は [goal.md](goal.md) のG0〜G6で進めます。[G5 拡張性・境界受入の証拠](handbook/developer/history/FEATURE_STRUCTURE_G5-2026-09-23.md)を記録し、次はG6の最終整理・回帰です。既存機能を対象とする追加作業であり、以下の実環境受入や新機能のゲートは維持します。
+機能中心の構造改善G0〜G6は完了しました。[最終受入の証拠](handbook/developer/history/FEATURE_STRUCTURE_G6-2026-09-23.md)と[拡張手順](handbook/developer/extending.md)を参照してください。以下の実環境受入や新機能のゲートは維持します。
 
-1. **Docsと共通タスクの確認**：読み手ごとの説明と実行コマンドを点検し、日英Docs、生成物、テスト、Image、Compose、Recovery、Caddyの検証を完了します。
+1. **Docsと共通タスクの確認（ローカル検証済み）**：日英Docs、生成物、テスト、Image、Compose、Recovery、Caddyと秘密情報検査の証拠をG6に記録しました。
 2. **クリーン環境・CI受入**：Windows Docker DesktopとLinuxのcheckoutで共通タスクを実行し、所有権、空白・日本語パス、並列実行、失敗からの再実行を確認します。Remote CIのCommitとRun URLを記録します。
 3. **Phase 3実機受入**：Stage専用Guild、OAuth、Webhook、Registry配布、監視閾値、Backup運用、使用する場合の実S3を[受入票](handbook/operator/stage-acceptance.md)で確認します。
 4. **Phase 4**：機能判定表、Moderation、Ticket、Reaction Roles、Social、Suggestions、横断UXの順に改善します。

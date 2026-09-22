@@ -6,11 +6,11 @@
 
 | 順序・ID | 担当 | 状態 | 依存・成果物 | 受入条件・証拠 | 阻害要因 |
 | --- | --- | --- | --- | --- | --- |
-| G 機能中心の構造改善 | 開発者 | 進行中 | [専用計画](../../goal.md)。G0〜G5完了、次はG6 | [G5 拡張性・境界受入](history/FEATURE_STRUCTURE_G5-2026-09-23.md)。Python405件・UI118件・対象ブラウザー12件・API/103コマンド・型/build成功 | G5なし。G6は未着手、実環境受入はC1/P3-Gで別管理 |
+| G 機能中心の構造改善 | 開発者 | ローカル検証済み | G0〜G6完了。カテゴリー/機能別のBackend・UI、登録とoverride、共有部品 | [G6 最終受入](history/FEATURE_STRUCTURE_G6-2026-09-23.md)。Python/Image各405件・UI119件・ブラウザー88+15件、API/103コマンド・運用入口・秘密情報検査成功 | Gの残作業なし。実環境受入はT1/C1/P3-Gで別管理 |
 | D1 役割別Docs・公開境界 | 開発者 | ローカル検証済み | 日英利用者Docs、Operator/Developer handbook、全コマンド対応表 | 日英build/リンク/検索/表示・103コマンド照合・内部資料404・Image不在 | なし |
 | D3 文書の仕様・文体点検 | 開発者 | ローカル検証済み | D1。[125件の点検台帳](history/DOCUMENTATION_AUDIT.md)、編集基準、表現・リンク検査 | 日英build、103コマンド照合、Docsブラウザー15件、文書8テスト成功。証拠は進捗 | Remote CI・実StageはC1/P3-G |
 | D2 導入・運用CLI | 開発者→運用者 | ローカル検証済み | D1。Windows/Linuxのcheck/configure/build/start、運用一覧 | クリーン設定・固定Image・失敗時停止・秘密値/Volume保持・Compose/Recovery受入 | Linux Host上の共通Composeタスク通し実行はC1で確認 |
-| T1 Composeタスク統一 | 開発者→運用者 | 進行中 | D1/D2。compose.tools.yaml、固定tools Image、CI・手順の統一を実装済み | 個別受入・Windowsパス・Linux所有権成功。[仕様](TOOLS.md)と[証拠](history/PROGRESS0910.md) | 最終一括検証と別Linux Host受入が残る。中断履歴は進捗参照。Remote CI・実Stageは別ゲート |
+| T1 Composeタスク統一 | 開発者→運用者 | 進行中 | D1/D2。compose.tools.yaml、固定tools Image、CI・手順の統一を実装済み | Windows Docker Desktopで全群項目を受入。[仕様](TOOLS.md)、[最新証拠](history/FEATURE_STRUCTURE_G6-2026-09-23.md)、[従来の個別受入](history/PROGRESS0910.md) | 別Linux Host受入が残る。Remote CI・実Stageは別ゲート |
 | C1 最終CI確認 | 開発者 | 未着手 | D1/D2。Remote CIのRunとCommitを固定 | 全Job成功のURL/対象Commit、Linux clean checkoutで共通Composeタスクから導入。提示済み失敗ログとローカル再検証は進捗参照 | Remote最新Run未確認 |
 | P3-G 実機受入 | 運用者＋開発者 | 外部環境待ち | C1。専用Stage/Guild/Registry/Hostと受入票 | Discord/OAuth/Webhook、同一digest配布、監視閾値、実Transcript、使用時のS3、TLS/定期Backup/通知/Host外保管 | Stage等未準備 |
 | P4-1 完成度判定 | 開発者 | 未着手 | P3出口。機能・コード・テスト・実機の対応表 | Registry/UI/Docsの安定・改善中・利用不可が一致、未検証を安定としない | P3-G |
@@ -40,4 +40,4 @@ P5順序: Forms/Applications → Moderation Appeals/ModMail → Scheduled Messag
 
 Host Caddyの設定生成CLI・Linux/systemd手順・内部CAによるローカルHTTPS受入を追加済み。証拠は2026-09-20の進捗記録。公開DNS・証明書取得/更新・systemd常駐/reload・実OAuth/WebhookはP3-Gの実機受入に残し、Remote CIはC1で確認する。
 
-2026-09-20のWindows Docker Desktop/Linuxコンテナで `ci --group python`（374テスト・API・103コマンド・Docs・Restore・ツール受入）、`build-image`、`verify-runtime`（Image内374テスト）が成功。[未使用資産点検の証拠](history/UNUSED_CODE_AUDIT.md)を参照。T1の全群一括検証、別Linux Host、C1/P3-Gは未完了のままとする。開発の引き継ぎと作業別指示は[HANDOFF](HANDOFF.md)を入口にする。
+2026-09-23のWindows Docker Desktop/Linuxコンテナで全群 `ci` を実行。Python/Web/Runtimeが成功し、最後のsecretsで履歴SHA-256の誤検出22件を検出した。該当Fingerprintだけを除外して `secrets` を再実行し、全群の項目を受入済み。Python405件、Image内405件、UI119件、Dashboardブラウザー88件、Docs15件、API/103コマンド、Restore・Compose・Setup・Recovery・Caddy成功。[G6の証拠](history/FEATURE_STRUCTURE_G6-2026-09-23.md)を参照。別Linux Host、C1/P3-Gは未完了。開発の引き継ぎと作業別指示は[HANDOFF](HANDOFF.md)を入口にする。

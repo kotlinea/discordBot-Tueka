@@ -61,6 +61,20 @@ for name in ('.env', '.env.postgres-dev', '.git', '.idea', 'data', '.venv', '.ve
 for executable in ('node', 'npm', 'git'):
     assert shutil.which(executable) is None, executable
 assert not pathlib.Path('/app/handbook').exists()
+assert not pathlib.Path('/app/goal.md').exists()
+for path in ('feature_registry.py', 'guild_settings/models.py', 'social/providers.py',
+             'cogs/community.py', 'cogs/engagement.py', 'cogs/welcome.py', 'cogs/tickets.py',
+             'cogs/social_updates.py', 'dashboard/frontend/src/features/modules',
+             'dashboard/frontend/src/features/guilds', 'dashboard/frontend/src/features/tickets',
+             'dashboard/frontend/src/features/reaction-roles', 'dashboard/frontend/src/features/suggestions',
+             'dashboard/frontend/src/routing/RegisteredModule.tsx'):
+    assert not pathlib.Path('/app', path).exists(), path
+from features.registry import REGISTRY
+from features.loading import resolve_bindings
+assert len([feature for feature in REGISTRY.features if feature.dashboard]) == 24
+for process in ('bot', 'api', 'worker'):
+    assert resolve_bindings(REGISTRY.for_process(process)), process
+print('category bindings resolve; retired source paths absent: OK')
 for path in ('operations/index.html', 'reference/environment.html', 'reference/architecture.html', 'reference/api.html', 'reference/extending.html', 'social/worker.html', 'EXECUTION_PLAN.html', 'PROGRESS0910.html', 'TESTING.html', 'en/operations.html'):
     assert not pathlib.Path('/opt/tueka-assets/docs', path).exists(), path
     try:

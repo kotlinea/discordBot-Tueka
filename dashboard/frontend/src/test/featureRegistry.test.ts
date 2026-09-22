@@ -127,4 +127,15 @@ describe('feature registration', () => {
     expect(() => createRegistry([category(feature('one', { standalone: [{ path: '/files/:id', load }] }), feature('two', { standalone: [{ path: '/files/:name', load }] }))])).toThrow('Duplicate standalone route')
     expect(load).not.toHaveBeenCalled()
   })
+
+  it('rejects routes owned by the application before a feature can shadow them', () => {
+    const load = vi.fn(async () => ({ default: screen }))
+    expect(() => createRegistry([category(feature('sample', { path: 'Settings' }))])).toThrow('Duplicate feature route')
+    expect(() => createRegistry([category(feature('sample', { settingsPath: 'settings' }))])).toThrow('Duplicate feature route')
+    expect(() => createRegistry([{ ...category(), hub: { path: 'settings', load, namespaces: ['common'], paletteKey: 'nav.example' } }])).toThrow('Duplicate feature route')
+    for (const path of ['/servers', '/Servers/:id', '/servers/1/custom']) {
+      expect(() => createRegistry([category(feature('sample', { standalone: [{ path, load }] }))])).toThrow('Reserved application route')
+    }
+    expect(load).not.toHaveBeenCalled()
+  })
 })

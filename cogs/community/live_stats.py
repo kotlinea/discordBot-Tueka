@@ -1,4 +1,4 @@
-"""Community automation: statistics voice channels and temporary voice."""
+"""Update registered statistics voice channels."""
 import logging
 
 import discord

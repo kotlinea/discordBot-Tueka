@@ -17,12 +17,12 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 
 ## 現在地と次の作業
 
-- 追加依頼の機能中心の構造改善は[専用計画](../../goal.md)で進める。G0〜G5完了、次はG6の最終整理・回帰。仮登録の実起動/Shellと依存境界を受入し、Python405件・UI118件・対象ブラウザー12件・API/103コマンド・型/build成功。[G5の範囲・証拠](history/FEATURE_STRUCTURE_G5-2026-09-23.md)を参照し、一会話につきG段階を一つ完了させる。作業記録は簡潔にする。
+- 機能中心の構造改善G0〜G6は完了。[最終受入・範囲](history/FEATURE_STRUCTURE_G6-2026-09-23.md)と[拡張手順](extending.md)を参照する。設計と証拠をhandbookへ移し、一時計画を終了した。作業記録は簡潔にする。
 
 - Phase 0〜2、P3-1〜4、役割別Docs・導入CLIはローカル検証済み。実Stageは未準備。
-- Compose基盤の最終全群検証、別Linux Hostのクリーン受入、最新CommitのRemote CI結果の確認が残る。その後Stage受入、Phase 4、Phase 5の順に進める。実害のある不具合は優先する。
-- 直近のコード検証は2026-09-20のWindows Docker Desktop/Linuxコンテナ。`ci --group python`、`build-image`、`verify-runtime` が成功。Python374件、Image内374件、103コマンド、API・Docs・Restore・ツール受入を確認。[証拠と削除判定](history/UNUSED_CODE_AUDIT.md)を参照する。全群CIや独立したLinux Hostの成功を示すものではない。
-- Remote CIの最新成功Run URLと実Stage受入の証拠は未確認。今回の文書整理は機能受入の追加ではない。
+- 別Linux Hostのクリーン受入、最新CommitのRemote CI結果の確認が残る。その後Stage受入、Phase 4、Phase 5の順に進める。実害のある不具合は優先する。
+- 直近の検証は2026-09-23のWindows Docker Desktop/Linuxコンテナ。全群CIのPython/Web/Runtimeが成功し、最後の秘密情報検査は履歴ハッシュの誤検出を限定除外して再実行成功。Python405件・Image内405件・UI119件・Dashboardブラウザー88件・Docs15件、API/103コマンドと運用入口を確認。詳細はG6記録。
+- Remote CIの最新成功Run URL、独立Linux Hostと実Stage受入の証拠は未確認。
 
 ## 継承する判断
 
