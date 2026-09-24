@@ -62,26 +62,32 @@ def check_ports(metadata):
 
 def configure(directory, environment, project=None):
     directory = Path(directory).resolve()
-    if directory.exists():
-        with locked(directory):
-            draft = not (directory / 'deployment.json').exists()
-            metadata = read_metadata(directory, draft=draft)
-            if metadata['environment'] != environment or (project and metadata['project'] != project):
-                raise ValueError('Existing configuration belongs to another environment/project')
-            path = directory / 'app.env'
-            if not path.is_file():
-                raise ValueError(f'{path}: existing app.env is missing; restore it before configure. Secrets will not be regenerated.')
-            original = path.read_bytes()
-            existing = env_template.parse(original.decode('utf-8-sig'), path)
-            password = (directory / 'database-password').read_bytes().decode('utf-8').rstrip('\n')
-            defaults = env_template.defaults(environment, password)
-            missing = defaults.keys() - existing.keys()
-            candidate = {**defaults, **existing}
-            validate_values(directory, metadata, candidate, require_credentials=False, draft=draft)
-            if missing:
-                env_template.append_missing(path, original, '# Added by configure (existing values preserved)\n' + env_template.render(defaults, missing))
-            return metadata
-    return initialize(directory, environment, None, project, draft=True)
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except FileExistsError:
+        raise ValueError(f'Configuration path must be a directory: {directory}. Select a directory with --config-dir; the existing file was preserved.') from None
+    with locked(directory):
+        if not any(path.name != '.recovery.lock' for path in directory.iterdir()):
+            return initialize(directory, environment, None, project, draft=True, existing_empty=True)
+        if not any((directory / name).is_file() for name in ('setup.json', 'deployment.json')):
+            raise ValueError(f'Incomplete configuration: {directory}. setup.json or deployment.json is missing. Restore the matching configuration, or select an empty directory with --config-dir. Existing secrets were preserved.')
+        draft = not (directory / 'deployment.json').exists()
+        metadata = read_metadata(directory, draft=draft)
+        if metadata['environment'] != environment or (project and metadata['project'] != project):
+            raise ValueError('Existing configuration belongs to another environment/project')
+        path = directory / 'app.env'
+        if not path.is_file():
+            raise ValueError(f'{path}: existing app.env is missing; restore it before configure. Secrets will not be regenerated.')
+        original = path.read_bytes()
+        existing = env_template.parse(original.decode('utf-8-sig'), path)
+        password = (directory / 'database-password').read_bytes().decode('utf-8').rstrip('\n')
+        defaults = env_template.defaults(environment, password)
+        missing = defaults.keys() - existing.keys()
+        candidate = {**defaults, **existing}
+        validate_values(directory, metadata, candidate, require_credentials=False, draft=draft)
+        if missing:
+            env_template.append_missing(path, original, '# Added by configure (existing values preserved)\n' + env_template.render(defaults, missing))
+        return metadata
 
 
 def build(directory, *, stage_directory=None):

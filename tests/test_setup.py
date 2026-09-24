@@ -13,6 +13,38 @@ from deploy import env_template
 
 
 class SetupTests(unittest.TestCase):
+    def test_configure_accepts_an_existing_empty_directory(self):
+        self.directory.mkdir()
+        setup.configure(self.directory, 'dev')
+        self.assertTrue((self.directory / 'setup.json').is_file())
+        self.assertFalse((self.directory / '.recovery.lock').exists())
+
+    def test_configure_preserves_an_existing_operation_lock(self):
+        self.directory.mkdir()
+        lock = self.directory / '.recovery.lock'
+        lock.write_text('active operation')
+        with self.assertRaisesRegex(ValueError, 'Operation lock already exists') as caught:
+            setup.configure(self.directory, 'dev')
+        self.assertIn(str(lock), str(caught.exception))
+        self.assertEqual(lock.read_text(), 'active operation')
+        self.assertEqual(list(self.directory.iterdir()), [lock])
+
+    def test_configure_preserves_partial_secrets(self):
+        self.directory.mkdir()
+        secret = self.directory / 'database-password'
+        secret.write_text('private-value')
+        with self.assertRaisesRegex(ValueError, 'Incomplete configuration') as caught:
+            setup.configure(self.directory, 'dev')
+        self.assertNotIn('private-value', str(caught.exception))
+        self.assertEqual(secret.read_text(), 'private-value')
+        self.assertFalse((self.directory / '.recovery.lock').exists())
+
+    def test_configure_reports_a_file_at_the_directory_path(self):
+        self.directory.write_text('keep')
+        with self.assertRaisesRegex(ValueError, 'Configuration path must be a directory'):
+            setup.configure(self.directory, 'dev')
+        self.assertEqual(self.directory.read_text(), 'keep')
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

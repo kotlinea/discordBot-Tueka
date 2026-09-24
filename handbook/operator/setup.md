@@ -81,6 +81,10 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 
 ## エラーと保存先
 
+`configure` は未作成または空の設定ディレクトリへ設定一式を生成し、設定済みの場合は不足項目を補完します。対象パスがファイルの場合、設定一式が不完全な場合、別の操作が排他ロックを保持している場合は、対象パスと確認内容を表示します。
+
+`Operation lock already exists` は、表示された `.recovery.lock` と同じ環境でsetup・deploy・recoveryが実行中、または中断された状態を示します。実行中の処理の終了を確認してください。中断後の環境を継続利用する場合は `recovery-pending.json`・`recovery-fence.json` を確認し、[復旧手順](backup.md)に従います。
+
 Migrationで停止した場合は、表示された `docker logs --tail 100 <project>-migrate-1` で原因を確認します。標準Dev環境の確認コマンド:
 
 ```text

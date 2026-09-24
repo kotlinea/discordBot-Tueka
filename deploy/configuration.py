@@ -12,13 +12,17 @@ ENVIRONMENTS = ('dev', 'stage', 'prod')
 IMMUTABLE_IMAGE = re.compile(r'(?:[a-zA-Z0-9./:_-]+@)?sha256:[0-9a-f]{64}\Z')
 
 
-def initialize(directory, environment, image, project=None, *, draft=False):
+def initialize(directory, environment, image, project=None, *, draft=False, existing_empty=False):
     if environment not in ENVIRONMENTS:
         raise ValueError('Unknown environment')
     directory = Path(directory).resolve()
     project = project or 'tueka-' + environment
     validate_identity(environment, ('sha256:' + '0' * 64) if draft else image, project)
-    directory.mkdir(parents=True, exist_ok=False)
+    if existing_empty:
+        if any(path.name != '.recovery.lock' for path in directory.iterdir()):
+            raise ValueError(f'Configuration directory is not empty: {directory}. Existing files were preserved.')
+    else:
+        directory.mkdir(parents=True, exist_ok=False)
     directory.chmod(0o700)
     password = secrets.token_hex(32)
     metadata = {'environment': environment, 'image': None if draft else image, 'project': project,
