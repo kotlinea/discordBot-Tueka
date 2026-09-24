@@ -60,17 +60,41 @@ def check_ports(metadata):
             raise ValueError(f'Local port {port} is unavailable; stop its owner or change the configured port') from None
 
 
+def _require_configuration_files(directory):
+    missing_files = [str(directory / name) for name in ('app.env', 'database-password', 'postgres-admin-password')
+                     if not (directory / name).is_file()]
+    if missing_files:
+        raise ValueError(
+            f'Incomplete configuration; missing required files: {", ".join(missing_files)}. '
+            'app.env and metadata alone are not a complete configuration. '
+            'For a new environment, select an empty --config-dir and let configure generate all files before editing app.env. '
+            'For an existing environment, restore its matching files. No secrets were regenerated.'
+        )
+
+
 def configure(directory, environment, project=None):
     directory = Path(directory).resolve()
     try:
-        directory.mkdir(parents=True, exist_ok=True)
-    except FileExistsError:
-        raise ValueError(f'Configuration path must be a directory: {directory}. Select a directory with --config-dir; the existing file was preserved.') from None
+        # Some Host bind mounts return EEXIST, not ENOENT, for missing parents.
+        # Create from the first missing parent rather than relying on errno recursion.
+        for parent in (*reversed(directory.parents), directory):
+            if not parent.is_dir():
+                parent.mkdir(exist_ok=True)
+    except FileExistsError as error:
+        conflict = Path(error.filename) if error.filename else directory
+        if conflict.is_file():
+            detail = 'The path is a file; select a directory with --config-dir.'
+        else:
+            detail = ('The OS reports that this path exists, but it is not accessible as a directory. '
+                      'Compare this path on the Host and in the Docker bind mount, including parent paths. '
+                      'Check filesystem access and Docker file sharing before retrying.')
+        raise ValueError(f'Cannot create configuration directory (EEXIST): {conflict}. {detail}') from None
     with locked(directory):
         if not any(path.name != '.recovery.lock' for path in directory.iterdir()):
             return initialize(directory, environment, None, project, draft=True, existing_empty=True)
         if not any((directory / name).is_file() for name in ('setup.json', 'deployment.json')):
             raise ValueError(f'Incomplete configuration: {directory}. setup.json or deployment.json is missing. Restore the matching configuration, or select an empty directory with --config-dir. Existing secrets were preserved.')
+        _require_configuration_files(directory)
         draft = not (directory / 'deployment.json').exists()
         metadata = read_metadata(directory, draft=draft)
         if metadata['environment'] != environment or (project and metadata['project'] != project):
@@ -92,8 +116,25 @@ def configure(directory, environment, project=None):
 
 def build(directory, *, stage_directory=None):
     directory = Path(directory).resolve()
+    if not directory.is_dir():
+        raise ValueError(
+            f'Configuration directory is missing or is not a directory: {directory}. '
+            'Build requires the same --config-dir used by setup configure. '
+            'If configure has not succeeded for this environment, run setup configure with '
+            '--environment dev, stage or prod and this --config-dir, then fill in app.env before build. '
+            'No application image build was started.'
+        )
     with locked(directory):
+        if not any((directory / name).is_file() for name in ('setup.json', 'deployment.json')):
+            raise ValueError(
+                f'Configuration metadata is missing: {directory / "setup.json"} '
+                f'or {directory / "deployment.json"}. '
+                'Use the --config-dir where setup configure succeeded. '
+                'For an empty directory run setup configure first; for a partial configuration restore its matching files. '
+                'No application image build was started.'
+            )
         # Re-running installation must not rebuild a deployed release or rotate secrets.
+        _require_configuration_files(directory)
         if (directory / 'deployment.json').exists():
             metadata, _ = read(directory)
             image_id(metadata['image'])

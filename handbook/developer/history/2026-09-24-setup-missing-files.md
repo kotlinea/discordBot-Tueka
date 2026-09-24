@@ -1,0 +1,9 @@
+# 設定生成とbuildの失敗調査 2026-09-24
+
+別環境のread-only診断でdata/environments/devと親dataが不在と確認。Docker bindの共有元はWindowsのリポジトリでRW。Host/コンテナともdataの存在なしにもかかわらず、Python mkdir(parents=True)は子パスへのEEXISTで失敗。Host PowerShellで親を含めて作成すると共有が反映された。共有実装内部の原因までは未確認。
+
+続くconfigureのTracebackはdatabase-password読込みのFileNotFoundError。残存ファイルはapp.envとsetup.jsonのみ。独立した一時設定先ではconfigureが4ファイルを正常生成した。不完全な設定が生じた経緯は確定していない。
+
+修正: buildの設定先・メタデータ・必須ファイル事前検査、configureの同じ不足検査、EEXIST時の実際の発生パス表示、親から順に作成する処理、秘密ファイル生成後にメタデータを保存する順序。秘密値の自動再生成は行わない。setup.mdの障害対応はsetup-troubleshooting.mdへ分離。
+
+検証: 共通Composeの設定テスト、文書リンク・公開境界を確認。初期化書込失敗、不足ファイル、親不在時EEXIST、既存ファイル衝突をテスト。別環境の一時設定生成成功は利用者提示ログで確認。実環境のbuild/start成功は未確認。

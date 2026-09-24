@@ -13,6 +13,67 @@ from deploy import env_template
 
 
 class SetupTests(unittest.TestCase):
+    def test_configure_creates_parents_before_children_on_bind_mounts(self):
+        original = Path.mkdir
+        def host_mkdir(path, *args, **kwargs):
+            if not path.parent.is_dir():
+                raise FileExistsError(17, 'File exists', str(path))
+            return original(path, *args, **kwargs)
+        target = self.directory / 'environments' / 'dev'
+        with patch.object(Path, 'mkdir', host_mkdir):
+            setup.configure(target, 'dev')
+        self.assertEqual(sorted(p.name for p in target.iterdir()),
+                         ['app.env', 'database-password', 'postgres-admin-password', 'setup.json'])
+
+    def test_initialization_failure_does_not_publish_metadata(self):
+        original = Path.write_text
+        def fail_secret(path, *args, **kwargs):
+            if path.name == 'database-password':
+                raise OSError('simulated write failure')
+            return original(path, *args, **kwargs)
+        with patch.object(Path, 'write_text', fail_secret):
+            with self.assertRaises(OSError):
+                setup.configure(self.directory, 'dev')
+        self.assertFalse((self.directory / 'setup.json').exists())
+        self.assertFalse((self.directory / '.recovery.lock').exists())
+
+    def test_build_partial_configuration_does_not_launch_docker(self):
+        setup.configure(self.directory, 'dev')
+        (self.directory / 'database-password').unlink()
+        with patch('deploy.setup.subprocess.run') as run:
+            with self.assertRaisesRegex(ValueError, 'missing required files'):
+                setup.build(self.directory)
+        run.assert_not_called()
+
+    def test_configure_lists_missing_secret_files_without_changing_config(self):
+        setup.configure(self.directory, 'dev')
+        for name in ('database-password', 'postgres-admin-password'):
+            (self.directory / name).unlink()
+        before = {p.name: p.read_bytes() for p in self.directory.iterdir()}
+        with self.assertRaisesRegex(ValueError, 'missing required files') as caught:
+            setup.configure(self.directory, 'dev')
+        for name in ('database-password', 'postgres-admin-password'):
+            self.assertIn(str(self.directory / name), str(caught.exception))
+        self.assertEqual(before, {p.name: p.read_bytes() for p in self.directory.iterdir()})
+
+    def test_build_missing_directory_reports_configure_before_lock_or_docker(self):
+        with patch('deploy.setup.locked') as lock, patch('deploy.setup.subprocess.run') as run:
+            with self.assertRaisesRegex(ValueError, 'Configuration directory is missing') as caught:
+                setup.build(self.directory)
+        self.assertIn(str(self.directory), str(caught.exception))
+        self.assertIn('same --config-dir', str(caught.exception))
+        lock.assert_not_called()
+        run.assert_not_called()
+        self.assertFalse(self.directory.exists())
+
+    def test_build_empty_directory_reports_missing_metadata(self):
+        self.directory.mkdir()
+        with patch('deploy.setup.subprocess.run') as run:
+            with self.assertRaisesRegex(ValueError, 'Configuration metadata is missing'):
+                setup.build(self.directory)
+        run.assert_not_called()
+        self.assertEqual(list(self.directory.iterdir()), [])
+
     def test_configure_accepts_an_existing_empty_directory(self):
         self.directory.mkdir()
         setup.configure(self.directory, 'dev')
@@ -41,9 +102,17 @@ class SetupTests(unittest.TestCase):
 
     def test_configure_reports_a_file_at_the_directory_path(self):
         self.directory.write_text('keep')
-        with self.assertRaisesRegex(ValueError, 'Configuration path must be a directory'):
+        with self.assertRaisesRegex(ValueError, 'The path is a file'):
             setup.configure(self.directory, 'dev')
         self.assertEqual(self.directory.read_text(), 'keep')
+
+    def test_configure_reports_actual_invisible_mkdir_conflict(self):
+        conflict = self.directory.parent / 'invisible'
+        with patch('deploy.setup.Path.mkdir', side_effect=FileExistsError(17, 'File exists', str(conflict))):
+            with self.assertRaisesRegex(ValueError, 'Docker file sharing') as caught:
+                setup.configure(self.directory, 'dev')
+        self.assertIn(str(conflict), str(caught.exception))
+        self.assertNotIn('The path is a file', str(caught.exception))
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

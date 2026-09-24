@@ -27,7 +27,6 @@ def initialize(directory, environment, image, project=None, *, draft=False, exis
     password = secrets.token_hex(32)
     metadata = {'environment': environment, 'image': None if draft else image, 'project': project,
                 'dashboard_port': {'dev': 8002, 'stage': 8001, 'prod': 8000}[environment], 'vite_port': 5173}
-    (directory / ('setup.json' if draft else 'deployment.json')).write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
     values = {
         'TUEKA_ENV': environment,
         'DATABASE_URL': f'postgresql://tueka_{environment}:{quote(password)}@postgres:5432/tueka_{environment}',
@@ -51,6 +50,8 @@ def initialize(directory, environment, image, project=None, *, draft=False, exis
         # Compose file secrets are bind mounts: uid/gid overrides are not portable.
         # The host directory is private, while the mounted file is readable by UID 10001.
         path.chmod(0o644)
+    # Metadata marks a complete configuration; publish it after every secret exists.
+    (directory / ('setup.json' if draft else 'deployment.json')).write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
     return metadata
 
 
