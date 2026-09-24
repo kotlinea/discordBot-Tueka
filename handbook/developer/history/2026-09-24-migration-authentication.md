@@ -1,0 +1,7 @@
+# Migration接続失敗 2026-09-24
+
+別環境の提示ログでMigrationのOperationalErrorを確認。PostgreSQLログのpassword authentication failed for user tueka_devから認証失敗と確定。利用者は設定変更なしと回答。既存Volumeの初期化は省略されており、不一致が生じた経緯は未確定。
+
+Migration CLIに秘密値を含めない接続失敗分類を追加。Composeのwait失敗時にログ取得・設定ファイル・再開手順を表示し、Writer停止を維持。管理者が現在のマウント秘密ファイルを既存Roleへ適用するSQLとDev復旧手順を追加。実環境のパスワード変更は未実施。
+
+検証: 共通Composeのtest-pythonで診断2件・配布16件成功。証拠はartifacts/test-python/20260924T053554-df79b387、20260924T053633-f960c885。check-docs成功（artifacts/check-docs/20260924T053648-652f9fdf）。復旧SQLは専用postgres-testで一時Roleを作成し、SCRAMパスワード設定を確認してRollback。git diff --check成功。別環境の再起動成功は利用者の実行結果待ち。

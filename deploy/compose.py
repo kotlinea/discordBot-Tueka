@@ -72,5 +72,16 @@ def _up(directory, stage_directory=None):
     execute(directory, 'up', '-d', '--wait', 'postgres')
     execute(directory, 'rm', '-f', 'migrate')
     execute(directory, 'up', '-d', 'migrate')
-    execute(directory, 'wait', 'migrate')
+    try:
+        execute(directory, 'wait', 'migrate')
+    except subprocess.CalledProcessError:
+        raise ValueError(
+            f'Migration failed; application services remain stopped. '
+            f'Inspect: docker logs --tail 100 {config["project"]}-migrate-1. '
+            f'Configuration: {Path(directory).resolve() / "app.env"} (DATABASE_URL), '
+            f'{Path(directory).resolve() / "database-password"}. '
+            'PostgreSQL healthy only confirms readiness, not application authentication. '
+            'For an existing volume, restore its matching credentials; do not regenerate secrets or delete the volume. '
+            'Correct the reported cause, then retry the same start/up command.'
+        ) from None
     execute(directory, 'up', '-d', '--no-deps', *APPLICATIONS, *(['vite'] if config['environment'] == 'dev' else []))

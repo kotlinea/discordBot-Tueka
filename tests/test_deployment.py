@@ -1,6 +1,7 @@
 """Environment isolation and migration gating are deployment contracts."""
 import json
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -153,11 +154,14 @@ class DeploymentTests(unittest.TestCase):
         def execute(directory, *args, **kwargs):
             commands.append(args)
             if args[0] == 'wait':
-                raise RuntimeError('migration failed')
+                raise subprocess.CalledProcessError(1, ['docker', 'compose', 'wait', 'migrate'])
 
         with patch('deploy.compose.execute', side_effect=execute), patch('deploy.compose.subprocess.run'):
-            with self.assertRaisesRegex(RuntimeError, 'migration failed'):
+            with self.assertRaisesRegex(ValueError, 'Migration failed') as caught:
                 up(self.root / 'stage')
+        self.assertIn('docker logs --tail 100', str(caught.exception))
+        self.assertIn(str(self.root / 'stage' / 'app.env'), str(caught.exception))
+        self.assertIn('DATABASE_URL', str(caught.exception))
         self.assertLess(commands.index(('stop', 'bot', 'dashboard', 'social-worker')), commands.index(('up', '-d', 'migrate')))
         self.assertEqual(commands[-1], ('wait', 'migrate'))
 
