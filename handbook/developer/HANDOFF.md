@@ -17,6 +17,8 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 
 ## 現在地と次の作業
 
+- 2026-09-24の方針: 本番専用配布の整備より機能完成を優先する。2リポジトリ化は未決定。[将来の配布整理への引き継ぎ](RELEASE_DISTRIBUTION_HANDOFF.md)に意図・未決定事項・再開手順を保存している。配布実装は再開指示後に扱い、既存の実環境受入状態は維持する。
+
 - 機能中心の構造改善G0〜G6は完了。[最終受入・範囲](history/FEATURE_STRUCTURE_G6-2026-09-23.md)と[拡張手順](extending.md)を参照する。設計と証拠をhandbookへ移し、一時計画を終了した。作業記録は簡潔にする。
 
 - Phase 0〜2、P3-1〜4、役割別Docs・導入CLIはローカル検証済み。実Stageは未準備。
