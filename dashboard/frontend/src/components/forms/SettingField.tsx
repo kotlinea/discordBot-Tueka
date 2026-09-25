@@ -4,7 +4,7 @@ import { Toggle, Field } from './Fields'
 import type { SettingFieldProps } from '../feature/ModuleSettings'
 import s from '../../styles/App.module.css'
 
-export type FieldOptions = { label: string; resource?: 'category' | 'channel' | 'voice' | 'role'; options?: { value: string; label: string }[]; template?: { variables: readonly string[]; maxLength: number; multiline?: boolean } }
+export type FieldOptions = { label: string; resource?: 'category' | 'channel' | 'voice' | 'role'; references?: { kind: 'channel' | 'role'; ids: (value: unknown) => string[] }; options?: { value: string; label: string }[]; template?: { variables: readonly string[]; maxLength: number; multiline?: boolean } }
 export function SettingField({ name, value, channels, roles, onChange, label, options, template, resource }: SettingFieldProps & FieldOptions) {
   const { t } = useTranslation('common')
   if (typeof value === 'boolean') return <Toggle label={label} checked={value} onChange={onChange}/>

@@ -304,11 +304,16 @@ for (const locale of ['ja', 'en'] as const) {
     const trigger = page.getByRole('button', { name: copy.common.prefs.title, exact: true })
     for (const appearance of ['precision', 'community', 'atmosphere'] as const) {
       for (const scheme of ['light', 'dark'] as const) {
+        const unchanged = preferences.appearance === appearance && preferences.color_scheme === scheme
         await trigger.click()
         const dialog = page.getByRole('dialog')
         await dialog.getByRole('button', { name: copy.common.prefs[appearance], exact: true }).click()
         await dialog.getByRole('button', { name: copy.common.prefs[scheme], exact: true }).click()
-        await dialog.getByRole('button', { name: copy.common.common.save, exact: true }).click()
+        const save = dialog.getByRole('button', { name: copy.common.common.save, exact: true })
+        if (unchanged) {
+          await expect(save).toBeDisabled()
+          await dialog.getByRole('button', { name: copy.common.common.discard, exact: true }).click()
+        } else await save.click()
         await expect(dialog).toHaveCount(0)
         await expect(page.locator('html')).toHaveAttribute('lang', locale)
         await expect(page.locator('html')).toHaveAttribute('data-appearance', appearance)

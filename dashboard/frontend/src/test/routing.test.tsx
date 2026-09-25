@@ -2,12 +2,15 @@ import { routeScreen } from './routeScreens'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { Suspense } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { RegisteredFeatures } from '../routing/RegisteredFeatures'
 import { StandaloneFeatures } from '../routing/StandaloneFeatures'
 import { activeFeature, featureBreadcrumbs, paletteItems } from '../routing/catalog'
 import { featureRegistry } from '../features/registry'
 import '../i18n'
+
+vi.mock('../api', async importOriginal => ({ ...await importOriginal<typeof import('../api')>(), request: vi.fn(async () => ({ channels: [], roles: [] })) }))
 
 vi.mock('../features/DefaultSettings', () => ({ default: routeScreen('settings') }))
 vi.mock('../features/community/welcome/Settings', () => ({ default: routeScreen('welcome') }))
@@ -44,10 +47,11 @@ beforeAll(async () => {
   for (const feature of featureRegistry.features) for (const route of feature.standalone ?? []) await route.load()
 })
 async function mount(path: string, staffOnly = false) {
-  await act(async () => { render(<MemoryRouter initialEntries={[path]}><Suspense fallback="Loading"><Routes>
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  await act(async () => { render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><Suspense fallback="Loading"><Routes>
     <Route path="/servers/:guildId/*" element={<RegisteredFeatures features={[]} staffOnly={staffOnly}/>}/>
     <Route path="*" element={<StandaloneFeatures/>}/>
-  </Routes></Suspense></MemoryRouter>) })
+  </Routes></Suspense></MemoryRouter></QueryClientProvider>) })
 }
 
 describe('registered routes preserve direct links and parameters', () => {

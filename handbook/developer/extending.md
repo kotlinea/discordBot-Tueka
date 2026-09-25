@@ -54,6 +54,8 @@ Frontendの `src/test/featureExtension.test.tsx` はRegistryとHTTP応答だけ�
 
 Guild設定は型、初期値、上限、Discord Resource種別をServer側でも検証します。UIだけに検証を依存させません。複数管理者が編集する設定にはrevisionを付けます。
 
+UIの専用編集画面も共通の未保存・保存中・失敗・破棄・再取得・離脱保護契約に従います。`components/forms/` のdraft/save/guardを使い、保存成功後の応答反映とQuery再取得を機能側で実装してください。設定状態のResource判定はfieldsのresource宣言を利用します。Leveling報酬のように複合値へIDを含む場合は `references: { kind, ids }` で参照IDの抽出を登録し、共有画面へ機能ID分岐を追加しません。稼働結果はDomainの実測APIに基づきます。
+
 保存時の既定値・正規化は `guild_settings/<category>/<feature>.py` に置き、同カテゴリーの `registry.py` に `SettingsModel` を登録します。Repositoryへ機能IDの分岐を追加しません。専用の保存Domainを持つ機能は、そのRepositoryを設定Factoryへ渡します。Social Providerは `social/providers/registry.py` へAdapterを明示登録します。
 
 ## 非同期処理

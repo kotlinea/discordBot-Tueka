@@ -49,8 +49,10 @@ describe('Suggestions settings', () => {
     const client = await mount()
     fireEvent.click(await screen.findByRole('switch', { name: 'Enable Suggestions' }))
     fireEvent.change(screen.getByRole('combobox', { name: /^Suggestion channel/ }), { target: { value: '' } })
+    let saved = initial()
     request.mockImplementation(async (path, init) => {
-      if (init?.method === 'PUT') return { ...JSON.parse(String(init.body)), revision: 2 }
+      if (init?.method === 'PUT') { saved = { ...initial(), ...JSON.parse(String(init.body)), revision: 2 }; return saved }
+      if (path.endsWith('/settings')) return saved
       if (path.endsWith('/resources')) return { channels: [], roles: [] }
       return { items: [] }
     })

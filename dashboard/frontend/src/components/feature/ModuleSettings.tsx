@@ -11,6 +11,9 @@ import { Loading, NotFound, SectionHead, Failure } from '../Feedback'
 import { PermissionDiagnostics } from '../PermissionDiagnostics'
 import { Toggle } from '../forms/Fields'
 import { SaveBar } from '../SaveBar'
+import { useSaveMutation } from '../forms/useSaveMutation'
+import { useUnsavedChanges } from '../forms/useUnsavedChanges'
+import { EditNotice } from '../forms/EditNotice'
 import s from '../../styles/App.module.css'
 
 export interface SettingFieldProps { name: string; value: unknown; channels: Resource[]; roles: Resource[]; onChange: (value: unknown) => void }
@@ -30,7 +33,7 @@ export function ModuleSettings({ feature, renderField, title, description, actio
       form.reset({ enabled: feature.enabled, settings: feature.settings, revision: feature.revision })
     }
   }, [feature, form])
-  const save = useMutation({
+  const save = useSaveMutation({
     mutationFn: (value: Value) => request('PUT /api/v1/guilds/{guild_id}/modules/{module_id}', `/guilds/${guildId}/modules/${feature!.id}`, { method: 'PUT', body: encodeBody('PUT /api/v1/guilds/{guild_id}/modules/{module_id}', value) }),
     onSuccess: async value => {
       form.reset(value)
@@ -38,14 +41,17 @@ export function ModuleSettings({ feature, renderField, title, description, actio
       await queryClient.invalidateQueries({ queryKey: ['features', guildId] })
     },
   })
+  useUnsavedChanges(form.formState.isDirty, save.isPending)
   if (!feature) return <NotFound/>
   if (resources.isLoading) return <Loading/>
-  if (resources.error) return <Failure error={resources.error} retry={() => resources.refetch()}/>
+  if (resources.error && !resources.data) return <Failure error={resources.error} retry={() => resources.refetch()}/>
   const groups = ['state', 'basic', 'targets', 'notifications', 'permissions'] as const
   return <main className={s.page}>
     <SectionHead title={title ?? feature.title} description={description ?? feature.description} actions={actions ?? <a className={s.docsButton} href={feature.docs_path} aria-label={t('module.guide')} target="_blank" rel="noopener noreferrer"><BookOpen/><span>{t('module.guide')}</span></a>}/>
     <PermissionDiagnostics title={t('module.permissions')} messages={feature.missing_permissions}/>
-    <form id={formId} className={s.moduleForm} onSubmit={form.handleSubmit(value => save.mutate(value))}>
+    {resources.error && <Failure error={resources.error} retry={() => resources.refetch()}/>}
+    <EditNotice dirty={form.formState.isDirty} changedRemotely={feature.revision > form.getValues('revision')} saved={save.isSuccess}/>
+    <form id={formId} className={s.moduleForm} onSubmit={form.handleSubmit(value => { if(!resources.error)save.mutate(value) })}>
       <fieldset disabled={save.isPending} className={s.moduleFields}>
         {groups.map((group, index) => {
           const fields = feature.fields.filter(field => groupFor(field) === index)
@@ -58,6 +64,6 @@ export function ModuleSettings({ feature, renderField, title, description, actio
       </fieldset>
       {save.error && <Failure error={save.error}/>}
     </form>
-    {form.formState.isDirty && <SaveBar count={1} pending={save.isPending} error={save.error} form={formId} onDiscard={() => { form.reset(); save.reset() }}/>}
+    {form.formState.isDirty && <SaveBar count={1} pending={save.isPending} disabled={Boolean(resources.error)} form={formId} onDiscard={() => { form.reset({ enabled: feature.enabled, settings: feature.settings, revision: feature.revision }); save.reset() }}/>}
   </main>
 }

@@ -169,6 +169,14 @@ RootとDomain Routerは `React.lazy` / `Suspense` で画面を遅延読込みし
 
 共通UIは値・変更コールバック・見出し等を受け取り、Domainの保存処理を持ちません。例えばEmbedのTicket変数案内とScheduleの見出しはTicket画面から渡します。SaveBarは通常の保存CallbackとHTML form属性によるsubmitの両方に対応し、必須入力のブラウザー検証を維持します。409や権限喪失で編集内容を破棄せず、再試行・再読込を利用者が判断できます。
 
+設定状態は `components/feature/ConfigurationState.tsx` がMetadataの保存値・親機能・必須項目・不足権限とResource一覧を照合します。特殊なResource項目はRegistryのfields宣言を渡します。Domainの稼働を推測する共通Serviceは作らず、ルール有効件数・Provider可用性・公開状態は各画面が既存APIから表示します。設定ON、公開済み、アカウント確認済みは実行・配送成功の証明ではありません。Ticket Staffの画面では管理Metadata・Resource取得と設定状態表示を行いません。
+
+`components/forms/useSettingsDraft.ts` は取得値・編集値・編集開始時のrevisionを分けます。未編集の再取得は反映し、編集中は入力を保持して変更通知を出します。破棄は最新取得値、成功は保存応答を次の基準にします。`useSaveMutation.ts` はReactの再描画前の重複送信も抑止し、API入力・成功後のcache更新/再取得は呼出元が所有します。React Hook Formの画面は同じ契約をresetとdirty状態で実現します。
+
+アプリ入口はData Routerを使用し、`NavigationGuard.tsx` の一つのBlockerが各 `useUnsavedChanges` の編集状態を集約します。リンク・検索の命令的遷移・履歴移動を保護し、保存中は移動を抑止します。保存成功後の意図した遷移だけを呼出元が明示的に許可します。タブ終了/再読込はbeforeunloadで保護します。認可は引き続きAPIの責務です。401は既存の再ログイン経路を維持し、Draftの永続保存は行いません。
+
+ルール一覧の既存削除APIは逐次処理です。成功済みIDをpendingから除き、失敗時は削除済み件数・残りの変更・元revisionを保持します。破棄で成功済み削除を復元しません。これは全件原子的に行う予定のルール一括有効化とは別契約です。
+
 `components/feature/ModuleSettings.tsx` は共通Module APIの保存・状態表示を担当し、項目描画・説明・追加操作をpropsで受け取ります。成功時は応答のrevisionを次回保存へ渡し、失敗時と編集中の再取得では入力を保持します。`components/ui/Button.tsx` は既存Tokenのvariant、loading、disabled、form/type、aria/refを扱います。`components/editors/EmbedEditor.tsx` は値と制約・変数候補を受け取り、Ticket側が生成API制約と保存を所有します。共有部品から機能モジュールへ依存しません。
 
 視覚仕様は `design.md` と既存Tokenを維持します。Playwrightは別の一時出力先へbuildしたSPAをpreviewで配信し、開発サーバーの初回変換時間と画面の動作を切り分けます。本番の `/ui/` buildとは出力先を分け、4画面幅、日英、3外観×light/dark、保存・再読込・競合・権限・キーボード・Accessibilityを検証します。

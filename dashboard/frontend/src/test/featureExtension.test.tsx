@@ -65,7 +65,9 @@ async function mount(mode: 'existing' | 'category' | 'removed', path: string, st
 describe('registration-only extension through the real Shell', () => {
   it('adds a feature to an existing category with default editing, navigation and saving', async () => {
     const { request, routing, features } = await mount('existing', 'modules/g5_probe')
-    const input = await screen.findByRole('textbox', { name: 'G5 input' })
+    // Cold lazy imports can exceed the default 1s wait in a shared container.
+    // This test checks registry composition and saving, not load-time latency.
+    const input = await screen.findByRole('textbox', { name: 'G5 input' }, { timeout: 5000 })
     expect(input).toHaveValue('initial')
     expect(within(screen.getByRole('navigation', { name: 'Dashboard' })).getByRole('link', { name: probe.id })).toHaveAttribute('href', '/servers/1/modules/g5_probe')
     expect(routing.featureBreadcrumbs('/servers/1/modules/g5_probe', '1', features, key => key).at(-1)?.label).toBe(probe.id)

@@ -4,6 +4,15 @@ import { ApiError, encodeBody, request, setCsrf } from '../api'
 afterEach(() => vi.unstubAllGlobals())
 
 describe('generated API client', () => {
+  it('requires sign-in after an expired session without retrying the write', async () => {
+    const assign = vi.fn()
+    vi.stubGlobal('window', { location: { assign } })
+    const fetch = vi.fn().mockResolvedValue(new Response('{}', { status: 401 }))
+    vi.stubGlobal('fetch', fetch)
+    await expect(request('PUT /api/v1/preferences', '/preferences', { body: encodeBody('PUT /api/v1/preferences', { revision: 1 }) })).rejects.toMatchObject({ status: 401, code: 'authentication_required' })
+    expect(assign).toHaveBeenCalledWith('/login')
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
   it('preserves Discord IDs and sends the generated operation method and CSRF', async () => {
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: 'queued' }), { status: 202 }))
     vi.stubGlobal('fetch', fetch)

@@ -17,6 +17,7 @@
 | `dashboard/frontend/src/features/community/tickets/Routes.tsx`、`reaction_roles/{Routes,Groups,Events}.tsx` | Ticketの動的受付詳細・Panel編集、RRの動的編集・Link Group・履歴。静的内部ページは各 `.feature.tsx` が登録 |
 | `dashboard/frontend/src/features/community/{tickets,reaction_roles}/`、`engagement/suggestions/` | 専用APIを使う画面と入力状態。Moderation/Socialの共有画面は各カテゴリー内 |
 | `dashboard/frontend/src/components/{feature,ui,editors}/` | 共通設定画面、標準Button、値・制約を受け取るEmbedEditor |
+| `dashboard/frontend/src/components/feature/ConfigurationState.tsx`、`components/forms/{useSettingsDraft,useSaveMutation,useUnsavedChanges,NavigationGuard,EditNotice}` | 設定値と実行条件、編集中の再取得、保存重複防止、ルーター離脱保護、未保存表示。保存APIは機能側が所有 |
 | `tokens.css`、`design.md`（本書と同階層） | 共通視覚TokenとUI設計契約 |
 | `guild_settings/<category>/<feature>.py`、`registry.py`、`repository.py` | 機能別の既定値・正規化、Domain内の明示登録、共通の保存・revision |
 | `moderation/`、`ticketing/`、`reaction_roles/`、`suggestions/` | 各Domainのモデル、Repository、Service、Discord Adapter |

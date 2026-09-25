@@ -41,7 +41,7 @@ export function Shell({ session }: { session: Session }) {
   if (guilds.error) return <Failure error={guilds.error}/>
   if (!currentGuild) return <NotFound/>
   if ((!staffOnly && metadata.isLoading) || (needsOverview && overview.isLoading)) return <Loading/>
-  if ((!staffOnly && metadata.error) || (needsOverview && overview.error)) return <Failure error={metadata.error || overview.error}/>
+  if ((!staffOnly && metadata.error && !metadata.data) || (needsOverview && overview.error && !overview.data)) return <Failure error={metadata.error || overview.error}/>
   const features = staffOnly ? [] : metadata.data?.items || []
   const hasGuildChild = location.pathname.replace(/\/$/, '') !== base
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -77,7 +77,7 @@ export function Shell({ session }: { session: Session }) {
         {!staffOnly && <CommandPalette guildId={guildId} features={features}/>}
         <div className={s.topActions}><DocsLink/><PreferencesDialog session={session}/><AccountIdentity session={session}/><LogoutButton/></div>
       </header>
-      <Breadcrumbs items={breadcrumbItems}/>
+      <Breadcrumbs items={breadcrumbItems}/>{metadata.error && metadata.data && <Failure error={metadata.error} retry={() => void metadata.refetch()}/>}{needsOverview && overview.error && overview.data && <Failure error={overview.error} retry={() => void overview.refetch()}/>}
       <Suspense fallback={<Loading/>}><Routes>
         <Route index element={staffOnly ? (staffFeatures[0] ? <Navigate to={featurePath(guildId, staffFeatures[0])} replace/> : <NotFound/>) : <GuildOverview features={features} moderation={overview.data?.moderation || { summary: {}, events: [], lockdown: null }}/>}/>
         {!staffOnly && <Route path="settings" element={<ServerInformation guild={currentGuild} features={features}/>}/>}

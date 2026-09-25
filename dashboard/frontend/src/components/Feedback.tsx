@@ -1,4 +1,5 @@
 import { FieldErrors } from './FieldErrors'
+import { ApiError } from '../api'
 import { AlertTriangle, CircleHelp, MoreHorizontal } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -8,7 +9,7 @@ import s from "../styles/App.module.css"
 
 export function Loading() { const { t } = useTranslation(['common']); return <main className={s.centerState} aria-live="polite"><span className={s.spinner} aria-hidden="true"/><p>{t('common.loading')}</p></main> }
 
-export function Failure({ error, retry }: { error: unknown; retry?: () => void }) { const { t } = useTranslation(['common']); const text = error instanceof Error ? error.message : String(error); return <div className={s.failure} role="alert"><AlertTriangle/><div><strong>{text}</strong><p>{t('common.checkAccess')}</p><FieldErrors error={error}/></div>{retry && <button className={s.secondaryButton} onClick={retry}>{t('common.retry')}</button>}</div> }
+export function Failure({ error, retry }: { error: unknown; retry?: () => void }) { const { t } = useTranslation(['common']); const text = error instanceof Error ? error.message : String(error); return <div className={s.failure} role="alert"><AlertTriangle/><div><strong>{text}</strong><p>{t(error instanceof ApiError ? error.status === 409 ? 'editing.conflict' : error.status === 403 ? 'editing.forbidden' : error.status === 422 ? 'editing.invalid' : 'common.checkAccess' : 'common.checkAccess')}</p><FieldErrors error={error}/></div>{retry && <button className={s.secondaryButton} onClick={retry}>{t('common.retry')}</button>}</div> }
 
 export function Empty({ title, body, action }: { title: string; body: string; action?: React.ReactNode }) { return <div className={s.empty}><CircleHelp/><strong>{title}</strong><p>{body}</p>{action}</div> }
 

@@ -3,6 +3,8 @@
 .shell { min-height:100dvh; display:grid; grid-template-columns:minmax(0,1fr); }
 .rail { display:none; }
 .workspace { min-width:0; }
+.configurationState { display:flex; flex-wrap:wrap; gap:var(--space-xs); padding:var(--space-sm) var(--space-md); border-block-end:var(--rule-hair) solid var(--color-rule); font-size:var(--text-sm); }
+.configurationState>span { color:var(--color-muted); }.configurationState ul { flex-basis:100%; margin:0; }
 .featureNavigation { display:grid; gap:var(--space-xs); padding:var(--space-md); border-block-end:var(--rule-hair) solid var(--color-rule); }
 .featureNavigation nav { display:flex; flex-wrap:wrap; gap:var(--space-xs); }
 .featureNavigation [aria-current="page"] { background:var(--color-paper-3); }
@@ -47,7 +49,7 @@
 .dialog,.confirmDialog { inset:0; margin:auto; width:min(calc(100% - 2rem),38rem); height:fit-content; max-height:min(80dvh,44rem); overflow:auto; padding:var(--space-lg); border-radius:var(--radius-card); }
 .confirmDialog { width:min(calc(100% - 2rem),30rem); }
 .dialogHead { display:flex; justify-content:space-between; gap:var(--space-md); margin-block-end:var(--space-lg); }.dialogHead h2 { font-size:var(--text-lg); }.dialogHead p { color:var(--color-muted); }
-.dialogActions { display:flex; justify-content:flex-end; gap:var(--space-xs); margin-block-start:var(--space-xl); }
+.dialogActions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:var(--space-xs); margin-block-start:var(--space-xl); }
 .mobileNav { inset:0 auto 0 0; width:min(90%,22rem); padding:var(--space-md); overflow:auto; animation:slideIn var(--dur-short) var(--ease-out); }.mobileClose { margin-inline-start:auto; }
 .commandDialog { inset:0; margin:0; width:100%; height:100dvh; padding:var(--space-md); }
 .commandInput { display:flex; align-items:center; gap:var(--space-xs); height:3.25rem; border-block-end:var(--rule-hair) solid var(--color-rule); }.commandInput svg { width:1.15rem; }.commandInput input { min-width:0; flex:1; border:0; background:transparent; color:var(--color-ink); }.commandInput kbd { color:var(--color-muted); }

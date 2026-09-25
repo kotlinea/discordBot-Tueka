@@ -6,6 +6,7 @@
 - HTTPのSwagger/OpenAPIはDevかつ `TUEKA_API_DOCS_ENABLED=true` の場合だけ有効。Stage/Prodと通常設定は404を維持する。型生成はオフラインで行う。
 - 画面経路、Feature Registry、機能別Docsリンク、日英翻訳を揃える。Tokenと既存コンポーネントを使い、機能変更と見た目の再設計を混ぜない。
 - 保存・再読込、失敗時の入力保持、409、無効化、空状態、キーボード、モバイルを確認する。一般メンバーとGuild管理者の操作権限を明確にする。
+- 編集画面は共有のdraft/save/離脱保護契約を使う。取得値からdirty値を無条件にresetしない。成功時の応答反映と再取得、保存中の二重送信・入力抑止、削除の確認と部分成功を検証する。設定ONを実稼働として表示しない。詳細は[設計](../architecture.md)を参照する。
 
 ```text
 docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build api-generate

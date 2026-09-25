@@ -29,6 +29,7 @@ async function mount(locale = 'en', feature = initial()) {
   return { client, update: (value: Feature) => view.rerender(tree(value)) }
 }
 beforeEach(() => {
+  vi.stubGlobal('confirm', vi.fn(() => true))
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
   request.mockReset()
   request.mockImplementation(async (_path, init) => init?.method === 'PUT' ? { ...JSON.parse(String(init.body)), revision: 3 } : { channels: [{ id: '10', name: 'Welcome', type: 0 }], roles: [] })
@@ -43,6 +44,9 @@ describe('registered welcome settings', () => {
     await waitFor(() => expect(content).toHaveValue('Refreshed'))
     fireEvent.change(content, { target: { value: 'Local draft' } })
     mounted.update({ ...initial(), revision: 4, settings: { ...initial().settings, welcome_content: 'Other server content' } })
+    expect(content).toHaveValue('Local draft')
+    vi.mocked(window.confirm).mockReturnValueOnce(false)
+    fireEvent.click(screen.getByRole('link', { name: 'Other server' }))
     expect(content).toHaveValue('Local draft')
     fireEvent.click(screen.getByRole('link', { name: 'Other server' }))
     await waitFor(() => expect(screen.getByRole('textbox', { name: /Welcome content/ })).toHaveValue('Other server content'))
