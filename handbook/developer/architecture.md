@@ -2,6 +2,8 @@
 
 ## 境界
 
+Dashboardの共通入口は概要とサーバー情報です。サーバー情報はGuild一覧とDiscord Resourceの取得値を表示し、機能設定は各機能画面が所有します。サーバー運営（Ticket/RR）・コミュニティ・エンゲージメント・モデレーション・通知とソーシャルの表示所属はUI Registryへ集約します。Sidebar・検索・パンくずが同じ登録を使用し、Backendの機能ID・カテゴリー・保存先は表示移動と独立しています。
+
 - **Repository**：PostgreSQLへの読書き、Transaction、Lease、Revision
 - **Service**：検証、状態遷移、冪等性、権限に依存しない業務処理
 - **Discord Adapter / Cog**：Discord Event、Interaction、Permission、API操作

@@ -36,6 +36,12 @@ Guild内の `settings` と最上位の `/servers` 配下はアプリ基盤が所
 
 ## 登録経路の受入
 
+Workspaceの主画面リンク名は `homeTitleKey`（既定は概要）で指定します。内部ページの `group: { id, titleKey }` は同じ目的のページを一つの入口とサブナビへまとめます。Ticketの受付設定はPanels・Panel Messages・Forms・Teams・Tagsをまとめた実例です。グループ内の先頭ページを入口にし、表示権限で除外したページへは誘導しません。グループIDと表示名の不整合は登録時に拒否します。内部ページの `nested: true` は配下の動的詳細を機能内Routerへ委ね、`breadcrumbs` はその詳細のパンくずを宣言します。静的な内部ページを機能内Routerへ重複定義しません。
+
+Ticket/RRは表示カテゴリー `server_operations` に配置します。Ticketの設定別名 `modules/tickets` は `tickets/settings`、RRの `modules/reaction_roles` は `reaction-roles` へ接続します。RRのLink Group・履歴・設定・作成はそれぞれ `link-groups / events / settings / new` です。設定は同じ専用Dialogと保存先を使用します。画面間リンクは機能の絶対経路を使い、RegistryによるRouteの構成変更で戻り先が変わらないようにします。
+
+`e2e/workspaces.spec.ts` は24機能の配置、カテゴリー検索、Ticketの受付設定・詳細・戻り先、RRの内部画面、設定別名、Staffの管理画面拒否、モバイル選択後のフォーカスを検証します。
+
 `tests/test_feature_extension.py` は独立Processでテスト専用機能を既存カテゴリーへ追加し、新カテゴリーの登録・解除も確認します。実Registryの宣言だけをメモリ上で差し替え、通常のSettings、全Bot拡張の起動/終了、API合成、既定設定の保存・revision・CSRFを通します。作業ツリーの起動・合成ファイルは編集しません。
 
 Frontendの `src/test/featureExtension.test.tsx` はRegistryとHTTP応答だけをテスト用に差し替え、実Shellで既定編集・保存、専用画面override、Navigation・検索・パンくず、登録解除後の404を確認します。仮機能は公開Registryや配布機能へ追加しません。

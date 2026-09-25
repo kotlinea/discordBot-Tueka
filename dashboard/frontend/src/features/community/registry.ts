@@ -10,5 +10,5 @@ import { feature as tickets } from './tickets.feature'
 
 export const category: CategoryDefinition = {
   id: 'community', titleKey: 'nav.community', icon: Users,
-  features: [welcome, autorole, leveling, reaction_roles, live_stats, temporary_voice, tickets],
+  features: [tickets, reaction_roles, welcome, autorole, leveling, live_stats, temporary_voice],
 }

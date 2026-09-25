@@ -19,20 +19,24 @@ test('UX inventory captures manager and staff workspaces', async ({ page }, info
   await page.route('**/api/v1/guilds/1/reaction-roles/link-groups', route => route.fulfill({ json: { items: [] } }))
   await page.route('**/api/v1/guilds/1/moderation/automod/rules', route => route.fulfill({ json: { items: [], trigger_types: ['keyword'] } }))
   for (const [path, heading, name] of [
-    ['settings', 'サーバー設定', 'server-settings'],
-    ['tickets', 'チケット', 'tickets'],
+    ['settings', 'サーバー情報', 'server-information'],
+    ['tickets', 'サポートチケット', 'tickets'],
     ['reaction-roles', 'リアクションロール', 'reaction-roles'],
     ['moderation/automod', 'AutoMod', 'rules'],
   ]) {
-    if (path === 'tickets') await page.locator('main a[href="/servers/1/tickets"]').click()
-    else await page.goto(`/servers/1/${path}`)
+    if (path === 'tickets') {
+      const menu = page.getByRole('button', { name: 'Navigation', exact: true })
+      if (await menu.isVisible()) await menu.click()
+      await page.getByRole('navigation', { name: 'Dashboard' }).filter({ visible: true }).getByRole('link', { name: 'サポートチケット', exact: true }).click()
+      await expect(page.getByRole('dialog')).toHaveCount(0)
+    } else await page.goto(`/servers/1/${path}`)
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
     await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: true })
     if (path === 'tickets') {
       await page.locator('main a[href$="/inbox"]').first().click()
       await expect(page).toHaveURL(/\/tickets\/inbox$/)
       await page.goBack()
-      await page.locator('main a[href$="/settings"]').click()
+      await page.getByRole('navigation', { name: '機能内ナビゲーション' }).getByRole('link', { name: '設定', exact: true }).click()
       await expect(page.getByRole('heading', { name: '設定', exact: true })).toBeVisible()
       await page.goBack()
       await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
@@ -51,11 +55,11 @@ test('UX inventory captures manager and staff workspaces', async ({ page }, info
   staff = true
   await page.goto('/servers/1')
   await expect(page).toHaveURL(/\/tickets$/)
-  await expect(page.getByRole('heading', { name: 'チケット', exact: true })).toBeVisible()
-  await expect(page.locator('main a[href$="/settings"]')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'サポートチケット', exact: true })).toBeVisible()
+  await expect(page.locator('a[href$="/tickets/settings"]')).toHaveCount(0)
   await page.screenshot({ path: info.outputPath('staff-tickets.png'), fullPage: true })
   await page.locator('main a[href$="/inbox"]').first().click()
   await expect(page).toHaveURL(/\/tickets\/inbox$/)
   await page.goBack()
-  await expect(page.getByRole('heading', { name: 'チケット', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'サポートチケット', exact: true })).toBeVisible()
 })

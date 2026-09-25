@@ -101,7 +101,7 @@ describe('feature registration', () => {
       expect(translated(language, 'missing.key')).toBe(false)
       for (const group of featureRegistry.presentationCategories) expect(translated(language, group.titleKey, ['common']), group.titleKey).toBe(true)
       for (const definition of featureRegistry.features) {
-        const keys = [definition.titleKey, ...definition.pages.map(page => page.titleKey), ...Object.values(definition.fields ?? {}).map(field => field.labelKey)].filter((key): key is string => Boolean(key))
+        const keys = [definition.titleKey, definition.homeTitleKey, ...definition.pages.flatMap(page => [page.titleKey, page.group?.titleKey]), ...Object.values(definition.fields ?? {}).map(field => field.labelKey)].filter((key): key is string => Boolean(key))
         definition.label?.(key => { keys.push(key); return key })
         for (const key of keys) expect(translated(language, key, [...definition.namespaces]), `${definition.id}: ${key}`).toBe(true)
       }
@@ -128,6 +128,17 @@ describe('feature registration', () => {
     expect(() => createRegistry([category({ ...feature(), load: undefined } as unknown as FeatureDefinition)])).toThrow('Missing screen loader')
     expect(() => createRegistry([category(feature('sample', { namespaces: [] }))])).toThrow('Unknown namespace')
     expect(() => featureRegistry.get('missing')).toThrow('Unknown feature')
+  })
+
+  it('rejects inconsistent internal page groups and preserves nested page routing', () => {
+    const pages = [
+      { id: 'panels', path: 'panels', titleKey: 'tickets.panels', kind: 'navigation' as const, access: 'manager' as const, nested: true, group: { id: 'setup', titleKey: 'tickets.configuration' }, load: async () => ({ default: screen }) },
+      { id: 'forms', path: 'forms', titleKey: 'tickets.forms', kind: 'navigation' as const, access: 'manager' as const, group: { id: 'setup', titleKey: 'tickets.configuration' }, load: async () => ({ default: screen }) },
+    ]
+    const registry = createRegistry([category(feature('sample', { screenKind: 'workspace', pages }))])
+    expect(registry.routes.find(route => route.path.endsWith('/panels'))?.nested).toBe(true)
+    expect(registry.routes.find(route => route.path.endsWith('/forms'))?.nested).toBe(false)
+    expect(() => createRegistry([category(feature('sample', { screenKind: 'workspace', pages: [pages[0], { ...pages[1], group: { id: 'setup', titleKey: 'conflicting' } }] }))])).toThrow('Invalid page group')
   })
 
   it('initializes a shared screen once even across concurrent feature requests', async () => {
@@ -178,7 +189,7 @@ describe('feature registration', () => {
 
   it('rejects category hub and standalone route collisions before screen loading', () => {
     const load = vi.fn(async () => ({ default: screen }))
-    expect(() => createRegistry([{ ...category(feature('sample', { path: 'hub' })), hub: { path: 'hub', load, namespaces: ['common'], paletteKey: 'nav.example' } }])).toThrow('Duplicate feature route')
+    expect(() => createRegistry([{ ...category(feature('sample', { path: 'hub' })), hub: { path: 'hub', load, namespaces: ['common'] } }])).toThrow('Duplicate feature route')
     expect(() => createRegistry([category(feature('one', { standalone: [{ path: '/files/:id', load }] }), feature('two', { standalone: [{ path: '/files/:name', load }] }))])).toThrow('Duplicate standalone route')
     expect(load).not.toHaveBeenCalled()
   })
@@ -187,7 +198,7 @@ describe('feature registration', () => {
     const load = vi.fn(async () => ({ default: screen }))
     expect(() => createRegistry([category(feature('sample', { path: 'Settings' }))])).toThrow('Duplicate feature route')
     expect(() => createRegistry([category(feature('sample', { settingsPath: 'settings' }))])).toThrow('Duplicate feature route')
-    expect(() => createRegistry([{ ...category(), hub: { path: 'settings', load, namespaces: ['common'], paletteKey: 'nav.example' } }])).toThrow('Duplicate feature route')
+    expect(() => createRegistry([{ ...category(), hub: { path: 'settings', load, namespaces: ['common'] } }])).toThrow('Duplicate feature route')
     for (const path of ['/servers', '/Servers/:id', '/servers/1/custom']) {
       expect(() => createRegistry([category(feature('sample', { standalone: [{ path, load }] }))])).toThrow('Reserved application route')
     }

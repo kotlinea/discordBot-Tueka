@@ -9,6 +9,6 @@ import { feature as instagram_updates } from './instagram_updates.feature'
 export const providers = [youtube_updates, twitch_updates, tiktok_updates, x_updates, instagram_updates]
 export const category: CategoryDefinition = {
   id: 'social', titleKey: 'nav.social', icon: Bell,
-  hub: { path: 'social', paletteKey: 'social.title', namespaces: ['social', 'common'], load: () => import('./Hub').then(module => ({ default: module.SocialHub })) },
+  hub: { path: 'social', namespaces: ['social', 'common'], load: () => import('./Hub').then(module => ({ default: module.SocialHub })) },
   features: providers,
 }

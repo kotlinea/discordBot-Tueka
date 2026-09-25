@@ -43,9 +43,15 @@ export function createRegistry(categories: readonly CategoryDefinition[], presen
       // React Router defaults to case-insensitive matching; parameter names are not distinct routes.
       registerRoute(feature.path, feature.id)
       const pageIds = new Set<string>()
+      const pageGroups = new Map<string, string>()
       for (const page of feature.pages) {
         if (!identifier.test(page.id) || pageIds.has(page.id) || !page.titleKey) throw new Error(`Invalid or duplicate page: ${feature.id}/${page.id}`)
         pageIds.add(page.id)
+        if (page.group) {
+          const { id, titleKey } = page.group
+          if (!identifier.test(id) || !titleKey || (pageGroups.has(id) && pageGroups.get(id) !== titleKey)) throw new Error(`Invalid page group: ${page.id}`)
+          pageGroups.set(id, titleKey)
+        }
         if (!['navigation', 'action'].includes(page.kind)) throw new Error(`Unknown page kind: ${page.id}`)
         if (!['manager', 'ticket_staff'].includes(page.access) || (feature.access === 'manager' && page.access !== 'manager')) throw new Error(`Invalid page access: ${page.id}`)
         // Entries are static local destinations. Dynamic detail routes remain in the feature.
@@ -82,7 +88,7 @@ export function createRegistry(categories: readonly CategoryDefinition[], presen
   }
   const pending = new Map<ScreenLoader, Promise<ScreenModule>>()
   const screenRoutes: FeatureDefinition[] = [...features.values()].flatMap(feature => [feature,
-    ...feature.pages.map(page => ({ ...feature, path: `${feature.path}/${page.path}`, nested: false, load: page.load, access: page.access, breadcrumbs: undefined })),
+    ...feature.pages.map(page => ({ ...feature, path: `${feature.path}/${page.path}`, nested: page.nested ?? false, load: page.load, access: page.access, breadcrumbs: page.breadcrumbs })),
     ...(feature.settingsPath ? [{ ...feature, path: feature.settingsPath, nested: false, load: feature.settingsLoad ?? loadModuleSettings, access: 'manager' as const, screenKind: 'settings' as const, pages: [], breadcrumbs: undefined }] : []),
   ])
   function get(id: string) {

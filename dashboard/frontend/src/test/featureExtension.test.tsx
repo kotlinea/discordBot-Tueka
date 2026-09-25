@@ -69,7 +69,7 @@ describe('registration-only extension through the real Shell', () => {
     expect(input).toHaveValue('initial')
     expect(within(screen.getByRole('navigation', { name: 'Dashboard' })).getByRole('link', { name: probe.id })).toHaveAttribute('href', '/servers/1/modules/g5_probe')
     expect(routing.featureBreadcrumbs('/servers/1/modules/g5_probe', '1', features, key => key).at(-1)?.label).toBe(probe.id)
-    expect(routing.paletteItems('1', features, key => key)).toContainEqual({ title: probe.id, path: '/servers/1/modules/g5_probe' })
+    expect(routing.paletteItems('1', features, key => key)).toContainEqual({ title: probe.id, path: '/servers/1/modules/g5_probe', category: 'nav.community' })
     fireEvent.change(input, { target: { value: 'saved through default' } })
     fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
     await waitFor(() => expect(request.mock.calls.some(([, , init]) => init?.method === 'PUT')).toBe(true))
@@ -82,9 +82,9 @@ describe('registration-only extension through the real Shell', () => {
   it('adds a category and a dedicated override without editing Shell or Router composition', async () => {
     const { routing, features } = await mount('category', custom.path)
     expect(await screen.findByRole('heading', { name: 'G5 dedicated screen' })).toBeInTheDocument()
-    expect(screen.getByText('Probe operations')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Probe operations' })).toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: 'Dashboard' })).getByRole('link', { name: custom.id })).toHaveAttribute('href', '/servers/1/g5/custom')
-    expect(routing.paletteItems('1', features, key => key)).toContainEqual({ title: custom.id, path: '/servers/1/g5/custom' })
+    expect(routing.paletteItems('1', features, key => key)).toContainEqual({ title: custom.id, path: '/servers/1/g5/custom', category: 'Probe operations' })
   })
   it('connects workspace navigation, actions and breadcrumbs using only registration', async () => {
     const { request, routing, features } = await mount('category', custom.path)
@@ -93,6 +93,7 @@ describe('registration-only extension through the real Shell', () => {
     fireEvent.click(within(nav).getByRole('link', { name: '新しいルール' }))
     expect(await screen.findByRole('heading', { name: 'Probe create' })).toBeInTheDocument()
     expect(routing.featureBreadcrumbs('/servers/1/g5/custom/new', '1', features, key => key)).toEqual([
+      { label: 'Probe operations', to: undefined },
       { label: custom.id, to: '/servers/1/g5/custom' }, { label: 'common.create', to: undefined },
     ])
     fireEvent.click(within(nav).getByRole('link', { name: '概要' }))

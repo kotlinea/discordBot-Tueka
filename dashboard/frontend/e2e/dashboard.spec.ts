@@ -167,7 +167,7 @@ test('social account registration only requires an account and Discord channel',
     await route.fulfill({ json: { items: [], available: true, events: ['video','live_start','live_end'], limit: 10, variables: ['account','title','url'], defaults: { video: template, live_start: template, live_end: template } } })
   })
   await page.goto('/servers/1/social/youtube')
-  const breadcrumb = page.getByRole('navigation', { name: 'パンくず' })
+  const breadcrumb = page.getByRole('navigation', { name: /パンくず|Breadcrumbs/ })
   await expect(breadcrumb.getByRole('link', { name: 'Servers' })).toHaveAttribute('href', '/servers')
   await expect(breadcrumb.getByRole('link', { name: 'Maple Server' })).toHaveAttribute('href', '/servers/1')
   await expect(breadcrumb.getByRole('link', { name: '通知・ソーシャル' })).toHaveAttribute('href', '/servers/1/social')

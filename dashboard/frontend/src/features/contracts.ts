@@ -17,6 +17,9 @@ export interface FeaturePage {
   readonly kind: 'navigation' | 'action'
   readonly access: DisplayAccess
   readonly load: ScreenLoader
+  readonly nested?: boolean
+  readonly group?: { readonly id: string; readonly titleKey: string }
+  readonly breadcrumbs?: FeatureDefinition['breadcrumbs']
 }
 
 /** Presentation order is declaration order; independent of backend category/parent. */
@@ -31,6 +34,7 @@ export interface FeatureDefinition {
   readonly category: string
   readonly presentationCategory: string
   readonly screenKind: 'settings' | 'workspace'
+  readonly homeTitleKey?: string
   readonly pages: readonly FeaturePage[]
   readonly parent?: string
   /** Existing path relative to /servers/:guildId; not an authorization rule. */
@@ -56,5 +60,5 @@ export interface CategoryDefinition {
   readonly titleKey: string
   readonly features: readonly FeatureDefinition[]
   readonly icon?: LucideIcon
-  readonly hub?: { readonly path: string; readonly load: ScreenLoader; readonly namespaces: readonly Namespace[]; readonly paletteKey: string }
+  readonly hub?: { readonly path: string; readonly load: ScreenLoader; readonly namespaces: readonly Namespace[] }
 }

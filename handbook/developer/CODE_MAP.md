@@ -12,7 +12,9 @@
 | `dashboard/repository.py` | Session、OAuth state、個人設定 |
 | `dashboard/frontend/src/features/<category>/<id>.feature.tsx`、各 `registry.ts` | UIの機能入口。経路、lazy loader、表示権限、項目描画、表示カテゴリー・画面種別・内部ページ/操作入口を明示登録 |
 | `dashboard/frontend/src/routing/` | 登録からGuild/Standalone Route、Navigation、検索、パンくずを組立て |
-| `dashboard/frontend/src/app/`、`app/guilds/` | Session、Shell、個人設定、Guild選択・概要。`locales/` は日英翻訳 |
+| `dashboard/frontend/src/app/`、`app/guilds/` | Session、Shell、個人設定、Guild選択・概要。`Information.tsx` はDiscord由来のサーバー情報。`locales/` は日英翻訳 |
+| `dashboard/frontend/src/routing/WorkspaceNavigation.tsx`、`focus.ts` | 登録済み内部ページとグループのナビ、Overlay選択後の遅延画面へのFocus |
+| `dashboard/frontend/src/features/community/tickets/Routes.tsx`、`reaction_roles/{Routes,Groups,Events}.tsx` | Ticketの動的受付詳細・Panel編集、RRの動的編集・Link Group・履歴。静的内部ページは各 `.feature.tsx` が登録 |
 | `dashboard/frontend/src/features/community/{tickets,reaction_roles}/`、`engagement/suggestions/` | 専用APIを使う画面と入力状態。Moderation/Socialの共有画面は各カテゴリー内 |
 | `dashboard/frontend/src/components/{feature,ui,editors}/` | 共通設定画面、標準Button、値・制約を受け取るEmbedEditor |
 | `tokens.css`、`design.md`（本書と同階層） | 共通視覚TokenとUI設計契約 |

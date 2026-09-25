@@ -69,13 +69,13 @@ for (const locale of ['ja', 'en'] as const) {
     for (const item of other) {
       const path = ['audit_log', 'trust_score'].includes(item.id) ? `moderation/${item.id}` : `modules/${item.id}`
       await page.goto(`/servers/1/${path}`)
-      const title = item.id === 'automod' ? copy.moderation.moderation.automod : item.id === 'anti_spam' ? copy.moderation.moderation.anti_spam : item.id === 'anti_raid' ? copy.moderation.moderation.anti_raid : item.id
+      const title = item.id === 'moderation' ? copy.common.nav.moderationSettings : item.id === 'automod' ? copy.moderation.moderation.automod : item.id === 'anti_spam' ? copy.moderation.moderation.anti_spam : item.id === 'anti_raid' ? copy.moderation.moderation.anti_raid : item.id
       await expect(page.getByRole('heading', { name: item.id, exact: true })).toBeVisible()
-      await expect(page.getByRole('navigation', { name: 'パンくず' })).toContainText(title)
+      await expect(page.getByRole('navigation', { name: /パンくず|Breadcrumbs/ })).toContainText(title)
     }
     await page.keyboard.press('ControlOrMeta+k')
     await expect(page.getByRole('dialog')).toBeVisible()
-    await expect(page.getByRole('dialog').getByRole('button', { name: copy.social.social.title, exact: true })).toBeVisible()
+    await expect(page.getByRole('dialog').getByRole('button', { name: `${copy.common.nav.social} · ${copy.common.nav.overview}`, exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await page.goto('/servers/1/modules/temporary_voice')
@@ -163,7 +163,7 @@ for (const locale of ['ja', 'en'] as const) {
       })
       await page.goto(`/servers/1/social/${provider}`)
       await expect(page.getByRole('heading', { name: `${name} ${copy.social.social.title}`, exact: true })).toBeVisible()
-      await expect(page.getByRole('navigation', { name: 'パンくず' })).toContainText(`${name} ${copy.social.social.title}`)
+      await expect(page.getByRole('navigation', { name: /パンくず|Breadcrumbs/ })).toContainText(`${name} ${copy.social.social.title}`)
       await page.getByRole('button', { name: copy.social.social.add, exact: true }).first().click()
       const dialog = page.getByRole('dialog')
       await dialog.getByLabel(copy.social.social.account, { exact: true }).fill('sample')

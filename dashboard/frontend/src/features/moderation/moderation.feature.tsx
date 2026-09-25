@@ -3,7 +3,7 @@ import { defineFeature } from '../defaults'
 export const feature = defineFeature({
   id: 'moderation', category: 'moderation',
   path: 'modules/moderation', namespaces: ['common'],
-  inPalette: false,
+  titleKey: 'nav.moderationSettings',
   fields: {
     default_log_channel_id: { labelKey: 'settingsFields.default_log_channel_id' },
     immune_role_ids: { labelKey: 'settingsFields.immune_role_ids' },

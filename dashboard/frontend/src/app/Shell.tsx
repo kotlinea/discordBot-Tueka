@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, LayoutDashboard, Menu, Settings, X } from 'lucide-react'
@@ -15,9 +15,10 @@ import { RegisteredFeatures } from '../routing/RegisteredFeatures'
 import { CommandPalette, Breadcrumbs } from './Navigation'
 import { DocsLink, AccountIdentity, LogoutButton } from './Account'
 import { PreferencesDialog } from './Preferences'
+import { focusPageHeading } from '../routing/focus'
 
 const GuildOverview = lazy(() => import('./guilds/Overview').then(module => ({ default: module.GuildOverview })))
-const ServerSettings = lazy(() => import('./guilds/Settings').then(module => ({ default: module.ServerSettings })))
+const ServerInformation = lazy(() => import('./guilds/Information').then(module => ({ default: module.ServerInformation })))
 const staffFeatures = featureRegistry.features.filter(feature => feature.access === 'ticket_staff')
 
 export function Shell({ session }: { session: Session }) {
@@ -25,6 +26,10 @@ export function Shell({ session }: { session: Session }) {
   const { t } = useTranslation(dashboardNamespaces)
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const navigationChosen = useRef(false)
+  const previousHeading = useRef<Element | null>(null)
+  const stopFocus = useRef<() => void>(() => {})
+  useEffect(() => () => stopFocus.current(), [])
   const guilds = useQuery({ queryKey: ['guilds'], queryFn: () => request('GET /api/v1/guilds', '/guilds') })
   const currentGuild = guilds.data?.items.find(item => item.id === guildId)
   const staffOnly = currentGuild?.access === 'ticket_staff'
@@ -55,14 +60,17 @@ export function Shell({ session }: { session: Session }) {
       {presentationGroups.map(category => {
         const Icon = category.icon
         const items = groupFeatures(category.id, features)
-        return items.length ? <div className={s.navGroup} key={category.id}><p>{Icon && <Icon/>}{t(category.titleKey)}</p>{items.map(item => <NavLink key={item.id} to={featurePath(guildId, item)}>{featureLabel(item, features, t)}</NavLink>)}</div> : null
+        return items.length ? <div className={s.navGroup} role="group" aria-label={t(category.titleKey)} key={category.id}><p>{Icon && <Icon/>}{t(category.titleKey)}</p>{items.map(item => <NavLink key={item.id} to={featurePath(guildId, item)}>{featureLabel(item, features, t)}</NavLink>)}</div> : null
       })}
     </>}</nav>
   </>
   return <div className={`${s.shell} ${session.preferences.navigation_collapsed ? s.shellCollapsed : ''}`}>
     <aside className={s.rail}>{nav}</aside>
-    <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}><Dialog.Portal><Dialog.Overlay className={s.overlay}/><Dialog.Content className={s.mobileNav} aria-describedby={undefined}><Dialog.Title className={s.srOnly}>Navigation</Dialog.Title><Dialog.Close className={s.mobileClose}><X/></Dialog.Close>{nav}</Dialog.Content></Dialog.Portal></Dialog.Root>
-    <div className={s.workspace}>
+    <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}><Dialog.Portal><Dialog.Overlay className={s.overlay}/><Dialog.Content className={s.mobileNav} aria-describedby={undefined}
+      onClick={event => { const link = (event.target as HTMLElement).closest<HTMLAnchorElement>('nav a'); if (link && !event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) { navigationChosen.current = true; previousHeading.current = link.pathname !== location.pathname ? document.querySelector('[data-workspace] main h1') : null; setMobileOpen(false) } }}
+      onCloseAutoFocus={event => { if (navigationChosen.current) { event.preventDefault(); navigationChosen.current = false; stopFocus.current(); requestAnimationFrame(() => { stopFocus.current = focusPageHeading(previousHeading.current) }) } }}>
+      <Dialog.Title className={s.srOnly}>Navigation</Dialog.Title><Dialog.Close className={s.mobileClose} aria-label={t('common.close')}><X/></Dialog.Close>{nav}</Dialog.Content></Dialog.Portal></Dialog.Root>
+    <div className={s.workspace} data-workspace>
       <header className={s.topbar}>
         <button className={s.mobileMenu} onClick={() => setMobileOpen(true)} aria-label="Navigation"><Menu/></button>
         <Link to="/servers" className={s.guildSelector}>{currentGuild && guildIcon(currentGuild) ? <img src={guildIcon(currentGuild)!} alt=""/> : <span>{currentGuild?.name.slice(0, 1)}</span>}<strong>{currentGuild?.name}</strong><ChevronRight/></Link>
@@ -72,7 +80,7 @@ export function Shell({ session }: { session: Session }) {
       <Breadcrumbs items={breadcrumbItems}/>
       <Suspense fallback={<Loading/>}><Routes>
         <Route index element={staffOnly ? (staffFeatures[0] ? <Navigate to={featurePath(guildId, staffFeatures[0])} replace/> : <NotFound/>) : <GuildOverview features={features} moderation={overview.data?.moderation || { summary: {}, events: [], lockdown: null }}/>}/>
-        {!staffOnly && <Route path="settings" element={<ServerSettings features={features}/>}/>}
+        {!staffOnly && <Route path="settings" element={<ServerInformation guild={currentGuild} features={features}/>}/>}
         <Route path="*" element={<RegisteredFeatures features={features} staffOnly={staffOnly}/>}/>
       </Routes></Suspense>
     </div>

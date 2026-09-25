@@ -11,8 +11,12 @@ export default function ReactionRoles({ definition }: FeatureScreenProps) {
   if (!definition) return <NotFound/>
   return <Suspense fallback={<Loading/>}><Routes>
     <Route index element={<Overview/>}/>
-    <Route path="new" element={<Editor/>}/>
     <Route path=":configId" element={<Editor/>}/>
     <Route path="*" element={<Navigate to={`/servers/${guildId}/${definition.path}`} replace/>}/>
   </Routes></Suspense>
+}
+
+export function ReactionRoleSettingsAlias() {
+  const { guildId = '' } = useParams()
+  return <Navigate to={`/servers/${guildId}/reaction-roles`} replace/>
 }
