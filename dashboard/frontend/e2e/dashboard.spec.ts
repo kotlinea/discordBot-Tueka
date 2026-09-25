@@ -39,6 +39,7 @@ test('suggestions save bar validates and persists edits', async ({ page }) => {
 })
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/guilds/1/features', route => route.fulfill({ json: { items: [feature('moderation','moderation'), feature('automod','moderation','moderation'), feature('anti_spam','moderation','moderation'), feature('anti_raid','moderation','moderation'), feature('infractions','moderation','moderation'), feature('moderation_actions','moderation','moderation'), feature('moderation_logs','moderation','moderation'), feature('tickets','community'), welcome, reactionRoles] } }))
   await page.route('**/api/v1/session', route => route.fulfill({ json: session }))
   await page.route('**/api/v1/guilds', route => route.fulfill({ json: { items: [{ id: '1', name: 'Maple Server', icon: null }] } }))
   await page.route('**/api/v1/guilds/1/overview', route => route.fulfill({ json: { guild_id: '1', features: [feature('moderation','moderation'), feature('automod','moderation','moderation'), feature('anti_spam','moderation','moderation'), feature('anti_raid','moderation','moderation'), feature('infractions','moderation','moderation'), feature('moderation_actions','moderation','moderation'), feature('moderation_logs','moderation','moderation'), feature('tickets','community'), welcome, reactionRoles], resources: { channels: [], roles: [], bot_permissions: '8' }, moderation: { summary: {}, events: [], lockdown: null } } }))
@@ -94,6 +95,7 @@ test('resource selections preserve snowflake IDs and module labels are Japanese'
 
 for (const locale of ['ja', 'en'] as const) {
   test(`shared permission diagnostics survive feature isolation (${locale})`, async ({ page }) => {
+    await page.route('**/api/v1/guilds/1/features', route => route.fulfill({ json: { items: [{ ...feature('moderation', 'moderation'), missing_permissions: ['Manage Roles required', 'Manage Roles required'] }] } }))
     const copy = locale === 'ja' ? ja : en
     await page.route('**/api/v1/session', route => route.fulfill({ json: { ...session, preferences: { ...session.preferences, locale } } }))
     await page.route('**/api/v1/guilds/1/overview', route => route.fulfill({ json: {

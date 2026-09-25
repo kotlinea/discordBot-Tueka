@@ -5,6 +5,7 @@ export interface ProviderPresentation { id: string; name: string; unofficial?: b
 export function defineProvider(provider: ProviderPresentation) {
   return {
     ...defineFeature({
+      screenKind: 'workspace',
       id: `${provider.id}_updates`, category: 'social', path: `social/${provider.id}`,
       settingsPath: `modules/${provider.id}_updates`,
       namespaces: ['social', 'common'],

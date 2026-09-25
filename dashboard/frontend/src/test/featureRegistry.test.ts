@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRegistry } from '../features/catalog'
-import type { CategoryDefinition, FeatureDefinition, ScreenModule } from '../features/contracts'
+import type { CategoryDefinition, FeatureDefinition, FeaturePage, ScreenModule } from '../features/contracts'
 import { defineFeature, loadModuleSettings } from '../features/defaults'
 import { featureRegistry } from '../features/registry'
 import baseline from './fixtures/feature_metadata.json'
@@ -10,6 +10,7 @@ import en from '../locales/en'
 const screen = () => null
 const feature = (id = 'sample', overrides: Partial<FeatureDefinition> = {}) => defineFeature({ id, category: 'example', ...overrides })
 const category = (...features: FeatureDefinition[]): CategoryDefinition => ({ id: 'example', titleKey: 'nav.example', features })
+const page = (overrides: Partial<FeaturePage> = {}): FeaturePage => ({ id: 'inbox', path: 'inbox', titleKey: 'tickets.inbox', kind: 'navigation', access: 'manager', load: async () => ({ default: screen }), ...overrides })
 
 describe('feature registration', () => {
   it('covers exactly the backend public catalog and retains existing navigation paths', () => {
@@ -51,6 +52,60 @@ describe('feature registration', () => {
     expect(() => createRegistry([category(feature(), feature())])).toThrow('duplicate feature')
     expect(() => createRegistry([category(feature('sample', { category: 'missing' }))])).toThrow('Unregistered category')
     expect(() => createRegistry([category(feature('../bad'))])).toThrow('Invalid or duplicate feature')
+  })
+
+  it('separates presentation categories from backend ownership and validates their references', () => {
+    const source = feature('sample', { presentationCategory: 'operations' })
+    const groups = [{ id: 'operations', titleKey: 'nav.operations' }]
+    const registry = createRegistry([category(source)], groups)
+    expect(registry.get('sample').category).toBe('example')
+    expect(registry.get('sample').presentationCategory).toBe('operations')
+    expect(registry.presentationCategories).toEqual(groups)
+    expect(() => createRegistry([category(source)])).toThrow('Unknown presentation category')
+    expect(() => createRegistry([], [...groups, ...groups])).toThrow('duplicate presentation category')
+  })
+
+  it('validates internal page routes, access and loaders before loading screens', () => {
+    const register = (pages: FeaturePage[], overrides: Partial<FeatureDefinition> = {}) => createRegistry([category(feature('sample', { screenKind: 'workspace', pages, ...overrides }))])
+    expect(() => register([page(), page()])).toThrow('duplicate page')
+    expect(() => register([page(), page({ id: 'other', path: 'Inbox' })])).toThrow('Duplicate feature route')
+    expect(() => register([page()], { screenKind: 'settings' })).toThrow('require workspace')
+    expect(() => register([page({ access: 'ticket_staff' })])).toThrow('Invalid page access')
+    expect(() => register([page({ load: undefined } as unknown as FeaturePage)])).toThrow('Missing screen loader')
+    for (const path of ['', '../settings', '/outside', 'a//b', 'new?x', 'new#x', 'a\\b', '%2e%2e', ':id']) {
+      expect(() => register([page({ path })]), path).toThrow()
+    }
+    expect(() => register([page()], { settingsPath: 'modules/sample/inbox' })).toThrow('Duplicate feature route')
+    expect(() => createRegistry([category(feature('sample', { screenKind: 'workspace', pages: [page()] }), feature('other', { path: 'modules/sample/inbox' }))])).toThrow('Duplicate feature route')
+  })
+
+  it('loads declared pages once and keeps manager settings aliases separate from workspace navigation', async () => {
+    const load = vi.fn(async () => ({ default: screen }))
+    const registry = createRegistry([category(feature('sample', { screenKind: 'workspace', access: 'ticket_staff', pages: [page({ load })], settingsPath: 'sample/settings' }))])
+    expect(load).not.toHaveBeenCalled()
+    await Promise.all([registry.loadRoute('modules/sample/inbox'), registry.loadRoute('modules/sample/inbox')])
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(registry.routes.find(route => route.path === 'sample/settings')).toMatchObject({ access: 'manager', screenKind: 'settings', pages: [] })
+    expect(Object.isFrozen(registry.get('sample').pages[0])).toBe(true)
+  })
+
+  it('requires bilingual text for all registered presentation labels and page entries', () => {
+    function translated(language: typeof ja | typeof en, key: string, scopes = Object.keys(language)) {
+      return scopes.some(scope => {
+        let value: unknown = language[scope as keyof typeof language]
+        for (const part of key.split('.')) value = value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined
+        return typeof value === 'string' && value.length > 0
+      })
+    }
+    for (const language of [ja, en]) {
+      expect(translated(language, 'missing.key')).toBe(false)
+      for (const group of featureRegistry.presentationCategories) expect(translated(language, group.titleKey, ['common']), group.titleKey).toBe(true)
+      for (const definition of featureRegistry.features) {
+        const keys = [definition.titleKey, ...definition.pages.map(page => page.titleKey), ...Object.values(definition.fields ?? {}).map(field => field.labelKey)].filter((key): key is string => Boolean(key))
+        definition.label?.(key => { keys.push(key); return key })
+        for (const key of keys) expect(translated(language, key, [...definition.namespaces]), `${definition.id}: ${key}`).toBe(true)
+      }
+    }
   })
 
   it('rejects missing, cyclic and cross-category parents', () => {

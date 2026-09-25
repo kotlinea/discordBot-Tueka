@@ -1,6 +1,7 @@
 import { defineFeature } from '../defaults'
 
 export const feature = defineFeature({
+  screenKind: 'workspace',
   id: 'reaction_roles', category: 'community',
   path: 'reaction-roles', namespaces: ['reactionRoles', 'common'],
   nested: true, titleKey: 'reactionRoles.title',

@@ -20,7 +20,15 @@ UIの実例は `features/community/welcome.feature.tsx` と配下の `welcome/Se
 
 単純設定は `community/leveling.feature.tsx` のように `fields` のラベルKey・Resource種別・テンプレート候補を指定します。編集対象の項目一覧はAPI Metadataを使用します。専用保存は `community/tickets.feature.tsx` のように `load` を差し替え、同カテゴリーの専用フォルダーへ画面を置きます。子画面には `nested`、別設定画面には `settingsPath`、Guild外の経路には `standalone` を使います。別設定経路でも専用保存が必要なら `settingsLoad` で画面を指定します。必要な翻訳は `namespaces`、表示名とパンくずは `titleKey / label / breadcrumbs` で指定します。
 
-カテゴリーにはIconと、必要なら `hub` の一覧画面・経路を登録します。Shell、共通Route、Navigation、検索に機能名の分岐を追加しません。`access: 'ticket_staff'` はStaffに見せる入口、`overview: false` は管理者用Overviewを必要としない画面の宣言です。APIの認可を代替しません。ModerationのRule初期値は `defineRuleFeature`、Socialの表示名・注意書き・入力例は `defineProvider` の引数で所有します。
+カテゴリーにはIconと、必要なら `hub` の一覧画面・経路を登録します。Shell、共通Route、Navigation、検索に機能名の分岐を追加しません。`access: 'ticket_staff'` はStaffに見せる入口の宣言で、APIの認可を代替しません。ModerationのRule初期値は `defineRuleFeature`、Socialの表示名・注意書き・入力例は `defineProvider` の引数で所有します。
+
+表示カテゴリーは `createRegistry(categories, presentationCategories)` の第2引数で宣言します。項目は `id / titleKey / icon`、順序は配列順です。省略時は既存カテゴリーを表示カテゴリーとして使います。機能の `presentationCategory` は既定で `category` と同じですが、表示だけを移動する場合に差し替えます。Backendのカテゴリー・親・保存先は変えません。Shellは登録順の機能を表示カテゴリー見出しの下へ配置し、`hub` の有無やBackendの親から表示階層を決めません。既存Hubの経路・検索入口は保持します。
+
+`screenKind` は既定が `settings`、複数の操作画面を持つ機能は `workspace` を指定します。Workspaceの `pages` へ `id / path / titleKey / kind / access / load` を登録すると、機能内リンク・Route・パンくずを組み立てます。`path` は機能の主経路からの静的な相対経路、`kind` は通常の移動を表す `navigation` または作成等の画面を開く `action` です。操作入口のクリック自体では保存しません。更新・複製・一括変更の実行とValidationは読み込む機能画面・APIが所有します。動的な詳細経路は `nested` と機能内Routerで扱います。
+
+ページの `access` は明示します。管理者専用機能の子ページをStaffへ開放する登録は拒否します。Staff対応機能の管理者専用ページはリンクを隠し、直URLでもloaderを実行しません。別設定経路は常に管理者専用で、Workspaceの操作リンクを引き継ぎません。ページID・経路重複、不明な表示カテゴリー、機能の親循環もRegistryが拒否し、登録された表示名・項目・ページの翻訳は日英のテストで検査します。
+
+管理者ナビのMetadataは `/guilds/:guildId/features` から独立して取得します。ShellはGuild概要画面でだけOverviewを取得し、Moderation Hub等の固有データは機能画面が取得します。専用画面へ直接入っても機能一覧を表示し、取得失敗を空の一覧として扱いません。Staffは管理者MetadataとOverviewを呼びません。共通Module保存・Suggestions保存後は `['features', guildId]` を無効化して更新値を再取得します。
 
 Guild内の `settings` と最上位の `/servers` 配下はアプリ基盤が所有します。機能・カテゴリー一覧やStandalone経路として重複登録するとRegistryが拒否します。
 
@@ -31,6 +39,8 @@ Guild内の `settings` と最上位の `/servers` 配下はアプリ基盤が所
 `tests/test_feature_extension.py` は独立Processでテスト専用機能を既存カテゴリーへ追加し、新カテゴリーの登録・解除も確認します。実Registryの宣言だけをメモリ上で差し替え、通常のSettings、全Bot拡張の起動/終了、API合成、既定設定の保存・revision・CSRFを通します。作業ツリーの起動・合成ファイルは編集しません。
 
 Frontendの `src/test/featureExtension.test.tsx` はRegistryとHTTP応答だけをテスト用に差し替え、実Shellで既定編集・保存、専用画面override、Navigation・検索・パンくず、登録解除後の404を確認します。仮機能は公開Registryや配布機能へ追加しません。
+
+同テストはBackendカテゴリーと異なる表示カテゴリー、Workspaceのページ・操作登録、Metadata失敗、Staffの表示・直URL・loader拒否も通します。`e2e/features.spec.ts` は日英・各画面幅でチケット直アクセス時の24機能ナビとOverview未取得、StaffのMetadata未取得を確認します。
 
 `tests/test_feature_boundaries.py` とFrontendの `src/test/featureBoundaries.test.ts` はDomainからSDK/HTTP、共有基盤から機能、カテゴリー間の内部Importを検査します。相対Import・再Export・文字列による動的Importも対象とし、UIは中間モジュールを辿ります。拒否例のテストも維持してください。これらは通常の `test-python` / `test-web` に含まれます。
 

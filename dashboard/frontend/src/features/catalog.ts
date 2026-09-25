@@ -1,11 +1,20 @@
-import type { CategoryDefinition, FeatureDefinition, ScreenLoader, ScreenModule } from './contracts'
+import type { CategoryDefinition, FeatureDefinition, PresentationCategory, ScreenLoader, ScreenModule } from './contracts'
 import { loadModuleSettings } from './defaults'
 
 const identifier = /^[a-z][a-z0-9_]*$/
 const namespaces = new Set(['common', 'moderation', 'tickets', 'reactionRoles', 'social', 'suggestions'])
 
-export function createRegistry(categories: readonly CategoryDefinition[]) {
+export function createRegistry(categories: readonly CategoryDefinition[], presentationCategories: readonly PresentationCategory[] = categories) {
   const categoryIds = new Set<string>()
+  for (const category of categories) {
+    if (!identifier.test(category.id) || categoryIds.has(category.id) || !category.titleKey) throw new Error(`Invalid or duplicate category: ${category.id}`)
+    categoryIds.add(category.id)
+  }
+  const presentationIds = new Set<string>()
+  for (const category of presentationCategories) {
+    if (!identifier.test(category.id) || presentationIds.has(category.id) || !category.titleKey) throw new Error(`Invalid or duplicate presentation category: ${category.id}`)
+    presentationIds.add(category.id)
+  }
   const features = new Map<string, FeatureDefinition>()
   // Shell owns the guild settings route outside feature composition.
   const routes = new Set<string>(['settings'])
@@ -17,8 +26,6 @@ export function createRegistry(categories: readonly CategoryDefinition[]) {
     routes.add(shape)
   }
   for (const category of categories) {
-    if (!identifier.test(category.id) || categoryIds.has(category.id) || !category.titleKey) throw new Error(`Invalid or duplicate category: ${category.id}`)
-    categoryIds.add(category.id)
     if (category.hub) {
       registerRoute(category.hub.path, category.id)
       if (typeof category.hub.load !== 'function') throw new Error(`Missing screen loader: ${category.id}`)
@@ -27,11 +34,25 @@ export function createRegistry(categories: readonly CategoryDefinition[]) {
     for (const feature of category.features) {
       if (!identifier.test(feature.id) || features.has(feature.id)) throw new Error(`Invalid or duplicate feature: ${feature.id}`)
       if (feature.category !== category.id) throw new Error(`Unregistered category: ${feature.id}`)
+      if (!presentationIds.has(feature.presentationCategory)) throw new Error(`Unknown presentation category: ${feature.id}`)
+      if (!['settings', 'workspace'].includes(feature.screenKind)) throw new Error(`Unknown screen kind: ${feature.id}`)
+      if (feature.pages.length && feature.screenKind !== 'workspace') throw new Error(`Internal pages require workspace: ${feature.id}`)
       if (typeof feature.load !== 'function') throw new Error(`Missing screen loader: ${feature.id}`)
       if (!feature.namespaces.length || feature.namespaces.some(value => !namespaces.has(value))) throw new Error(`Unknown namespace: ${feature.id}`)
       if (!['manager', 'ticket_staff'].includes(feature.access)) throw new Error(`Unknown display access: ${feature.id}`)
       // React Router defaults to case-insensitive matching; parameter names are not distinct routes.
       registerRoute(feature.path, feature.id)
+      const pageIds = new Set<string>()
+      for (const page of feature.pages) {
+        if (!identifier.test(page.id) || pageIds.has(page.id) || !page.titleKey) throw new Error(`Invalid or duplicate page: ${feature.id}/${page.id}`)
+        pageIds.add(page.id)
+        if (!['navigation', 'action'].includes(page.kind)) throw new Error(`Unknown page kind: ${page.id}`)
+        if (!['manager', 'ticket_staff'].includes(page.access) || (feature.access === 'manager' && page.access !== 'manager')) throw new Error(`Invalid page access: ${page.id}`)
+        // Entries are static local destinations. Dynamic detail routes remain in the feature.
+        if (/[\\:%]/.test(page.path)) throw new Error(`Invalid page path: ${page.id}`)
+        registerRoute(`${feature.path}/${page.path}`, page.id)
+        if (typeof page.load !== 'function') throw new Error(`Missing screen loader: ${page.id}`)
+      }
       if (feature.settingsPath) {
         registerRoute(feature.settingsPath, feature.id)
         if (feature.settingsLoad !== undefined && typeof feature.settingsLoad !== 'function') throw new Error(`Missing settings loader: ${feature.id}`)
@@ -44,7 +65,7 @@ export function createRegistry(categories: readonly CategoryDefinition[]) {
         if (typeof route.load !== 'function') throw new Error(`Missing screen loader: ${feature.id}`)
         standaloneRoutes.add(shape)
       }
-      features.set(feature.id, Object.freeze({ ...feature, namespaces: Object.freeze([...feature.namespaces]) }))
+      features.set(feature.id, Object.freeze({ ...feature, namespaces: Object.freeze([...feature.namespaces]), pages: Object.freeze(feature.pages.map(page => Object.freeze({ ...page }))) }))
     }
   }
   for (const feature of features.values()) {
@@ -60,7 +81,10 @@ export function createRegistry(categories: readonly CategoryDefinition[]) {
     }
   }
   const pending = new Map<ScreenLoader, Promise<ScreenModule>>()
-  const screenRoutes: FeatureDefinition[] = [...features.values()].flatMap(feature => [feature, ...(feature.settingsPath ? [{ ...feature, path: feature.settingsPath, nested: false, load: feature.settingsLoad ?? loadModuleSettings, access: 'manager' as const, overview: true, breadcrumbs: undefined }] : [])])
+  const screenRoutes: FeatureDefinition[] = [...features.values()].flatMap(feature => [feature,
+    ...feature.pages.map(page => ({ ...feature, path: `${feature.path}/${page.path}`, nested: false, load: page.load, access: page.access, breadcrumbs: undefined })),
+    ...(feature.settingsPath ? [{ ...feature, path: feature.settingsPath, nested: false, load: feature.settingsLoad ?? loadModuleSettings, access: 'manager' as const, screenKind: 'settings' as const, pages: [], breadcrumbs: undefined }] : []),
+  ])
   function get(id: string) {
     const feature = features.get(id)
     if (!feature) throw new Error(`Unknown feature: ${id}`)
@@ -79,6 +103,7 @@ export function createRegistry(categories: readonly CategoryDefinition[]) {
   }
   return Object.freeze({
     categories: Object.freeze(categories.map(category => Object.freeze({ ...category, features: Object.freeze(category.features.map(feature => get(feature.id))) }))),
+    presentationCategories: Object.freeze(presentationCategories.map(({ id, titleKey, icon }) => Object.freeze({ id, titleKey, icon }))),
     features: Object.freeze([...features.values()]), get,
     routes: Object.freeze(screenRoutes),
     load: (id: string) => loadScreen(get(id).load, id),

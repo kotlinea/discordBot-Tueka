@@ -25,6 +25,7 @@ for (const locale of ['ja', 'en'] as const) {
     const chunks: string[] = []
     page.on('request', request => { if (request.url().endsWith('.js')) chunks.push(request.url()) })
     await page.route('**/api/v1/guilds/1/overview', route => route.fulfill({ json: { features: [leveling, ...other], moderation: { summary: {}, events: [], lockdown: null } } }))
+    await page.route('**/api/v1/guilds/1/features', route => route.fulfill({ json: { items: [leveling, ...other] } }))
     await page.route('**/api/v1/guilds/1/modules/leveling', async route => {
       if (route.request().method() === 'PUT') {
         expect(route.request().headers()['x-csrf-token']).toBe('csrf')
@@ -91,6 +92,8 @@ for (const locale of ['ja', 'en'] as const) {
   test(`staff navigation avoids manager requests and preserves transcript links (${locale})`, async ({ page }) => {
     await session(page, locale, 'ticket_staff')
     let overviewRequests = 0
+    let metadataRequests = 0
+    await page.route('**/api/v1/guilds/1/features', route => { metadataRequests++; return route.fulfill(failure(403)) })
     await page.route('**/api/v1/guilds/1/overview', route => { overviewRequests++; return route.fulfill(failure(403)) })
     await page.route('**/api/v1/guilds/1/tickets', route => route.fulfill({ json: { can_manage: false, summary: { open: 0, unclaimed: 0, closed_30d: 0 }, transcript_storage: { available: true } } }))
     await page.route('**/api/v1/guilds/1/tickets/items*', route => route.fulfill({ json: { items: [], next: null } }))
@@ -112,6 +115,7 @@ for (const locale of ['ja', 'en'] as const) {
     await page.goto('/servers/1/modules/welcome')
     await expect(page.getByRole('heading', { name: 'ページが見つかりません' })).toBeVisible()
     expect(overviewRequests).toBe(0)
+    expect(metadataRequests).toBe(0)
     await page.route('**/api/v1/tickets/transcripts/678', route => route.fulfill({ json: { ticket: { id: 7, ticket_number: 23 }, messages: [], attachments: [], closed_at: 1700000000, close_reason: 'Resolved', feedback_enabled: false } }))
     await page.goto('/tickets/transcripts/678')
     await expect(page.getByRole('heading', { name: `${copy.tickets.tickets.transcript} · Ticket #23` })).toBeVisible()
@@ -122,9 +126,30 @@ for (const locale of ['ja', 'en'] as const) {
     await expect(page.getByRole('heading', { name: 'Login' })).toBeVisible()
   })
 
+  test(`direct workspace navigation uses independent metadata (${locale})`, async ({ page }, info) => {
+    await session(page, locale)
+    let overviewRequests = 0
+    await page.route('**/api/v1/guilds/1/overview', route => { overviewRequests++; return route.fulfill(failure(503)) })
+    await page.route('**/api/v1/guilds/1/features', route => route.fulfill({ json: { items: baseline.features.map(item => metadata(item.id)) } }))
+    await page.route('**/api/v1/guilds/1/tickets', route => route.fulfill({ json: { can_manage: true, summary: { open: 0, unclaimed: 0, closed_30d: 0 }, transcript_storage: { available: true } } }))
+    await page.goto('/servers/1/tickets')
+    await expect(page.getByRole('heading', { name: copy.tickets.tickets.title, exact: true })).toBeVisible()
+    const menu = page.getByRole('button', { name: 'Navigation', exact: true })
+    if (await menu.isVisible()) await menu.click()
+    const nav = page.getByRole('navigation', { name: 'Dashboard' }).filter({ visible: true })
+    await expect(nav.getByRole('link')).toHaveCount(baseline.features.length + 2)
+    await expect(nav.locator('a[href="/servers/1/modules/welcome"]')).toBeVisible()
+    await expect(nav.locator('a[href="/servers/1/moderation/automod"]')).toBeVisible()
+    await expect(nav.locator('a[href="/servers/1/social/youtube"]')).toBeVisible()
+    expect(overviewRequests).toBe(0)
+    await page.screenshot({ path: info.outputPath(`registered-navigation-${locale}.png`), fullPage: true })
+    if (await page.getByRole('dialog').isVisible()) await page.keyboard.press('Escape')
+  })
+
   test(`registered social providers select their own presentation and endpoints (${locale})`, async ({ page }, info) => {
     await session(page, locale)
     await page.route('**/api/v1/guilds/1/overview', route => route.fulfill({ json: { features: [], moderation: { summary: {}, events: [], lockdown: null } } }))
+    await page.route('**/api/v1/guilds/1/features', route => route.fulfill({ json: { items: [] } }))
     for (const [provider, name] of [['youtube', 'YouTube'], ['twitch', 'Twitch'], ['tiktok', 'TikTok'], ['x', 'X'], ['instagram', 'Instagram']]) {
       let result = 409
       let body: Record<string, unknown> | undefined

@@ -12,6 +12,7 @@ for (const locale of ['ja', 'en'] as const) {
     await page.route('**/api/v1/session', route => route.fulfill({ json: { user: { id: '1', name: 'Manager', avatar_url: '' }, csrf_token: 'csrf', preferences: { locale, appearance: 'precision', color_scheme: 'light', navigation_collapsed: false, revision: 1 } } }))
     await page.route('**/api/v1/guilds', route => route.fulfill({ json: { items: [{ id: '1', name: 'Example', icon: null }] } }))
     await page.route('**/api/v1/guilds/1/overview', route => route.fulfill({ json: { guild_id: '1', features: [feature], moderation: { summary: {}, events: [], lockdown: null } } }))
+    await page.route('**/api/v1/guilds/1/features', route => route.fulfill({ json: { items: [feature] } }))
     await page.route('**/api/v1/guilds/1/resources', route => route.fulfill({ json: { channels: [{ id: '123456789012345678', name: 'welcome', type: 0 }], roles: [], bot_permissions: '8' } }))
     await page.route('**/api/v1/guilds/1/modules/welcome', async route => {
       if (route.request().method() === 'PUT') {

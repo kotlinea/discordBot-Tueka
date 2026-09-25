@@ -9,7 +9,7 @@ import type { Session } from '../types'
 import s from '../styles/App.module.css'
 import { Loading, Failure, NotFound } from '../components/Feedback'
 import type { BreadcrumbItem } from './Navigation'
-import { activeFeature, categoryGroups, categoryHubs, dashboardNamespaces, featureBreadcrumbs, featureLabel, featurePath, guildIcon } from '../routing/catalog'
+import { dashboardNamespaces, featureBreadcrumbs, featureLabel, featurePath, groupFeatures, guildIcon, presentationGroups } from '../routing/catalog'
 import { featureRegistry } from '../features/registry'
 import { RegisteredFeatures } from '../routing/RegisteredFeatures'
 import { CommandPalette, Breadcrumbs } from './Navigation'
@@ -25,16 +25,19 @@ export function Shell({ session }: { session: Session }) {
   const { t } = useTranslation(dashboardNamespaces)
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const definition = activeFeature(location.pathname)
   const guilds = useQuery({ queryKey: ['guilds'], queryFn: () => request('GET /api/v1/guilds', '/guilds') })
   const currentGuild = guilds.data?.items.find(item => item.id === guildId)
   const staffOnly = currentGuild?.access === 'ticket_staff'
-  const needsOverview = definition?.overview !== false && !staffOnly
-  const overview = useQuery({ queryKey: ['overview', guildId], queryFn: () => request('GET /api/v1/guilds/{guild_id}/overview', `/guilds/${guildId}/overview`), enabled: Boolean(guildId) && guilds.isSuccess && needsOverview })
-  if (guilds.isLoading || (needsOverview && overview.isLoading)) return <Loading/>
-  if (guilds.error || (needsOverview && overview.error)) return <Failure error={guilds.error || overview.error}/>
-  const features = overview.data?.features || []
   const base = `/servers/${guildId}`
+  const needsOverview = location.pathname.replace(/\/$/, '') === base && !staffOnly
+  const overview = useQuery({ queryKey: ['overview', guildId], queryFn: () => request('GET /api/v1/guilds/{guild_id}/overview', `/guilds/${guildId}/overview`), enabled: Boolean(currentGuild) && needsOverview })
+  const metadata = useQuery({ queryKey: ['features', guildId], queryFn: () => request('GET /api/v1/guilds/{guild_id}/features', `/guilds/${guildId}/features`), enabled: Boolean(currentGuild) && !staffOnly })
+  if (guilds.isLoading) return <Loading/>
+  if (guilds.error) return <Failure error={guilds.error}/>
+  if (!currentGuild) return <NotFound/>
+  if ((!staffOnly && metadata.isLoading) || (needsOverview && overview.isLoading)) return <Loading/>
+  if ((!staffOnly && metadata.error) || (needsOverview && overview.error)) return <Failure error={metadata.error || overview.error}/>
+  const features = staffOnly ? [] : metadata.data?.items || []
   const hasGuildChild = location.pathname.replace(/\/$/, '') !== base
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: 'Servers', to: '/servers' },
@@ -48,14 +51,11 @@ export function Shell({ session }: { session: Session }) {
       return <NavLink key={feature.id} to={featurePath(guildId, feature)}>{Icon && <Icon/>}{featureLabel(feature, features, t)}</NavLink>
     }) : <>
       <NavLink end to={base}><LayoutDashboard/>{t('nav.overview')}</NavLink>
-      {categoryHubs.map(category => {
-        const Icon = category.icon
-        return <NavLink key={category.id} to={`${base}/${category.hub!.path}`}>{Icon && <Icon/>}{t(category.titleKey)}</NavLink>
-      })}
       <NavLink to={`${base}/settings`}><Settings/>{t('nav.settings')}</NavLink>
-      {categoryGroups.map(category => {
+      {presentationGroups.map(category => {
         const Icon = category.icon
-        return <div className={s.navGroup} key={category.id}><p>{Icon && <Icon/>}{t(category.titleKey)}</p>{features.filter(item => item.category === category.id && !item.parent).map(item => <NavLink key={item.id} to={featurePath(guildId, item)}>{item.title}</NavLink>)}</div>
+        const items = groupFeatures(category.id, features)
+        return items.length ? <div className={s.navGroup} key={category.id}><p>{Icon && <Icon/>}{t(category.titleKey)}</p>{items.map(item => <NavLink key={item.id} to={featurePath(guildId, item)}>{featureLabel(item, features, t)}</NavLink>)}</div> : null
       })}
     </>}</nav>
   </>

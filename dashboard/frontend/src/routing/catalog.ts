@@ -7,12 +7,19 @@ import { featureRegistry } from '../features/registry'
 export const dashboardNamespaces = [...new Set(['common' as const, ...featureRegistry.features.flatMap(feature => feature.namespaces), ...featureRegistry.categories.flatMap(category => category.hub?.namespaces ?? [])])]
 export const categoryHubs = featureRegistry.categories.filter(category => category.hub)
 export const categoryGroups = featureRegistry.categories.filter(category => !category.hub)
+export const presentationGroups = featureRegistry.presentationCategories
+
+export function groupFeatures(categoryId: string, features: Feature[]) {
+  const available = new Set(features.map(feature => feature.id))
+  return featureRegistry.features.filter(feature => feature.presentationCategory === categoryId && available.has(feature.id))
+}
 
 export function featurePath(guildId: string, item: Pick<Feature, 'id'>) { return featureRegistry.path(guildId, item.id) }
 export function guildIcon(guild: Guild) { return guild.icon ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png?size=96` : null }
 export function featurePattern(feature: FeatureDefinition) { return feature.path + (feature.nested ? '/*' : '') }
 export function activeFeature(pathname: string) {
-  return featureRegistry.routes.find(feature => matchPath(`/servers/:guildId/${featurePattern(feature)}`, pathname))
+  return featureRegistry.routes.find(feature => !feature.nested && matchPath(`/servers/:guildId/${feature.path}`, pathname))
+    ?? featureRegistry.routes.find(feature => matchPath(`/servers/:guildId/${featurePattern(feature)}`, pathname))
 }
 export function featureLabel(definition: FeatureDefinition, features: Feature[], t: (key: string) => string) {
   return definition.label?.(t) ?? (definition.titleKey ? t(definition.titleKey) : features.find(item => item.id === definition.id)?.title ?? definition.id)
@@ -27,10 +34,12 @@ export function featureBreadcrumbs(pathname: string, guildId: string, features: 
     items.push({ label: t(category.titleKey), to: definition ? `${base}/${category.hub.path}` : undefined })
   }
   if (definition) {
+    const owner = featureRegistry.get(definition.id)
+    const page = owner.pages.find(page => `${owner.path}/${page.path}` === definition.path)
     const match = matchPath<string>(`/servers/:guildId/${featurePattern(definition)}`, pathname)
     const suffix = (match?.params['*'] ?? '').split('/').filter(Boolean)
-    const children = definition.breadcrumbs?.(suffix, t) ?? []
-    items.push({ label: featureLabel(definition, features, t), to: children.length ? `${base}/${definition.path}` : undefined })
+    const children = page ? [{ label: t(page.titleKey) }] : definition.breadcrumbs?.(suffix, t) ?? []
+    items.push({ label: featureLabel(definition, features, t), to: children.length ? `${base}/${page ? owner.path : definition.path}` : undefined })
     items.push(...children.map(item => ({ label: item.label, to: item.suffix ? `${featurePath(guildId, definition)}/${item.suffix}` : undefined })))
   }
   return items

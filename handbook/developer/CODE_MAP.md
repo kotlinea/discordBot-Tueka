@@ -1,6 +1,6 @@
 # 現行ファイル構成と責務
 
-確認日: 2026-09-23。追跡対象の実装構成を示す。ローカルのvenv・node_modules・一時コピーは構成に含めない。詳しい処理契約は[architecture.md](architecture.md)を参照する。
+確認日: 2026-09-25。追跡対象の実装構成を示す。ローカルのvenv・node_modules・一時コピーは構成に含めない。詳しい処理契約は[architecture.md](architecture.md)を参照する。
 
 | 入口・場所 | 責務と変更の起点 |
 | --- | --- |
@@ -10,7 +10,7 @@
 | `cogs/community/welcome.py`、`guild_settings/community/welcome.py`、`dashboard/api/community/welcome.py` | welcomeのDiscord入力、設定モデル、登録用設定Factory。参加ロールは隣接するautorole Cog |
 | `dashboard/app.py`、`dashboard/api_v1.py`、`dashboard/api/` | Web配信、OAuth、API Router合成、認可・入力検証 |
 | `dashboard/repository.py` | Session、OAuth state、個人設定 |
-| `dashboard/frontend/src/features/<category>/<id>.feature.tsx`、各 `registry.ts` | UIの機能入口。経路、lazy loader、表示権限、項目描画、パンくずとカテゴリーを明示登録 |
+| `dashboard/frontend/src/features/<category>/<id>.feature.tsx`、各 `registry.ts` | UIの機能入口。経路、lazy loader、表示権限、項目描画、表示カテゴリー・画面種別・内部ページ/操作入口を明示登録 |
 | `dashboard/frontend/src/routing/` | 登録からGuild/Standalone Route、Navigation、検索、パンくずを組立て |
 | `dashboard/frontend/src/app/`、`app/guilds/` | Session、Shell、個人設定、Guild選択・概要。`locales/` は日英翻訳 |
 | `dashboard/frontend/src/features/community/{tickets,reaction_roles}/`、`engagement/suggestions/` | 専用APIを使う画面と入力状態。Moderation/Socialの共有画面は各カテゴリー内 |

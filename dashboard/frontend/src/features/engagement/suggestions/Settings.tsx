@@ -42,7 +42,7 @@ export default function Suggestions() {
   },[guildId,query.data])
   const dirty=useMemo(()=>Boolean(draft&&query.data&&JSON.stringify(draft)!==JSON.stringify(query.data)),[draft,query.data])
   useEffect(()=>{if(!dirty)return;const guard=(event:BeforeUnloadEvent)=>{event.preventDefault()};addEventListener('beforeunload',guard);return()=>removeEventListener('beforeunload',guard)},[dirty])
-  const save=useMutation({mutationFn:(value:SettingsResponse)=>request("PUT /api/v1/guilds/{guild_id}/suggestions/settings", `/guilds/${guildId}/suggestions/settings`, {method:'PUT',body:encodeBody("PUT /api/v1/guilds/{guild_id}/suggestions/settings", value)}),onSuccess:value=>{qc.setQueryData(['suggestionsSettings',guildId],value);setDraft(structuredClone(value));void qc.invalidateQueries({queryKey:['overview',guildId]})}})
+  const save=useMutation({mutationFn:(value:SettingsResponse)=>request("PUT /api/v1/guilds/{guild_id}/suggestions/settings", `/guilds/${guildId}/suggestions/settings`, {method:'PUT',body:encodeBody("PUT /api/v1/guilds/{guild_id}/suggestions/settings", value)}),onSuccess:value=>{qc.setQueryData(['suggestionsSettings',guildId],value);setDraft(structuredClone(value));void qc.invalidateQueries({queryKey:['overview',guildId]});void qc.invalidateQueries({queryKey:['features',guildId]})}})
   if(query.error||resources.error)return <main className={s.page}><Failure error={query.error||resources.error}/></main>
   if(query.isLoading||resources.isLoading||!draft)return <Loading/>
   const settings=draft.settings; const textChannels=(resources.data?.channels||[]).filter(channel=>channel.type===0)

@@ -11,7 +11,10 @@ export function defineFeature(definition: Definition): FeatureDefinition {
     path: `modules/${definition.id}`,
     load: loadModuleSettings,
     access: 'manager',
+    presentationCategory: definition.category,
+    screenKind: 'settings',
     ...definition,
     namespaces: Object.freeze([...(definition.namespaces ?? ['common'])]),
+    pages: Object.freeze((definition.pages ?? []).map(page => Object.freeze({ ...page }))),
   })
 }

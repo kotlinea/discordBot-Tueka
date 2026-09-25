@@ -162,9 +162,10 @@ class RecoveryBoundaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             with locked(root):
-                with self.assertRaises(FileExistsError):
+                with self.assertRaisesRegex(ValueError, 'Operation lock already exists'):
                     with locked(root):
                         pass
+                self.assertTrue((root / '.recovery.lock').exists())
                 with self.assertRaisesRegex(ValueError, 'Recovery'):
                     compose.up(root)
             self.assertFalse((root / '.recovery.lock').exists())

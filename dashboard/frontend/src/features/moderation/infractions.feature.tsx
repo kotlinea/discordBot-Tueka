@@ -2,6 +2,7 @@ import { BookOpen } from 'lucide-react'
 import { defineFeature } from '../defaults'
 
 export const feature = defineFeature({
+  screenKind: 'workspace',
   id: 'infractions', category: 'moderation', parent: 'moderation',
   path: 'moderation/infractions', namespaces: ['moderation', 'common'],
   settingsPath: 'modules/infractions',

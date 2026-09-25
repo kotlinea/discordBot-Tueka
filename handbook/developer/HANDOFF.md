@@ -1,6 +1,6 @@
 # 作業開始
 
-更新: 2026-09-23。現行仕様は[構成](CODE_MAP.md)と[設計](architecture.md)、実施順序・状態は[実行計画](EXECUTION_PLAN.md)を正本とする。
+更新: 2026-09-25。現行仕様は[構成](CODE_MAP.md)と[設計](architecture.md)、実施順序・状態は[実行計画](EXECUTION_PLAN.md)を正本とする。
 
 ## 最初の手順
 
@@ -16,6 +16,8 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 ```
 
 ## 現在地と次の作業
+
+- 2026-09-24の追加依頼: [表示構造・設定操作の専用計画](../../goal.md)を制定。次回の新機能追加前に、カテゴリーと大機能、機能レジストラー、設定状態、ルール再利用を整理する。2026-09-25に[U0の配置・設定・操作棚卸しとbaseline](history/FEATURE_UX_U0-2026-09-25.md)を完了。同日に[U1の登録契約](history/FEATURE_UX_U1-2026-09-25.md)も完了。型検査・UI128件・build・ブラウザー100件成功。次はU2の配置と大機能。U0/U1の残作業なし。
 
 - 2026-09-24の方針: 本番専用配布の整備より機能完成を優先する。2リポジトリ化は未決定。[将来の配布整理への引き継ぎ](RELEASE_DISTRIBUTION_HANDOFF.md)に意図・未決定事項・再開手順を保存している。配布実装は再開指示後に扱い、既存の実環境受入状態は維持する。
 

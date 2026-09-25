@@ -10,7 +10,15 @@ import type { Feature, Session } from '../types'
 import '../i18n'
 
 const probe = defineFeature({ id: 'g5_probe', category: 'community', fields: { text: { labelKey: 'G5 input' } } })
-const custom = defineFeature({ id: 'g5_custom', category: 'g5_category', path: 'g5/custom',
+const loadCreate = vi.fn(async () => ({ default: () => <h1>Probe create</h1> }))
+const custom = defineFeature({ id: 'g5_custom', category: 'g5_category', presentationCategory: 'operations', path: 'g5/custom',
+  namespaces: ['common', 'tickets'],
+  screenKind: 'workspace', access: 'ticket_staff', nested: true,
+  pages: [
+    { id: 'inbox', path: 'inbox', titleKey: 'tickets.inbox', kind: 'navigation', access: 'ticket_staff', load: async () => ({ default: () => <h1>Probe inbox</h1> }) },
+    { id: 'create', path: 'new', titleKey: 'common.create', kind: 'action', access: 'manager', load: loadCreate },
+  ],
+  settingsPath: 'modules/g5_custom',
   load: async () => ({ default: () => <h1>G5 dedicated screen</h1> }) })
 const extra: CategoryDefinition = { id: 'g5_category', titleKey: 'G5 category', features: [custom] }
 const metadata = (id: string, category: string): Feature => ({ id, category, parent: null, title: id,
@@ -22,15 +30,21 @@ const session: Session = { user: { id: '20', name: 'Test', avatar_url: '/test-av
 beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }))
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.doUnmock('../features/registry'); vi.doUnmock('../api') })
 
-async function mount(mode: 'existing' | 'category' | 'removed', path: string) {
+async function mount(mode: 'existing' | 'category' | 'removed', path: string, staffOnly = false, metadataError = false) {
+  loadCreate.mockClear()
   vi.resetModules()
   const categories = original.categories.map(category => category.id === 'community' && mode === 'existing'
     ? { ...category, features: [...category.features, probe] } : category)
-  const registry = createRegistry(mode === 'category' ? [...categories, extra] : categories)
+  const registry = createRegistry(mode === 'category' ? [...categories, extra] : categories,
+    mode === 'category' ? [...original.presentationCategories, { id: 'operations', titleKey: 'Probe operations' }] : original.presentationCategories)
   const feature = metadata(mode === 'category' ? custom.id : probe.id, mode === 'category' ? extra.id : probe.category)
   const features = mode === 'removed' ? [] : [feature]
   const request = vi.fn(async (_operation: string, endpoint: string, init?: RequestInit) => {
-    if (endpoint === '/guilds') return { items: [{ id: '1', name: 'G5 guild', icon: null, access: 'admin' }] }
+    if (endpoint === '/guilds') return { items: [{ id: '1', name: 'G5 guild', icon: null, access: staffOnly ? 'ticket_staff' : 'admin' }] }
+    if (endpoint.endsWith('/features')) {
+      if (metadataError) throw new Error('Metadata unavailable')
+      return { items: features }
+    }
     if (endpoint.endsWith('/overview')) return { features, moderation: { summary: {}, events: [], lockdown: null } }
     if (endpoint.endsWith('/resources')) return { channels: [], roles: [] }
     if (init?.method === 'PUT') return { ...JSON.parse(String(init.body)), revision: 4 }
@@ -62,13 +76,48 @@ describe('registration-only extension through the real Shell', () => {
     const saved = request.mock.calls.find(([, , init]) => init?.method === 'PUT')!
     expect(saved[1]).toBe('/guilds/1/modules/g5_probe')
     expect(JSON.parse(String(saved[2]?.body))).toMatchObject({ revision: 3, settings: { text: 'saved through default' } })
+    await waitFor(() => expect(request.mock.calls.filter(([, endpoint]) => endpoint.endsWith('/features')).length).toBe(2))
+    expect(request.mock.calls.some(([, endpoint]) => endpoint.endsWith('/overview'))).toBe(false)
   })
   it('adds a category and a dedicated override without editing Shell or Router composition', async () => {
     const { routing, features } = await mount('category', custom.path)
     expect(await screen.findByRole('heading', { name: 'G5 dedicated screen' })).toBeInTheDocument()
-    expect(screen.getByText('G5 category')).toBeInTheDocument()
+    expect(screen.getByText('Probe operations')).toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: 'Dashboard' })).getByRole('link', { name: custom.id })).toHaveAttribute('href', '/servers/1/g5/custom')
     expect(routing.paletteItems('1', features, key => key)).toContainEqual({ title: custom.id, path: '/servers/1/g5/custom' })
+  })
+  it('connects workspace navigation, actions and breadcrumbs using only registration', async () => {
+    const { request, routing, features } = await mount('category', custom.path)
+    await screen.findByRole('heading', { name: 'G5 dedicated screen' })
+    const nav = screen.getByRole('navigation', { name: '機能内ナビゲーション' })
+    fireEvent.click(within(nav).getByRole('link', { name: '新しいルール' }))
+    expect(await screen.findByRole('heading', { name: 'Probe create' })).toBeInTheDocument()
+    expect(routing.featureBreadcrumbs('/servers/1/g5/custom/new', '1', features, key => key)).toEqual([
+      { label: custom.id, to: '/servers/1/g5/custom' }, { label: 'common.create', to: undefined },
+    ])
+    fireEvent.click(within(nav).getByRole('link', { name: '概要' }))
+    expect(await screen.findByRole('heading', { name: 'G5 dedicated screen' })).toBeInTheDocument()
+    expect(request.mock.calls.some(([, endpoint]) => endpoint.endsWith('/features'))).toBe(true)
+    expect(request.mock.calls.some(([, endpoint]) => endpoint.endsWith('/overview'))).toBe(false)
+  })
+  it('keeps metadata failures visible instead of silently rendering an empty manager navigation', async () => {
+    await mount('category', custom.path, false, true)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Metadata unavailable')
+    expect(screen.queryByRole('heading', { name: 'G5 dedicated screen' })).not.toBeInTheDocument()
+  })
+  it('shows only permitted workspace pages to staff without manager metadata requests', async () => {
+    const { request } = await mount('category', 'g5/custom/inbox', true)
+    expect(await screen.findByRole('heading', { name: 'Probe inbox' })).toBeInTheDocument()
+    const nav = screen.getByRole('navigation', { name: '機能内ナビゲーション' })
+    expect(within(nav).queryByRole('link', { name: '新しいルール' })).not.toBeInTheDocument()
+    expect(request.mock.calls.map(([, endpoint]) => endpoint)).toEqual(['/guilds'])
+  })
+  it.each(['g5/custom/new', 'modules/g5_custom'])('rejects staff direct access to manager page %s before loading it', async path => {
+    const { request } = await mount('category', path, true)
+    expect(await screen.findByRole('heading', { name: 'ページが見つかりません' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Probe create' })).not.toBeInTheDocument()
+    expect(loadCreate).not.toHaveBeenCalled()
+    expect(request.mock.calls.map(([, endpoint]) => endpoint)).toEqual(['/guilds'])
   })
   it.each(['modules/g5_probe', 'g5/custom'])('removing registration removes route and navigation for %s', async path => {
     const { registry, routing } = await mount('removed', path)

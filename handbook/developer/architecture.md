@@ -20,6 +20,10 @@ Frontendは `features/<category>/<id>.feature.tsx` に経路、画面loader、Na
 
 汎用設定は `features/DefaultSettings.tsx` が登録された項目表示を共通Formへ渡します。機能定義の `fields` はラベル・Resource種別・テンプレート候補の表示指定であり、保存対象や必須条件はAPI Metadataを使います。ルール画面は `settingsPath` で別の設定経路を登録します。カテゴリー内の `defineRuleFeature` と `defineProvider` は実在する共通画面を組み立て、初期Trigger・Provider名等を機能別に受け取ります。
 
+表示カテゴリーはRegistryの `presentationCategories`、機能側の所属は `presentationCategory` が所有します。Backendカテゴリー・親とは独立し、カテゴリー見出しと機能リンクを同じ階層で組み立てます。既定の `screenKind: settings` を `workspace` に差し替え、静的な内部画面を `pages` に登録すると、Route・内部ナビ・操作入口・パンくずへ接続します。動的詳細画面は機能内Routerが所有します。`action` は画面を開く入口であり、共有ナビにDomainの更新処理を持ち込みません。
+
+Shellの管理者Metadata取得は `/guilds/:guildId/features` を使用し、各画面のOverview取得と分離します。Guild確認後だけ取得し、Staffでは管理者向けのどちらも取得しません。登録された管理者専用内部画面は直URLでもloader実行前に拒否します。これは表示側の保護であり、APIのGuild認可・CSRF・revision検査は独立して維持します。
+
 `welcome` の入力は `cogs/community/welcome.py`、設定モデルは `guild_settings/community/welcome.py`、API設定Factoryは `dashboard/api/community/welcome.py` が担当します。参加ロールは独立した `cogs/community/autorole.py` が担当します。Featureの `settings_factory` はアプリのContextへ `SettingsAccess` を一度生成し、共通Routerが認可・CSRF・Resource確認後に検証と保存を呼びます。既定の `ModuleSettingsAccess` は正規化とrevision付き保存を提供します。
 
 DashboardのSession・Discord OAuth state・ユーザー個人設定は `dashboard/repository.py` が保存します。Web画面とJSON APIはこのRepositoryを直接使用します。

@@ -35,6 +35,7 @@ export function ModuleSettings({ feature, renderField, title, description, actio
     onSuccess: async value => {
       form.reset(value)
       await queryClient.invalidateQueries({ queryKey: ['overview', guildId] })
+      await queryClient.invalidateQueries({ queryKey: ['features', guildId] })
     },
   })
   if (!feature) return <NotFound/>

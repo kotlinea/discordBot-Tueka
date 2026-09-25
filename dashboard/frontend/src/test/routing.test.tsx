@@ -96,7 +96,7 @@ describe('registered routes preserve direct links and parameters', () => {
     expect(featureBreadcrumbs('/servers/1/tickets/panel-messages', '1', [], t).map(item => item.label)).toEqual(['tickets.title', 'tickets.panelMessages'])
     expect(featureBreadcrumbs('/servers/1/social/youtube', '1', [], t).map(item => item.label)).toEqual(['nav.social', 'YouTube social.title'])
     expect(paletteItems('1', [], t).map(item => item.path)).toEqual(['/servers/1', '/servers/1/moderation', '/servers/1/social'])
-    expect(activeFeature('/servers/1/tickets/inbox/4')?.overview).toBe(false)
+    expect(activeFeature('/servers/1/tickets/inbox/4')?.screenKind).toBe('workspace')
     expect(featureRegistry.features.filter(item => item.access === 'ticket_staff').map(item => item.id)).toEqual(['tickets'])
   })
 })
