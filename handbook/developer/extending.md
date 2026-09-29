@@ -52,6 +52,8 @@ Frontendの `src/test/featureExtension.test.tsx` はRegistryとHTTP応答だけ�
 
 ## 設定
 
+Moderationの3 Familyは `ruleScreen.tsx` で作成画面のactionを共通登録します。`RuleEditor` と `TriggerFields` を使い、既定値はBackendのtemplate APIから取得します。Trigger項目を追加する場合は、未表示項目を失わない `ruleForm` の変換と新規/複製/再保存のテストを維持してください。一括状態変更は専用APIへID/revision集合を一度だけ送り、逐次PUTへ置き換えないでください。
+
 Guild設定は型、初期値、上限、Discord Resource種別をServer側でも検証します。UIだけに検証を依存させません。複数管理者が編集する設定にはrevisionを付けます。
 
 UIの専用編集画面も共通の未保存・保存中・失敗・破棄・再取得・離脱保護契約に従います。`components/forms/` のdraft/save/guardを使い、保存成功後の応答反映とQuery再取得を機能側で実装してください。設定状態のResource判定はfieldsのresource宣言を利用します。Leveling報酬のように複合値へIDを含む場合は `references: { kind, ids }` で参照IDの抽出を登録し、共有画面へ機能ID分岐を追加しません。稼働結果はDomainの実測APIに基づきます。

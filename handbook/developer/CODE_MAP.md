@@ -1,6 +1,6 @@
 # 現行ファイル構成と責務
 
-確認日: 2026-09-25。追跡対象の実装構成を示す。ローカルのvenv・node_modules・一時コピーは構成に含めない。詳しい処理契約は[architecture.md](architecture.md)を参照する。
+確認日: 2026-09-29。追跡対象の実装構成を示す。ローカルのvenv・node_modules・一時コピーは構成に含めない。詳しい処理契約は[architecture.md](architecture.md)を参照する。
 
 | 入口・場所 | 責務と変更の起点 |
 | --- | --- |
@@ -21,6 +21,8 @@
 | `tokens.css`、`design.md`（本書と同階層） | 共通視覚TokenとUI設計契約 |
 | `guild_settings/<category>/<feature>.py`、`registry.py`、`repository.py` | 機能別の既定値・正規化、Domain内の明示登録、共通の保存・revision |
 | `moderation/`、`ticketing/`、`reaction_roles/`、`suggestions/` | 各Domainのモデル、Repository、Service、Discord Adapter |
+| `moderation/rules.py`、`moderation/repository.py`、`dashboard/api/moderation/rules.py` | Family/Triggerの初期値・有効化検証、全件原子的な状態更新、認可とHTTP応答 |
+| `dashboard/frontend/src/features/moderation/{ruleScreen,RuleList,RuleEditor,ruleForm,TriggerFields,RuleBulkDialog}` | 作成画面登録、一覧選択・原子的な状態変更、未保存複製・テンプレート、損失しない変換、Trigger入力、状態変更前の条件確認 |
 | `ticketing/access.py` | SessionとTicket APIで共有するTeam所属判定の公開契約 |
 | `social/providers/<provider>.py`、`social/`、`social_worker.py` | Provider別取得と明示Registry、Token、Webhook、監視Workerと登録起動入口 |
 | `community/`、`engagement/` | VC/XP/ランキング、Pollの保存と処理 |

@@ -10,6 +10,10 @@ from ticketing import TicketRepository
 
 
 CONTRACT = Path(__file__).parent / 'fixtures' / 'api_v1_contract.json'
+U4_PATHS = {
+    '/api/v1/guilds/{guild_id}/moderation/{family}/rules/state': 'put',
+    '/api/v1/guilds/{guild_id}/moderation/{family}/templates/{trigger_type}': 'get',
+}
 
 
 def request_path(template):
@@ -47,7 +51,9 @@ class ApiContractTests(unittest.TestCase):
         expected = json.loads(CONTRACT.read_text(encoding='utf-8'))
         actual = self.api.app.openapi()['paths']
         baseline = expected['openapi']['paths']
-        self.assertEqual(set(actual), set(baseline))
+        self.assertEqual(set(actual), set(baseline) | set(U4_PATHS))
+        for path, method in U4_PATHS.items():
+            self.assertEqual(set(actual[path]), {method})
         for path, methods in baseline.items():
             self.assertEqual(set(actual[path]), set(methods))
             for method, operation in methods.items():
@@ -65,7 +71,16 @@ class ApiContractTests(unittest.TestCase):
                 row['body'] = {'detail': error_detail(row['status'], row['body']['detail'])}
             elif isinstance(row['body'], dict) and 'items' in row['body']:
                 row['body'] = {'next': None, **row['body']}
-        self.assertEqual(boundary_responses(self.api), baseline)
+        actual = boundary_responses(self.api)
+        self.assertEqual([row for row in actual if row['path'] not in U4_PATHS], baseline)
+        added = [row for row in actual if row['path'] in U4_PATHS]
+        self.assertEqual(len(added), 5)
+        for row in added:
+            # CSRF runs before authentication on writes, as for existing routes.
+            expected_code = ('csrf_invalid' if row['method'] == 'PUT' and row['mode'] != 'forbidden'
+                             else 'authentication_required' if row['mode'] == 'anonymous' else 'guild_forbidden')
+            self.assertEqual(row['body']['detail']['code'], expected_code, row)
+            self.assertEqual(row['status'], 401 if expected_code == 'authentication_required' else 403)
 
     def test_social_save_conflict_cross_guild_and_delete_contract(self):
         root = '/api/v1/guilds/1/social/youtube/subscriptions'

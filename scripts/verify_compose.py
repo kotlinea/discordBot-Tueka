@@ -210,8 +210,8 @@ def main():
                 bad.write_text('CREATE TABLE must_rollback(id BIGINT); INSERT INTO must_rollback VALUES (1/0);\n', encoding='utf-8')
                 try:
                     compose.up(stage)
-                except subprocess.CalledProcessError:
-                    pass
+                except ValueError as error:
+                    assert 'Migration failed; application services remain stopped.' in str(error), str(error)
                 else:
                     raise AssertionError('Failed migration must block application startup')
                 for service in compose.APPLICATIONS:

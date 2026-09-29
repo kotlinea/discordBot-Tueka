@@ -6,6 +6,8 @@ Support tickets has Overview, Inbox, Intake setup, Transcripts, Stats, and Setti
 
 Server information displays the server name and ID, channel and role counts from Discord, and missing required permissions. Edit each feature's settings in its own screen.
 
+In AutoMod, Anti-Spam, and Anti-Raid, copy saved rules and change their scope or actions to reuse them. Select multiple saved rules to enable or disable them without recreating them. See [Creating and reusing moderation rules](moderation-rules.md) and [Saving and conflicts](saving.md) for saving, discarding, and resolving conflicting edits.
+
 Choose channels, categories, roles and emoji from Discord resource pickers. Multi-select supports select-all and invert-selection. Select one access policy before entering whitelist/blacklist targets.
 
 Language, appearance and rail preferences belong to your Discord account. Choose Precision, Community or Atmosphere and system, light or dark color schemes. Logout uses a confirmation dialog and does not log you out of Discord itself.

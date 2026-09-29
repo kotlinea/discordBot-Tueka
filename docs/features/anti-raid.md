@@ -26,3 +26,5 @@ Lockdown後に管理者がOverwriteを変更した場合は、自動解除で上
 ::: warning 必要権限
 LockdownにはManage Channels、制裁にはModerate Members、Kick Members、Ban Membersが必要です。実行時のRole階層も満たす必要があります。
 :::
+
+ルールの作成・複製・一括ON/OFFは[ルール操作ガイド](../dashboard/moderation-rules.md)を参照してください。

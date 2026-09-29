@@ -28,6 +28,20 @@ test('long feature pages do not overflow', async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false)
 })
 
+test('dashboard guides expose rule reuse and conflict recovery in both languages', async ({ page }) => {
+  for (const locale of ['', 'en/']) {
+    await page.goto(`./${locale}dashboard/`)
+    await page.locator('.vp-doc').getByRole('link', { name: locale ? 'Creating and reusing moderation rules' : 'モデレーションルールの作成と再利用', exact: true }).click()
+    await expect(page).toHaveURL(/dashboard\/moderation-rules(?:\.html)?$/)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(locale ? 'Create and reuse moderation rules' : 'モデレーションルールの作成と再利用')
+    await expect(page.locator('.vp-doc')).toContainText(locale ? 'Reload and review selection' : '再取得して選択を確認')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false)
+    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze()).violations).toEqual([])
+    await page.locator('.vp-doc').getByRole('link', { name: locale ? 'Saving and conflicts' : '保存と競合', exact: true }).click()
+    await expect(page).toHaveURL(/dashboard\/saving(?:\.html)?$/)
+  }
+})
+
 test('bilingual commands and search stay within public documentation', async ({ page }) => {
   await page.goto('./en/reference/commands')
   await expect(page.getByRole('heading', { name: /^All Discord commands/, level: 1 })).toBeVisible()

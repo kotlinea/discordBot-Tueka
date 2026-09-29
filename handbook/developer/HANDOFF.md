@@ -1,6 +1,6 @@
 # 作業開始
 
-更新: 2026-09-25。現行仕様は[構成](CODE_MAP.md)と[設計](architecture.md)、実施順序・状態は[実行計画](EXECUTION_PLAN.md)を正本とする。
+更新: 2026-09-29。現行仕様は[構成](CODE_MAP.md)と[設計](architecture.md)、実施順序・状態は[実行計画](EXECUTION_PLAN.md)を正本とする。
 
 ## 最初の手順
 
@@ -17,7 +17,7 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 
 ## 現在地と次の作業
 
-- 2026-09-24の追加依頼: [表示構造・設定操作の専用計画](../../goal.md)。U0〜U3完了。[U3の設定と共通操作](history/FEATURE_UX_U3-2026-09-25.md)で保存値と稼働条件、dirty保持・破棄・二重送信・離脱保護を統一。UI160件、ブラウザー116ケースを受入（失敗8件は修正後再検証）。型検査・Dashboard/日英Docs build成功。次はU4のルール契約。U0〜U3の残作業なし。
+- 表示構造・設定操作の改善U0〜U6は完了。[最終受入・要件対応](history/FEATURE_UX_U6-2026-09-29.md)に証拠を保存し、一時計画を終了した。24機能の配置、Ticket/RR内部画面、登録/override、設定と稼働条件、ルール複製・一括状態変更を受入済み。Uの残作業なし。
 
 - 2026-09-24の方針: 本番専用配布の整備より機能完成を優先する。2リポジトリ化は未決定。[将来の配布整理への引き継ぎ](RELEASE_DISTRIBUTION_HANDOFF.md)に意図・未決定事項・再開手順を保存している。配布実装は再開指示後に扱い、既存の実環境受入状態は維持する。
 
@@ -25,7 +25,7 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 
 - Phase 0〜2、P3-1〜4、役割別Docs・導入CLIはローカル検証済み。実Stageは未準備。
 - 別Linux Hostのクリーン受入、最新CommitのRemote CI結果の確認が残る。その後Stage受入、Phase 4、Phase 5の順に進める。実害のある不具合は優先する。
-- 直近の検証は2026-09-23のWindows Docker Desktop/Linuxコンテナ。全群CIのPython/Web/Runtimeが成功し、最後の秘密情報検査は履歴ハッシュの誤検出を限定除外して再実行成功。Python405件・Image内405件・UI119件・Dashboardブラウザー88件・Docs15件、API/103コマンドと運用入口を確認。詳細はG6記録。
+- 直近の検証は2026-09-29のWindows Docker Desktop/Linuxコンテナ。Python/Image各428件、UI163件、Dashboard164ケース、Docs20ケース、API/103コマンド、Restore/Compose/Setup/Recovery/Caddyと秘密情報検査が成功。Compose検査の例外契約不一致は修正しRuntime群を再実行した。詳細はU6記録。
 - Remote CIの最新成功Run URL、独立Linux Hostと実Stage受入の証拠は未確認。
 
 ## 継承する判断

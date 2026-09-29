@@ -14,7 +14,7 @@ Tuekaの基盤整備、運用受入、機能改善を進める順序と完了条
 
 | 範囲 | 状態 | 確認対象 |
 | --- | --- | --- |
-| U 表示構造・設定操作の統一 | 進行中 | [専用計画](goal.md)。カテゴリー・大機能・機能レジストラー、設定の実態、ルール複製/一括状態変更。U0〜U3完了、次はU4 |
+| U 表示構造・設定操作の統一 | ローカル検証済み | U0〜U6完了。[最終受入](handbook/developer/history/FEATURE_UX_U6-2026-09-29.md)。カテゴリー・大機能・登録契約・設定操作・ルール再利用を受入 |
 | Phase 0〜2 | ローカル検証済み | V2、Domain境界、PostgreSQL、API/UI契約 |
 | P3-1〜4 | ローカル検証済み | Image、Compose、監視、Backup/Restore |
 | D1・D2 | ローカル検証済み | 役割別Docs、導入・管理CLI |
@@ -29,7 +29,7 @@ Tuekaの基盤整備、運用受入、機能改善を進める順序と完了条
 
 ## 次の作業
 
-2026-09-24の追加依頼として、次回の新機能追加前に[表示構造・設定操作の専用計画](goal.md)を進めます。U0の棚卸し、U1の登録契約、U2の配置、[U3の設定と共通操作](handbook/developer/history/FEATURE_UX_U3-2026-09-25.md)を完了し、次はU4のルール契約です。ローカルの改善作業を優先し、実環境受入の状態は個別に維持します。
+表示構造・設定操作の改善U0〜U6は完了しました。[最終受入](handbook/developer/history/FEATURE_UX_U6-2026-09-29.md)と[拡張手順](handbook/developer/extending.md)に結果・登録契約を残し、一時計画を終了しました。以下の実環境受入と新機能の順序は維持します。
 
 機能中心の構造改善G0〜G6は完了しました。[最終受入の証拠](handbook/developer/history/FEATURE_STRUCTURE_G6-2026-09-23.md)と[拡張手順](handbook/developer/extending.md)を参照してください。以下の実環境受入や新機能のゲートは維持します。
 

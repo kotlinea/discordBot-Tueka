@@ -11,8 +11,25 @@ export function lines(value: string) { return value.split(/\r?\n/).map(item => i
 
 export function ids(value: string) { return lines(value).filter(item => /^\d+$/.test(item)) }
 
-export function fromForm(value: RuleForm): Rule { const trigger_config: Record<string, unknown> = {}; if (value.trigger_type === 'keyword') Object.assign(trigger_config, { keywords: lines(value.keywordsText), allow_list: lines(value.allowText), match: 'wildcard' }); else if (value.trigger_type === 'regex') Object.assign(trigger_config, { patterns: lines(value.patternsText) }); else if (value.trigger_type === 'domain') Object.assign(trigger_config, { domains: lines(value.domainsText), mode: 'blacklist' }); else Object.assign(trigger_config, { limit: Number(value.limit), window_seconds: Number(value.windowSeconds) }); const channelIds = ids(value.scopeChannelIdsText); const roleIds = ids(value.scopeRoleIdsText); return { ...value, trigger_config, conditions: { channel_policy: value.channelPolicy, role_policy: value.rolePolicy, channel_ids: value.channelPolicy === 'only' ? channelIds : [], required_role_ids: value.rolePolicy === 'only' ? roleIds : [] }, exemptions: { channel_ids: value.channelPolicy === 'all_except' ? channelIds : [], role_ids: value.rolePolicy === 'all_except' ? roleIds : [] }, actions: value.actions } }
+export function cloneDraft(rule: Rule): Rule {
+  return { family: rule.family, event_type: rule.event_type, name: rule.name, enabled: false,
+    mode: rule.mode, priority: rule.priority, stop_on_match: rule.stop_on_match,
+    trigger_type: rule.trigger_type, trigger_config: structuredClone(rule.trigger_config),
+    conditions: structuredClone(rule.conditions), exemptions: structuredClone(rule.exemptions),
+    actions: structuredClone(rule.actions) }
+}
 
+export function fromForm(value: RuleForm): Rule {
+  const trigger_config: Record<string, unknown> = { ...value.trigger_config }
+  if (value.trigger_type === 'keyword') Object.assign(trigger_config, { keywords: lines(value.keywordsText), allow_list: lines(value.allowText) })
+  else if (value.trigger_type === 'regex') Object.assign(trigger_config, { patterns: lines(value.patternsText) })
+  else if (value.trigger_type === 'domain') Object.assign(trigger_config, { domains: lines(value.domainsText) })
+  else if ('limit' in trigger_config || 'window_seconds' in trigger_config) Object.assign(trigger_config, { limit: Number(value.limit), window_seconds: Number(value.windowSeconds) })
+  const channelIds = ids(value.scopeChannelIdsText); const roleIds = ids(value.scopeRoleIdsText)
+  return { ...cloneDraft(value), ...(value.id == null ? {} : { id: value.id }), ...(value.revision == null ? {} : { revision: value.revision }), enabled: value.enabled,
+    trigger_config, conditions: { ...value.conditions, channel_policy: value.channelPolicy, role_policy: value.rolePolicy, channel_ids: value.channelPolicy === 'only' ? channelIds : [], required_role_ids: value.rolePolicy === 'only' ? roleIds : [] },
+    exemptions: { ...value.exemptions, channel_ids: value.channelPolicy === 'all_except' ? channelIds : [], role_ids: value.rolePolicy === 'all_except' ? roleIds : [] } }
+}
 export const RULE_ACTION_TYPES = ['delete','points','notify','dm','timeout','kick','ban','tempban','log'] as const
 
 export function defaultAction(type: string): Record<string, unknown> { if (type === 'points') return { type, points: 1, expires_days: 30 }; if (type === 'timeout') return { type, duration_minutes: 10 }; if (type === 'tempban') return { type, duration_minutes: 1440 }; if (type === 'notify') return { type, message: '{user} さんのルール違反を検知しました: {reason}' }; if (type === 'dm') return { type, message: '{server}でルール違反を検知しました: {reason}' }; if (type === 'log') return { type, message: '{rule}: {reason}' }; return { type } }

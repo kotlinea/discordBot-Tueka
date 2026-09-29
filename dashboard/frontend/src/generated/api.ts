@@ -889,10 +889,12 @@ export interface Operations {
   "GET /api/v1/guilds/{guild_id}/moderation/{family}/rules": { response: RulesResponse; body: never }
   "POST /api/v1/guilds/{guild_id}/moderation/{family}/rules": { response: Rule; body: { "id"?: number; "guild_id"?: string; "family"?: string; "event_type"?: string; "name"?: string; "enabled"?: boolean; "mode"?: ("monitor" | "enforce"); "priority"?: number; "stop_on_match"?: boolean; "trigger_type"?: string; "trigger_config"?: Record<string, unknown>; "conditions"?: Record<string, unknown>; "exemptions"?: Record<string, unknown>; "actions"?: Array<Record<string, unknown>>; "revision"?: number } }
   "PUT /api/v1/guilds/{guild_id}/moderation/{family}/rules/order": { response: Items_Rule_; body: { "items"?: Array<{ "id": number; "revision": number; "stop_on_match"?: boolean }> } }
+  "PUT /api/v1/guilds/{guild_id}/moderation/{family}/rules/state": { response: Items_Rule_; body: { "items": Array<{ "id": number; "revision": number }>; "enabled": boolean } }
   "DELETE /api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}": { response: void; body: never }
   "GET /api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}": { response: Rule; body: never }
   "PUT /api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}": { response: Rule; body: { "id"?: number; "guild_id"?: string; "family"?: string; "event_type"?: string; "name"?: string; "enabled"?: boolean; "mode"?: ("monitor" | "enforce"); "priority"?: number; "stop_on_match"?: boolean; "trigger_type"?: string; "trigger_config"?: Record<string, unknown>; "conditions"?: Record<string, unknown>; "exemptions"?: Record<string, unknown>; "actions"?: Array<Record<string, unknown>>; "revision"?: number } }
   "POST /api/v1/guilds/{guild_id}/moderation/{family}/rules/{rule_id}/duplicate": { response: Rule; body: never }
+  "GET /api/v1/guilds/{guild_id}/moderation/{family}/templates/{trigger_type}": { response: Rule; body: never }
   "GET /api/v1/guilds/{guild_id}/modules/{module_id}": { response: Feature; body: never }
   "PUT /api/v1/guilds/{guild_id}/modules/{module_id}": { response: ModuleValue; body: { "enabled"?: boolean; "settings"?: Record<string, unknown>; "revision"?: number } }
   "GET /api/v1/guilds/{guild_id}/overview": { response: GuildOverview; body: never }

@@ -126,6 +126,7 @@ test('overview is responsive and accessible', async ({ page }) => {
 })
 
 test('rule scope uses one policy and action options open in a dialog', async ({ page }) => {
+  await page.route('**/api/v1/guilds/1/moderation/automod/templates/keyword', route => route.fulfill({ json: { ...rule(1, ''), id: undefined, revision: undefined, enabled: false, mode: 'monitor', actions: [{type:'log'}] } }))
   await page.route('**/api/v1/guilds/1/moderation/automod/rules', route => route.fulfill({ json: { items: [], trigger_types: ['keyword'] } }))
   await page.goto('/servers/1/moderation/automod/rules/new')
   await page.getByRole('button', { name: /適用範囲・例外/ }).click()

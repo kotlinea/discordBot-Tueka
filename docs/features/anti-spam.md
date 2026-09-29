@@ -27,3 +27,5 @@ keywords: 連投 同一メッセージ メンションスパム リアクショ�
 最初の検知で最近の投稿を削除してWarningを加算し、pointsの閾値横断を[Warnings / Infractions](infractions.md)でTimeoutやBanへ接続できます。同時に複数閾値を越えた場合は最高段階だけを実行します。
 
 Bot／Webhookは既定で対象外です。連携Botの暴走を監視する場合は、actor種別と対象Channelを明示した専用ルールを作成してください。
+
+ルールの作成・複製・一括ON/OFFは[ルール操作ガイド](../dashboard/moderation-rules.md)を参照してください。

@@ -1,12 +1,12 @@
 # 現行実行計画
 
-更新: 2026-09-25。方針の正本は[ROADMAP](../../ROADMAP.md)。過去の調査・完了経緯は[旧計画](history/EXECUTION_PLAN-2026-09-19.md)と[進捗](history/PROGRESS0910.md)へ分離する。旧P番号は履歴との対応を保つ。
+更新: 2026-09-29。方針の正本は[ROADMAP](../../ROADMAP.md)。過去の調査・完了経緯は[旧計画](history/EXECUTION_PLAN-2026-09-19.md)と[進捗](history/PROGRESS0910.md)へ分離する。旧P番号は履歴との対応を保つ。
 
 状態は **未着手 / 進行中 / ローカル検証済み / 外部環境待ち / 受入完了**。コードの存在、ローカル成功、GitHub CI成功、実機受入を混同しない。
 
 | 順序・ID | 担当 | 状態 | 依存・成果物 | 受入条件・証拠 | 阻害要因 |
 | --- | --- | --- | --- | --- | --- |
-| U 表示構造・設定操作の統一 | 開発者 | 進行中 | [専用計画](../../goal.md)。U0〜U3完了、次はU4 | カテゴリー/大機能の階層、機能レジストラー、設定の実態、ルール複製・一括状態変更をU0〜U6で受入 | [U0](history/FEATURE_UX_U0-2026-09-25.md)・[U1](history/FEATURE_UX_U1-2026-09-25.md)・[U2](history/FEATURE_UX_U2-2026-09-25.md)・[U3の設定と共通操作](history/FEATURE_UX_U3-2026-09-25.md)受入済み。U4〜U6未着手、実環境受入は別ゲート |
+| U 表示構造・設定操作の統一 | 開発者 | ローカル検証済み | U0〜U6完了。[最終受入](history/FEATURE_UX_U6-2026-09-29.md) | Python/Image各428件、UI163件、Dashboard164ケース、Docs20ケース、登録拡張・依存境界・API/103コマンド・運用入口を受入。Runtime検査の例外契約を修正後、全群の項目が成功 | Uの残作業なし。独立Linux Host・Remote CI・実StageはT1/C1/P3-Gで別管理 |
 | G 機能中心の構造改善 | 開発者 | ローカル検証済み | G0〜G6完了。カテゴリー/機能別のBackend・UI、登録とoverride、共有部品 | [G6 最終受入](history/FEATURE_STRUCTURE_G6-2026-09-23.md)。Python/Image各405件・UI119件・ブラウザー88+15件、API/103コマンド・運用入口・秘密情報検査成功 | Gの残作業なし。実環境受入はT1/C1/P3-Gで別管理 |
 | D1 役割別Docs・公開境界 | 開発者 | ローカル検証済み | 日英利用者Docs、Operator/Developer handbook、全コマンド対応表 | 日英build/リンク/検索/表示・103コマンド照合・内部資料404・Image不在 | なし |
 | D3 文書の仕様・文体点検 | 開発者 | ローカル検証済み | D1。[125件の点検台帳](history/DOCUMENTATION_AUDIT.md)、編集基準、表現・リンク検査 | 日英build、103コマンド照合、Docsブラウザー15件、文書8テスト成功。証拠は進捗 | Remote CI・実StageはC1/P3-G |

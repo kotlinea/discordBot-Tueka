@@ -57,6 +57,16 @@ class ReorderInput(ApiModel):
     items: list[ReorderItem] = []
 
 
+class RuleStateItem(ApiModel):
+    id: int = Field(gt=0, strict=True)
+    revision: int = Field(gt=0, strict=True)
+
+
+class RuleStateInput(ApiModel):
+    items: list[RuleStateItem] = Field(min_length=1, max_length=200)
+    enabled: bool = Field(strict=True)
+
+
 class RuleTestInput(ApiModel):
     content: str = Field(default='', max_length=4000)
     channel_id: str | int | None = None

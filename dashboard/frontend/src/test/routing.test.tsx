@@ -98,7 +98,7 @@ describe('registered routes preserve direct links and parameters', () => {
   it('builds nested breadcrumbs and palette paths from registrations', () => {
     const t = (key: string) => key
     expect(featureBreadcrumbs('/servers/1/moderation/anti_raid/rules/new', '1', [], t)).toEqual([
-      { label: 'nav.moderation', to: '/servers/1/moderation' }, { label: 'moderation.anti_raid', to: '/servers/1/moderation/anti_raid' }, { label: 'common.create', to: undefined },
+      { label: 'nav.moderation', to: '/servers/1/moderation' }, { label: 'moderation.anti_raid', to: '/servers/1/moderation/anti_raid' }, { label: 'operations.create', to: undefined },
     ])
     expect(featureBreadcrumbs('/servers/1/tickets/panel-messages', '1', [], t).map(item => item.label)).toEqual(['nav.serverOperations', 'tickets.title', 'tickets.panelMessages'])
     expect(featureBreadcrumbs('/servers/1/social/youtube', '1', [], t).map(item => item.label)).toEqual(['nav.social', 'YouTube social.title'])

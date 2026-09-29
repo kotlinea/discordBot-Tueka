@@ -7,6 +7,7 @@ from jobs import QueueRepository, QueueSpec
 from jobs.catalog import QUEUE_SPECS
 from database import lock_resource, require_current, transaction
 from guild_settings.moderation.moderation import normalize as moderation_settings
+from .rules import FAMILY_TRIGGERS, validate_activation
 
 
 class ModerationRepository:
@@ -75,6 +76,48 @@ class ModerationRepository:
                 ON CONFLICT(guild_id,module_id) DO UPDATE SET settings_json=excluded.settings_json""",
                 (guild_id, int(core["enabled"]) if core else 0, json.dumps(settings)))
         return self.moderation_rules(guild_id, family=family)
+
+    def set_moderation_rules_enabled(self, guild_id: int, family: str,
+            items: list[dict[str, Any]], enabled: bool) -> list[dict[str, Any]]:
+        """Change selected states and the runtime generation in one transaction."""
+        if family not in FAMILY_TRIGGERS or type(enabled) is not bool or not 1 <= len(items) <= 200:
+            raise ValueError('Invalid rule selection')
+        for item in items:
+            if any(type(item.get(key)) is not int or item[key] <= 0 for key in ('id', 'revision')):
+                raise ValueError('Rule ID and revision are required')
+        ids = [item['id'] for item in items]
+        if len(set(ids)) != len(ids):
+            raise ValueError('Duplicate rule IDs')
+        with self._connection() as connection:
+            lock_resource(connection, 'guild-module', f'{guild_id}:moderation')
+            rows = connection.execute(
+                f"SELECT * FROM moderation_rules WHERE guild_id=%s AND family=%s AND id IN ({','.join('%s' for _ in ids)}) ORDER BY priority,id FOR UPDATE",
+                (guild_id, family, *ids)).fetchall()
+            current = {row['id']: row for row in rows}
+            if set(current) != set(ids):
+                raise ValueError('Rule selection contains an unknown rule or another server/family')
+            for item in items:
+                if item['revision'] != current[item['id']]['revision']:
+                    raise RuntimeError('revision_conflict')
+            if enabled:
+                for row in rows:
+                    validate_activation(self._moderation_rule(row))
+            changed = [row['id'] for row in rows if bool(row['enabled']) != enabled]
+            if changed:
+                now = int(time.time())
+                connection.execute(
+                    f"UPDATE moderation_rules SET enabled=%s,revision=revision+1,updated_at=%s WHERE guild_id=%s AND id IN ({','.join('%s' for _ in changed)})",
+                    (int(enabled), now, guild_id, *changed))
+                core = connection.execute("SELECT enabled,settings_json FROM guild_modules WHERE guild_id=%s AND module_id='moderation'", (guild_id,)).fetchone()
+                settings = moderation_settings(json.loads(core['settings_json']) if core else {})
+                settings['rules_revision'] = int(settings.get('rules_revision', 0)) + 1
+                connection.execute("""INSERT INTO guild_modules(guild_id,module_id,enabled,settings_json) VALUES(%s,'moderation',%s,%s)
+                    ON CONFLICT(guild_id,module_id) DO UPDATE SET settings_json=excluded.settings_json""",
+                    (guild_id, int(core['enabled']) if core else 0, json.dumps(settings)))
+            result = connection.execute(
+                f"SELECT * FROM moderation_rules WHERE guild_id=%s AND id IN ({','.join('%s' for _ in ids)}) ORDER BY priority,id",
+                (guild_id, *ids)).fetchall()
+        return [self._moderation_rule(row) for row in result]
 
     def save_moderation_rule(self, guild_id: int, rule: dict[str, Any], rule_id: int | None = None, *, expected_revision: int | None = None) -> dict[str, Any]:
         now = int(time.time())

@@ -14,7 +14,7 @@ from dashboard.api.schemas import inputs
 from dashboard.api.body import read_body, request_schema
 from dashboard.api.dependencies import ApiDependencies
 from dashboard.api.serialization import _serialize_rule_resource_ids
-FAMILY_TRIGGERS = {'automod': ('keyword', 'regex', 'safe_browsing', 'phishing_link', 'discord_invite', 'domain', 'caps', 'emoji_sticker_rate', 'media_only', 'honeypot'), 'anti_spam': ('message_rate', 'duplicate', 'mention_rate', 'link_rate', 'attachment_rate', 'reaction_rate', 'reaction_burst'), 'anti_raid': ('join_rate', 'leave_rate', 'new_account_ratio', 'new_member_activity')}
+from moderation.rules import FAMILY_TRIGGERS, rule_template
 ALLOWED_ACTIONS = {'warn', 'timeout', 'untimeout', 'kick', 'ban', 'unban', 'softban', 'purge', 'lock', 'unlock', 'lockdown', 'unlockdown'}
 
 def create_router(context: ApiContext) -> APIRouter:
@@ -24,6 +24,13 @@ def create_router(context: ApiContext) -> APIRouter:
     moderation_repository = context.moderation_repository
     guild_settings_repository = context.guild_settings_repository
     manage = auth.manage
+
+    @router.get('/guilds/{guild_id}/moderation/{family}/templates/{trigger_type}', response_model=schemas.Rule, response_model_exclude_unset=True)
+    async def template(request: Request, guild_id: int, family: str, trigger_type: str, _access: str=Depends(auth.read)) -> dict[str, Any]:
+        try:
+            return _serialize_rule_resource_ids(rule_template(family, trigger_type))
+        except ValueError as exc:
+            raise api_error(404, 'template_not_found', 'ルールの初期設定が見つかりません。') from exc
 
     @router.get('/guilds/{guild_id}/moderation/{family}/rules', response_model=schemas.RulesResponse, response_model_exclude_unset=True)
     async def rules(request: Request, guild_id: int, family: str) -> dict[str, Any]:
@@ -73,6 +80,19 @@ def create_router(context: ApiContext) -> APIRouter:
             raise revision_conflict('別の管理者がルール一覧を更新しました。再読み込みしてください。') from exc
         except (TypeError, ValueError) as exc:
             raise api_error(422, 'rule_order_invalid', 'ルールの順序を再読み込みして、もう一度保存してください。') from exc
+
+    @router.put('/guilds/{guild_id}/moderation/{family}/rules/state', dependencies=[Depends(auth.csrf)], response_model=schemas.Items[schemas.Rule], response_model_exclude_unset=True, openapi_extra=request_schema(inputs.RuleStateInput))
+    async def set_rules_state(request: Request, guild_id: int, family: str, _access: str=Depends(auth.write)) -> dict[str, Any]:
+        if family not in FAMILY_TRIGGERS:
+            raise api_error(404, 'family_not_found', 'ルール種別が見つかりません。')
+        body = await read_body(request, inputs.RuleStateInput)
+        try:
+            items = moderation_repository.set_moderation_rules_enabled(guild_id, family, body['items'], body['enabled'])
+            return {'items': [_serialize_rule_resource_ids(item) for item in items]}
+        except RuntimeError as exc:
+            raise revision_conflict('別の管理者がルールを更新しました。一覧を再読み込みして選択を確認してください。') from exc
+        except (TypeError, ValueError) as exc:
+            raise api_error(422, 'rule_state_invalid', str(exc)) from exc
 
     @router.put('/guilds/{guild_id}/moderation/{family}/rules/{rule_id}', dependencies=[Depends(auth.csrf)], response_model=schemas.Rule, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.RuleInput))
     async def update_rule(request: Request, guild_id: int, family: str, rule_id: int, _access: str=Depends(auth.write)) -> dict[str, Any]:

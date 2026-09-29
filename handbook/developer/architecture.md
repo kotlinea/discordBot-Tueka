@@ -4,6 +4,16 @@
 
 Dashboardの共通入口は概要とサーバー情報です。サーバー情報はGuild一覧とDiscord Resourceの取得値を表示し、機能設定は各機能画面が所有します。サーバー運営（Ticket/RR）・コミュニティ・エンゲージメント・モデレーション・通知とソーシャルの表示所属はUI Registryへ集約します。Sidebar・検索・パンくずが同じ登録を使用し、Backendの機能ID・カテゴリー・保存先は表示移動と独立しています。
 
+| 表示カテゴリー | 機能ID（24公開機能） |
+| --- | --- |
+| サーバー運営 | `tickets`、`reaction_roles` |
+| コミュニティ | `welcome`、`autorole`、`leveling`、`live_stats`、`temporary_voice` |
+| エンゲージメント | `advanced_polls`、`suggestions`、`minigames` |
+| モデレーション | `moderation`、`automod`、`anti_spam`、`anti_raid`、`infractions`、`moderation_actions`、`moderation_logs`、`audit_log`、`trust_score` |
+| 通知・ソーシャル | `youtube_updates`、`twitch_updates`、`tiktok_updates`、`x_updates`、`instagram_updates` |
+
+カテゴリーは探索の見出し、機能は目的別の入口です。Ticket/RRのような大機能は内部に複数画面を持ち、各画面を機能専用フォルダーへ置きます。機能別ファイルは登録入口の単位であり、実装全体を一ファイルへ集約する規則ではありません。共通入口は機能数に含めず、Bot専用機能に架空のDashboard画面を作りません。
+
 - **Repository**：PostgreSQLへの読書き、Transaction、Lease、Revision
 - **Service**：検証、状態遷移、冪等性、権限に依存しない業務処理
 - **Discord Adapter / Cog**：Discord Event、Interaction、Permission、API操作
@@ -175,12 +185,22 @@ RootとDomain Routerは `React.lazy` / `Suspense` で画面を遅延読込みし
 
 アプリ入口はData Routerを使用し、`NavigationGuard.tsx` の一つのBlockerが各 `useUnsavedChanges` の編集状態を集約します。リンク・検索の命令的遷移・履歴移動を保護し、保存中は移動を抑止します。保存成功後の意図した遷移だけを呼出元が明示的に許可します。タブ終了/再読込はbeforeunloadで保護します。認可は引き続きAPIの責務です。401は既存の再ログイン経路を維持し、Draftの永続保存は行いません。
 
-ルール一覧の既存削除APIは逐次処理です。成功済みIDをpendingから除き、失敗時は削除済み件数・残りの変更・元revisionを保持します。破棄で成功済み削除を復元しません。これは全件原子的に行う予定のルール一括有効化とは別契約です。
+ルール一覧の既存削除APIは逐次処理です。成功済みIDをpendingから除き、失敗時は削除済み件数・残りの変更・元revisionを保持します。破棄で成功済み削除を復元しません。これは全件原子的なルール一括状態変更APIとは別契約です。
+
+ModerationのFamily/Trigger選択・未保存の無効テンプレート・有効化時の検証は `moderation/rules.py` が所有します。一括状態変更はRepositoryが既存CRUDと同じGuild Moduleロックを取得し、選択全件の所属/revision/設定を確認してからenabledだけを更新します。変更された行のrevisionとModuleのrules_revisionを同時Commitし、Runtimeのキャッシュ再取得を促します。後半の保存失敗も全件Rollbackします。既存ルールの内容・順序・履歴と親/Familyの有効状態は保持します。HTTP契約は[API](api.md)、受入は `tests/test_rule_operations.py` を参照してください。
 
 `components/feature/ModuleSettings.tsx` は共通Module APIの保存・状態表示を担当し、項目描画・説明・追加操作をpropsで受け取ります。成功時は応答のrevisionを次回保存へ渡し、失敗時と編集中の再取得では入力を保持します。`components/ui/Button.tsx` は既存Tokenのvariant、loading、disabled、form/type、aria/refを扱います。`components/editors/EmbedEditor.tsx` は値と制約・変数候補を受け取り、Ticket側が生成API制約と保存を所有します。共有部品から機能モジュールへ依存しません。
 
 視覚仕様は `design.md` と既存Tokenを維持します。Playwrightは別の一時出力先へbuildしたSPAをpreviewで配信し、開発サーバーの初回変換時間と画面の動作を切り分けます。本番の `/ui/` buildとは出力先を分け、4画面幅、日英、3外観×light/dark、保存・再読込・競合・権限・キーボード・Accessibilityを検証します。
 
+
+## Moderationルールの操作画面
+
+`ruleScreen.tsx` はFamilyごとの作成画面を既存FeaturePageのactionとして登録し、静的な `rules/new` はRegistryが合成します。既存詳細URLは機能内Routerが扱います。`RuleEditor` はGuild/Family/ID/複製元でDraftを分離し、`?copy=<id>` を未保存・無効・Identityなしの新規入力へ変換します。保存は既存POST、編集はrevision付きPUTです。即時保存duplicate APIはこのUIで使いません。
+
+テンプレートはBackendから取得し、読込失敗では入力を保持します。明示的な既定値読込は置換確認後に適用し、検知方法だけの切替はそのTriggerのconfig/event_typeを差し替えます。`ruleForm.ts` はDomain項目を明示的に送信し、画面補助値を除きます。編集対象外のconditions/exemptions/Trigger固有値を保持し、複製では元のID/revision/時刻を持ち込みません。
+
+`RuleList` は順序・削除のdraftと、一括変更の選択スナップショットを分け、両操作を同時に保存させません。`RuleBulkDialog` は件数、モード、権限、Resource・親停止・入力不足を確認し、状態更新を単一リクエストで送ります。409の選択/revisionは黙って上書きせず、明示再取得後に再確認を求めます。保存中の再送信・画面移動を共通hookで保護します。表示上の条件確認はAPI認可や実行時のResource/Role階層検査を代替しません。
 
 ## DB時刻と障害境界
 

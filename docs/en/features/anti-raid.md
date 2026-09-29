@@ -10,3 +10,5 @@ Detect join/leave bursts, recently created account ratios and activity immediate
 Raid state survives restarts. End it through configured exit conditions or administrator action. Combine administrator notices, timeout/kick/ban, channel locks and server lockdown. Lockdown retains previous channel overwrites for expiry or manual release; later administrator changes are treated as conflicts rather than overwritten.
 
 The Bot needs Manage Channels for locks, and Moderate Members/Kick Members/Ban Members for the corresponding sanctions. Role hierarchy still applies.
+
+See [the rule workflow](../dashboard/moderation-rules.md) for creation, duplication and bulk state changes.

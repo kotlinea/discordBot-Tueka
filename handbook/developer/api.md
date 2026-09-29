@@ -47,6 +47,15 @@ Domain Routerは `dashboard/api/`、合成入口は `dashboard/api_v1.py` です
 - 添付取得は認可後に `application/octet-stream` を返し、生成クライアントでは `Blob` として受け取ります。204の削除応答は本文なしです。
 - Moduleの可変設定、Moderation Triggerの種類別設定、Outbox payload等はJSONオブジェクトとして保持します。生成型では `Record<string, unknown>` とし、Domainの正規化・組合せ検証が責任を持ちます。
 
+## Moderationルールの初期値と一括状態変更
+
+- `GET /api/v1/guilds/{guild_id}/moderation/{family}/templates/{trigger_type}` はFamilyに対応する未保存の初期値を返す。`enabled: false`、ID・revision・履歴なし。keyword/regex/domain/honeypot等は入力を補ってから既存POSTへ送る。不明なFamily/Triggerの組合せは404。取得にはGuild管理権限が必要。
+- `PUT /api/v1/guilds/{guild_id}/moderation/{family}/rules/state` は `{"enabled":true,"items":[{"id":1,"revision":2}]}` を受け取る。対象は同一Guild・Familyの1〜200件、ID/revisionは必須の正整数、enabledはboolean。重複・不存在・他Guild/Family・不正設定は422、revision競合は409。Session・CSRF・現在のGuild管理権限を検査する。
+- 全対象の所属・revision、有効化時の設定を検証後、状態だけを同一Transactionで変更する。途中失敗は全件不変更。応答のitemsは選択対象をpriority/id順で返す。内容・順序・履歴・親/FamilyのON/OFFは変更しない。
+- 状態が変わるルールだけrevisionを加算し、`rules_revision` はTransactionごとに一度加算する。同じ状態の再指定でもrevision検査は必要だが、変更がなければいずれも加算しない。409では一覧を再取得し、対象を再確認する。
+- この操作は保存値の切替であり、Discord処置を即時実行しない。親/Family設定、Resource・Bot権限、外部サービス等の実行条件は引き続きRuntimeが判定する。参照Resourceの現在の存在や権限を一括APIの成功だけで保証しない。
+- 未保存ドラフトの複製は元ルールからID/revision/時刻を除外し、無効状態で既存POSTへ保存する。既存の即時保存 `/rules/{rule_id}/duplicate` は別契約として保持する。操作画面の導入状況は実行計画を参照する。
+
 ## SchemaからFrontendへの生成
 
 `dashboard/api/schemas/` が公開DTOと入力制約を定義します。`body.py` は同じ入力ModelからOpenAPIを構築し、実際のJSONも検証します。作成・更新の部分入力は未指定の項目をDomainへ渡さず、既定値・組合せ・Guild Resource検査はDomainとRouterで行います。明示的なnullはnullable項目に限ります。
