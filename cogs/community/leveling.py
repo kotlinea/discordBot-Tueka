@@ -73,29 +73,33 @@ class LevelingCog(commands.Cog):
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or message.guild is None or not isinstance(message.author, discord.Member):
             return
-        if not self.guild_settings.module_enabled(message.guild.id, "leveling"):
-            return
         key = (message.guild.id, message.author.id)
         now = time.monotonic()
-        if now - self.last_xp_time.get(key, 0) < 60:
+        last = self.last_xp_time.get(key)
+        if last is not None and now - last < 60:
             return
-        old_user = self.repository.get_user(message.guild.id, message.author.id)
-        old_level, _ = calculate_level(old_user["xp"])
-        user = self.repository.add_xp(message.guild.id, message.author.id, random.randint(15, 25))
+        module = self.guild_settings.get_module(message.guild.id, "leveling")
+        if not module["enabled"]:
+            return
+        amount = random.randint(15, 25)
+        user = self.repository.add_xp(message.guild.id, message.author.id, amount)
+        old_level, _ = calculate_level(user["xp"] - amount)
         new_level, _ = calculate_level(user["xp"])
         self.last_xp_time[key] = now
         if new_level > old_level:
-            settings = self.guild_settings.get_module(message.guild.id, "leveling")["settings"]
-            await self._on_level_up(message.author, new_level, settings, "text")
+            await self._on_level_up(message.author, new_level, module["settings"], "text")
 
     @tasks.loop(seconds=60)
     async def voice_xp_tick(self) -> None:
+        now = time.monotonic()
+        self.last_xp_time = {key: last for key, last in self.last_xp_time.items() if now - last < 60}
         for guild_id in self.guild_settings.enabled_module_guild_ids("leveling"):
             guild = self.bot.get_guild(guild_id)
             if guild is None:
                 continue
-            settings = self.guild_settings.get_module(guild_id, "leveling")["settings"]
-            if not settings.get("voice_enabled"):
+            module = self.guild_settings.get_module(guild_id, "leveling")
+            settings = module["settings"]
+            if not module["enabled"] or not settings.get("voice_enabled"):
                 continue
             amount = max(1, min(int(settings.get("voice_xp_per_minute", 5)), 100))
             allow_solo = bool(settings.get("voice_allow_solo"))
@@ -110,8 +114,8 @@ class LevelingCog(commands.Cog):
                     state = member.voice
                     if state is None or (not allow_muted and (state.self_mute or state.mute or state.self_deaf or state.deaf)):
                         continue
-                    old_level, _ = calculate_level(self.repository.get_voice_user(guild.id, member.id)["xp"])
                     current = self.repository.add_voice_xp(guild.id, member.id, amount)
+                    old_level, _ = calculate_level(current["xp"] - amount)
                     new_level, _ = calculate_level(current["xp"])
                     if new_level > old_level:
                         await self._on_level_up(member, new_level, settings, "voice")

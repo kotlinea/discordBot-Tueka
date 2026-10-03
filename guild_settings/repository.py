@@ -1,5 +1,6 @@
 """Guild module settings persistence shared by Dashboard and runtime domains."""
 import json
+from collections.abc import Iterable
 from typing import Any
 
 from contextlib import nullcontext
@@ -18,10 +19,23 @@ class GuildSettingsRepository:
     def get_module(self, guild_id: int, module_id: str, *, _conn=None) -> dict[str, Any]:
         with (nullcontext(_conn) if _conn is not None else self._connection()) as connection:
             row = connection.execute("SELECT enabled, settings_json, revision FROM guild_modules WHERE guild_id = %s AND module_id = %s", (guild_id, module_id)).fetchone()
+        return self._module(module_id, row)
+
+    @staticmethod
+    def _module(module_id: str, row) -> dict[str, Any]:
         if row:
             settings = normalize(module_id, json.loads(row["settings_json"]))
             return {"enabled": bool(row["enabled"]), "settings": settings, "revision": int(row["revision"])}
         return {"enabled": False, "settings": normalize(module_id, None), "revision": 0}
+
+    def get_modules(self, guild_id: int, module_ids: Iterable[str]) -> dict[str, dict[str, Any]]:
+        ids = list(dict.fromkeys(module_ids))
+        if not ids:
+            return {}
+        with self._connection() as connection:
+            rows = connection.execute("SELECT module_id, enabled, settings_json, revision FROM guild_modules WHERE guild_id=%s AND module_id=ANY(%s)", (guild_id, ids)).fetchall()
+        stored = {row["module_id"]: row for row in rows}
+        return {module_id: self._module(module_id, stored.get(module_id)) for module_id in ids}
 
     def set_module(self, guild_id: int, module_id: str, *, enabled: bool, settings: dict[str, Any] | None = None,
                    expected_revision: int | None = None) -> dict[str, Any]:
@@ -38,7 +52,9 @@ class GuildSettingsRepository:
             return self.get_module(guild_id, module_id, _conn=connection)
 
     def module_enabled(self, guild_id: int, module_id: str) -> bool:
-        return self.get_module(guild_id, module_id)["enabled"]
+        with self._connection() as connection:
+            row = connection.execute("SELECT enabled FROM guild_modules WHERE guild_id=%s AND module_id=%s", (guild_id, module_id)).fetchone()
+        return bool(row and row["enabled"])
 
     def enabled_module_guild_ids(self, module_id: str) -> list[int]:
         with self._connection() as connection:

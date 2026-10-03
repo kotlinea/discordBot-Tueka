@@ -202,6 +202,16 @@ ModerationのFamily/Trigger選択・未保存の無効テンプレート・有�
 
 `RuleList` は順序・削除のdraftと、一括変更の選択スナップショットを分け、両操作を同時に保存させません。`RuleBulkDialog` は件数、モード、権限、Resource・親停止・入力不足を確認し、状態更新を単一リクエストで送ります。409の選択/revisionは黙って上書きせず、明示再取得後に再確認を求めます。保存中の再送信・画面移動を共通hookで保護します。表示上の条件確認はAPI認可や実行時のResource/Role階層検査を代替しません。
 
+## 軽量化の処理契約
+
+XP加算はRepositoryの単一UPSERTとRETURNINGで自身の更新結果を返す。Cogは付与量から更新前レベルを求め、DB更新成功後だけ60秒のクールダウンを記録する。期限切れのクールダウンは既存の毎分VC処理で整理する。有効フラグだけの判定はJSONを取得・正規化しない。
+
+概要・機能一覧では標準ModuleSettingsAccessが扱う設定をリクエスト内で一括取得し、単件と同じ正規化・表示変換を使う。独自settings factory、派生Access、専用Repository、別のStoreは自身のreadを保持する。共有キャッシュは追加せず、保存時の現在の認可・revision検査を維持する。
+
+Live Statsは参加・退出・ロール作成/削除のGuild IDを保留し、5秒周期で集約する。5分再同期と同じGuild単位のLockを使用し、実行時に有効設定とチャンネルを確認する。個人へのロール付与やVC状態は表示値に関係しないため処理しない。失敗は次の周期へ保留し、退出・Cog終了時に状態を整理する。5秒は集約周期であり、DiscordのRate Limitや既存操作の待ち時間は別に発生する。
+
+Socialの履歴削除はmonotonic時計で起動から1時間後、その後は完了から1時間後に実行する。失敗でも次周期へ送る。保持期間・削除対象はRepositoryが所有し、Provider取得やLeaseの契約は変えない。
+
 ## DB時刻と障害境界
 
 保存時刻・Lease期限はアプリがUTC epoch秒で生成し、接続SessionのTimezoneもUTCに固定します。Bot・Dashboard・Workerを動かすHostの時計を同期してください。テストだけはQueue/Resource Leaseの時計を注入して失効を再現します。

@@ -39,7 +39,10 @@ class ModuleSettingsAccess:
     additional_permissions: Callable[[Settings], tuple[str, ...]] = additional_permissions
 
     def read(self, guild_id: int) -> Settings:
-        value = deepcopy(self.store.get_module(guild_id, self.feature_id))
+        return self.from_module(self.store.get_module(guild_id, self.feature_id))
+
+    def from_module(self, module: Settings) -> Settings:
+        value = deepcopy(module)
         return {**value, 'settings': self.normalize(value['settings'])}
 
     def save(self, guild_id: int, *, enabled: bool, settings: Settings,

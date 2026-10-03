@@ -17,7 +17,8 @@ class CommunityRepositoryTests(unittest.TestCase):
 
     def test_parallel_xp_additions_are_not_lost_and_tracks_are_isolated(self):
         with ThreadPoolExecutor(max_workers=4) as workers:
-            list(workers.map(lambda _: self.repository.add_xp(1, 10, 5), range(20)))
+            results = list(workers.map(lambda _: self.repository.add_xp(1, 10, 5), range(20)))
+        self.assertEqual(sorted(row['xp'] for row in results), list(range(5, 101, 5)))
         self.repository.add_voice_xp(1, 10, 8)
         self.repository.add_xp(2, 10, 2)
         restarted = CommunityRepository(self.path)

@@ -25,11 +25,23 @@ log = logging.getLogger("tueka.social_worker")
 
 
 class SocialWorker:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, *, clock=time.monotonic) -> None:
         self.settings = settings
         self.repository = SocialRepository(settings.database_url)
         self.owner = f"{socket.gethostname()}:{os.getpid()}"
         self.failures: dict[str, int] = {}
+        self._clock = clock
+        self._next_purge_at = clock() + 3600
+
+    def _purge_history_if_due(self) -> None:
+        if self._clock() < self._next_purge_at:
+            return
+        try:
+            self.repository.purge_social_history(retention_days=30)
+        except Exception:
+            log.warning("Social history cleanup failed", exc_info=True)
+        finally:
+            self._next_purge_at = self._clock() + 3600
 
     async def _process_target(self, target: dict[str, Any], adapters: dict[str, Any]) -> None:
         provider = target["provider"]
@@ -76,8 +88,7 @@ class SocialWorker:
                 await asyncio.gather(*(run(target) for target in targets))
             else:
                 await asyncio.sleep(2)
-            if int(time.time()) % 3600 < 3:
-                self.repository.purge_social_history(retention_days=30)
+            self._purge_history_if_due()
 
     async def heartbeat_loop(self) -> None:
         while True:

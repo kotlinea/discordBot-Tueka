@@ -31,8 +31,8 @@ class CommunityRepository:
 
     def add_xp(self, guild_id: int, user_id: int, amount: int) -> dict[str, int]:
         with self._connection() as connection:
-            connection.execute("INSERT INTO guild_users (guild_id, user_id, xp) VALUES (%s, %s, %s) ON CONFLICT(guild_id, user_id) DO UPDATE SET xp = guild_users.xp + excluded.xp", (guild_id, user_id, amount))
-        return self.get_user(guild_id, user_id)
+            row = connection.execute("INSERT INTO guild_users (guild_id, user_id, xp) VALUES (%s, %s, %s) ON CONFLICT(guild_id, user_id) DO UPDATE SET xp = guild_users.xp + excluded.xp RETURNING xp", (guild_id, user_id, amount)).fetchone()
+        return {"xp": row["xp"]}
 
     def get_voice_user(self, guild_id: int, user_id: int) -> dict[str, int]:
         with self._connection() as connection:
@@ -41,8 +41,8 @@ class CommunityRepository:
 
     def add_voice_xp(self, guild_id: int, user_id: int, amount: int) -> dict[str, int]:
         with self._connection() as connection:
-            connection.execute("INSERT INTO guild_voice_users (guild_id,user_id,xp) VALUES (%s,%s,%s) ON CONFLICT(guild_id,user_id) DO UPDATE SET xp=guild_voice_users.xp+excluded.xp", (guild_id, user_id, amount))
-        return self.get_voice_user(guild_id, user_id)
+            row = connection.execute("INSERT INTO guild_voice_users (guild_id,user_id,xp) VALUES (%s,%s,%s) ON CONFLICT(guild_id,user_id) DO UPDATE SET xp=guild_voice_users.xp+excluded.xp RETURNING xp", (guild_id, user_id, amount)).fetchone()
+        return {"xp": row["xp"]}
 
     def voice_leaderboard(self, guild_id: int, limit: int = 5) -> list[dict[str, int]]:
         with self._connection() as connection:

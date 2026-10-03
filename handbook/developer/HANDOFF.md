@@ -1,6 +1,6 @@
 # 作業開始
 
-更新: 2026-09-29。現行仕様は[構成](CODE_MAP.md)と[設計](architecture.md)、実施順序・状態は[実行計画](EXECUTION_PLAN.md)を正本とする。
+更新: 2026-10-03。現行仕様は[構成](CODE_MAP.md)と[設計](architecture.md)、実施順序・状態は[実行計画](EXECUTION_PLAN.md)を正本とする。
 
 ## 最初の手順
 
@@ -16,6 +16,8 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 ```
 
 ## 現在地と次の作業
+
+- 処理の軽量化は[計画](PERFORMANCE_PLAN.md)の範囲をローカル検証済み。XP・Dashboard設定取得・Live Stats・Social定期処理を改善し、[測定・受入](history/PERFORMANCE-2026-10-03.md)へ証拠を保存した。XP 3→1 SQL、一覧22→4 SQL、Python440成功・測定1skip、UI163件、API/103コマンド・資料検査成功。監視集計とDB非同期化は測定・判断材料まで。実環境の性能は未検証。
 
 - 表示構造・設定操作の改善U0〜U6は完了。[最終受入・要件対応](history/FEATURE_UX_U6-2026-09-29.md)に証拠を保存し、一時計画を終了した。24機能の配置、Ticket/RR内部画面、登録/override、設定と稼働条件、ルール複製・一括状態変更を受入済み。Uの残作業なし。
 
