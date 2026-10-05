@@ -8,7 +8,7 @@ keywords: 禁止ワード 正規表現 URL ドメイン Discord招待 Safe Brows
 
 メッセージ内容を検査し、削除、Warning、通知、Timeoutなどを組み合わせます。時間窓の連投対策は[Anti-Spam](anti-spam.md)を使用します。
 
-禁止語はDashboardのKeyword Ruleへ設定します。pointsの累計に応じた処置を使う場合は、[Warnings / Infractions](infractions.md)を有効にして閾値と処置を設定してください。
+禁止語はダッシュボードのKeyword Ruleへ設定します。pointsの累計に応じた処置を使う場合は、[Warnings / Infractions](infractions.md)を有効にして閾値と処置を設定してください。
 
 ## Trigger
 
@@ -21,13 +21,13 @@ keywords: 禁止ワード 正規表現 URL ドメイン Discord招待 Safe Brows
 | safe_browsing | URL | API未設定・障害時はfail-open |
 | phishing_link | 表示名と遷移先 | 不一致やフィッシング表記を検査 |
 | caps | 大文字率、最小文字数 | 短文を除外可能 |
-| emoji_sticker_rate | Emoji／Sticker数 | 1投稿または時間窓で判定 |
-| media_only | 対象Channel | 添付・Embedを含まない投稿を検知 |
-| honeypot | 対象Channel | 投稿自体を検知 |
+| emoji_sticker_rate | 絵文字・スタンプ数 | 1投稿または時間窓で判定 |
+| media_only | 対象チャンネル | 添付・Embedを含まない投稿を検知 |
+| honeypot | 対象チャンネル | 投稿自体を検知 |
 
 ## 適用範囲と例外
 
-Whitelist方式は選択した対象だけに適用し、Blacklist方式は選択した対象を除外します。同じ対象を許可と拒否へ同時登録する構成は保存できません。Role、User、Channel、Categoryを設定できます。
+Whitelist方式は選択した対象だけに適用し、Blacklist方式は選択した対象を除外します。同じ対象を許可と拒否へ同時登録する構成は保存できません。ロール、ユーザー、チャンネル、カテゴリを設定できます。
 
 ## Action
 

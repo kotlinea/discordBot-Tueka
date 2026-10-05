@@ -10,9 +10,9 @@ keywords: Warn Timeout Kick Ban Unban Softban Purge Lock Lockdown
 
 ## 利用できる処置
 
-Warn、Timeout、Timeout解除、Kick、Ban、Unban、Tempban、Softban、メッセージ削除、最近のメッセージ削除、リアクション削除、Channel Lock／Unlock、Server Lockdown／解除を利用できます。
+Warn、Timeout、Timeout解除、Kick、Ban、Unban、Tempban、Softban、メッセージ削除、最近のメッセージ削除、リアクション削除、チャンネル Lock／Unlock、Server Lockdown／解除を利用できます。
 
-高い影響を持つBanやLockdownは、ダッシュボードで対象名を入力して確認します。Action実行直前に権限、Role階層、対象状態を再検証します。
+影響が大きいBanやLockdownは、ダッシュボードに表示された対象ユーザーIDまたはサーバーIDを入力して確認します。処置の実行直前に権限、ロール階層、対象の状態を確認し直します。
 
 ## Discordコマンド
 

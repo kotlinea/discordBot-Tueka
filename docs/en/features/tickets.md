@@ -5,7 +5,7 @@ title: Support tickets
 
 # Support tickets
 
-Ticket flow: panel message → panel → form → ticket → staff response → close → feedback/transcript. Server managers configure intake; members use a published panel or `/ticket open` (`/t open`).
+Choose an intake button in a panel message and complete its form to open a ticket. After staff respond and close the ticket, you can view feedback and the transcript. Server managers configure intake; members use a published panel or `/ticket open` (`/t open`).
 
 ## Panel editor
 

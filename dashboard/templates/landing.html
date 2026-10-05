@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="description" content="Tueka — Discordサーバーの保護、運用、コミュニティ機能を一か所で管理します。">
-  <title>{{ bot.name }} — Discord operations workbench</title>
+  <meta name="description" content="TuekaでDiscordサーバーの保護、運用、コミュニティ機能を一か所で管理できます。">
+  <title>{{ bot.name }} | Discordサーバー管理</title>
   {% if frontend_css %}<link rel="stylesheet" href="{{ frontend_css }}">{% endif %}
   <link rel="stylesheet" href="/static/landing-v2.css">
 </head>
@@ -19,10 +19,10 @@
   <main>
     <section class="intro">
       <div class="intro-copy">
-        <p class="signal">Discord operations workbench</p>
-        <h1>守る、判断する、記録する。</h1>
-        <p class="lede">AutoMod、Anti-Spam、Anti-Raid、警告、手動処置、監査ログを、サーバーごとの運用フローとして管理します。</p>
-        <div class="intro-actions"><a class="primary" href="{{ '/servers' if authenticated else '/login' }}">{{ '管理を続ける' if authenticated else 'Discordで開始' }}</a><a class="secondary" href="#capabilities">機能を見る</a></div>
+        <p class="signal">Discordサーバー管理</p>
+        <h1>サーバーの保護と運営を管理する</h1>
+        <p class="lede">サーバーごとにAutoMod、Anti-Spam、Anti-Raidを設定し、警告、手動処置、監査ログを管理できます。</p>
+        <div class="intro-actions"><a class="primary" href="{{ '/servers' if authenticated else '/login' }}">{{ '管理を続ける' if authenticated else 'Discordでログイン' }}</a><a class="secondary" href="#capabilities">機能を見る</a></div>
       </div>
       <div class="operations-board" aria-label="Moderation features">
         <div class="board-head"><span>Moderation</span></div>

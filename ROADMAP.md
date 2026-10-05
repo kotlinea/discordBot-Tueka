@@ -14,6 +14,7 @@ Tuekaの基盤整備、運用受入、機能改善を進める順序と完了条
 
 | 範囲 | 状態 | 確認対象 |
 | --- | --- | --- |
+| W ドキュメント・画面文言の推敲 | ローカル検証済み | 現行資料とDashboard全体を見直し、用語と操作説明を統一。文章差分55件と関連テストを確認。[計画・結果](handbook/developer/WRITING_PLAN.md) |
 | L 処理の軽量化 | ローカル検証済み | [計画](handbook/developer/PERFORMANCE_PLAN.md)の範囲完了。[測定・受入](handbook/developer/history/PERFORMANCE-2026-10-03.md)。XP・設定取得・イベント集約・Social定期処理を改善。実環境性能は未検証 |
 | U 表示構造・設定操作の統一 | ローカル検証済み | U0〜U6完了。[最終受入](handbook/developer/history/FEATURE_UX_U6-2026-09-29.md)。カテゴリー・大機能・登録契約・設定操作・ルール再利用を受入 |
 | Phase 0〜2 | ローカル検証済み | V2、Domain境界、PostgreSQL、API/UI契約 |

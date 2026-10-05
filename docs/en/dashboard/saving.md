@@ -2,7 +2,7 @@
 
 Settings show an unsaved notice and Save/Discard controls. Use the footer in a dialog or the save bar on a settings page. Inputs and repeated submissions are disabled while saving. A successful save refreshes the server values.
 
-Background refreshes preserve your edits. Discard restores the latest loaded values. Links, search navigation and the browser Back button ask before leaving an edited page. Use Try again after a read failure.
+Your input stays in place when settings change on the server. Discard restores the latest loaded values. Links, search navigation and the browser Back button ask before leaving an edited page. Use Try again after a read failure.
 
 Rule deletion marks and ordering changes are applied when saved. If deletion fails partway through, the page shows the number already deleted and retains the remaining changes. Retry processes only the remainder. Discard cannot undo successful deletions. Operations such as subscription deletion are sent after their confirmation.
 

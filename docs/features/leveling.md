@@ -6,19 +6,19 @@ keywords: XP Rank Leaderboard Voice Role reward
 
 # レベリング
 
-Text投稿とVoice滞在からXPを加算し、Rank、Leaderboard、Role Rewardを提供します。
+テキストの投稿やボイスチャンネルへの滞在でXPが増えます。レベルや順位を確認でき、レベルに応じた報酬ロールを設定できます。
 
-## TextとVoice
+## テキストとボイス
 
-Text通知Channelはレベルアップ通知の送信先です。Voice XPは個別に有効化し、1分あたりXP、ソロ参加、Mute中の加算方針を設定します。
+テキストの通知チャンネルはレベルアップ通知の送信先です。ボイスXPは個別に有効化し、1分あたりXP、1人での参加やミュート中に加算するかどうかを設定します。
 
-Role RewardはLevelとRoleの組を最大25件まで設定できます。同じLevelを重複登録できません。BotにManage Rolesがあり、全Reward RoleよりBot Roleが上である必要があります。
+レベル報酬ロールはレベルとロールの組を最大25件まで設定できます。同じレベルを重複登録できません。BotにManage Rolesがあり、すべての報酬ロールよりBotのロールが上である必要があります。
 
 ## コマンド
 
-- `/rank`：現在のText Rankを表示
-- `/leaderboard`：Text XPの順位を表示
-- `/vcrank`：Voice Rankを表示
-- `/vcleaderboard`：Voice XPの順位を表示
+- `/rank`：現在のテキストレベルを表示
+- `/leaderboard`：テキストXPの順位を表示
+- `/vcrank`：ボイスレベルを表示
+- `/vcleaderboard`：ボイスXPの順位を表示
 
-Voice XPが増えない場合はVoice機能、通知Channel、ソロ／Mute設定、BotのVoice State受信状態を確認します。
+ボイスXPが増えない場合はボイス機能、通知チャンネル、1人での参加・ミュート時の設定、Botによるボイス状態の受信を確認します。

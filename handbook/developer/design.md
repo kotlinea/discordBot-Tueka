@@ -28,6 +28,7 @@
 ## 文言と権限
 
 - 日本語は簡潔で丁寧にし、英語も同等の情報を提供する。Labelは対象、Buttonは具体的な動作、Errorは原因と復帰方法を示す。
+- 画面の説明は、利用者ができる操作とその結果を書く。内部のServiceやQueueの構成で説明しない。設定の保存、処理の受付、実行完了を区別し、権限不足や競合時に入力が残る条件を省略しない。用語は公開ガイドとそろえる。
 - 実測していない指標、利用者の声、保護効果、Discordの状態を創作しない。
 - Lockdown/Channel lockはManage Channels、Reaction削除/PurgeはManage Messages、監査照合はView Audit Logを確認する。
 - Timeout/Kick/Banは対応権限とRole階層を実行時にも検査する。

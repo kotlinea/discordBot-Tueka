@@ -6,6 +6,7 @@
 
 | 順序・ID | 担当 | 状態 | 依存・成果物 | 受入条件・証拠 | 阻害要因 |
 | --- | --- | --- | --- | --- | --- |
+| W ドキュメント・画面文言の推敲 | 開発者 | ローカル検証済み | [計画](WRITING_PLAN.md)。現行資料、Dashboard全体、機能一覧の説明 | [結果・ログ](history/WRITING-2026-10-03.md)。文章差分55件、Python440件・UI163件・Dashboard164ケース・Docs20ケース、ビルド・API・103コマンド・資料検査成功 | 実環境の検証はT1/C1/P3-Gで別管理 |
 | L 処理の軽量化 | 開発者 | ローカル検証済み | [計画](PERFORMANCE_PLAN.md)。XP・設定取得・Live Stats・Social定期処理 | [測定・受入](history/PERFORMANCE-2026-10-03.md)。XP 3→1 SQL、一覧22→4 SQL、Python440成功・測定1skip、UI163件、API/103コマンド・資料検査成功。監視集計・同期DB待ちは測定まで | 実Discord・Remote CI・独立Linux Hostの性能は未検証 |
 | U 表示構造・設定操作の統一 | 開発者 | ローカル検証済み | U0〜U6完了。[最終受入](history/FEATURE_UX_U6-2026-09-29.md) | Python/Image各428件、UI163件、Dashboard164ケース、Docs20ケース、登録拡張・依存境界・API/103コマンド・運用入口を受入。Runtime検査の例外契約を修正後、全群の項目が成功 | Uの残作業なし。独立Linux Host・Remote CI・実StageはT1/C1/P3-Gで別管理 |
 | G 機能中心の構造改善 | 開発者 | ローカル検証済み | G0〜G6完了。カテゴリー/機能別のBackend・UI、登録とoverride、共有部品 | [G6 最終受入](history/FEATURE_STRUCTURE_G6-2026-09-23.md)。Python/Image各405件・UI119件・ブラウザー88+15件、API/103コマンド・運用入口・秘密情報検査成功 | Gの残作業なし。実環境受入はT1/C1/P3-Gで別管理 |

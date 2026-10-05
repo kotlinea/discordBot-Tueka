@@ -1,6 +1,6 @@
 # 運用者向けガイド
 
-システム構築、ビルド、配布、日々の保守を担当する方の資料です。リポジトリ内で参照できます。Discordサーバーの機能設定は[利用者Docs](../../docs/index.md)を参照します。
+システムの構築、ビルド、配布、日々の保守を担当する方向けのガイドです。リポジトリ内で読めます。Discordサーバーの機能設定は[利用者Docs](../../docs/index.md)を参照します。
 
 1. [クローンから起動](setup.md)
 2. [Discord Application](application-setup.md)・[環境変数](environment.md)

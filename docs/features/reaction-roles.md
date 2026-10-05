@@ -6,43 +6,43 @@ keywords: Reaction Roles normal unique verify binding drop reversed temp lock li
 
 # リアクションロール
 
-メッセージのEmojiへリアクションすると、設定に応じてRoleを取得・解除できます。サーバー管理者はDashboardまたは `/reactionrole` コマンドで、対象メッセージとEmoji・Roleの対応を設定します。`/r` は短縮コマンドです。
+メッセージの絵文字へリアクションすると、設定に応じてロールを取得・解除できます。サーバー管理者はダッシュボードまたは `/reactionrole` コマンドで、対象メッセージと絵文字・ロールの対応を設定します。`/r` は短縮コマンドです。
 
-## 動作Type
+## 動作方式
 
-| Type | 追加時 | 削除時 | 特徴 |
+| 動作方式 | 追加時 | 削除時 | 特徴 |
 | --- | --- | --- | --- |
-| normal | Role付与 | Role解除 | 複数選択可能 |
-| unique | 新Roleへ切替 | Role解除 | 同一Message内で1択 |
-| verify | Role付与 | 維持 | 認証用途 |
-| binding | 初回だけRole付与 | 設定に従う | 選択履歴をResetするまで再選択不可 |
-| drop | Role解除 | 変更なし | Role返却用途 |
-| reversed | Role解除 | Role付与 | 通常と逆 |
-| temp | 期限付きRole付与 | 即時解除 | 1分～365日 |
-| lock | 処理停止 | 処理停止 | 元Typeを保持した停止状態 |
+| normal | ロール付与 | ロール解除 | 複数選択可能 |
+| unique | 新ロールへ切替 | ロール解除 | 同じメッセージ内で1つだけ選択可能 |
+| verify | ロール付与 | 維持 | 認証用途 |
+| binding | 初回だけロール付与 | 設定に従う | 選択履歴をリセットするまで再選択不可 |
+| drop | ロール解除 | 変更なし | ロール返却用途 |
+| reversed | ロール解除 | ロール付与 | 通常と逆 |
+| temp | 期限付きロール付与 | 即時解除 | 1分～365日 |
+| lock | 処理停止 | 処理停止 | 元の動作方式を保持した停止状態 |
 
 ## アクセス方式と制約
 
-Blacklist方式は指定Roleを拒否します。Whitelist方式は指定Roleを持つMemberだけを許可します。両方式の同時設定はDashboardとAPIの両方で拒否されます。拒否一致は最優先です。
+Blacklist方式は指定ロールを持つメンバーの利用を拒否します。Whitelist方式は指定ロールを持つメンバーだけを許可します。両方式の同時設定はダッシュボードとAPIの両方で拒否されます。拒否一致は最優先です。
 
-Limitは選択数、Max Rolesは実際にRoleを持つMember数の上限です。`unique`と`binding`はlimit 1固定です。
+Limitは選択数、Max Rolesは実際にロールを持つメンバー数の上限です。`unique`と`binding`はlimit 1固定です。
 
-Link Groupは複数Messageをまたいだ1択を作ります。参加できるTypeはnormal、unique、tempです。
+Link Groupでは、複数のメッセージ全体から1つだけ選べるようにします。参加できる動作方式はnormal、unique、tempです。
 
-## Emoji
+## 絵文字
 
-Emoji PickerからUnicode EmojiまたはサーバーEmojiを選択します。UnicodeはNFC正規化し、Custom EmojiはDiscord Emoji IDで保存します。自由入力した文字列や利用できない外部Emojiは保存できません。同じMessageでEmojiとRoleはそれぞれ一意です。
+絵文字の選択画面からUnicode絵文字またはサーバー絵文字を選択します。UnicodeはNFC正規化し、カスタム絵文字はDiscordの絵文字IDで保存します。自由入力した文字列や利用できない外部絵文字は保存できません。同じメッセージ内では、絵文字とロールをそれぞれ重複して設定できません。
 
 ## 必要権限
 
-Manage Roles、Add Reactions、Read Message History、Manage Messagesが必要です。Bot Roleは付与Roleより上に配置します。MessageまたはChannelが見えない場合はView Channelも確認します。
+Manage Roles、Add Reactions、Read Message History、Manage Messagesが必要です。Botのロールは付与ロールより上に配置します。メッセージやチャンネルが見えない場合はView Channelも確認します。
 
-## Roleが付かない場合
+## ロールが付かない場合
 
-1. Dashboardの診断で権限とRole階層を確認します。
-2. Message ID、Channel、Emoji対応が現在のDiscord投稿と一致するか確認します。
+1. ダッシュボードの診断で権限とロール階層を確認します。
+2. メッセージID、チャンネル、絵文字とロールの組み合わせが現在のDiscord投稿と一致するか確認します。
 3. Lock、Whitelist／Blacklist、Binding履歴、Limit、Max Rolesを確認します。
 4. `fix`でBotのリアクションと設定を再同期します。
-5. 外部Emojiだけ失敗する場合は`fixforeign`を使用します。
+5. 外部絵文字だけ失敗する場合は`fixforeign`を使用します。
 
-DiscordイベントはGuild・User・MessageまたはLink Group単位でロックされ、重複イベントによる二重付与を防ぎます。
+Discordイベントはサーバー・ユーザー・メッセージまたはLink Group単位でロックされ、重複イベントによる二重付与を防ぎます。

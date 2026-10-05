@@ -2,14 +2,14 @@
 
 | 用語 | 意味 |
 | --- | --- |
-| Actor | Eventを発生させたUser、Bot、Webhook |
-| Trigger | Ruleが対象とする検知方法 |
-| Condition | Trigger前に満たす必要があるAND条件 |
-| Exemption / 免疫 | 評価から除外するUser、Role、Channelなど |
+| Actor | イベントを発生させたユーザー、Bot、Webhook |
+| Trigger | ルールで使用する検知方法 |
+| Condition | 検知前にすべて満たす必要がある条件 |
+| Exemption / 免疫 | 評価から除外するユーザー、ロール、チャンネルなど |
 | Action | 削除、Warning、Timeout、通知などの処置 |
-| Case | Moderation処置の履歴単位 |
-| Revision | 競合更新を検出するVersion番号 |
-| Lease | 複数Process間でJobを一時的に占有する期限付き権利 |
-| Outbox | 外部配送をDBへ先に保存するQueue |
-| Cursor | Providerで最後に確認したEvent位置 |
+| Case | モデレーション処置の履歴単位 |
+| Revision | 競合更新を検出するバージョン番号 |
+| Lease | 複数のプロセス間で、ジョブを一時的に占有するための期限付きの権利 |
+| Outbox | 外部へ送る処理を先にDBへ保存するキュー |
+| Cursor | 通知サービスで最後に確認したイベントの位置 |
 | Best effort | 外部の非公式仕様に依存し、継続動作を保証できない機能 |

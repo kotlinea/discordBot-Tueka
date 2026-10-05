@@ -10,4 +10,4 @@ In AutoMod, Anti-Spam, and Anti-Raid, copy saved rules and change their scope or
 
 Choose channels, categories, roles and emoji from Discord resource pickers. Multi-select supports select-all and invert-selection. Select one access policy before entering whitelist/blacklist targets.
 
-Language, appearance and rail preferences belong to your Discord account. Choose Precision, Community or Atmosphere and system, light or dark color schemes. Logout uses a confirmation dialog and does not log you out of Discord itself.
+Language, appearance and rail preferences belong to your Discord account. Choose Precision, Community or Atmosphere and system, light or dark color schemes. Confirm logout in the dialog. You remain signed in to Discord.

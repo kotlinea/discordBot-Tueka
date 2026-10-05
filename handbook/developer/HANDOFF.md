@@ -17,6 +17,8 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 
 ## 現在地と次の作業
 
+- ドキュメントとダッシュボード全体の文章をyomiyasuスキルで見直し、ローカル検証を完了した。[計画](WRITING_PLAN.md)と[結果・ログ](history/WRITING-2026-10-03.md)を参照。用語と操作説明をそろえ、保存・競合・権限の条件を維持した。Python440件・UI163件・Dashboard164ケース・Docs20ケース、ビルド・API・103コマンド・資料検査が成功した。
+
 - 処理の軽量化は[計画](PERFORMANCE_PLAN.md)の範囲をローカル検証済み。XP・Dashboard設定取得・Live Stats・Social定期処理を改善し、[測定・受入](history/PERFORMANCE-2026-10-03.md)へ証拠を保存した。XP 3→1 SQL、一覧22→4 SQL、Python440成功・測定1skip、UI163件、API/103コマンド・資料検査成功。監視集計とDB非同期化は測定・判断材料まで。実環境の性能は未検証。
 
 - 表示構造・設定操作の改善U0〜U6は完了。[最終受入・要件対応](history/FEATURE_UX_U6-2026-09-29.md)に証拠を保存し、一時計画を終了した。24機能の配置、Ticket/RR内部画面、登録/override、設定と稼働条件、ルール複製・一括状態変更を受入済み。Uの残作業なし。

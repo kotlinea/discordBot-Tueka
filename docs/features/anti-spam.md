@@ -14,7 +14,7 @@ keywords: 連投 同一メッセージ メンションスパム リアクショ�
 | --- | --- |
 | message_rate | 指定秒数内のメッセージ数 |
 | duplicate | 同一または類似内容の連投 |
-| mention_rate | User／Role Mention数 |
+| mention_rate | ユーザー・ロールへのメンション数 |
 | link_rate | URLを含む投稿数 |
 | attachment_rate | 添付を含む投稿数 |
 | reaction_rate | リアクション追加数 |
@@ -24,8 +24,8 @@ keywords: 連投 同一メッセージ メンションスパム リアクショ�
 
 ## 段階的な制裁
 
-最初の検知で最近の投稿を削除してWarningを加算し、pointsの閾値横断を[Warnings / Infractions](infractions.md)でTimeoutやBanへ接続できます。同時に複数閾値を越えた場合は最高段階だけを実行します。
+最初の検知で最近の投稿を削除し、警告ポイントを加算します。[Warnings / Infractions](infractions.md)でしきい値を設定すると、累計ポイントがしきい値を越えたときにTimeoutやBanを実行できます。同時に複数のしきい値を越えた場合は、最も高い段階の処置だけを実行します。
 
-Bot／Webhookは既定で対象外です。連携Botの暴走を監視する場合は、actor種別と対象Channelを明示した専用ルールを作成してください。
+Bot／Webhookは既定で対象外です。連携Botの暴走を監視する場合は、actor種別と対象チャンネルを明示した専用ルールを作成してください。
 
 ルールの作成・複製・一括ON/OFFは[ルール操作ガイド](../dashboard/moderation-rules.md)を参照してください。

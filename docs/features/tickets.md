@@ -6,53 +6,53 @@ keywords: Ticket Panel Form Staff Claim Close Transcript S3 Outbox private threa
 
 # サポートチケット
 
-Ticketは`Panel Message → Panel → Form → Ticket → Staff対応 → Close → Feedback / Transcript`として処理されます。Discordボタン、コマンド、Dashboardは同じTicket Serviceを使用します。
+パネルメッセージのボタンから受付を選び、フォームに回答してチケットを作成します。スタッフの対応とクローズを経て、評価や対応履歴（Transcript）を確認できます。Discordのボタン、コマンド、ダッシュボードから操作できます。
 
 
-## 6タブEditor
+## 設定画面の6つのタブ
 
-1. **チケット設定**：Mention Role、Team、Transcript Channel、Mode、Cooldown、Category、User上限、操作Button、退出Form、命名規則
-2. **パネル**：配置Message、Title、Description、Color、Channel、Button Style／Text／Emoji、画像
-3. **ようこそメッセージ**：Title、Description、Author、Image、Thumbnail、Footer、Timestamp、最大25 Fields
-4. **チケットの許可**：Embed、添付、外部Emoji／Sticker、Voice MessageなどChannel権限
-5. **アクセス制御**：Role単位の許可／拒否。拒否一致を優先
-6. **サポート時間**：IANA Timezone、24時間受付、曜日別の時間帯
+1. 「チケット設定」で、通知ロール、担当チーム、Transcript通知先、作成方式、クールダウン、カテゴリ、ユーザーごとの上限、操作ボタン、退出フォーム、命名規則を設定します。
+2. 「パネル」で、配置メッセージ、タイトル、説明、色、チャンネル、ボタンの色・本文・絵文字、画像を設定します。
+3. 「ようこそメッセージ」で、タイトル、説明、著者、画像、サムネイル、フッター、時刻、最大25件のフィールドを設定します。
+4. 「チケットの許可」で、埋め込み、添付、外部絵文字・スタンプ、音声メッセージなどのチャンネル権限を設定します。
+5. 「アクセス制御」で、ロールごとの許可・拒否を設定します。拒否に一致した場合は拒否を優先します。
+6. 「サポート時間」で、IANAタイムゾーン、24時間受付、曜日ごとの時間帯を設定します。
 
-全変更はDraftです。保存時にPanelとPanel Messageのrevision、Discordリソース所属、文字数、URL、権限をまとめて検証します。
+編集内容は保存するまで反映されません。保存時には、パネルとパネルメッセージの更新番号（revision）、Discordリソースの所属、文字数、URL、権限を確認します。
 
-## Channel ModeとThread Mode
+## チャンネル方式とスレッド方式
 
-| 項目 | Channel | Private Thread |
+| 項目 | チャンネル | 非公開スレッド |
 | --- | --- | --- |
-| 作成先 | Category内の専用Channel | 親Channel内のPrivate Thread |
+| 作成先 | カテゴリ内の専用チャンネル | 親チャンネル内の非公開スレッド |
 | Claim / Staff Notes | 対応 | Join / On-Call方式 |
 | Close | Transcript確定後に即時削除 | Locked＋Archived |
 | Reopen | 不可 | 手動削除前なら可能 |
-| 権限 | Ticket用Overwrite | 親Channelの権限を継承 |
+| 権限 | チケット専用の権限設定 | 親チャンネルの権限を継承 |
 
 ## 作成判定
 
-機能有効 → Blacklist → Access Rule → Support Hours → Guild上限 → User上限 → Cooldown → Form → Discord権限 → DB予約・Discord作成の順です。Interaction IDで二重作成を防ぎます。
+機能の有効状態、拒否リスト、アクセスルール、受付時間、サーバー全体の上限、ユーザーごとの上限、クールダウン、フォーム、Discord権限の順に確認してから、DBへの予約とDiscordでの作成を行います。同じ操作（Interaction ID）による二重作成を防ぎます。
 
-Staffは上限とCooldownの対象外です。Support Hours外では次回受付時刻を表示します。
+スタッフには上限とクールダウンを適用しません。受付時間外には、次に受け付けられる時刻を表示します。
 
 ## 対応とClose
 
-Channel ModeではClaim、Unclaim、Transfer、Staff Notesを利用できます。回答待ちへ移すと専用Categoryへ移動し、作成者の返信で元Categoryへ戻ります。移動に失敗した場合は、チャンネルの権限と移動先Categoryを確認します。
+チャンネル方式ではClaim、Unclaim、Transfer、Staff Notesを利用できます。回答待ちへ移すと専用カテゴリへ移動し、作成者の返信で元カテゴリへ戻ります。移動に失敗した場合は、チャンネルの権限と移動先カテゴリを確認します。
 
-Close Requestは24時間有効です。理由付きCloseは理由入力を必須にできます。Thread ModeはArchive後にReopenできます。
+Close Requestは24時間有効です。理由付きCloseは理由入力を必須にできます。スレッド方式はArchive後にReopenできます。
 
 ## Transcript
 
-Form回答、全Message、編集・削除状態、Staff操作、Close理由、添付Metadataを時系列で生成します。本文は保存用の鍵で暗号化します。
+フォームの回答、すべてのメッセージ、編集・削除の状態、スタッフの操作、クローズ理由、添付ファイルの情報を発生順に記録します。本文は保存用の鍵で暗号化します。
 
-Transcriptは暗号化して保管されます。保管先の障害が続く場合は、Ticket番号と発生時刻を運用者へ伝えてください。保持期間は既定365日、1～3650日です。添付は1件25MB、Ticket合計100MBまでです。
+Transcriptは暗号化して保管されます。保管先の障害が続く場合は、チケット番号と発生時刻を運用者へ伝えてください。保持期間は既定365日、1～3650日です。添付は1件25MB、チケット合計100MBまでです。
 
-閲覧者は作成者本人、Manage Guild保持者、Ticket管理者、担当Teamに限定されます。共有する場合は、閲覧者の権限を確認してください。
+閲覧者は作成者本人、Manage Guild権限を持つメンバー、チケット管理者、担当チームに限定されます。共有する場合は、閲覧者の権限を確認してください。
 
 ## テンプレート変数
 
-Welcomeは`{ticket_number}`、`{user}`、`{username}`、`{user_id}`、`{panel}`、`{team}`を使用できます。Channel名は`{number}`、`{username}`、`{user_id}`、`{panel}`を使用できます。
+Welcomeは`{ticket_number}`、`{user}`、`{username}`、`{user_id}`、`{panel}`、`{team}`を使用できます。チャンネル名は`{number}`、`{username}`、`{user_id}`、`{panel}`を使用できます。
 
 ## 必要権限
 
