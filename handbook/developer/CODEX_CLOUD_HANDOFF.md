@@ -68,3 +68,17 @@ docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --bu
 
 接続が回復した後、リポジトリと専用ブランチを選び、本書の指示でセットアップを開始する。GitHub同期の成功は別途pushとリモートのCommit確認で記録する。
 
+## 接続回復後の結果
+
+GitHub接続が回復し、Codex Cloudの環境セットアップを開始した。Git CLIのpushは認証不足で失敗したため、GitHub連携を使って専用ブランチへ2文書を追加し、読み取りで確認した。リモートの文書追加Commitは`6ff3468a81fbd911a2d86110cc5af10c4b09fe84`、ローカルの文書Commitは`e2ffb5d`。同じ文書を別のCommitで保存しており、ブランチの履歴が完全同期したとは扱わない。
+
+セットアップチャット: `01a138e0-c259-7562-826c-98679808a09a`。クラウド側で引き継ぎ資料とR0計画を確認した。
+
+- クラウド側確認済み: Docker／Compose、GitHub読み取り、Compose設定、テスト用PostgreSQLの起動とSQL実行。
+- 未完了: Compose check、UI検証・ビルド、開発サーバー起動、プレビューURL、HTTPS、OAuth callback。
+- インストールスクリプトと起動用スキルをドラフトへ設定。利用できるユーザーは「自分のみ」、秘密情報と環境変数は未追加。
+- 固定DebianアーカイブとPlaywright Imageの取得に必要な`snapshot.debian.org`、`centralus.data.mcr.microsoft.com`のネットワーク許可を追加するドラフトを確認した。
+- 「下書きを保存」は自動承認審査で拒否された。永続的なネットワーク許可の対象と範囲を明示したユーザー承認が必要という理由。別経路で保存や公開を行わない。
+
+次は2ドメインの許可と設定保存についてユーザー承認を得てから保存し、クラウド側で未完了の検証を再実行する。成功を確認した範囲で環境を公開し、R0試作へ進む。
+
