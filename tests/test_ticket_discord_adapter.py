@@ -59,6 +59,34 @@ class TicketDiscordAdapterTests(unittest.IsolatedAsyncioTestCase):
         bot = SimpleNamespace(user=SimpleNamespace(id=99), get_guild=lambda _: guild)
         return DiscordTicketAdapter(bot)
 
+    async def test_attachment_falls_back_when_cache_is_missing_or_unsupported(self):
+        for status in (404, 415):
+            with self.subTest(status=status):
+                error = discord.HTTPException(SimpleNamespace(status=status, reason='cache unavailable'), 'cache unavailable')
+                attachment = SimpleNamespace(read=AsyncMock(side_effect=[error, b'generated attachment']))
+                self.assertEqual(await self.adapter(None).read_attachment(attachment), b'generated attachment')
+                self.assertEqual(attachment.read.await_args_list[0].kwargs, {'use_cached': True})
+                self.assertEqual(attachment.read.await_args_list[1].kwargs, {'use_cached': False})
+
+    async def test_attachment_does_not_fallback_on_auth_or_rate_limit_failure(self):
+        for status in (403, 429, 503):
+            with self.subTest(status=status):
+                error = discord.HTTPException(SimpleNamespace(status=status, reason='request failed'), 'request failed')
+                attachment = SimpleNamespace(read=AsyncMock(side_effect=error))
+                with self.assertRaises(DiscordFailure) as raised:
+                    await self.adapter(None).read_attachment(attachment)
+                self.assertEqual(raised.exception.retry, status in (429, 503))
+                attachment.read.assert_awaited_once_with(use_cached=True)
+
+    async def test_attachment_fallback_preserves_source_retry_status(self):
+        cached = discord.HTTPException(SimpleNamespace(status=415, reason='unsupported'), 'unsupported')
+        source = discord.HTTPException(SimpleNamespace(status=503, reason='unavailable'), 'unavailable')
+        attachment = SimpleNamespace(read=AsyncMock(side_effect=[cached, source]))
+        with self.assertRaises(DiscordFailure) as raised:
+            await self.adapter(None).read_attachment(attachment)
+        self.assertTrue(raised.exception.retry)
+        self.assertIs(raised.exception.__cause__, source)
+
     async def test_notice_recovery_rejects_foreign_author_and_prefix_collision(self):
         marker = 'Tueka ticket notice:30:1000'
         messages = []
