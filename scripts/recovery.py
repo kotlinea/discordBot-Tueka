@@ -8,12 +8,15 @@ import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from deploy.recovery import backup, restore, release, abort
+from deploy.backup_job import run as scheduled_backup
+from deploy.backup_job import BackupConfigurationError, BackupJobError
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('backup', 'restore', 'release', 'abort'))
-    parser.add_argument('--config-dir', type=Path, required=True)
+    parser.add_argument('action', choices=('backup', 'restore', 'release', 'abort', 'scheduled-backup'))
+    parser.add_argument('--config-dir', type=Path)
+    parser.add_argument('--backup-config', type=Path)
     parser.add_argument('--bundle', type=Path)
     parser.add_argument('--backup-root', type=Path)
     parser.add_argument('--resume-source', action='store_true')
@@ -22,6 +25,21 @@ def main():
     source.add_argument('--source-fenced', action='store_true')
     parser.add_argument('--reconciled', action='store_true')
     args = parser.parse_args()
+    if args.action == 'scheduled-backup':
+        if not args.backup_config or any((args.config_dir, args.bundle, args.backup_root, args.resume_source,
+                                         args.source_config, args.source_fenced, args.reconciled)):
+            parser.error('scheduled-backup requires only --backup-config')
+        try:
+            print(json.dumps(scheduled_backup(args.backup_config)))
+        except (BackupConfigurationError, BackupJobError) as error:
+            print(str(error), file=sys.stderr)
+            raise SystemExit(1) from None
+        except Exception:
+            print('Scheduled backup failed. Inspect the private configuration and local recovery/service logs.', file=sys.stderr)
+            raise SystemExit(1) from None
+        return
+    if not args.config_dir or args.backup_config:
+        parser.error('This action requires --config-dir and does not accept --backup-config')
     try:
         if args.action == 'backup':
             if bool(args.bundle) == bool(args.backup_root):

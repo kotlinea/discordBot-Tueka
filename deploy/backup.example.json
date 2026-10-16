@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "enabled": false,
+  "environments": [
+    {
+      "config_dir": "environments/prod",
+      "backup_root": "backups/prod"
+    }
+  ],
+  "minimum_free_gib": 5,
+  "smtp": {
+    "enabled": false,
+    "host": "",
+    "port": 465,
+    "tls": "ssl",
+    "username": "",
+    "password": "",
+    "from": "",
+    "to": [],
+    "on_success": false,
+    "timeout_seconds": 15
+  }
+}
