@@ -3,6 +3,9 @@ from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+import httpx
+import math
+from dashboard.discord_api import retry_after
 
 from .schemas.common import ErrorResponse
 
@@ -35,4 +38,18 @@ class ApiRoute(APIRoute):
                           for item in exc.errors()]
                 return JSONResponse({'detail': {'code': 'validation_failed', 'message': '入力を確認してください。',
                                                'errors': errors}}, status_code=422)
+            except httpx.HTTPError as exc:
+                # Do not return upstream URLs, headers, bodies or credentials.
+                if (isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 401
+                        and exc.request.headers.get('Authorization', '').startswith('Bearer ')):
+                    return JSONResponse({'detail': {'code': 'authentication_required',
+                        'message': 'Discordで再ログインしてください。', 'errors': []}}, status_code=401)
+                headers = None
+                if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429:
+                    delay = retry_after(exc.response)
+                    if delay is not None:
+                        headers = {'Retry-After': str(math.ceil(delay))}
+                return JSONResponse({'detail': {'code': 'upstream_unavailable',
+                    'message': '外部サービスとの通信に失敗しました。少し待ってから再試行してください。',
+                    'errors': []}}, status_code=503, headers=headers)
         return normalized
