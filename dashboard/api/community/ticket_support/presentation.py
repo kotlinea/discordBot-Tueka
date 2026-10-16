@@ -23,6 +23,9 @@ def ticket_bundle_payload(value: dict[str, Any]) -> dict[str, Any]:
         result['panel'] = ticket_ids(result['panel'])
         result['panel']['access_rules'] = [{**rule, 'role_id': str(rule['role_id'])} for rule in result['panel'].get('access_rules', [])]
     if result.get('deployment'):
-        result['deployment'] = ticket_ids(result['deployment'])
+        deployment = result['deployment']
+        result['deployment'] = {**ticket_ids(deployment),
+            'panel_message_id': deployment['id'],
+            'position': deployment['panel_ids'].index(result['panel']['id'])}
     result['deployments'] = [ticket_ids(item) for item in result.get('deployments', [])]
     return result

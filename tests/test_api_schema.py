@@ -96,6 +96,43 @@ class ApiSchemaTests(unittest.TestCase):
         self.assertEqual(stats.status_code, 200, stats.text)
         self.assertEqual(stats.json()['panels'][0]['id'], panel['id'])
 
+    def test_ticket_bundle_create_read_update_preserves_shared_message_identity(self):
+        root = '/api/v1/guilds/1/tickets'
+        team_response = self.api.client.post(root + '/teams', headers=self.api.headers, json={
+            'name': 'Recovery test', 'role_ids': [], 'user_ids': [], 'admin_user_ids': [],
+            'notification_channel_id': None, 'enabled': True})
+        self.assertEqual(team_response.status_code, 201, team_response.text)
+        team = team_response.json()
+        response = self.api.client.post(root + '/panels/bundles', headers=self.api.headers, json={
+            'panel': {'name': 'First', 'mode': 'channel', 'category_id': '100', 'team_id': team['id']},
+            'deployment': {'name': 'Entry', 'channel_id': '10', 'title': 'Recovery test'}})
+        self.assertEqual(response.status_code, 201, response.text)
+        first = response.json()
+        message_id = first['deployments'][0]['id']
+        self.assertEqual(first['deployment']['panel_message_id'], message_id)
+        self.assertEqual(first['deployment']['position'], 0)
+        editor = root + '/panels/' + str(first['panel']['id']) + '/editor'
+        loaded = self.api.client.get(editor)
+        self.assertEqual(loaded.status_code, 200, loaded.text)
+        self.assertEqual(loaded.json(), first)
+        first['deployment']['title'] = 'Updated entry'
+        updated = self.api.client.put(root + '/panels/' + str(first['panel']['id']) + '/bundle',
+                                      headers=self.api.headers, json=first)
+        self.assertEqual(updated.status_code, 200, updated.text)
+        self.assertEqual(updated.json()['deployment']['panel_message_id'], message_id)
+        self.assertEqual(len(updated.json()['deployments']), 1)
+        self.assertEqual(self.api.client.get(editor).json()['deployment']['title'], 'Updated entry')
+        second = self.api.client.post(root + '/panels/bundles', headers=self.api.headers, json={
+            'panel': {'name': 'Second', 'mode': 'channel', 'category_id': '100', 'team_id': team['id']},
+            'deployment': {**updated.json()['deployment'], 'position': 0}})
+        self.assertEqual(second.status_code, 201, second.text)
+        self.assertEqual(second.json()['deployment']['panel_message_id'], message_id)
+        self.assertEqual(second.json()['deployment']['position'], 0)
+        reread = self.api.client.get(editor)
+        self.assertEqual(reread.status_code, 200, reread.text)
+        self.assertEqual(reread.json()['deployment']['position'], 1)
+        self.assertEqual(reread.json()['deployment']['panel_message_id'], message_id)
+
     def test_framework_domain_and_json_validation_share_one_error_shape(self):
         cases = [self.api.client.get('/api/v1/guilds/invalid/modules/welcome'),
                  self.api.client.get('/api/v1/guilds/1/reaction-roles/messages/999'),
