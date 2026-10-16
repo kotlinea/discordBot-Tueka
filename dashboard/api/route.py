@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 import httpx
 import math
-from dashboard.discord_api import retry_after
+from dashboard.discord_api import API_BASE, retry_after
 
 from .schemas.common import ErrorResponse
 
@@ -41,6 +41,7 @@ class ApiRoute(APIRoute):
             except httpx.HTTPError as exc:
                 # Do not return upstream URLs, headers, bodies or credentials.
                 if (isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 401
+                        and str(exc.request.url).startswith(API_BASE + '/')
                         and exc.request.headers.get('Authorization', '').startswith('Bearer ')):
                     return JSONResponse({'detail': {'code': 'authentication_required',
                         'message': 'Discordで再ログインしてください。', 'errors': []}}, status_code=401)

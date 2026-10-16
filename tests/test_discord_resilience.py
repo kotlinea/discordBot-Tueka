@@ -130,8 +130,11 @@ class UpstreamEnvelopeTests(unittest.TestCase):
         self.assertEqual(response.headers['Retry-After'], '65')
 
     def test_only_rejected_user_oauth_requires_login_not_rejected_bot_credentials(self):
-        for authorization, expected in (('Bearer PRIVATE_TOKEN', 401), ('Bot PRIVATE_TOKEN', 503)):
-            request = httpx.Request('GET', 'https://discord.com/api/v10/users/@me/guilds',
+        for authorization, origin, expected in (
+                ('Bearer PRIVATE_TOKEN', 'https://discord.com/api/v10', 401),
+                ('Bot PRIVATE_TOKEN', 'https://discord.com/api/v10', 503),
+                ('Bearer PRIVATE_TOKEN', 'https://provider.example.test', 503)):
+            request = httpx.Request('GET', origin + '/users/@me/guilds',
                                     headers={'Authorization': authorization})
             error = httpx.HTTPStatusError('PRIVATE_DETAIL', request=request,
                 response=httpx.Response(401, request=request))
