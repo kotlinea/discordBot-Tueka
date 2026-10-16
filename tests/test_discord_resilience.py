@@ -1,5 +1,6 @@
 """Bounded Discord reads, live authorization, and safe public failure responses."""
 import asyncio
+import json
 import unittest
 from unittest.mock import AsyncMock
 
@@ -9,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from dashboard.api.route import ApiRoute
 from dashboard.discord_api import DiscordAPI
+from observability.logging import SafeJsonFormatter
 
 
 class DiscordResilienceTests(unittest.IsolatedAsyncioTestCase):
@@ -26,9 +28,13 @@ class DiscordResilienceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(replies, [])
         replies = [httpx.Response(429, json={'retry_after': 0}), httpx.Response(200)]
         api = self.api(replies)
-        with self.assertRaises(httpx.HTTPStatusError):
-            await api._request('POST', '/test', json={'content': 'never repeat'})
+        with self.assertLogs('tueka.discord', level='WARNING') as captured:
+            with self.assertRaises(httpx.HTTPStatusError):
+                await api._request('POST', '/test', json={'content': 'never repeat'})
         self.assertEqual(len(replies), 1)
+        logged = SafeJsonFormatter('test').format(captured.records[0])
+        self.assertEqual(json.loads(logged)['status'], 429)
+        self.assertNotIn('private', logged)
 
     async def test_long_malformed_and_repeated_limits_fail_without_unbounded_wait(self):
         for delay in (3, -1, 'nan', 'inf', None, 'not-a-number'):

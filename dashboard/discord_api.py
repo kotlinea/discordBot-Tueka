@@ -111,7 +111,7 @@ class DiscordAPI:
                     await asyncio.sleep(delay)
                     response = await client.request(method, f"{API_BASE}{path}", **kwargs)
             if response.is_error:
-                logging.getLogger('tueka.discord').warning('Discord request failed (status=%d)', response.status_code)
+                logging.getLogger('tueka.discord').warning('Discord request failed', extra={'status': response.status_code})
             response.raise_for_status()
             return response
         finally:
