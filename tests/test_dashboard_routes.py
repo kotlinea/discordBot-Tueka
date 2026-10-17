@@ -41,7 +41,8 @@ class DashboardRouteTests(unittest.TestCase):
         for path in ['/servers', '/servers/1', '/servers/1/settings', '/servers/1/modules/welcome',
                      '/servers/1/social', '/servers/1/social/youtube', '/servers/1/moderation/automod/rules/new',
                      '/servers/1/tickets/inbox/123', '/servers/1/tickets/panels/2', '/servers/1/reaction-roles/new',
-                     '/servers/1/suggestions', '/tickets/transcripts/token']:
+                     '/servers/1/suggestions', '/servers/1/applications', '/servers/1/applications/review',
+                     '/servers/1/applications/settings', '/tickets/transcripts/token']:
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200, response.text)
@@ -53,7 +54,8 @@ class DashboardRouteTests(unittest.TestCase):
         (self.module.FRONTEND_DIST / 'index.html').unlink()
         self.assertEqual(self.client.get('/servers').status_code, 503)
         for path in ['/servers/1/automod', '/servers/1/modules/reaction_roles', '/servers/1/modules/unknown',
-                     '/servers/1/moderation/automod/rules/1.json']:
+                     '/servers/1/moderation/automod/rules/1.json', '/servers/1/modules/applications',
+                     '/servers/1/applications/unknown', '/servers/1/applications/review/1.json']:
             self.assertEqual(self.client.get(path).status_code, 404, path)
         for path in ['/servers/1/modules/welcome', '/servers/1/automod/settings', '/servers/1/social/subscriptions',
                      '/servers/1/moderation/settings']:
