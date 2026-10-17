@@ -42,6 +42,11 @@ SCHEDULE_PATHS = {
     '/api/v1/guilds/{guild_id}/schedules/items/{item_id}/delivery/{job_id}/retry': {'post'},
 }
 ADDED_PATHS = {**{path:{method} for path,method in U4_PATHS.items()},**APPLICATION_PATHS,**APPEAL_PATHS,**SCHEDULE_PATHS}
+ADDED_PATHS.update({
+    '/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}':{'get'},
+    '/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/labels':{'post'},
+    '/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/merge':{'post'},
+})
 
 
 def request_path(template):
@@ -87,7 +92,11 @@ class ApiContractTests(unittest.TestCase):
             for method, operation in methods.items():
                 current = actual[path][method]
                 for key in ('operationId', 'parameters'):
-                    self.assertEqual(current.get(key), operation.get(key), (path, method, key))
+                    value=current.get(key)
+                    if path=='/api/v1/guilds/{guild_id}/suggestions/items' and method=='get' and key=='parameters':
+                        self.assertTrue({'category','tag','status'} <= {p['name'] for p in value})
+                        value=[p for p in value if p['name'] not in {'category','tag','status'}]
+                    self.assertEqual(value, operation.get(key), (path, method, key))
                 self.assertTrue(set(operation['responses']).issubset(current['responses']))
 
     def test_all_route_authentication_authorization_and_csrf_boundaries_are_preserved(self):
@@ -102,7 +111,7 @@ class ApiContractTests(unittest.TestCase):
         actual = boundary_responses(self.api)
         self.assertEqual([row for row in actual if row['path'] not in ADDED_PATHS], baseline)
         added = [row for row in actual if row['path'] in ADDED_PATHS]
-        self.assertEqual(len(added), 57)
+        self.assertEqual(len(added), 65)
         for row in added:
             # CSRF runs before authentication on writes, as for existing routes.
             expected_code = ('csrf_invalid' if row['method'] in {'PUT', 'POST'} and row['mode'] != 'forbidden'

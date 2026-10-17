@@ -22,6 +22,10 @@ class SuggestionDeliveryService:
         if item is None:
             return Outcome('Suggestion unavailable')
         module = self.guild_settings.get_module(item['guild_id'], 'suggestions')
+        if item.get('merged_into'):
+            target=self.repository.get(item['guild_id'],item['merged_into'])
+            if target:
+                item={**item,'merged_target':{'channel_id':target['channel_id'],'message_id':target['message_id']}}
         settings = normalize_settings(module['settings'])
         recover = bool(job['delivery_started'] or job['payload'].get('recover'))
         try:

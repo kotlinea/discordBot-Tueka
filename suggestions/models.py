@@ -13,6 +13,9 @@ class SuggestionValidationError(ValueError):
 
 
 DEFAULT_SETTINGS: dict[str, Any] = {
+    'categories': [],
+    'tags': [],
+    'retention_days': 30,
     "channel_id": None,
     "log_channel_id": None,
     "review_role_ids": [],
@@ -38,6 +41,11 @@ def normalize_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
     """Return a complete, bounded settings object suitable for Discord modals."""
     source = dict(DEFAULT_SETTINGS)
     source.update(settings or {})
+    from .roadmap import taxonomy
+    source['categories']=taxonomy(source.get('categories',[]),'categories',20)
+    source['tags']=taxonomy(source.get('tags',[]),'tags',50)
+    if type(source.get('retention_days')) is not int or not 1 <= source['retention_days'] <= 365:
+        raise SuggestionValidationError('retention_days','保存日数は1〜365日で指定してください。')
     for name in ("channel_id", "log_channel_id"):
         value = source.get(name)
         if value in (None, ""):

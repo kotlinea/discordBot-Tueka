@@ -61,7 +61,7 @@ class FeatureRegistrationTests(unittest.TestCase):
                 result = getattr(actual, key)
                 if actual.id == 'suggestions' and key == 'fields':
                     self.assertEqual(result.count('discussion_enabled'), 1)
-                    result = tuple(field for field in result if field != 'discussion_enabled')
+                    result = tuple(field for field in result if field not in {'discussion_enabled','categories','tags','retention_days'})
                 self.assertEqual(list(result) if isinstance(result, tuple) else result, value, (actual.id, key))
         self.assertEqual({item.id for item in REGISTRY.features if not item.dashboard}, {'echo', 'calculate', 'roll', 'gemini'})
 

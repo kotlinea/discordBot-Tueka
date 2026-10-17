@@ -78,8 +78,8 @@ class SuggestionDeliveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(retry.id, claim.id)
             self.assertIsNone((await self.service.deliver(retry.payload)).error)
             self.assertTrue(self.repo.outbox_jobs.finish(retry, Outcome()))
+            self.assertEqual(self.repo.get(1, self.item['id'])['message_id'], 900)
         self.assertEqual(self.port.sent, 1)
-        self.assertEqual(self.repo.get(1, self.item['id'])['message_id'], 900)
 
     async def test_stale_lease_cannot_attach_message_or_change_delivery_state(self):
         self.repo.outbox_jobs.clock = lambda: self.item['created_at']

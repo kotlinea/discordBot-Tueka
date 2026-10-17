@@ -79,7 +79,19 @@ async def seed():
     claim = suggestions.outbox_jobs.claim('crashed-worker')
     assert claim.payload['action'] == 'publish' and claim.payload['suggestion_id'] == pending['id']
     suggestions.delivery_state(claim.payload, started=True)
+    guilds.set_module(1,'suggestions',enabled=True,settings={'categories':['Recovery'],'tags':['Snapshot']})
+    duplicate=suggestions.create(1,2,6,{'idea':'Restored duplicate'})
+    suggestions.attach_message(1,duplicate['id'],333)
+    suggestions.vote(1,duplicate['id'],31,1)
+    suggestions.vote(1,duplicate['id'],32,-1)
+    canonical=suggestions.get(1,delivered['id'])
+    canonical=suggestions.set_labels(1,canonical['id'],5,'Recovery',['Snapshot'],canonical['revision'])
+    duplicate=suggestions.get(1,duplicate['id'])
+    suggestions.merge(1,duplicate['id'],canonical['id'],5,'Recovery duplicate proof',duplicate['revision'],canonical['revision'])
     with transaction(settings.database_url) as c:
+        # Simulated, already known original receipt; leave only the existing uncertain job pending.
+        c.execute("UPDATE suggestion_outbox SET status='completed',completed_at=%s WHERE suggestion_id=ANY(%s) AND status='pending'",(int(time.time()),[duplicate['id'],canonical['id']]))
+        c.execute('INSERT INTO suggestion_votes(suggestion_id,user_id,value,created_at,updated_at) VALUES(%s,31,0,%s,%s)',(canonical['id'],int(time.time()),int(time.time())))
         c.execute("UPDATE suggestion_outbox SET lease_until=0 WHERE suggestion_id=%s", (pending['id'],))
         c.execute("INSERT INTO app_metadata VALUES('recovery_version','old')")
     print(json.dumps(await verify(settings)))
@@ -141,7 +153,14 @@ async def resume():
     assert await run_batch(repository.outbox_jobs, 'restored-worker', service.deliver) == 0
     assert port.calls == 1
     with transaction(settings.database_url) as c:
-        assert [row['message_id'] for row in c.execute('SELECT message_id FROM suggestions ORDER BY id')] == [111, 222]
+        assert [row['message_id'] for row in c.execute('SELECT message_id FROM suggestions ORDER BY id')] == [111, 222, 333]
+        canonical=c.execute("SELECT id,category,tags_json FROM suggestions WHERE message_id=111").fetchone()
+        duplicate=c.execute("SELECT id,merged_into,status FROM suggestions WHERE message_id=333").fetchone()
+        assert canonical['category']=='Recovery' and json.loads(canonical['tags_json'])==['Snapshot']
+        assert duplicate['merged_into']==canonical['id'] and duplicate['status']=='merged'
+        assert repository.get(1,canonical['id'])['upvotes']==0 and repository.get(1,canonical['id'])['downvotes']==1
+        assert c.execute('SELECT count(*) AS n FROM suggestion_votes WHERE suggestion_id=%s',(duplicate['id'],)).fetchone()['n']==2
+        assert c.execute("SELECT count(*) AS n FROM suggestion_events WHERE event_type='merged'").fetchone()['n']==1
         reviewed = c.execute('SELECT status,review_reason,discussion_thread_id,implemented_at FROM suggestions WHERE message_id=111').fetchone()
         assert reviewed['status'] == 'implemented' and reviewed['review_reason'] == 'Recovery implementation proof'
         assert reviewed['discussion_thread_id'] == 111 and reviewed['implemented_at'] is not None

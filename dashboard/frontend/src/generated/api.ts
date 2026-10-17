@@ -75,8 +75,8 @@ export type StatusResponse = { "status": string }
 export type SuggestionEvent = { "id": number; "actor_id": (string | null); "event_type": string; "detail": Record<string, unknown>; "created_at": number }
 export type SuggestionFeature = { "maturity"?: "stable" | "improving" | "unavailable"; "id": string; "category": string; "parent": (string | null); "docs_path": string; "title": string; "description": string; "fields": Array<string>; "required_fields": Array<string>; "required_bot_permissions": Array<string>; "enabled": boolean; "settings": SuggestionSettings; "revision": number; "missing_permissions": Array<string> }
 export type SuggestionFormField = { "key": string; "label": string; "placeholder": string; "style": ("short" | "paragraph"); "required": boolean; "min_length": number; "max_length": number }
-export type SuggestionItem = { "id": number; "author_id": string; "message_id": (string | null); "status": "pending" | "reviewing" | "approved" | "rejected" | "delivery_failed" | "implemented"; "review_reason"?: string; "discussion_thread_id"?: (string | null); "implemented_at"?: (number | null); "answers": Record<string, string>; "upvotes": number; "downvotes": number; "reviewer_id": (string | null); "created_at": number; "revision": number }
-export type SuggestionSettings = { "channel_id": (string | null); "log_channel_id": (string | null); "review_role_ids": Array<string>; "allow_voting": boolean; "discussion_enabled"?: boolean; "show_author": boolean; "form_title": string; "form_fields": Array<SuggestionFormField> }
+export type SuggestionItem = { "id": number; "author_id": string; "message_id": (string | null); "status": "pending" | "reviewing" | "approved" | "rejected" | "delivery_failed" | "implemented" | "merged"; "category"?: string; "tags"?: Array<string>; "merged_into"?: (number | null); "expires_at"?: (number | null); "review_reason"?: string; "discussion_thread_id"?: (string | null); "implemented_at"?: (number | null); "answers": Record<string, string>; "upvotes": number; "downvotes": number; "reviewer_id": (string | null); "created_at": number; "revision": number }
+export type SuggestionSettings = { "categories"?: Array<string>; "tags"?: Array<string>; "retention_days"?: number; "channel_id": (string | null); "log_channel_id": (string | null); "review_role_ids": Array<string>; "allow_voting": boolean; "discussion_enabled"?: boolean; "show_author": boolean; "form_title": string; "form_fields": Array<SuggestionFormField> }
 export type TicketAccessRule = { "role_id": string; "label": string; "allow": boolean }
 export type TicketDeployment = { "panel_message_id": (number | null); "revision": (number | null); "name": string; "channel_id": (string | null); "content": string; "title": string; "description": string; "color": string; "image_url": string; "thumbnail_url": string; "position": (number | null) }
 export type TicketDetail = { "ticket": TicketItem; "panel": TicketPanel; "messages": Array<TicketMessage>; "transcript": TranscriptReference; "outbox": Array<Record<string, unknown>> }
@@ -739,20 +739,27 @@ export const constraints = {
   "SuggestionItem": {
     "answers": {},
     "author_id": {},
+    "category": {},
     "created_at": {},
     "discussion_thread_id": {},
     "downvotes": {},
+    "expires_at": {},
     "id": {},
     "implemented_at": {},
+    "merged_into": {},
     "message_id": {},
     "review_reason": {},
     "reviewer_id": {},
     "revision": {},
     "status": {},
+    "tags": {},
     "upvotes": {}
   },
   "SuggestionSettings": {
     "allow_voting": {},
+    "categories": {
+      "maxItems": 20
+    },
     "channel_id": {},
     "discussion_enabled": {},
     "form_fields": {
@@ -764,10 +771,17 @@ export const constraints = {
       "minLength": 1
     },
     "log_channel_id": {},
+    "retention_days": {
+      "maximum": 365.0,
+      "minimum": 1.0
+    },
     "review_role_ids": {
       "maxItems": 25
     },
-    "show_author": {}
+    "show_author": {},
+    "tags": {
+      "maxItems": 50
+    }
   },
   "TicketAccessRule": {
     "allow": {},
@@ -1178,10 +1192,13 @@ export interface Operations {
   "PUT /api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}": { response: SocialSubscription; body: { "account"?: string; "channel_id"?: (string | number | null); "role_id"?: (string | number | null); "events"?: Array<string>; "event_channels"?: Record<string, (string | number)>; "templates"?: Record<string, { "content"?: string; "title"?: string; "description"?: string; "color"?: string; "url"?: string; "thumbnail_url"?: string; "image_url"?: string; "footer"?: string }>; "enabled"?: boolean; "revision"?: (number | null) } }
   "POST /api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}/retry": { response: StatusResponse; body: never }
   "GET /api/v1/guilds/{guild_id}/suggestions/items": { response: Items_SuggestionItem_; body: never }
+  "GET /api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}": { response: SuggestionItem; body: never }
   "GET /api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/events": { response: Items_SuggestionEvent_; body: never }
+  "POST /api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/labels": { response: SuggestionItem; body: { "category"?: string; "tags"?: Array<string>; "revision": number } }
+  "POST /api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/merge": { response: SuggestionItem; body: { "target_id": number; "target_revision": number; "revision": number; "reason": string } }
   "POST /api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/review": { response: SuggestionItem; body: { "status": "reviewing" | "approved" | "rejected" | "implemented"; "reason": string; "revision": number } }
   "GET /api/v1/guilds/{guild_id}/suggestions/settings": { response: SuggestionFeature; body: never }
-  "PUT /api/v1/guilds/{guild_id}/suggestions/settings": { response: SuggestionFeature; body: { "enabled"?: boolean; "revision"?: (number | null); "settings"?: { "channel_id"?: (string | null); "log_channel_id"?: (string | null); "review_role_ids"?: Array<string>; "allow_voting"?: boolean; "discussion_enabled"?: boolean; "show_author"?: boolean; "form_title"?: string; "form_fields"?: Array<{ "key"?: string; "label"?: string; "placeholder"?: string; "style"?: ("short" | "paragraph"); "required"?: boolean; "min_length"?: number; "max_length"?: number }> } } }
+  "PUT /api/v1/guilds/{guild_id}/suggestions/settings": { response: SuggestionFeature; body: { "enabled"?: boolean; "revision"?: (number | null); "settings"?: { "categories"?: Array<string>; "tags"?: Array<string>; "retention_days"?: number; "channel_id"?: (string | null); "log_channel_id"?: (string | null); "review_role_ids"?: Array<string>; "allow_voting"?: boolean; "discussion_enabled"?: boolean; "show_author"?: boolean; "form_title"?: string; "form_fields"?: Array<{ "key"?: string; "label"?: string; "placeholder"?: string; "style"?: ("short" | "paragraph"); "required"?: boolean; "min_length"?: number; "max_length"?: number }> } } }
   "GET /api/v1/guilds/{guild_id}/tickets": { response: TicketOverview; body: never }
   "GET /api/v1/guilds/{guild_id}/tickets/forms": { response: Items_TicketForm_; body: never }
   "POST /api/v1/guilds/{guild_id}/tickets/forms": { response: TicketForm; body: { "id"?: number; "name"?: string; "title"?: string; "fields"?: Array<{ "key"?: string; "label"?: string; "placeholder"?: string; "style"?: ("short" | "paragraph"); "required"?: boolean; "min_length"?: number; "max_length"?: number }>; "revision"?: number } }

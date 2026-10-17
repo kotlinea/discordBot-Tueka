@@ -11,6 +11,23 @@ from database.testing import temporary_database
 
 
 class MigrationTests(unittest.TestCase):
+    def test_suggestion_roadmap_upgrade_preserves_original_votes_and_unlimited_legacy_history(self):
+        for _,name,_,source in load()[:6]:(self.directory/name).write_text(source,encoding='utf-8')
+        apply(self.url,self.directory)
+        with connect(self.url) as c:
+            item=c.execute("INSERT INTO suggestions(guild_id,channel_id,author_id,answers_json,created_at,updated_at) VALUES(1,10,20,'{\"idea\":\"Preserved legacy\"}',1,1) RETURNING id").fetchone()['id']
+            c.execute('INSERT INTO suggestion_votes VALUES(%s,30,1,1,1)',(item,))
+            c.execute("INSERT INTO suggestion_events(suggestion_id,guild_id,actor_id,event_type,created_at) VALUES(%s,1,20,'created',1)",(item,))
+            before=c.execute('SELECT version,name,checksum FROM schema_migrations ORDER BY version').fetchall()
+        self.assertEqual(apply(self.url)['applied'],[row[1] for row in load()[6:]])
+        with connect(self.url) as c:
+            row=c.execute('SELECT * FROM suggestions WHERE id=%s',(item,)).fetchone()
+            self.assertIsNone(row['expires_at']);self.assertEqual(row['category'],'');self.assertEqual(row['tags_json'],'[]')
+            self.assertIn('Preserved legacy',row['answers_json'])
+            self.assertEqual(c.execute('SELECT value FROM suggestion_votes').fetchone()['value'],1)
+            self.assertEqual(c.execute('SELECT count(*) AS n FROM suggestion_events').fetchone()['n'],1)
+            self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version<=6 ORDER BY version').fetchall(),before)
+        self.assertEqual(apply(self.url),{'applied':[]})
     def test_appeals_upgrade_preserves_nonempty_phase5_applications(self):
         for _,name,_,source in load()[:4]:
             (self.directory/name).write_text(source,encoding='utf-8')

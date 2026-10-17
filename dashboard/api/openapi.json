@@ -3584,6 +3584,11 @@
             "title": "Author Id",
             "type": "string"
           },
+          "category": {
+            "default": "",
+            "title": "Category",
+            "type": "string"
+          },
           "created_at": {
             "title": "Created At",
             "type": "integer"
@@ -3603,6 +3608,17 @@
             "title": "Downvotes",
             "type": "integer"
           },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -3617,6 +3633,17 @@
               }
             ],
             "title": "Implemented At"
+          },
+          "merged_into": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Into"
           },
           "message_id": {
             "anyOf": [
@@ -3656,10 +3683,18 @@
               "approved",
               "rejected",
               "delivery_failed",
-              "implemented"
+              "implemented",
+              "merged"
             ],
             "title": "Status",
             "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
           },
           "upvotes": {
             "title": "Upvotes",
@@ -3687,6 +3722,14 @@
           "allow_voting": {
             "title": "Allow Voting",
             "type": "boolean"
+          },
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Categories",
+            "type": "array"
           },
           "channel_id": {
             "anyOf": [
@@ -3730,6 +3773,13 @@
             ],
             "title": "Log Channel Id"
           },
+          "retention_days": {
+            "default": 30,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Retention Days",
+            "type": "integer"
+          },
           "review_role_ids": {
             "items": {
               "type": "string"
@@ -3741,6 +3791,14 @@
           "show_author": {
             "title": "Show Author",
             "type": "boolean"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Tags",
+            "type": "array"
           }
         },
         "required": [
@@ -14662,6 +14720,54 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tag"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
           }
         ],
         "responses": {
@@ -14737,6 +14843,104 @@
           }
         },
         "summary": "Suggestion Items"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}": {
+      "get": {
+        "operationId": "suggestion_detail_api_v1_guilds__guild_id__suggestions_items__suggestion_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "title": "Suggestion Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Suggestion Detail"
       }
     },
     "/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/events": {
@@ -14861,6 +15065,279 @@
           }
         },
         "summary": "Suggestion Events"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/labels": {
+      "post": {
+        "operationId": "labels_api_v1_guilds__guild_id__suggestions_items__suggestion_id__labels_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "title": "Suggestion Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "category": {
+                    "default": "",
+                    "maxLength": 40,
+                    "title": "Category",
+                    "type": "string"
+                  },
+                  "revision": {
+                    "minimum": 1,
+                    "title": "Revision",
+                    "type": "integer"
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 10,
+                    "title": "Tags",
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "revision"
+                ],
+                "title": "SuggestionLabelsInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Labels"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/merge": {
+      "post": {
+        "operationId": "merge_api_v1_guilds__guild_id__suggestions_items__suggestion_id__merge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "title": "Suggestion Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "reason": {
+                    "maxLength": 1000,
+                    "minLength": 1,
+                    "title": "Reason",
+                    "type": "string"
+                  },
+                  "revision": {
+                    "minimum": 1,
+                    "title": "Revision",
+                    "type": "integer"
+                  },
+                  "target_id": {
+                    "minimum": 1,
+                    "title": "Target Id",
+                    "type": "integer"
+                  },
+                  "target_revision": {
+                    "minimum": 1,
+                    "title": "Target Revision",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "target_id",
+                  "target_revision",
+                  "revision",
+                  "reason"
+                ],
+                "title": "SuggestionMergeInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Merge"
       }
     },
     "/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/review": {
@@ -15131,6 +15608,14 @@
                         "title": "Allow Voting",
                         "type": "boolean"
                       },
+                      "categories": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 20,
+                        "title": "Categories",
+                        "type": "array"
+                      },
                       "channel_id": {
                         "anyOf": [
                           {
@@ -15222,6 +15707,12 @@
                         ],
                         "title": "Log Channel Id"
                       },
+                      "retention_days": {
+                        "maximum": 365,
+                        "minimum": 1,
+                        "title": "Retention Days",
+                        "type": "integer"
+                      },
                       "review_role_ids": {
                         "items": {
                           "type": "string"
@@ -15233,6 +15724,14 @@
                       "show_author": {
                         "title": "Show Author",
                         "type": "boolean"
+                      },
+                      "tags": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 50,
+                        "title": "Tags",
+                        "type": "array"
                       }
                     },
                     "title": "SuggestionSettingsInput",
