@@ -128,6 +128,16 @@
             "title": "Id",
             "type": "string"
           },
+          "maturity": {
+            "default": "improving",
+            "enum": [
+              "stable",
+              "improving",
+              "unavailable"
+            ],
+            "title": "Maturity",
+            "type": "string"
+          },
           "missing_permissions": {
             "items": {
               "type": "string"
@@ -459,6 +469,34 @@
           "items"
         ],
         "title": "Items[Rule]",
+        "type": "object"
+      },
+      "Items_SuggestionEvent_": {
+        "additionalProperties": true,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionEvent"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Items[SuggestionEvent]",
         "type": "object"
       },
       "Items_SuggestionItem_": {
@@ -2362,6 +2400,48 @@
         "title": "StatusResponse",
         "type": "object"
       },
+      "SuggestionEvent": {
+        "additionalProperties": true,
+        "properties": {
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "integer"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "actor_id",
+          "event_type",
+          "detail",
+          "created_at"
+        ],
+        "title": "SuggestionEvent",
+        "type": "object"
+      },
       "SuggestionFeature": {
         "additionalProperties": true,
         "properties": {
@@ -2390,6 +2470,16 @@
           },
           "id": {
             "title": "Id",
+            "type": "string"
+          },
+          "maturity": {
+            "default": "improving",
+            "enum": [
+              "stable",
+              "improving",
+              "unavailable"
+            ],
+            "title": "Maturity",
             "type": "string"
           },
           "missing_permissions": {
@@ -2534,6 +2624,17 @@
             "title": "Created At",
             "type": "integer"
           },
+          "discussion_thread_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discussion Thread Id"
+          },
           "downvotes": {
             "title": "Downvotes",
             "type": "integer"
@@ -2541,6 +2642,17 @@
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "implemented_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implemented At"
           },
           "message_id": {
             "anyOf": [
@@ -2552,6 +2664,11 @@
               }
             ],
             "title": "Message Id"
+          },
+          "review_reason": {
+            "default": "",
+            "title": "Review Reason",
+            "type": "string"
           },
           "reviewer_id": {
             "anyOf": [
@@ -2569,29 +2686,16 @@
             "type": "integer"
           },
           "status": {
-            "anyOf": [
-              {
-                "const": "pending",
-                "type": "string"
-              },
-              {
-                "const": "reviewing",
-                "type": "string"
-              },
-              {
-                "const": "approved",
-                "type": "string"
-              },
-              {
-                "const": "rejected",
-                "type": "string"
-              },
-              {
-                "const": "delivery_failed",
-                "type": "string"
-              }
+            "enum": [
+              "pending",
+              "reviewing",
+              "approved",
+              "rejected",
+              "delivery_failed",
+              "implemented"
             ],
-            "title": "Status"
+            "title": "Status",
+            "type": "string"
           },
           "upvotes": {
             "title": "Upvotes",
@@ -2630,6 +2734,11 @@
               }
             ],
             "title": "Channel Id"
+          },
+          "discussion_enabled": {
+            "default": false,
+            "title": "Discussion Enabled",
+            "type": "boolean"
           },
           "form_fields": {
             "items": {
@@ -11111,6 +11220,268 @@
         "summary": "Suggestion Items"
       }
     },
+    "/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/events": {
+      "get": {
+        "operationId": "suggestion_events_api_v1_guilds__guild_id__suggestions_items__suggestion_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "title": "Suggestion Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Items_SuggestionEvent_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Suggestion Events"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/review": {
+      "post": {
+        "operationId": "review_suggestion_api_v1_guilds__guild_id__suggestions_items__suggestion_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "title": "Suggestion Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "reason": {
+                    "maxLength": 1000,
+                    "minLength": 1,
+                    "title": "Reason",
+                    "type": "string"
+                  },
+                  "revision": {
+                    "minimum": 1,
+                    "title": "Revision",
+                    "type": "integer"
+                  },
+                  "status": {
+                    "enum": [
+                      "reviewing",
+                      "approved",
+                      "rejected",
+                      "implemented"
+                    ],
+                    "title": "Status",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "status",
+                  "reason",
+                  "revision"
+                ],
+                "title": "SuggestionReviewInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Review Suggestion"
+      }
+    },
     "/api/v1/guilds/{guild_id}/suggestions/settings": {
       "get": {
         "operationId": "suggestion_settings_api_v1_guilds__guild_id__suggestions_settings_get",
@@ -11251,6 +11622,10 @@
                           }
                         ],
                         "title": "Channel Id"
+                      },
+                      "discussion_enabled": {
+                        "title": "Discussion Enabled",
+                        "type": "boolean"
                       },
                       "form_fields": {
                         "items": {

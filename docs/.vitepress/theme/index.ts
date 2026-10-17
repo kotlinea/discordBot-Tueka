@@ -1,4 +1,6 @@
 import DefaultTheme from 'vitepress/theme'
+import { useData } from 'vitepress'
+import maturity from '../../reference/feature-maturity.json'
 import { defineComponent, h, onMounted, ref } from 'vue'
 import '@fontsource/space-grotesk/600.css'
 import '@fontsource/space-grotesk/700.css'
@@ -36,9 +38,24 @@ const AppearanceControl = defineComponent({
 // This route belongs to the Dashboard, outside VitePress's /docs/ base.
 const dashboardLink = () => h('a', { href: '/servers', target: '_self', class: 'dashboard-link' }, 'Dashboard')
 
+const FeatureMaturity = defineComponent({
+  setup() {
+    const { frontmatter, lang } = useData()
+    return () => {
+      const value = (maturity as Record<string,string>)[String(frontmatter.value.feature_id || '')]
+      if (!value) return null
+      const labels:Record<string,string> = lang.value.startsWith('ja')
+        ? {label:'完成度',stable:'安定',improving:'改善中',unavailable:'利用不可'}
+        : {label:'Maturity',stable:'Stable',improving:'Improving',unavailable:'Unavailable'}
+      return h('p', {class:'feature-maturity'}, `${labels.label}: ${labels[value]}`)
+    }
+  },
+})
+
 export default {
   extends: DefaultTheme,
   Layout: () => h(DefaultTheme.Layout, null, {
+    'doc-before': () => h(FeatureMaturity),
     'nav-bar-content-after': () => h('div', { class: 'appearance-top' }, [dashboardLink(), h(AppearanceControl)]),
     'nav-screen-content-after': () => h('div', { class: 'appearance-mobile' }, [dashboardLink(), h(AppearanceControl)]),
   }),

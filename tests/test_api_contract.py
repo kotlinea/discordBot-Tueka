@@ -13,6 +13,8 @@ CONTRACT = Path(__file__).parent / 'fixtures' / 'api_v1_contract.json'
 U4_PATHS = {
     '/api/v1/guilds/{guild_id}/moderation/{family}/rules/state': 'put',
     '/api/v1/guilds/{guild_id}/moderation/{family}/templates/{trigger_type}': 'get',
+    '/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/events': 'get',
+    '/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/review': 'post',
 }
 
 
@@ -74,10 +76,10 @@ class ApiContractTests(unittest.TestCase):
         actual = boundary_responses(self.api)
         self.assertEqual([row for row in actual if row['path'] not in U4_PATHS], baseline)
         added = [row for row in actual if row['path'] in U4_PATHS]
-        self.assertEqual(len(added), 5)
+        self.assertEqual(len(added), 10)
         for row in added:
             # CSRF runs before authentication on writes, as for existing routes.
-            expected_code = ('csrf_invalid' if row['method'] == 'PUT' and row['mode'] != 'forbidden'
+            expected_code = ('csrf_invalid' if row['method'] in {'PUT', 'POST'} and row['mode'] != 'forbidden'
                              else 'authentication_required' if row['mode'] == 'anonymous' else 'guild_forbidden')
             self.assertEqual(row['body']['detail']['code'], expected_code, row)
             self.assertEqual(row['status'], 401 if expected_code == 'authentication_required' else 403)

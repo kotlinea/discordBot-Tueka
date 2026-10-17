@@ -49,6 +49,7 @@ class Resource(ApiModel):
 
 
 class Feature(ApiModel):
+    maturity: Literal['stable', 'improving', 'unavailable'] = 'improving'
     id: str
     category: str
     parent: str | None

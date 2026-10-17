@@ -12,6 +12,25 @@ from moderation import ModerationRepository
 
 
 class ModerationCommandLoadTests(unittest.IsolatedAsyncioTestCase):
+    async def test_manual_queue_dispatch_does_not_wait_for_maintenance(self):
+        from cogs.moderation.runtime import AutoModCog
+        from jobs import Outcome
+        with tempfile.TemporaryDirectory() as directory:
+            url = prepare_database(Path(directory) / 'manual-queue.db', self.addCleanup)
+            repository = ModerationRepository(url)
+            identifier = repository.enqueue_moderation_action(1, 2, 'untimeout', target_user_id=3,
+                                                              reason='release trial', dedupe_key='dispatch-trial')
+            cog = AutoModCog.__new__(AutoModCog)
+            cog.owner = 'test-manual-dispatch'
+            cog.moderation_repository = repository
+            cog.engine = SimpleNamespace(prune=MagicMock(side_effect=AssertionError('Housekeeping must remain independent')))
+            cog._execute_requested_action = AsyncMock(return_value=Outcome())
+            await cog.dispatch_actions()
+            cog._execute_requested_action.assert_awaited_once()
+            self.assertEqual(cog._execute_requested_action.await_args.args[0]['id'], identifier)
+            with repository._connection() as connection:
+                self.assertEqual(connection.execute('SELECT status FROM moderation_action_requests WHERE id=%s', (identifier,)).fetchone()['status'], 'completed')
+
     async def test_message_match_converts_to_value_context_before_execution(self):
         from cogs.moderation.runtime import AutoModCog
         from moderation.contracts import ActionContext

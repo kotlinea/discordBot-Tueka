@@ -35,7 +35,7 @@ class MigrationTests(unittest.TestCase):
         with connect(self.url) as c:
             c.execute("INSERT INTO app_metadata VALUES('upgrade_probe','preserved')")
             before = c.execute('SELECT version,name,checksum FROM schema_migrations').fetchall()
-        self.assertEqual(apply(self.url)['applied'], ['0002_observability.sql'])
+        self.assertEqual(apply(self.url)['applied'], [row[1] for row in load()[1:]])
         with connect(self.url) as c:
             self.assertEqual(c.execute("SELECT value FROM app_metadata WHERE key='upgrade_probe'").fetchone()['value'], 'preserved')
             self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version=1').fetchall(), before)
@@ -51,6 +51,25 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(c.execute('SELECT value FROM preserved').fetchone()['value'], 'keep')
             self.assertIsNone(c.execute("SELECT to_regclass('partial') AS relation").fetchone()['relation'])
             self.assertIsNone(c.execute("SELECT to_regclass('schema_migrations') AS relation").fetchone()['relation'])
+
+    def test_suggestion_review_upgrade_preserves_votes_history_and_delivery(self):
+        for migration in load()[:2]:
+            (self.directory/migration[1]).write_text(migration[3],encoding='utf-8')
+        apply(self.url,self.directory)
+        with connect(self.url) as c:
+            suggestion=c.execute("INSERT INTO suggestions(guild_id,channel_id,author_id,answers_json,created_at,updated_at) VALUES(1,2,3,'{}',1,1) RETURNING id").fetchone()['id']
+            c.execute('INSERT INTO suggestion_votes(suggestion_id,user_id,value,created_at,updated_at) VALUES(%s,4,1,1,1)',(suggestion,))
+            c.execute("INSERT INTO suggestion_events(suggestion_id,guild_id,actor_id,event_type,created_at) VALUES(%s,1,3,'created',1)",(suggestion,))
+            c.execute("INSERT INTO suggestion_outbox(suggestion_id,action,available_at,created_at) VALUES(%s,'publish',1,1)",(suggestion,))
+        self.assertEqual(apply(self.url)['applied'],['0003_suggestion_review.sql'])
+        self.assertEqual(apply(self.url),{'applied':[]})
+        with connect(self.url) as c:
+            row=c.execute('SELECT * FROM suggestions WHERE id=%s',(suggestion,)).fetchone()
+            self.assertEqual(row['review_reason'],'')
+            self.assertIsNone(row['discussion_thread_id'])
+            self.assertIsNone(row['implemented_at'])
+            for table in ('suggestion_votes','suggestion_events','suggestion_outbox'):
+                self.assertEqual(c.execute(f'SELECT COUNT(*) AS n FROM {table} WHERE suggestion_id=%s',(suggestion,)).fetchone()['n'],1)
 
     def test_transaction_and_session_control_cannot_escape_rollback(self):
         self.seed()

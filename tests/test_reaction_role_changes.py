@@ -54,6 +54,32 @@ class RoleChangeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([row['role_id'] for row in self.repo.assignments(30, config_id=self.config['id'])], [20])
         self.assertEqual(self.repo.pending_role_changes(1), [])
 
+    async def test_all_seven_types_apply_add_and_remove_with_persisted_assignments(self):
+        cases = {
+            'normal': (set(), {20}, set()), 'unique': (set(), {20}, set()),
+            'verify': (set(), {20}, {20}), 'binding': (set(), {20}, {20}),
+            'drop': ({20}, set(), set()), 'reversed': ({20}, set(), {20}),
+            'temp': (set(), {20}, set()),
+        }
+        for index,(behavior,(initial,after_add,after_remove)) in enumerate(cases.items()):
+            with self.subTest(behavior=behavior):
+                config=self.decisions.create(1,message(behavior=behavior,channel_id=100+index))
+                self.repo.set_discord_message(config['id'],1000+index)
+                config=self.repo.message(1,config['id']);mapping=config['mappings'][0]
+                port=RolePort();port.roles=set(initial)
+                service=RoleChangeService(self.repo,port)
+                user=100+index
+                for event,expected in [('add',after_add),('remove',after_remove)]:
+                    decision=self.decisions.decide(config,mapping,event=event,user_id=user,member_role_ids=port.roles)
+                    self.assertTrue(decision.allowed)
+                    if decision.operation!='none':await service.apply(config,mapping,user,decision)
+                    self.assertEqual(port.roles,expected)
+                assigned={r['role_id'] for r in self.repo.assignments(user,config_id=config['id'])}
+                self.assertEqual(assigned,after_remove)
+                if behavior=='binding':
+                    self.assertIsNotNone(self.repo.binding_receipt(config['id'],user))
+                    self.assertFalse(self.decisions.decide(config,mapping,event='add',user_id=user,member_role_ids=port.roles).allowed)
+
     async def test_failed_compensation_survives_retention_and_can_resume_after_restart(self):
         self.port.fail_restore = True
         with patch.object(self.repo, 'commit_role_change', side_effect=RuntimeError('database failed')):

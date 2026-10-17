@@ -20,6 +20,7 @@ class SuggestionSettings(ApiModel):
     log_channel_id: str | None
     review_role_ids: list[str] = Field(max_length=25)
     allow_voting: bool
+    discussion_enabled: bool = False
     show_author: bool
     form_title: str = Field(min_length=1, max_length=45)
     form_fields: list[SuggestionFormField] = Field(min_length=1, max_length=5)
@@ -29,7 +30,10 @@ class SuggestionItem(ApiModel):
     id: int
     author_id: str
     message_id: str | None
-    status: Literal["pending"] | Literal["reviewing"] | Literal["approved"] | Literal["rejected"] | Literal["delivery_failed"]
+    status: Literal["pending", "reviewing", "approved", "rejected", "delivery_failed", "implemented"]
+    review_reason: str = ''
+    discussion_thread_id: str | None = None
+    implemented_at: int | None = None
     answers: dict[str, str]
     upvotes: int
     downvotes: int
@@ -43,3 +47,11 @@ from .common import Feature
 
 class SuggestionFeature(Feature):
     settings: SuggestionSettings
+
+
+class SuggestionEvent(ApiModel):
+    id: int
+    actor_id: str | None
+    event_type: str
+    detail: dict[str, Any]
+    created_at: int

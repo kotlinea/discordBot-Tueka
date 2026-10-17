@@ -14,7 +14,12 @@ from dashboard.api.schemas import inputs
 from dashboard.api.body import read_body, request_schema
 from dashboard.api.dependencies import ApiDependencies
 from dashboard.api.serialization import _serialize_rule_resource_ids
+from features.defaults import ModuleSettingsAccess
 ALLOWED_ACTIONS = {'warn', 'timeout', 'untimeout', 'kick', 'ban', 'unban', 'softban', 'purge', 'lock', 'unlock', 'lockdown', 'unlockdown'}
+
+def create_settings(context: ApiContext) -> ModuleSettingsAccess:
+    return ModuleSettingsAccess(context.guild_settings_repository, 'moderation', normalize=lambda settings: {})
+
 
 def create_router(context: ApiContext) -> APIRouter:
     router = APIRouter(route_class=ApiRoute, responses=ERROR_RESPONSES)
@@ -30,6 +35,9 @@ def create_router(context: ApiContext) -> APIRouter:
         action_name, reason = (str(body.get('action', '')), str(body.get('reason', '')).strip()[:500])
         if action_name not in ALLOWED_ACTIONS or not reason or body.get('confirmed') is not True:
             raise api_error(422, 'action_invalid', '処置、理由、確認内容を確認してください。')
+        duration_limit = {'timeout': 40320, 'lockdown': 1440}.get(action_name)
+        if duration_limit is not None and body.get('duration_minutes', 10) > duration_limit:
+            raise api_error(422, 'action_invalid', 'Timeoutは28日以内、Lockdownは24時間以内で指定してください。')
         if not guild_settings_repository.module_enabled(guild_id, 'moderation'):
             raise api_error(409, 'moderation_disabled', 'Moderationを有効にしてから処置を実行してください。')
         try:
@@ -37,7 +45,8 @@ def create_router(context: ApiContext) -> APIRouter:
             channel_id = int(body['channel_id']) if body.get('channel_id') else None
             channels, _, bot_permissions = await discord.guild_resources(guild_id, use_cache=False)
             guild_channel_ids = {int(item['id']) for item in channels}
-            text_channel_ids = {int(item['id']) for item in channels if int(item['type']) in {0, 5, 15}}
+            supported_types = {0, 5} if action_name == 'purge' else {0, 5, 15}
+            text_channel_ids = {int(item['id']) for item in channels if int(item['type']) in supported_types}
             target_actions = {'warn', 'timeout', 'untimeout', 'kick', 'ban', 'unban', 'softban'}
             channel_actions = {'purge', 'lock', 'unlock'}
             required_permissions = {'timeout': 'moderate_members', 'untimeout': 'moderate_members', 'kick': 'kick_members', 'ban': 'ban_members', 'unban': 'ban_members', 'softban': 'ban_members', 'purge': 'manage_messages', 'lock': 'manage_channels', 'unlock': 'manage_channels', 'lockdown': 'manage_channels', 'unlockdown': 'manage_channels'}

@@ -59,10 +59,17 @@ class FeatureRegistrationTests(unittest.TestCase):
                         self.assertTrue((ROOT / path).is_file(), path)
                     continue
                 result = getattr(actual, key)
+                if actual.id == 'suggestions' and key == 'fields':
+                    self.assertEqual(result.count('discussion_enabled'), 1)
+                    result = tuple(field for field in result if field != 'discussion_enabled')
                 self.assertEqual(list(result) if isinstance(result, tuple) else result, value, (actual.id, key))
         self.assertEqual({item.id for item in REGISTRY.features if not item.dashboard}, {'echo', 'calculate', 'roll', 'gemini'})
 
     def test_duplicate_categories_features_and_invalid_category_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'maturity'):
+            catalog(replace(feature(), maturity='unknown'))
+        for maturity in ('stable','improving','unavailable'):
+            self.assertEqual(catalog(replace(feature(),maturity=maturity)).features[0].maturity,maturity)
         with self.assertRaisesRegex(ValueError, 'category'):
             Registry((Category('example', 'nav.example', ()), Category('example', 'nav.other', ())))
         with self.assertRaisesRegex(ValueError, 'duplicate feature'):

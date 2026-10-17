@@ -5,7 +5,7 @@ export type Diagnostic = { "level": string; "message": string }
 export type ErrorDetail = { "code": string; "message": string; "errors"?: Array<ErrorField> }
 export type ErrorField = { "path": string; "message": string }
 export type ErrorResponse = { "detail": ErrorDetail }
-export type Feature = { "id": string; "category": string; "parent": (string | null); "docs_path": string; "title": string; "description": string; "fields": Array<string>; "required_fields": Array<string>; "required_bot_permissions": Array<string>; "enabled": boolean; "settings": Record<string, unknown>; "revision": number; "missing_permissions": Array<string> }
+export type Feature = { "maturity"?: "stable" | "improving" | "unavailable"; "id": string; "category": string; "parent": (string | null); "docs_path": string; "title": string; "description": string; "fields": Array<string>; "required_fields": Array<string>; "required_bot_permissions": Array<string>; "enabled": boolean; "settings": Record<string, unknown>; "revision": number; "missing_permissions": Array<string> }
 export type Guild = { "id": string; "name": string; "icon": (string | null); "access"?: ("admin" | "ticket_staff") }
 export type GuildOverview = { "guild_id": string; "features": Array<Feature>; "resources": Resources; "moderation": ModerationOverview }
 export type InfractionsResponse = { "user_id": string; "active_points": number; "cases": Array<ModerationCase> }
@@ -15,6 +15,7 @@ export type Items_ModerationEvent_ = { "items": Array<ModerationEvent>; "next"?:
 export type Items_ReactionRoleEvent_ = { "items": Array<ReactionRoleEvent>; "next"?: (number | null) }
 export type Items_ReactionRoleLinkGroup_ = { "items": Array<ReactionRoleLinkGroup>; "next"?: (number | null) }
 export type Items_Rule_ = { "items": Array<Rule>; "next"?: (number | null) }
+export type Items_SuggestionEvent_ = { "items": Array<SuggestionEvent>; "next"?: (number | null) }
 export type Items_SuggestionItem_ = { "items": Array<SuggestionItem>; "next"?: (number | null) }
 export type Items_TicketForm_ = { "items": Array<TicketForm>; "next"?: (number | null) }
 export type Items_TicketItem_ = { "items": Array<TicketItem>; "next"?: (number | null) }
@@ -52,10 +53,11 @@ export type SocialSummary = { "providers": Array<SocialProviderSummary>; "worker
 export type SocialTarget = { "id": number; "provider": string; "account_key": string; "external_id"?: (string | null); "handle"?: (string | null); "display_name"?: (string | null); "avatar_url"?: (string | null); "status": ("pending" | "active" | "degraded" | "error"); "last_error"?: (string | null); "last_checked_at"?: (number | null); "revision": number }
 export type SocialTemplate = { "content": string; "title": string; "description": string; "color": string; "url": string; "thumbnail_url": string; "image_url": string; "footer": string }
 export type StatusResponse = { "status": string }
-export type SuggestionFeature = { "id": string; "category": string; "parent": (string | null); "docs_path": string; "title": string; "description": string; "fields": Array<string>; "required_fields": Array<string>; "required_bot_permissions": Array<string>; "enabled": boolean; "settings": SuggestionSettings; "revision": number; "missing_permissions": Array<string> }
+export type SuggestionEvent = { "id": number; "actor_id": (string | null); "event_type": string; "detail": Record<string, unknown>; "created_at": number }
+export type SuggestionFeature = { "maturity"?: "stable" | "improving" | "unavailable"; "id": string; "category": string; "parent": (string | null); "docs_path": string; "title": string; "description": string; "fields": Array<string>; "required_fields": Array<string>; "required_bot_permissions": Array<string>; "enabled": boolean; "settings": SuggestionSettings; "revision": number; "missing_permissions": Array<string> }
 export type SuggestionFormField = { "key": string; "label": string; "placeholder": string; "style": ("short" | "paragraph"); "required": boolean; "min_length": number; "max_length": number }
-export type SuggestionItem = { "id": number; "author_id": string; "message_id": (string | null); "status": ("pending" | "reviewing" | "approved" | "rejected" | "delivery_failed"); "answers": Record<string, string>; "upvotes": number; "downvotes": number; "reviewer_id": (string | null); "created_at": number; "revision": number }
-export type SuggestionSettings = { "channel_id": (string | null); "log_channel_id": (string | null); "review_role_ids": Array<string>; "allow_voting": boolean; "show_author": boolean; "form_title": string; "form_fields": Array<SuggestionFormField> }
+export type SuggestionItem = { "id": number; "author_id": string; "message_id": (string | null); "status": "pending" | "reviewing" | "approved" | "rejected" | "delivery_failed" | "implemented"; "review_reason"?: string; "discussion_thread_id"?: (string | null); "implemented_at"?: (number | null); "answers": Record<string, string>; "upvotes": number; "downvotes": number; "reviewer_id": (string | null); "created_at": number; "revision": number }
+export type SuggestionSettings = { "channel_id": (string | null); "log_channel_id": (string | null); "review_role_ids": Array<string>; "allow_voting": boolean; "discussion_enabled"?: boolean; "show_author": boolean; "form_title": string; "form_fields": Array<SuggestionFormField> }
 export type TicketAccessRule = { "role_id": string; "label": string; "allow": boolean }
 export type TicketDeployment = { "panel_message_id": (number | null); "revision": (number | null); "name": string; "channel_id": (string | null); "content": string; "title": string; "description": string; "color": string; "image_url": string; "thumbnail_url": string; "position": (number | null) }
 export type TicketDetail = { "ticket": TicketItem; "panel": TicketPanel; "messages": Array<TicketMessage>; "transcript": TranscriptReference; "outbox": Array<Record<string, unknown>> }
@@ -121,6 +123,7 @@ export const constraints = {
     "enabled": {},
     "fields": {},
     "id": {},
+    "maturity": {},
     "missing_permissions": {},
     "parent": {},
     "required_bot_permissions": {},
@@ -167,6 +170,10 @@ export const constraints = {
     "next": {}
   },
   "Items_Rule_": {
+    "items": {},
+    "next": {}
+  },
+  "Items_SuggestionEvent_": {
     "items": {},
     "next": {}
   },
@@ -463,6 +470,13 @@ export const constraints = {
   "StatusResponse": {
     "status": {}
   },
+  "SuggestionEvent": {
+    "actor_id": {},
+    "created_at": {},
+    "detail": {},
+    "event_type": {},
+    "id": {}
+  },
   "SuggestionFeature": {
     "category": {},
     "description": {},
@@ -470,6 +484,7 @@ export const constraints = {
     "enabled": {},
     "fields": {},
     "id": {},
+    "maturity": {},
     "missing_permissions": {},
     "parent": {},
     "required_bot_permissions": {},
@@ -505,9 +520,12 @@ export const constraints = {
     "answers": {},
     "author_id": {},
     "created_at": {},
+    "discussion_thread_id": {},
     "downvotes": {},
     "id": {},
+    "implemented_at": {},
     "message_id": {},
+    "review_reason": {},
     "reviewer_id": {},
     "revision": {},
     "status": {},
@@ -516,6 +534,7 @@ export const constraints = {
   "SuggestionSettings": {
     "allow_voting": {},
     "channel_id": {},
+    "discussion_enabled": {},
     "form_fields": {
       "maxItems": 5,
       "minItems": 1
@@ -921,8 +940,10 @@ export interface Operations {
   "PUT /api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}": { response: SocialSubscription; body: { "account"?: string; "channel_id"?: (string | number | null); "role_id"?: (string | number | null); "events"?: Array<string>; "event_channels"?: Record<string, (string | number)>; "templates"?: Record<string, { "content"?: string; "title"?: string; "description"?: string; "color"?: string; "url"?: string; "thumbnail_url"?: string; "image_url"?: string; "footer"?: string }>; "enabled"?: boolean; "revision"?: (number | null) } }
   "POST /api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}/retry": { response: StatusResponse; body: never }
   "GET /api/v1/guilds/{guild_id}/suggestions/items": { response: Items_SuggestionItem_; body: never }
+  "GET /api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/events": { response: Items_SuggestionEvent_; body: never }
+  "POST /api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/review": { response: SuggestionItem; body: { "status": "reviewing" | "approved" | "rejected" | "implemented"; "reason": string; "revision": number } }
   "GET /api/v1/guilds/{guild_id}/suggestions/settings": { response: SuggestionFeature; body: never }
-  "PUT /api/v1/guilds/{guild_id}/suggestions/settings": { response: SuggestionFeature; body: { "enabled"?: boolean; "revision"?: (number | null); "settings"?: { "channel_id"?: (string | null); "log_channel_id"?: (string | null); "review_role_ids"?: Array<string>; "allow_voting"?: boolean; "show_author"?: boolean; "form_title"?: string; "form_fields"?: Array<{ "key"?: string; "label"?: string; "placeholder"?: string; "style"?: ("short" | "paragraph"); "required"?: boolean; "min_length"?: number; "max_length"?: number }> } } }
+  "PUT /api/v1/guilds/{guild_id}/suggestions/settings": { response: SuggestionFeature; body: { "enabled"?: boolean; "revision"?: (number | null); "settings"?: { "channel_id"?: (string | null); "log_channel_id"?: (string | null); "review_role_ids"?: Array<string>; "allow_voting"?: boolean; "discussion_enabled"?: boolean; "show_author"?: boolean; "form_title"?: string; "form_fields"?: Array<{ "key"?: string; "label"?: string; "placeholder"?: string; "style"?: ("short" | "paragraph"); "required"?: boolean; "min_length"?: number; "max_length"?: number }> } } }
   "GET /api/v1/guilds/{guild_id}/tickets": { response: TicketOverview; body: never }
   "GET /api/v1/guilds/{guild_id}/tickets/forms": { response: Items_TicketForm_; body: never }
   "POST /api/v1/guilds/{guild_id}/tickets/forms": { response: TicketForm; body: { "id"?: number; "name"?: string; "title"?: string; "fields"?: Array<{ "key"?: string; "label"?: string; "placeholder"?: string; "style"?: ("short" | "paragraph"); "required"?: boolean; "min_length"?: number; "max_length"?: number }>; "revision"?: number } }

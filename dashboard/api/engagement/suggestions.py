@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from dashboard.discord_api import ADMINISTRATOR, PERMISSION_BITS
 from features.registry import get_feature
-from suggestions import SuggestionValidationError, normalize_settings as normalize_suggestion_settings
+from suggestions import SuggestionService, SuggestionValidationError, normalize_settings as normalize_suggestion_settings
 from dashboard.api.context import ApiContext
 from dashboard.api.route import ApiRoute, ERROR_RESPONSES
 from dashboard.api import schemas
@@ -48,7 +48,9 @@ def create_router(context: ApiContext) -> APIRouter:
                 raise SuggestionValidationError('log_channel_id', 'ログチャンネルを選択してください。')
             if set(value['review_role_ids']) - role_ids:
                 raise SuggestionValidationError('review_role_ids', 'このサーバーに存在するロールを選択してください。')
-            required = get_feature('suggestions').required_bot_permissions
+            required = list(get_feature('suggestions').required_bot_permissions)
+            if value.get('discussion_enabled'):
+                required.extend(['create_public_threads', 'send_messages_in_threads', 'read_message_history'])
             missing = [] if permissions & ADMINISTRATOR else [name for name in required if not permissions & PERMISSION_BITS[name]]
             if enabled and missing:
                 raise SuggestionValidationError('permissions', f"Bot権限が不足しています: {', '.join(missing)}")
@@ -65,8 +67,42 @@ def create_router(context: ApiContext) -> APIRouter:
     async def suggestion_items(request: Request, guild_id: int, before: int | None=None, limit: int=50, _access: str=Depends(auth.read)) -> dict[str, Any]:
         items = suggestion_repository.list(guild_id, before=before, limit=limit)
         for item in items:
-            for key in ('author_id', 'channel_id', 'message_id', 'reviewer_id'):
+            for key in ('author_id', 'channel_id', 'message_id', 'reviewer_id', 'discussion_thread_id'):
                 if item.get(key) is not None:
                     item[key] = str(item[key])
         return {'items': items}
+
+    @router.get('/guilds/{guild_id}/suggestions/items/{suggestion_id}/events', response_model=schemas.Items[schemas.SuggestionEvent], response_model_exclude_unset=True)
+    async def suggestion_events(request: Request, guild_id: int, suggestion_id: int, before: int | None=None,
+                                limit: int=50, _access: str=Depends(auth.read)) -> dict[str, Any]:
+        try:
+            items = suggestion_repository.events(guild_id, suggestion_id, before=before, limit=limit)
+        except LookupError as exc:
+            raise api_error(404, 'suggestion_not_found', '提案が見つかりません。') from exc
+        for item in items:
+            if item.get('actor_id') is not None:
+                item['actor_id'] = str(item['actor_id'])
+        return {'items': items}
+
+    @router.post('/guilds/{guild_id}/suggestions/items/{suggestion_id}/review', dependencies=[Depends(auth.csrf)],
+        response_model=schemas.SuggestionItem, response_model_exclude_unset=True, openapi_extra=request_schema(inputs.SuggestionReviewInput))
+    async def review_suggestion(request: Request, guild_id: int, suggestion_id: int, _access: str=Depends(auth.write)) -> dict[str, Any]:
+        body = await read_body(request, inputs.SuggestionReviewInput)
+        if not guild_settings_repository.get_module(guild_id, 'suggestions')['enabled']:
+            raise api_error(409, 'suggestions_disabled', 'Suggestionsは無効です。')
+        reason = body['reason'].strip()
+        if not reason:
+            raise api_error(422, 'suggestion_reason_required', '審査理由を入力してください。')
+        actor = await discord.current_user(auth.token(request))
+        try:
+            item = SuggestionService(suggestion_repository).review(guild_id, suggestion_id, int(actor['id']), body['status'],
+                reason, expected_revision=body['revision'])
+        except LookupError as exc:
+            raise api_error(404, 'suggestion_not_found', '提案が見つかりません。') from exc
+        except RuntimeError as exc:
+            raise revision_conflict('提案が更新されています。再読み込みしてください。') from exc
+        for key in ('author_id', 'channel_id', 'message_id', 'reviewer_id', 'discussion_thread_id'):
+            if item.get(key) is not None:
+                item[key] = str(item[key])
+        return item
     return router

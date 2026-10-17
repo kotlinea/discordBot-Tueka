@@ -12,6 +12,7 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / 'tests'), str(ROOT / 'scripts')]
 from cryptography.fernet import Fernet
+from database.migrations import load as load_migrations
 from deploy import compose
 from deploy.recovery import restore, release, abort, digest, load_bundle
 from deploy.backup_job import run as scheduled_backup
@@ -24,6 +25,8 @@ def main():
     parser.add_argument('--image', required=True)
     args = parser.parse_args()
     image = docker('image', 'inspect', '--format', '{{.Id}}', args.image).stdout.strip()
+    baseline_version = load_migrations()[-1][0]
+    probe_name = f'{baseline_version + 1:04d}_recovery_probe.sql'
     unique = uuid.uuid4().hex[:12]
     directories = []
     upgraded_tag = 'tueka-recovery-upgrade:' + unique
@@ -108,9 +111,9 @@ def main():
                 # Exercise a genuine newer image and schema, then return to the snapshot image/schema.
                 upgrade = root / 'upgrade'
                 upgrade.mkdir()
-                (upgrade / '0003_recovery_probe.sql').write_text('CREATE TABLE recovery_upgrade_probe(id BIGINT);\n')
+                (upgrade / probe_name).write_text('CREATE TABLE recovery_upgrade_probe(id BIGINT);\n')
                 docker('tag', image, base_tag)
-                (upgrade / 'Dockerfile').write_text(f'FROM {base_tag}\nCOPY 0003_recovery_probe.sql /app/migrations/postgresql/0003_recovery_probe.sql\n')
+                (upgrade / 'Dockerfile').write_text(f'FROM {base_tag}\nCOPY {probe_name} /app/migrations/postgresql/{probe_name}\n')
                 result = docker('build', '-t', upgraded_tag, str(upgrade), check=False)
                 if result.returncode:
                     raise RuntimeError('Isolated upgrade image build failed: ' + result.stderr)
@@ -144,8 +147,8 @@ def main():
                 compose.up(target)
                 ready(target)
                 assert docker('inspect', '--format', '{{.Image}}', container(target, 'dashboard')).stdout.strip() == image
-                assert sql(target, 'SELECT MAX(version) FROM schema_migrations') == '2'
-                assert sql(source, 'SELECT MAX(version) FROM schema_migrations') == '3'
+                assert sql(target, 'SELECT MAX(version) FROM schema_migrations') == str(baseline_version)
+                assert sql(source, 'SELECT MAX(version) FROM schema_migrations') == str(baseline_version + 1)
                 assert sql(source, "SELECT value FROM app_metadata WHERE key='recovery_version'") == 'new'
                 def volume(directory, service, destination):
                     return next(m['Name'] for m in json.loads(docker('inspect', container(directory, service)).stdout)[0]['Mounts'] if m['Destination'] == destination)

@@ -7,6 +7,7 @@ STATUS_LABELS = {
     "pending": "審査待ち",
     "reviewing": "審査中",
     "approved": "承認済み",
+    "implemented": "実装済み",
     "rejected": "却下",
     "delivery_failed": "投稿失敗",
 }
@@ -14,6 +15,7 @@ STATUS_COLORS = {
     "pending": 0x64748B,
     "reviewing": 0xD97706,
     "approved": 0x15803D,
+    "implemented": 0x2563EB,
     "rejected": 0xB91C1C,
     "delivery_failed": 0xB91C1C,
 }
@@ -33,6 +35,10 @@ def suggestion_embed(item: dict[str, Any], settings: dict[str, Any]) -> discord.
         embed.add_field(name=str(label)[:256], value=str(value)[:1024], inline=False)
     if settings.get("show_author", True):
         embed.set_author(name=f"投稿者: {item['author_id']}")
+    if item.get('review_reason'):
+        embed.add_field(name='審査理由', value=item['review_reason'][:1000], inline=False)
+    if item.get('discussion_thread_id'):
+        embed.add_field(name='Discussion', value=f"https://discord.com/channels/{item['guild_id']}/{item['discussion_thread_id']}", inline=False)
     reviewer = f" · 担当 <@{item['reviewer_id']}>" if item.get("reviewer_id") else ""
     embed.set_footer(text=f"賛成 {item.get('upvotes', 0)} · 反対 {item.get('downvotes', 0)}{reviewer} · Tueka suggestion:{item['id']}:{item['created_at']}")
     return embed
@@ -40,7 +46,7 @@ def suggestion_embed(item: dict[str, Any], settings: dict[str, Any]) -> discord.
 
 def suggestion_view(item: dict[str, Any], settings: dict[str, Any]) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
-    closed = item["status"] in {"approved", "rejected", "delivery_failed"}
+    closed = item["status"] in {"approved", "rejected", "implemented", "delivery_failed"}
     if settings.get("allow_voting", True):
         view.add_item(discord.ui.Button(
             label=f"賛成 {item.get('upvotes', 0)}", emoji="👍", style=discord.ButtonStyle.secondary,
@@ -62,4 +68,7 @@ def suggestion_view(item: dict[str, Any], settings: dict[str, Any]) -> discord.u
         label="却下", style=discord.ButtonStyle.danger,
         custom_id=f"tueka-suggestion:review:{item['id']}:rejected", disabled=closed,
     ))
+    if item['status'] == 'approved':
+        view.add_item(discord.ui.Button(label='実装済み', style=discord.ButtonStyle.primary,
+            custom_id=f"tueka-suggestion:review:{item['id']}:implemented", row=1))
     return view

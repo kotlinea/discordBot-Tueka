@@ -33,7 +33,7 @@ PERMISSION_BITS = {
     "add_reactions": 1 << 6, "view_channel": 1 << 10,
     "moderate_members": 1 << 40, "kick_members": 1 << 1, "ban_members": 1 << 2,
     "read_message_history": 1 << 16, "embed_links": 1 << 14, "attach_files": 1 << 15,
-    "manage_threads": 1 << 34, "create_private_threads": 1 << 36, "send_messages_in_threads": 1 << 38,
+    "manage_threads": 1 << 34, "create_public_threads": 1 << 35, "create_private_threads": 1 << 36, "send_messages_in_threads": 1 << 38,
 }
 
 

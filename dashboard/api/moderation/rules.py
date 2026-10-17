@@ -139,7 +139,7 @@ def create_router(context: ApiContext) -> APIRouter:
             engine, matches = (AutoModEngine(), [])
             repeats = int(value['trigger_config'].get('limit', 1)) if value['trigger_type'].endswith('rate') or value['trigger_type'] in {'duplicate', 'reaction_burst', 'new_account_ratio', 'emoji_sticker_rate'} else 1
             for _ in range(max(1, min(repeats, 100))):
-                matches = await engine.evaluate(context, [{**value, 'id': 1}])
+                matches = await engine.evaluate(context, [{**value, 'id': 1, 'enabled': True}])
             return {'matched': bool(matches), 'reason': matches[0].reason if matches else '一致しませんでした。', 'trace': ['actor', 'global_exemptions', 'family_exemptions', 'rule_exemptions', 'conditions', 'trigger']}
         except (TypeError, ValueError) as exc:
             raise api_error(422, 'preview_invalid', 'ルールまたはテスト入力を確認してください。') from exc

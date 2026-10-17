@@ -129,7 +129,7 @@ def run(task, args, root, log):
         extra = ['--check'] if task.endswith('check') else (['--write'] if name == 'commands' else [])
         call(python, f'scripts/generate_{name}.py', *extra, *args)
         if task.endswith('generate'):
-            paths = ['dashboard/api/openapi.json', 'dashboard/frontend/src/generated/api.ts'] if name == 'api' else [
+            paths = ['dashboard/api/openapi.json', 'dashboard/frontend/src/generated/api.ts', 'docs/reference/feature-maturity.json'] if name == 'api' else [
                 'docs/reference/commands.json', 'docs/reference/commands.md', 'docs/en/reference/commands.md']
             for relative in paths:
                 writeback(root / relative, relative)

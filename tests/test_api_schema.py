@@ -9,6 +9,68 @@ from scripts.generate_api import artifacts
 
 
 class ApiSchemaTests(unittest.TestCase):
+    def test_feature_maturity_is_independent_of_environment_enablement(self):
+        from guild_settings import GuildSettingsRepository
+        repository=GuildSettingsRepository(self.api.database)
+        for enabled in (False,True):
+            repository.set_module(1,'suggestions',enabled=enabled)
+            response=self.api.client.get('/api/v1/guilds/1/features')
+            self.assertEqual(response.status_code,200,response.text)
+            items=response.json()['items']
+            self.assertEqual(len(items),24)
+            self.assertTrue(all(item['maturity']=='improving' for item in items))
+            self.assertEqual(next(item for item in items if item['id']=='suggestions')['enabled'],enabled)
+
+    def test_manual_action_feature_state_tracks_the_executor_module_without_exposing_settings(self):
+        from guild_settings import GuildSettingsRepository
+        repository = GuildSettingsRepository(self.api.database)
+        for enabled in (True, False):
+            repository.set_module(1, 'moderation', enabled=enabled, settings={'default_log_channel_id':10})
+            repository.set_module(1, 'moderation_actions', enabled=not enabled)
+            response = self.api.client.get('/api/v1/guilds/1/features')
+            self.assertEqual(response.status_code,200,response.text)
+            feature = next(item for item in response.json()['items'] if item['id']=='moderation_actions')
+            self.assertEqual(feature['enabled'],enabled)
+            self.assertEqual(feature['settings'],{})
+
+    def test_purge_rejects_forum_but_lock_accepts_it_before_queueing(self):
+        from guild_settings import GuildSettingsRepository
+        from moderation import ModerationRepository
+        GuildSettingsRepository(self.api.database).set_module(1, 'moderation', enabled=True)
+        channels, roles, permissions = self.api.discord.guild_resources.return_value
+        self.api.discord.guild_resources.return_value = ([*channels, {'id':'15','type':15}], roles, permissions)
+        root = '/api/v1/guilds/1/moderation/actions'
+        repository = ModerationRepository(self.api.database)
+        body = {'action':'purge','channel_id':'15','reason':'channel support test','confirmed':True}
+        rejected = self.api.client.post(root,json=body,headers=self.api.headers)
+        self.assertEqual(rejected.status_code,422,rejected.text)
+        with repository._connection() as connection:
+            self.assertEqual(connection.execute('SELECT COUNT(*) AS count FROM moderation_action_requests').fetchone()['count'],0)
+        accepted = self.api.client.post(root,json={**body,'action':'lock'},headers=self.api.headers)
+        self.assertEqual(accepted.status_code,202,accepted.text)
+
+    def test_manual_action_duration_limits_reject_before_queueing_and_preserve_boundaries(self):
+        from guild_settings import GuildSettingsRepository
+        from moderation import ModerationRepository
+        GuildSettingsRepository(self.api.database).set_module(1, 'moderation', enabled=True)
+        root = '/api/v1/guilds/1/moderation/actions'
+        repository = ModerationRepository(self.api.database)
+        for action, maximum in (('timeout', 40320), ('lockdown', 1440)):
+            body = {'action': action, 'target_user_id': '30', 'reason': 'boundary test',
+                    'confirmed': True, 'confirmation': '1', 'duration_minutes': maximum + 1}
+            with repository._connection() as connection:
+                before = connection.execute('SELECT COUNT(*) AS count FROM moderation_action_requests').fetchone()['count']
+            rejected = self.api.client.post(root, json=body, headers=self.api.headers)
+            self.assertEqual(rejected.status_code, 422, rejected.text)
+            with repository._connection() as connection:
+                self.assertEqual(connection.execute('SELECT COUNT(*) AS count FROM moderation_action_requests').fetchone()['count'], before)
+            accepted = self.api.client.post(root, json={**body, 'duration_minutes': maximum}, headers=self.api.headers)
+            self.assertEqual(accepted.status_code, 202, accepted.text)
+            with repository._connection() as connection:
+                import json
+                row = connection.execute('SELECT options_json FROM moderation_action_requests WHERE id=%s', (accepted.json()['request_id'],)).fetchone()
+                self.assertEqual(json.loads(row['options_json'])['duration_minutes'], maximum)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

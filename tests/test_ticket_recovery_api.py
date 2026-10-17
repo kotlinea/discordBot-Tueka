@@ -54,3 +54,31 @@ class TicketRecoveryApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409, response.text)
         self.assertEqual(response.json()['detail']['code'], 'panel_recovery_required')
         self.assertEqual(self.repo.panel_bundle(1, panel_id), before)
+
+    def test_awaiting_without_category_is_rejected_without_queueing(self):
+        ticket = self.repo.reserve_ticket(1, self.bundle['panel']['id'], 20, 'awaiting-test', {}, staff_exempt=True)
+        ticket = self.repo.activate_ticket(ticket['id'], 600, 100)
+        before = self.repo.outbox(ticket['id'])
+        response = self.client.post(f"/api/v1/guilds/1/tickets/items/{ticket['id']}/action",
+            json={'action': 'awaiting_user', 'revision': ticket['revision']}, headers={'x-csrf-token': 'csrf'})
+        self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(response.json()['detail']['code'], 'awaiting_category_unavailable')
+        self.assertEqual(self.repo.outbox(ticket['id']), before)
+        self.assertEqual(self.repo.ticket(ticket['id']), ticket)
+
+    def test_awaiting_with_category_queues_only_for_open_ticket(self):
+        panel = self.repo.panel(1, self.bundle['panel']['id'])
+        self.repo.save_panel(1, {**panel, 'awaiting_category_id': 100}, panel['id'], expected_revision=panel['revision'])
+        ticket = self.repo.reserve_ticket(1, panel['id'], 20, 'awaiting-valid', {}, staff_exempt=True)
+        ticket = self.repo.activate_ticket(ticket['id'], 600, 100)
+        url = f"/api/v1/guilds/1/tickets/items/{ticket['id']}/action"
+        response = self.client.post(url, json={'action': 'awaiting_user', 'revision': ticket['revision']},
+            headers={'x-csrf-token': 'csrf'})
+        self.assertEqual(response.status_code, 202, response.text)
+        self.assertEqual([j['action'] for j in self.repo.outbox(ticket['id'])], ['awaiting_user'])
+        self.repo.set_awaiting_user(ticket['id'], 100)
+        before = self.repo.outbox(ticket['id'])
+        response = self.client.post(url, json={'action': 'awaiting_user', 'revision': ticket['revision']},
+            headers={'x-csrf-token': 'csrf'})
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(self.repo.outbox(ticket['id']), before)

@@ -9,4 +9,6 @@ Available actions include warn, timeout/untimeout, kick, ban/unban, temporary ba
 
 Use `/mod` for moderation actions. You can also use `/warn`, `/timeout`, `/kick`, `/ban` and `/clear` for their corresponding actions. See the [command reference](../reference/commands) for arguments and permissions.
 
+In the Dashboard, timeout durations range from 1 minute to 28 days, and lockdown durations from 1 minute to 24 hours. A ban does not expire automatically. Timeouts cannot be changed for the server owner or members with Administrator permission.
+
 Softban bans then unbans. If only the first step succeeds, inspect the case and action log before repairing the state; do not assume the member was unbanned.

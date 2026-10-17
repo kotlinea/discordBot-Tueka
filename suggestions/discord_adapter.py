@@ -41,6 +41,25 @@ class DiscordSuggestionAdapter:
         except discord.HTTPException as exc:
             raise DiscordFailure(str(exc), retry=exc.status == 429 or exc.status >= 500) from exc
 
+    async def discussion(self, item, *, recover):
+        channel = self.channel(item['guild_id'], item['channel_id'])
+        try:
+            message = await channel.fetch_message(item['message_id'])
+            thread = message.thread or channel.guild.get_thread(message.id)
+            if thread is None:
+                try:
+                    thread = await channel.guild.fetch_channel(message.id)
+                except discord.NotFound:
+                    if recover:
+                        raise DiscordFailure('Suggestion discussion needs reconciliation', partial=True)
+                    thread = await message.create_thread(name=f"提案 #{item['id']}", auto_archive_duration=1440)
+            if not isinstance(thread, discord.Thread) or thread.parent_id != channel.id or thread.id != message.id:
+                raise DiscordFailure('Suggestion discussion reference invalid', partial=True)
+            return thread.id
+        except discord.HTTPException as exc:
+            raise DiscordFailure(str(exc), retry=exc.status == 429 or exc.status >= 500,
+                                 partial=recover or exc.status >= 500) from exc
+
     async def review_log(self, item, settings, key, *, recover):
         channel = self.channel(item['guild_id'], settings['log_channel_id'])
         marker = f'Tueka suggestion log:{key}'
@@ -51,6 +70,8 @@ class DiscordSuggestionAdapter:
                         return
                 raise DiscordFailure('Suggestion log receipt needs reconciliation', partial=True)
             embed = discord.Embed()
+            if item.get('review_reason'):
+                embed.description = item['review_reason'][:1000]
             embed.set_footer(text=marker)
             await channel.send(f"提案 #{item['id']} を {STATUS_LABELS.get(item['status'], item['status'])} に変更しました。担当: <@{item['reviewer_id']}>",
                                embed=embed, allowed_mentions=discord.AllowedMentions.none())

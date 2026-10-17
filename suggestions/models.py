@@ -17,6 +17,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "log_channel_id": None,
     "review_role_ids": [],
     "allow_voting": True,
+    "discussion_enabled": False,
     "show_author": True,
     "form_title": "アイデアを投稿",
     "form_fields": [
@@ -56,6 +57,7 @@ def normalize_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
     source["review_role_ids"] = roles[:25]
     source["allow_voting"] = bool(source.get("allow_voting", True))
     source["show_author"] = bool(source.get("show_author", True))
+    source['discussion_enabled'] = bool(source.get('discussion_enabled', False))
     source["form_title"] = str(source.get("form_title") or DEFAULT_SETTINGS["form_title"]).strip()[:45]
     if not source["form_title"]:
         raise SuggestionValidationError("form_title", "フォームタイトルを入力してください。")

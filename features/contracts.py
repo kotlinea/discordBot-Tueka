@@ -31,6 +31,7 @@ class Feature:
     bindings: tuple[Binding, ...] = ()
     settings_factory: str | None = None  # API-scoped SettingsAccess factory.
     module_write: bool = True  # Dedicated configuration routes may own writes.
+    maturity: Literal['stable', 'improving', 'unavailable'] = 'improving'
 
 
 @dataclass(frozen=True)

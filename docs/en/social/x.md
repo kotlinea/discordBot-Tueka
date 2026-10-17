@@ -1,3 +1,7 @@
+---
+feature_id: x_updates
+---
+
 # X
 
 Register an account ID or handle and select a notification channel. The provider’s collection mode is controlled by the operator, not by individual server users.

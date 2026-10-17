@@ -35,7 +35,7 @@ class SuggestionRepository:
                     SELECT id,guild_id,author_id,'delivery_failed',%s,%s FROM suggestions WHERE id=%s""",
                     (json.dumps({'error': failed[:300]}), int(time.time()), item['suggestion_id']))
 
-    def publication_delivered(self, item: dict, message_id: int):
+    def publication_delivered(self, item: dict, message_id: int, *, discussion: bool = False):
         with self._connection() as connection:
             owned = connection.execute("SELECT 1 FROM suggestion_outbox WHERE id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s AND lease_until>%s FOR UPDATE",
                 (item['id'], item['_lease']['owner'], item['_lease']['token'], int(time.time()))).fetchone()
@@ -45,6 +45,20 @@ class SuggestionRepository:
                 (message_id, int(time.time()), item['suggestion_id'], message_id))
             if changed.rowcount != 1:
                 raise DiscordFailure('Suggestion publication reference changed; reconciliation required', partial=True)
+            self._queue(connection, item['suggestion_id'], 'sync')
+            if discussion:
+                self._queue(connection, item['suggestion_id'], 'discussion')
+
+    def discussion_delivered(self, item: dict, thread_id: int):
+        with self._connection() as connection:
+            owned = connection.execute("SELECT 1 FROM suggestion_outbox WHERE id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s AND lease_until>%s FOR UPDATE",
+                (item['id'], item['_lease']['owner'], item['_lease']['token'], int(time.time()))).fetchone()
+            if not owned:
+                raise LostLease('Suggestion delivery ownership changed')
+            changed = connection.execute('UPDATE suggestions SET discussion_thread_id=%s,revision=revision+1,updated_at=%s WHERE id=%s AND (discussion_thread_id IS NULL OR discussion_thread_id=%s)',
+                (thread_id, int(time.time()), item['suggestion_id'], thread_id))
+            if changed.rowcount != 1:
+                raise DiscordFailure('Suggestion discussion reference changed; reconciliation required', partial=True)
             self._queue(connection, item['suggestion_id'], 'sync')
 
     def delivery_suggestion(self, suggestion_id: int) -> dict | None:
@@ -135,7 +149,7 @@ class SuggestionRepository:
             item = connection.execute("SELECT status FROM suggestions WHERE guild_id=%s AND id=%s FOR UPDATE", (guild_id, suggestion_id)).fetchone()
             if item is None:
                 raise LookupError("suggestion_not_found")
-            if item["status"] in {"approved", "rejected", "delivery_failed"}:
+            if item["status"] in {"approved", "rejected", "implemented", "delivery_failed"}:
                 raise RuntimeError("suggestion_closed")
             current = connection.execute("SELECT value FROM suggestion_votes WHERE suggestion_id=%s AND user_id=%s", (suggestion_id, user_id)).fetchone()
             if current and int(current["value"]) == value:
@@ -156,14 +170,27 @@ class SuggestionRepository:
         assert result is not None
         return result
 
-    def review(self, guild_id: int, suggestion_id: int, reviewer_id: int, status: str) -> dict[str, Any]:
-        if status not in {"reviewing", "approved", "rejected"}:
+    def review(self, guild_id: int, suggestion_id: int, reviewer_id: int, status: str,
+               reason: str = '', *, expected_revision: int | None = None) -> dict[str, Any]:
+        if status not in {"reviewing", "approved", "rejected", "implemented"}:
             raise ValueError("invalid_status")
+        reason = reason.strip()
+        if not reason or len(reason) > 1000:
+            raise ValueError('invalid_reason')
         now = int(time.time())
         with self._connection() as connection:
+            previous = connection.execute('SELECT status,revision FROM suggestions WHERE guild_id=%s AND id=%s FOR UPDATE',
+                (guild_id, suggestion_id)).fetchone()
+            if previous is None:
+                raise LookupError('suggestion_not_found')
+            if expected_revision is not None and previous['revision'] != expected_revision:
+                raise RuntimeError('revision_conflict')
+            allowed = {'approved'} if status == 'implemented' else {'pending', 'reviewing'}
+            if previous['status'] not in allowed:
+                raise RuntimeError('suggestion_closed')
             cursor = connection.execute(
-                "UPDATE suggestions SET status=%s,reviewer_id=%s,reviewed_at=%s,updated_at=%s,revision=revision+1 WHERE guild_id=%s AND id=%s AND status IN ('pending','reviewing')",
-                (status, reviewer_id, now, now, guild_id, suggestion_id),
+                "UPDATE suggestions SET status=%s,reviewer_id=%s,review_reason=%s,reviewed_at=%s,implemented_at=CASE WHEN %s='implemented' THEN %s ELSE implemented_at END,updated_at=%s,revision=revision+1 WHERE guild_id=%s AND id=%s",
+                (status, reviewer_id, reason, now, status, now, now, guild_id, suggestion_id),
             )
             if not cursor.rowcount:
                 exists = connection.execute("SELECT 1 FROM suggestions WHERE guild_id=%s AND id=%s", (guild_id, suggestion_id)).fetchone()
@@ -172,10 +199,19 @@ class SuggestionRepository:
                 raise LookupError("suggestion_not_found")
             connection.execute(
                 "INSERT INTO suggestion_events(suggestion_id,guild_id,actor_id,event_type,detail_json,created_at) VALUES(%s,%s,%s,%s,%s,%s)",
-                (suggestion_id, guild_id, reviewer_id, "status_changed", json.dumps({"status": status}), now),
+                (suggestion_id, guild_id, reviewer_id, "status_changed", json.dumps({"status": status, 'previous_status': previous['status'], 'reason': reason}, ensure_ascii=False), now),
             )
             self._queue(connection, suggestion_id, 'sync')
-            self._queue(connection, suggestion_id, 'review_log', {'status': status, 'reviewer_id': reviewer_id})
+            self._queue(connection, suggestion_id, 'review_log', {'status': status, 'reviewer_id': reviewer_id, 'review_reason': reason})
         result = self.get(guild_id, suggestion_id)
         assert result is not None
         return result
+
+    def events(self, guild_id: int, suggestion_id: int, *, before: int | None = None, limit: int = 50) -> list[dict]:
+        with self._connection() as connection:
+            exists = connection.execute('SELECT 1 FROM suggestions WHERE guild_id=%s AND id=%s', (guild_id, suggestion_id)).fetchone()
+            if not exists:
+                raise LookupError('suggestion_not_found')
+            rows = connection.execute('SELECT id,actor_id,event_type,detail_json,created_at FROM suggestion_events WHERE guild_id=%s AND suggestion_id=%s AND (%s::bigint IS NULL OR id<%s) ORDER BY id DESC LIMIT %s',
+                (guild_id, suggestion_id, before, before, max(1, min(limit, 100)))).fetchall()
+        return [{**{k:v for k,v in row.items() if k != 'detail_json'}, 'detail': json.loads(row['detail_json'])} for row in rows]

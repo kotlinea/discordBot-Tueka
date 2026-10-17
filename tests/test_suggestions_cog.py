@@ -31,7 +31,7 @@ class SuggestionsCogTests(unittest.IsolatedAsyncioTestCase):
         return SimpleNamespace(
             guild=self.guild, user=user, message=SimpleNamespace(id=100),
             type=discord.InteractionType.component, data={'custom_id': custom_id},
-            response=SimpleNamespace(send_message=AsyncMock(), edit_message=AsyncMock(), defer=AsyncMock()),
+            response=SimpleNamespace(send_message=AsyncMock(), send_modal=AsyncMock(), edit_message=AsyncMock(), defer=AsyncMock()),
             followup=SimpleNamespace(send=AsyncMock()),
         )
 
@@ -71,10 +71,28 @@ class SuggestionsCogTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.cog.repository.get(1, item['id'])['status'], 'pending')
         interaction.user.roles = [SimpleNamespace(id=40)]
         await self.cog.on_interaction(interaction)
+        modal = interaction.response.send_modal.call_args.args[0]
+        modal.reason._value = 'Useful proposal'
+        await modal.on_submit(interaction)
         self.assertEqual(self.cog.repository.get(1, item['id'])['status'], 'approved')
         interaction.user.roles = []
         interaction.user.guild_permissions = discord.Permissions(manage_messages=True)
         self.assertTrue(self.cog._can_review(interaction, self.cog._settings(1)))
+
+    async def test_review_modal_rechecks_permission_and_revision(self):
+        item = self.item()
+        interaction = self.interaction(f"tueka-suggestion:review:{item['id']}:approved")
+        interaction.user.roles = [SimpleNamespace(id=40)]
+        await self.cog.on_interaction(interaction)
+        modal = interaction.response.send_modal.call_args.args[0]
+        modal.reason._value = 'Generated reason'
+        interaction.user.roles = []
+        await modal.on_submit(interaction)
+        self.assertEqual(self.cog.repository.get(1,item['id'])['status'],'pending')
+        interaction.user.roles = [SimpleNamespace(id=40)]
+        self.cog.repository.review(1,item['id'],30,'reviewing','Other reviewer')
+        await modal.on_submit(interaction)
+        self.assertEqual(self.cog.repository.get(1,item['id'])['status'],'reviewing')
 
     async def test_other_guild_and_message_cannot_vote(self):
         item = self.item()

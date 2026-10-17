@@ -48,6 +48,33 @@ class SuggestionModal(discord.ui.Modal):
             await interaction.response.send_message(message, ephemeral=True)
 
 
+class SuggestionReviewModal(discord.ui.Modal):
+    def __init__(self, cog, item: dict, status: str):
+        super().__init__(title='提案の審査理由', timeout=600)
+        self.cog, self.item, self.status = cog, item, status
+        self.reason = discord.ui.TextInput(label='理由', style=discord.TextStyle.paragraph, min_length=1, max_length=1000)
+        self.add_item(self.reason)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.guild is None or interaction.guild.id != self.item['guild_id']:
+            return
+        module = self.cog.guild_settings.get_module(interaction.guild.id, 'suggestions')
+        if not module['enabled'] or not self.cog._can_review(interaction, normalize_settings(module['settings'])):
+            await interaction.response.send_message('現在この提案を審査する権限がありません。', ephemeral=True)
+            return
+        reason = self.reason.value.strip()
+        if not reason:
+            await interaction.response.send_message('審査理由を入力してください。', ephemeral=True)
+            return
+        try:
+            self.cog.service.review(interaction.guild.id, self.item['id'], interaction.user.id, self.status,
+                reason, expected_revision=self.item['revision'])
+        except (LookupError, RuntimeError, ValueError):
+            await interaction.response.send_message('提案が更新されています。再度開いて状態を確認してください。', ephemeral=True)
+            return
+        await interaction.response.send_message('審査を保存しました。投稿と通知の更新を待っています。', ephemeral=True)
+
+
 class SuggestionsCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -150,7 +177,10 @@ class SuggestionsCog(commands.Cog):
                 if not self._can_review(interaction, settings):
                     await interaction.response.send_message("この提案を審査する権限がありません。", ephemeral=True)
                     return
-                item = self.service.review(interaction.guild.id, suggestion_id, interaction.user.id, value)
+                if value not in {'reviewing', 'approved', 'rejected', 'implemented'}:
+                    return
+                await interaction.response.send_modal(SuggestionReviewModal(self, item, value))
+                return
             else:
                 return
         except PermissionError:

@@ -1,3 +1,7 @@
+---
+feature_id: twitch_updates
+---
+
 # Twitch
 
 Register the Twitch account and select a destination for stream notifications. Save and wait for account resolution. Configure the event template and preview before enabling role mentions.

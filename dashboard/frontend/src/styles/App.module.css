@@ -116,6 +116,7 @@
 .suggestionList article span { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-muted); }
 .suggestionList article>div:last-child { justify-items:start; }
 .suggestionList small { color:var(--color-muted); }
+.suggestionReview { grid-column:1 / -1;min-width:0;display:grid;gap:var(--space-sm);overflow-wrap:anywhere; }
 @media (hover:hover) and (pointer:fine) { .suggestionFieldHead button:hover:not(:disabled) { background:var(--color-paper-3); } }
 @media (min-width:40rem) { .suggestionList article { grid-template-columns:minmax(0,1fr) auto;align-items:center; }.suggestionList article>div:last-child { justify-items:end; } }
 @media (min-width:60rem) { .shell { grid-template-columns:17rem minmax(0,1fr); }.rail { position:sticky;inset-block-start:0;height:100dvh;display:flex;flex-direction:column;border-inline-end:var(--rule-hair) solid var(--color-rule);overflow:auto;background:var(--color-paper); }.mobileMenu { display:none; }.page { padding-inline:var(--space-xl); }.topbar { padding-inline:var(--space-xl); }.breadcrumb { padding-inline:var(--space-xl); }.actionPicker { grid-template-columns:repeat(4,minmax(0,1fr)); }.ticketTabs>div { grid-template-columns:repeat(6,minmax(0,1fr)); }.ticketEditor { grid-template-columns:minmax(0,2fr) minmax(16rem,.7fr); }.ticketEditorAside { position:sticky;inset-block-start:7rem; } }

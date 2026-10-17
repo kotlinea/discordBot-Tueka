@@ -1,3 +1,7 @@
+---
+feature_id: youtube_updates
+---
+
 # YouTube
 
 Register a channel ID, handle or HTTPS youtube.com channel URL. Resolution identifies the canonical channel before notifications become active. Do not rewrite feed URLs to bypass a missing-channel error.
