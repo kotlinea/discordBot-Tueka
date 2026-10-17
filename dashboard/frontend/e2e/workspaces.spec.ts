@@ -61,7 +61,7 @@ for (const locale of ['ja', 'en'] as const) {
     const groups = [
       [copy.common.nav.serverOperations, ['tickets', 'reaction-roles', 'applications']],
       [copy.common.nav.community, ['modules/welcome', 'modules/autorole', 'modules/leveling', 'modules/live_stats', 'modules/temporary_voice']],
-      [copy.common.nav.engagement, ['modules/advanced_polls', 'suggestions', 'modules/minigames', 'schedules']],
+      [copy.common.nav.engagement, ['modules/advanced_polls', 'suggestions', 'modules/minigames', 'schedules', 'starboard']],
       [copy.common.nav.moderation, ['modules/moderation', 'moderation/automod', 'moderation/anti_spam', 'moderation/anti_raid', 'moderation/infractions', 'moderation/moderation_actions', 'moderation/moderation_logs', 'moderation/audit_log', 'moderation/trust_score','appeals']],
       [copy.common.nav.social, ['social/youtube', 'social/twitch', 'social/tiktok', 'social/x', 'social/instagram']],
     ] as const
