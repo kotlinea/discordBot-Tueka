@@ -13,7 +13,7 @@ for (const locale of ['ja', 'en'] as const) {
     let rrSettings = { enabled: false, revision: 0, log_channel_id: null, denial_dm: true, denial_dm_cooldown_seconds: 300 }
     const writes: string[] = []
     const forbidden: string[] = []
-    const features = baseline.features.map(feature => ({ ...feature, title: feature.id, description: '', enabled: false, settings: {}, revision: 1, missing_permissions: [] }))
+    const features = [...baseline.features,{id:'applications',category:'community',docs_path:'/docs/features/applications',fields:[],required_fields:[],required_bot_permissions:[]}].map(feature => ({ ...feature, title: feature.id, description: '', enabled: false, settings: {}, revision: 1, missing_permissions: [] }))
     await page.route('**/api/v1/session', route => route.fulfill({ json: { user: { id: '1', name: 'Reviewer', avatar_url: '' }, csrf_token: 'offline', preferences: { locale, appearance: 'precision', color_scheme: 'light', navigation_collapsed: false, revision: 1 } } }))
     await page.route('**/api/v1/guilds', route => route.fulfill({ json: { items: [{ id: '1', name: 'Workspace fixture', icon: null, access: staff ? 'ticket_staff' : 'manager' }] } }))
     await page.route('**/api/v1/guilds/1/**', route => {
@@ -109,7 +109,7 @@ for (const locale of ['ja', 'en'] as const) {
     await page.getByRole('button', { name: copy.common.nav.search, exact: true }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('textbox').fill(copy.common.nav.serverOperations)
-    await expect(dialog.getByRole('button')).toHaveCount(2)
+    await expect(dialog.getByRole('button')).toHaveCount(3)
     await dialog.getByRole('button', { name: new RegExp(copy.reactionRoles.reactionRoles.title) }).click()
     const rrHeading = page.getByRole('heading', { name: copy.reactionRoles.reactionRoles.title, exact: true })
     await expect(rrHeading).toBeFocused()
