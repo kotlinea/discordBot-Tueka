@@ -1,5 +1,7 @@
 """Discord REST client used by the dashboard, with safe GET-side caching."""
 import asyncio
+import math
+import logging
 import time
 from typing import Any
 
@@ -9,6 +11,20 @@ from dashboard.timing import add as add_timing
 
 
 API_BASE = "https://discord.com/api/v10"
+
+
+def retry_after(response: httpx.Response) -> float | None:
+    """Read Discord's delay without accepting malformed/non-finite headers."""
+    try:
+        value = response.headers.get('Retry-After')
+        if value is None:
+            value = response.json().get('retry_after')
+        delay = float(value)
+        return delay if math.isfinite(delay) and delay >= 0 else None
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
 ADMINISTRATOR = 0x8
 MANAGEMENT_PERMISSIONS = 0x0000000000000008 | 0x0000000000000010 | 0x0000000000000020 | 0x0000000000000040 | 0x0000000000000080 | 0x0000000000000100 | 0x0000000000000400 | 0x0000000000001000 | 0x0000000000002000 | 0x0000000000004000 | 0x0000000000008000 | 0x0000000001000000 | 0x0000000020000000
 PERMISSION_BITS = {
@@ -64,11 +80,17 @@ class DiscordAPI:
         self.bot_token, self.client_id, self.client_secret, self.redirect_uri = bot_token, client_id, client_secret, redirect_uri
         self._client: httpx.AsyncClient | None = None
         self._cache: dict[tuple[str, str], tuple[float, Any]] = {}
+        self._manageable_inflight: dict[str, asyncio.Task] = {}
 
     async def start(self) -> None:
         await self._client_or_create()
 
     async def close(self) -> None:
+        pending = tuple(self._manageable_inflight.values())
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
         if self._client is not None:
             await self._client.aclose()
             self._client = None
@@ -82,6 +104,14 @@ class DiscordAPI:
         client, started = await self._client_or_create(), time.perf_counter()
         try:
             response = await client.request(method, f"{API_BASE}{path}", **kwargs)
+            # Only safe reads may be retried. Never repeat a Discord mutation.
+            if method == 'GET' and response.status_code == 429:
+                delay = retry_after(response)
+                if delay is not None and delay <= 2:
+                    await asyncio.sleep(delay)
+                    response = await client.request(method, f"{API_BASE}{path}", **kwargs)
+            if response.is_error:
+                logging.getLogger('tueka.discord').warning('Discord request failed', extra={'status': response.status_code})
             response.raise_for_status()
             return response
         finally:
@@ -196,6 +226,17 @@ class DiscordAPI:
     async def manageable_guilds(self, access_token: str, *, use_cache: bool = True) -> list[dict[str, Any]]:
         if use_cache and (cached := self._get_cached("manageable", access_token)) is not None:
             return cached
+        if not use_cache:
+            return await self._load_manageable_guilds(access_token, use_cache=False)
+        task = self._manageable_inflight.get(access_token)
+        if task is None:
+            task = asyncio.create_task(self._load_manageable_guilds(access_token, use_cache=True))
+            self._manageable_inflight[access_token] = task
+            task.add_done_callback(lambda done: self._manageable_inflight.pop(access_token, None))
+        # One disconnected HTTP reader must not cancel another reader's check.
+        return await asyncio.shield(task)
+
+    async def _load_manageable_guilds(self, access_token: str, *, use_cache: bool) -> list[dict[str, Any]]:
         user_guilds, bot_guilds = await asyncio.gather(self.user_guilds(access_token), self.bot_guild_ids(use_cache=use_cache))
         value = [guild for guild in user_guilds if int(guild["id"]) in bot_guilds and int(guild.get("permissions", "0")) & ADMINISTRATOR]
         # A live write authorization still refreshes the cache for the immediate
