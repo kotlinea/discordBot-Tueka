@@ -106,9 +106,9 @@ class ReactionRoleRepository:
         for policy, key in (("whitelist", "whitelist_role_ids"), ("blacklist", "blacklist_role_ids")):
             c.cursor().executemany("INSERT INTO reaction_role_access_roles(message_config_id,role_id,policy) VALUES(%s,%s,%s)", [(config_id, role_id, policy) for role_id in value[key]])
 
-    def create_message(self, guild_id: int, value: dict[str, Any], actor_id: int | None = None) -> dict[str, Any]:
+    def create_message(self, guild_id: int, value: dict[str, Any], actor_id: int | None = None, *, _conn=None) -> dict[str, Any]:
         now = int(time.time())
-        with self.connection() as c:
+        with (nullcontext(_conn) if _conn is not None else self.connection()) as c:
             lock_resource(c, "reaction-role-settings", guild_id)
             # The first V2 configuration makes the feature usable immediately.
             # ON CONFLICT DO NOTHING means a deliberate administrator disable is
@@ -121,8 +121,8 @@ class ReactionRoleRepository:
             config_id = int(inserted["id"]); self._replace_children(c, config_id, value)
             if value["source"] == "bot": self._queue(c, guild_id, config_id, "publish", {})
             if value["self_destruct_at"]: self._schedule(c,guild_id,config_id,None,None,"self_destruct",value["self_destruct_at"])
-        self.audit(guild_id, config_id, "config_created", "success", actor_id=actor_id)
-        return self.message(guild_id, config_id) or {}
+            self.audit(guild_id, config_id, "config_created", "success", actor_id=actor_id, _conn=c)
+            return self.message(guild_id, config_id, _conn=c) or {}
 
     def update_message(self, guild_id: int, config_id: int, value: dict[str, Any], expected_revision: int, actor_id: int | None = None) -> dict[str, Any]:
         now = int(time.time())
@@ -161,8 +161,23 @@ class ReactionRoleRepository:
             row=c.execute("SELECT snapshot_json FROM reaction_role_recovery WHERE guild_id=%s AND deleted_message_id=%s AND expires_at>%s",(guild_id,message_id,int(time.time()))).fetchone()
         return json.loads(row["snapshot_json"]) if row else None
 
-    def consume_recovery(self,guild_id:int,message_id:int)->None:
-        with self.connection() as c:c.execute("DELETE FROM reaction_role_recovery WHERE guild_id=%s AND deleted_message_id=%s",(guild_id,message_id))
+    def consume_recovery(self,guild_id:int,message_id:int,*,_conn=None)->None:
+        with (nullcontext(_conn) if _conn is not None else self.connection()) as c:
+            c.execute("DELETE FROM reaction_role_recovery WHERE guild_id=%s AND deleted_message_id=%s",(guild_id,message_id))
+
+    def restore_message(self, guild_id: int, message_id: int, value: dict[str, Any], actor_id: int | None,
+                        *, expected_snapshot: dict[str, Any]) -> dict[str, Any]:
+        with self.connection() as c:
+            lock_resource(c, 'reaction-role-settings', guild_id)
+            row = c.execute('SELECT snapshot_json FROM reaction_role_recovery WHERE guild_id=%s AND deleted_message_id=%s AND expires_at>%s FOR UPDATE',
+                            (guild_id, message_id, int(time.time()))).fetchone()
+            if row is None:
+                raise ValueError('recovery_not_found')
+            if json.loads(row['snapshot_json']) != expected_snapshot:
+                raise RuntimeError('recovery_conflict')
+            created = self.create_message(guild_id, value, actor_id, _conn=c)
+            self.consume_recovery(guild_id, message_id, _conn=c)
+            return created
 
     def recoveries(self,guild_id:int)->list[dict[str,Any]]:
         now=int(time.time())
@@ -330,9 +345,9 @@ class ReactionRoleRepository:
 
 
 
-    def audit(self,guild_id:int,config_id:int|None,event_type:str,result:str,*,user_id:int|None=None,actor_id:int|None=None,emoji_key:str|None=None,role_id:int|None=None,reason:str|None=None,details:dict[str,Any]|None=None)->int:
+    def audit(self,guild_id:int,config_id:int|None,event_type:str,result:str,*,user_id:int|None=None,actor_id:int|None=None,emoji_key:str|None=None,role_id:int|None=None,reason:str|None=None,details:dict[str,Any]|None=None,_conn=None)->int:
         now=int(time.time())
-        with self.connection() as c: cursor=c.execute('INSERT INTO reaction_role_events(guild_id,message_config_id,user_id,actor_id,emoji_key,role_id,event_type,result,reason,details_json,created_at,expires_at) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id',(guild_id,config_id,user_id,actor_id,emoji_key,role_id,event_type,result,reason,json.dumps(details or {},ensure_ascii=False),now,now+90*86400)); inserted = cursor.fetchone()
+        with (nullcontext(_conn) if _conn is not None else self.connection()) as c: cursor=c.execute('INSERT INTO reaction_role_events(guild_id,message_config_id,user_id,actor_id,emoji_key,role_id,event_type,result,reason,details_json,created_at,expires_at) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id',(guild_id,config_id,user_id,actor_id,emoji_key,role_id,event_type,result,reason,json.dumps(details or {},ensure_ascii=False),now,now+90*86400)); inserted = cursor.fetchone()
         return int(inserted["id"])
 
     def events(self,guild_id:int,limit:int=100)->list[dict[str,Any]]:

@@ -3,11 +3,13 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from api_support import ApiFixture
 from moderation import default_rule
 from ticketing import TicketRepository
 from social import SocialRepository
+from reaction_roles.repository import ReactionRoleRepository
 
 
 CONTRACT = Path(__file__).parent / 'fixtures' / 'api_v1_contract.json'
@@ -122,6 +124,52 @@ class ApiContractTests(unittest.TestCase):
         after = repository.social_target(target['id'])
         self.assertEqual((after['status'], after['next_check_at'], after['cursor']), ('pending', 0, {'seen': ['old']}))
         self.assertEqual(repository.pending_social_events(), [])
+
+    def _deleted_reaction_role(self):
+        from test_reaction_roles import message
+        root = '/api/v1/guilds/1/reaction-roles'
+        created = self.api.client.post(root, json=message(role_id=500), headers=self.api.headers)
+        self.assertEqual(created.status_code, 201, created.text)
+        repository = ReactionRoleRepository(self.api.database)
+        repository.set_discord_message(created.json()['id'], 900)
+        repository.delete_message(1, created.json()['id'], recoverable=True)
+        return repository, root + '/recoveries/900/restore'
+
+    def test_reaction_role_restore_consumes_one_snapshot_and_is_guild_scoped(self):
+        repository, url = self._deleted_reaction_role()
+        body = {'channel_id': '10', 'message_id': '900'}
+        self.assertEqual(self.api.client.post(url.replace('/guilds/1/', '/guilds/2/'), json=body, headers=self.api.headers).status_code, 404)
+        with patch.object(ReactionRoleRepository, 'restore_message', side_effect=RuntimeError('recovery_conflict')):
+            self.assertEqual(self.api.client.post(url, json=body, headers=self.api.headers).status_code, 409)
+        self.assertIsNotNone(repository.recovery(1, 900))
+        restored = self.api.client.post(url, json=body, headers=self.api.headers)
+        self.assertEqual(restored.status_code, 201, restored.text)
+        self.assertEqual(restored.json()['source'], 'external')
+        self.assertEqual(restored.json()['message_id'], '900')
+        self.assertIsNone(repository.recovery(1, 900))
+        self.assertEqual(self.api.client.post(url, json=body, headers=self.api.headers).status_code, 404)
+        self.assertEqual(len(repository.messages(1)), 1)
+
+    def test_reaction_role_restore_snapshot_failure_rolls_back_configuration_and_audit(self):
+        repository, url = self._deleted_reaction_role()
+        before = repository.events(1)
+        with patch.object(ReactionRoleRepository, 'consume_recovery', side_effect=RuntimeError('fixture consume failure')):
+            with self.assertRaisesRegex(RuntimeError, 'fixture consume failure'):
+                self.api.client.post(url, json={'channel_id': '10', 'message_id': '900'}, headers=self.api.headers)
+        self.assertEqual(repository.messages(1), [])
+        self.assertIsNotNone(repository.recovery(1, 900))
+        self.assertEqual(repository.events(1), before)
+
+    def test_reaction_role_restore_to_occupied_message_keeps_snapshot(self):
+        from reaction_roles.service import ReactionRoleService
+        from test_reaction_roles import message
+        repository, url = self._deleted_reaction_role()
+        ReactionRoleService(repository).create(1, {**message(role_id=500), 'source': 'external', 'message_id': 900})
+        response = self.api.client.post(url, json={'channel_id': '10', 'message_id': '900'}, headers=self.api.headers)
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(response.json()['detail']['code'], 'message_exists')
+        self.assertIsNotNone(repository.recovery(1, 900))
+        self.assertEqual(len(repository.messages(1)), 1)
 
     def test_moderation_rule_revision_and_guild_isolation(self):
         root = '/api/v1/guilds/1/moderation/automod/rules'

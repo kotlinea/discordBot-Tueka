@@ -230,12 +230,21 @@ def create_router(context: ApiContext) -> APIRouter:
         if not snapshot:
             raise api_error(404, 'recovery_not_found', '復旧データが見つかりません。')
         body = await read_body(request, inputs.MoveInput)
-        snapshot.update({'source': 'external', 'channel_id': body.get('channel_id'), 'message_id': body.get('message_id'), 'self_destruct_at': None, 'link_group_id': None})
+        restored = {**snapshot, 'source': 'external', 'channel_id': body.get('channel_id'), 'message_id': body.get('message_id'), 'self_destruct_at': None, 'link_group_id': None}
         try:
-            value, actor_id = await checked_reaction_role(request, guild_id, {'message': snapshot})
-            created = repository.create_message(guild_id, value, actor_id)
-            repository.consume_recovery(guild_id, deleted_message_id)
+            value, actor_id = await checked_reaction_role(request, guild_id, {'message': restored})
+            created = repository.restore_message(guild_id, deleted_message_id, value, actor_id, expected_snapshot=snapshot)
             return rr_payload(created)
         except ReactionRoleValidationError as exc:
             raise rr_error(exc) from exc
+        except IntegrityError as exc:
+            raise api_error(409, 'message_exists', 'このDiscordメッセージはすでに登録されています。') from exc
+        except ValueError as exc:
+            if str(exc) == 'recovery_not_found':
+                raise api_error(404, 'recovery_not_found', '復旧データが見つかりません。') from exc
+            raise
+        except RuntimeError as exc:
+            if str(exc) == 'recovery_conflict':
+                raise revision_conflict('復旧データが更新されました。再読み込みしてください。') from exc
+            raise
     return router

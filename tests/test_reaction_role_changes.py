@@ -68,6 +68,33 @@ class RoleChangeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.repo.assignments(30, config_id=self.config['id']), [])
         self.assertEqual([row['role_id'] for row in self.repo.assignments(30, config_id=second['id'])], [21])
 
+    async def test_concurrent_restore_consumes_snapshot_once(self):
+        from concurrent.futures import ThreadPoolExecutor
+        self.repo.delete_message(1, self.config['id'], recoverable=True)
+        snapshot = self.repo.recovery(1, 900)
+        def restore(identifier):
+            value = self.decisions.validate({**snapshot, 'source': 'external', 'message_id': identifier,
+                'self_destruct_at': None, 'link_group_id': None})
+            try:
+                self.repo.restore_message(1, 900, value, 30, expected_snapshot=snapshot)
+                return 'created'
+            except ValueError as error:
+                return str(error)
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            results = list(workers.map(restore, (901, 902)))
+        self.assertCountEqual(results, ['created', 'recovery_not_found'])
+        self.assertEqual(len(self.repo.messages(1)), 1)
+        self.assertIsNone(self.repo.recovery(1, 900))
+
+    async def test_restore_refuses_a_snapshot_changed_after_validation(self):
+        self.repo.delete_message(1, self.config['id'], recoverable=True)
+        snapshot = self.repo.recovery(1, 900)
+        value = self.decisions.validate({**snapshot, 'source': 'external', 'message_id': 901})
+        with self.assertRaisesRegex(RuntimeError, 'recovery_conflict'):
+            self.repo.restore_message(1, 900, value, 30, expected_snapshot={**snapshot, 'name': 'Stale validation'})
+        self.assertEqual(self.repo.messages(1), [])
+        self.assertEqual(self.repo.recovery(1, 900), snapshot)
+
     async def test_all_seven_types_apply_add_and_remove_with_persisted_assignments(self):
         cases = {
             'normal': (set(), {20}, set()), 'unique': (set(), {20}, set()),
