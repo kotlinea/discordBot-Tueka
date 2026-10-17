@@ -6,7 +6,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 DOMAINS = {'community', 'engagement', 'guild_settings', 'moderation', 'ticketing',
-           'reaction_roles', 'social', 'suggestions'}
+           'reaction_roles', 'social', 'suggestions', 'applications'}
 SHARED = {'database', 'jobs', 'discord_io'}
 CATEGORIES = {p.parent.name for p in (ROOT / 'features').glob('*/registry.py')}
 LAYERS = ('features', 'cogs', 'guild_settings', 'dashboard.api')

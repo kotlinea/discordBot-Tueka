@@ -3,6 +3,9 @@
 .shell { min-height:100dvh; display:grid; grid-template-columns:minmax(0,1fr); }
 .rail { display:none; }
 .workspace { min-width:0; }
+.applicationSection { min-width:0; display:grid; gap:var(--space-md); padding-block:var(--space-lg); border-block-start:var(--rule-hair) solid var(--color-rule); }
+.applicationSection fieldset { min-width:0; display:grid; gap:var(--space-sm); }
+.applicationSection button { min-height:2.75rem; }
 .configurationState { display:flex; flex-wrap:wrap; gap:var(--space-xs); padding:var(--space-sm) var(--space-md); border-block-end:var(--rule-hair) solid var(--color-rule); font-size:var(--text-sm); }
 .configurationState>span { color:var(--color-muted); }.configurationState ul { flex-basis:100%; margin:0; }
 .featureNavigation { display:grid; gap:var(--space-xs); padding:var(--space-md); border-block-end:var(--rule-hair) solid var(--color-rule); }

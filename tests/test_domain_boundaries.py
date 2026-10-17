@@ -17,7 +17,7 @@ from moderation import ModerationRepository
 
 class DomainBoundaryTests(unittest.TestCase):
     def test_domain_services_have_no_discord_or_http_framework_dependency(self):
-        for folder in ('moderation', 'ticketing', 'reaction_roles', 'social', 'suggestions'):
+        for folder in ('moderation', 'ticketing', 'reaction_roles', 'social', 'suggestions', 'applications'):
             for name in ('service.py', 'delivery.py', 'roles.py', 'panel_delivery.py', 'contracts.py'):
                 path = Path(folder) / name
                 if not path.exists():
@@ -32,7 +32,7 @@ class DomainBoundaryTests(unittest.TestCase):
                     'remove_roles', 'set_permissions', 'create_text_channel', 'create_thread', 'fetch_message'}
         allowed = ('interaction.', 'self.service.', 'self.discord.', 'self.moderation.', 'self.transcripts.')
         for name in ('moderation/runtime', 'moderation/moderation_actions', 'moderation/action_support/direct_commands',
-                     'community/tickets', 'community/reaction_roles', 'social/delivery', 'engagement/suggestions'):
+                     'community/tickets', 'community/reaction_roles', 'social/delivery', 'engagement/suggestions', 'community/applications'):
             path = Path('cogs') / (name + '.py')
             for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
                 if isinstance(node, ast.Await) and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Attribute):
@@ -45,7 +45,7 @@ class DomainBoundaryTests(unittest.TestCase):
         files = list(root.glob('*.py'))
         files.extend((root / 'dashboard' / 'api').glob('*.py'))
         for folder in ('cogs', 'dashboard', 'community', 'engagement', 'social',
-                       'jobs', 'moderation', 'ticketing', 'suggestions', 'reaction_roles', 'guild_settings'):
+                       'jobs', 'moderation', 'ticketing', 'suggestions', 'reaction_roles', 'guild_settings', 'applications'):
             files.extend((root / folder).rglob('*.py'))
         for path in files:
             if path.name in {'database.py', 'migrate.py', 'repository.py'}:

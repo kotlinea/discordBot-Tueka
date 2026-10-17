@@ -20,6 +20,270 @@
         "title": "ActionResponse",
         "type": "object"
       },
+      "ApplicationEvent": {
+        "additionalProperties": true,
+        "properties": {
+          "actor_id": {
+            "title": "Actor Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "integer"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "actor_id",
+          "event_type",
+          "reason",
+          "created_at"
+        ],
+        "title": "ApplicationEvent",
+        "type": "object"
+      },
+      "ApplicationField": {
+        "additionalProperties": true,
+        "properties": {
+          "key": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 45,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "max_length": {
+            "default": 1000,
+            "maximum": 4000.0,
+            "minimum": 1.0,
+            "title": "Max Length",
+            "type": "integer"
+          },
+          "min_length": {
+            "default": 1,
+            "maximum": 4000.0,
+            "minimum": 0.0,
+            "title": "Min Length",
+            "type": "integer"
+          },
+          "required": {
+            "default": true,
+            "title": "Required",
+            "type": "boolean"
+          },
+          "style": {
+            "default": "paragraph",
+            "enum": [
+              "short",
+              "paragraph"
+            ],
+            "title": "Style",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "ApplicationField",
+        "type": "object"
+      },
+      "ApplicationForm": {
+        "additionalProperties": true,
+        "properties": {
+          "account_age_days": {
+            "default": 0,
+            "maximum": 3650.0,
+            "minimum": 0.0,
+            "title": "Account Age Days",
+            "type": "integer"
+          },
+          "cooldown_seconds": {
+            "default": 3600,
+            "maximum": 2592000.0,
+            "minimum": 0.0,
+            "title": "Cooldown Seconds",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "integer"
+          },
+          "denied_role_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 25,
+            "title": "Denied Role Ids",
+            "type": "array"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Description",
+            "type": "string"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ApplicationField"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Fields",
+            "type": "array"
+          },
+          "guild_id": {
+            "title": "Guild Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "member_age_days": {
+            "default": 0,
+            "maximum": 3650.0,
+            "minimum": 0.0,
+            "title": "Member Age Days",
+            "type": "integer"
+          },
+          "required_role_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 25,
+            "title": "Required Role Ids",
+            "type": "array"
+          },
+          "retention_days": {
+            "default": 30,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 45,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "title",
+          "fields",
+          "revision",
+          "id",
+          "guild_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ApplicationForm",
+        "type": "object"
+      },
+      "ApplicationItem": {
+        "additionalProperties": true,
+        "properties": {
+          "answers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Answers",
+            "type": "object"
+          },
+          "author_id": {
+            "title": "Author Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "integer"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "integer"
+          },
+          "form_id": {
+            "title": "Form Id",
+            "type": "integer"
+          },
+          "guild_id": {
+            "title": "Guild Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/ApplicationForm"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "reviewing",
+              "approved",
+              "rejected",
+              "withdrawn"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "guild_id",
+          "form_id",
+          "author_id",
+          "snapshot",
+          "answers",
+          "status",
+          "revision",
+          "created_at",
+          "updated_at",
+          "expires_at"
+        ],
+        "title": "ApplicationItem",
+        "type": "object"
+      },
       "Diagnostic": {
         "additionalProperties": true,
         "properties": {
@@ -301,6 +565,90 @@
           "cases"
         ],
         "title": "InfractionsResponse",
+        "type": "object"
+      },
+      "Items_ApplicationEvent_": {
+        "additionalProperties": true,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApplicationEvent"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Items[ApplicationEvent]",
+        "type": "object"
+      },
+      "Items_ApplicationForm_": {
+        "additionalProperties": true,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApplicationForm"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Items[ApplicationForm]",
+        "type": "object"
+      },
+      "Items_ApplicationItem_": {
+        "additionalProperties": true,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApplicationItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Items[ApplicationItem]",
         "type": "object"
       },
       "Items_Feature_": {
@@ -4675,6 +5023,926 @@
           }
         },
         "summary": "Guilds"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/applications/forms": {
+      "get": {
+        "operationId": "forms_api_v1_guilds__guild_id__applications_forms_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Items_ApplicationForm_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Forms"
+      },
+      "post": {
+        "operationId": "create_api_v1_guilds__guild_id__applications_forms_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "account_age_days": {
+                    "default": 0,
+                    "maximum": 3650,
+                    "minimum": 0,
+                    "title": "Account Age Days",
+                    "type": "integer"
+                  },
+                  "cooldown_seconds": {
+                    "default": 3600,
+                    "maximum": 2592000,
+                    "minimum": 0,
+                    "title": "Cooldown Seconds",
+                    "type": "integer"
+                  },
+                  "denied_role_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 25,
+                    "title": "Denied Role Ids",
+                    "type": "array"
+                  },
+                  "description": {
+                    "default": "",
+                    "maxLength": 2000,
+                    "title": "Description",
+                    "type": "string"
+                  },
+                  "enabled": {
+                    "default": false,
+                    "title": "Enabled",
+                    "type": "boolean"
+                  },
+                  "fields": {
+                    "items": {
+                      "additionalProperties": true,
+                      "properties": {
+                        "key": {
+                          "maxLength": 40,
+                          "minLength": 1,
+                          "title": "Key",
+                          "type": "string"
+                        },
+                        "label": {
+                          "maxLength": 45,
+                          "minLength": 1,
+                          "title": "Label",
+                          "type": "string"
+                        },
+                        "max_length": {
+                          "default": 1000,
+                          "maximum": 4000,
+                          "minimum": 1,
+                          "title": "Max Length",
+                          "type": "integer"
+                        },
+                        "min_length": {
+                          "default": 1,
+                          "maximum": 4000,
+                          "minimum": 0,
+                          "title": "Min Length",
+                          "type": "integer"
+                        },
+                        "required": {
+                          "default": true,
+                          "title": "Required",
+                          "type": "boolean"
+                        },
+                        "style": {
+                          "default": "paragraph",
+                          "enum": [
+                            "short",
+                            "paragraph"
+                          ],
+                          "title": "Style",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "label"
+                      ],
+                      "title": "ApplicationField",
+                      "type": "object"
+                    },
+                    "maxItems": 5,
+                    "minItems": 1,
+                    "title": "Fields",
+                    "type": "array"
+                  },
+                  "member_age_days": {
+                    "default": 0,
+                    "maximum": 3650,
+                    "minimum": 0,
+                    "title": "Member Age Days",
+                    "type": "integer"
+                  },
+                  "required_role_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 25,
+                    "title": "Required Role Ids",
+                    "type": "array"
+                  },
+                  "retention_days": {
+                    "default": 30,
+                    "maximum": 365,
+                    "minimum": 1,
+                    "title": "Retention Days",
+                    "type": "integer"
+                  },
+                  "revision": {
+                    "anyOf": [
+                      {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Revision"
+                  },
+                  "title": {
+                    "maxLength": 45,
+                    "minLength": 1,
+                    "title": "Title",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "fields"
+                ],
+                "title": "ApplicationFormInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationForm"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Create"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/applications/forms/{form_id}": {
+      "put": {
+        "operationId": "update_api_v1_guilds__guild_id__applications_forms__form_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "form_id",
+            "required": true,
+            "schema": {
+              "title": "Form Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "account_age_days": {
+                    "default": 0,
+                    "maximum": 3650,
+                    "minimum": 0,
+                    "title": "Account Age Days",
+                    "type": "integer"
+                  },
+                  "cooldown_seconds": {
+                    "default": 3600,
+                    "maximum": 2592000,
+                    "minimum": 0,
+                    "title": "Cooldown Seconds",
+                    "type": "integer"
+                  },
+                  "denied_role_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 25,
+                    "title": "Denied Role Ids",
+                    "type": "array"
+                  },
+                  "description": {
+                    "default": "",
+                    "maxLength": 2000,
+                    "title": "Description",
+                    "type": "string"
+                  },
+                  "enabled": {
+                    "default": false,
+                    "title": "Enabled",
+                    "type": "boolean"
+                  },
+                  "fields": {
+                    "items": {
+                      "additionalProperties": true,
+                      "properties": {
+                        "key": {
+                          "maxLength": 40,
+                          "minLength": 1,
+                          "title": "Key",
+                          "type": "string"
+                        },
+                        "label": {
+                          "maxLength": 45,
+                          "minLength": 1,
+                          "title": "Label",
+                          "type": "string"
+                        },
+                        "max_length": {
+                          "default": 1000,
+                          "maximum": 4000,
+                          "minimum": 1,
+                          "title": "Max Length",
+                          "type": "integer"
+                        },
+                        "min_length": {
+                          "default": 1,
+                          "maximum": 4000,
+                          "minimum": 0,
+                          "title": "Min Length",
+                          "type": "integer"
+                        },
+                        "required": {
+                          "default": true,
+                          "title": "Required",
+                          "type": "boolean"
+                        },
+                        "style": {
+                          "default": "paragraph",
+                          "enum": [
+                            "short",
+                            "paragraph"
+                          ],
+                          "title": "Style",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "label"
+                      ],
+                      "title": "ApplicationField",
+                      "type": "object"
+                    },
+                    "maxItems": 5,
+                    "minItems": 1,
+                    "title": "Fields",
+                    "type": "array"
+                  },
+                  "member_age_days": {
+                    "default": 0,
+                    "maximum": 3650,
+                    "minimum": 0,
+                    "title": "Member Age Days",
+                    "type": "integer"
+                  },
+                  "required_role_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 25,
+                    "title": "Required Role Ids",
+                    "type": "array"
+                  },
+                  "retention_days": {
+                    "default": 30,
+                    "maximum": 365,
+                    "minimum": 1,
+                    "title": "Retention Days",
+                    "type": "integer"
+                  },
+                  "revision": {
+                    "anyOf": [
+                      {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Revision"
+                  },
+                  "title": {
+                    "maxLength": 45,
+                    "minLength": 1,
+                    "title": "Title",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "fields"
+                ],
+                "title": "ApplicationFormInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationForm"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Update"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/applications/items": {
+      "get": {
+        "operationId": "items_api_v1_guilds__guild_id__applications_items_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Items_ApplicationItem_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Items"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/applications/items/{item_id}/events": {
+      "get": {
+        "operationId": "events_api_v1_guilds__guild_id__applications_items__item_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Items_ApplicationEvent_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Events"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/applications/items/{item_id}/review": {
+      "post": {
+        "operationId": "review_api_v1_guilds__guild_id__applications_items__item_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "reason": {
+                    "maxLength": 1000,
+                    "minLength": 1,
+                    "title": "Reason",
+                    "type": "string"
+                  },
+                  "revision": {
+                    "minimum": 1,
+                    "title": "Revision",
+                    "type": "integer"
+                  },
+                  "status": {
+                    "enum": [
+                      "reviewing",
+                      "approved",
+                      "rejected"
+                    ],
+                    "title": "Status",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "status",
+                  "reason",
+                  "revision"
+                ],
+                "title": "ApplicationReviewInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Review"
       }
     },
     "/api/v1/guilds/{guild_id}/features": {

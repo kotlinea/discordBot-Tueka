@@ -137,7 +137,7 @@ for (const locale of ['ja', 'en'] as const) {
     const menu = page.getByRole('button', { name: 'Navigation', exact: true })
     if (await menu.isVisible()) await menu.click()
     const nav = page.getByRole('navigation', { name: 'Dashboard' }).filter({ visible: true })
-    await expect(nav.getByRole('link')).toHaveCount(baseline.features.length + 2)
+    await expect(nav.getByRole('link')).toHaveCount(baseline.features.length + 3)
     await expect(nav.locator('a[href="/servers/1/modules/welcome"]')).toBeVisible()
     await expect(nav.locator('a[href="/servers/1/moderation/automod"]')).toBeVisible()
     await expect(nav.locator('a[href="/servers/1/social/youtube"]')).toBeVisible()

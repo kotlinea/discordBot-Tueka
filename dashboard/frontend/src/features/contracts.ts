@@ -3,7 +3,7 @@ import type { Feature } from '../types'
 import type { LucideIcon } from 'lucide-react'
 import type { FieldOptions } from '../components/forms/SettingField'
 
-export type Namespace = 'common' | 'moderation' | 'tickets' | 'reactionRoles' | 'social' | 'suggestions'
+export type Namespace = 'common' | 'moderation' | 'tickets' | 'reactionRoles' | 'social' | 'suggestions' | 'applications'
 export interface FeatureScreenProps { features: Feature[]; definition?: FeatureDefinition }
 export type ScreenModule = { default: ComponentType<FeatureScreenProps> }
 export type ScreenLoader = () => Promise<ScreenModule>

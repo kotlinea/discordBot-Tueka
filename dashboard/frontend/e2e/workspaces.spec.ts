@@ -57,15 +57,15 @@ for (const locale of ['ja', 'en'] as const) {
     const menu = page.getByRole('button', { name: 'Navigation', exact: true })
     if (await menu.isVisible()) await menu.click()
     const nav = page.getByRole('navigation', { name: 'Dashboard' }).filter({ visible: true })
-    // Independent acceptance table: one main entry for each of the 24 public features.
+    // Independent acceptance table: one main entry for every public feature.
     const groups = [
-      [copy.common.nav.serverOperations, ['tickets', 'reaction-roles']],
+      [copy.common.nav.serverOperations, ['tickets', 'reaction-roles', 'applications']],
       [copy.common.nav.community, ['modules/welcome', 'modules/autorole', 'modules/leveling', 'modules/live_stats', 'modules/temporary_voice']],
       [copy.common.nav.engagement, ['modules/advanced_polls', 'suggestions', 'modules/minigames']],
       [copy.common.nav.moderation, ['modules/moderation', 'moderation/automod', 'moderation/anti_spam', 'moderation/anti_raid', 'moderation/infractions', 'moderation/moderation_actions', 'moderation/moderation_logs', 'moderation/audit_log', 'moderation/trust_score']],
       [copy.common.nav.social, ['social/youtube', 'social/twitch', 'social/tiktok', 'social/x', 'social/instagram']],
     ] as const
-    await expect(nav.getByRole('link')).toHaveCount(26)
+    await expect(nav.getByRole('link')).toHaveCount(27)
     for (const [name, paths] of groups) {
       const links = nav.getByRole('group', { name, exact: true }).getByRole('link')
       expect(await links.evaluateAll(nodes => nodes.map(node => node.getAttribute('href')))).toEqual(paths.map(path => `/servers/1/${path}`))

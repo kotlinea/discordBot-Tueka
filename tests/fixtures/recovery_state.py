@@ -12,6 +12,7 @@ from social.crypto import SocialTokenCipher
 from suggestions import SuggestionRepository
 from suggestions.delivery import SuggestionDeliveryService
 from ticketing import TicketRepository
+from applications.repository import ApplicationRepository
 
 
 async def seed():
@@ -29,6 +30,11 @@ async def seed():
     cipher = SocialTokenCipher(settings.social_token_encryption_key)
     SocialRepository(settings.database_url).save_social_connection(1, 'twitch', 'offline', 'Offline', cipher.encrypt('private access'), cipher.encrypt('private refresh'), 9999999999)
     guilds = GuildSettingsRepository(settings.database_url)
+    guilds.set_module(1, 'applications', enabled=True)
+    applications = ApplicationRepository(settings.database_url)
+    form = applications.save_form(1, 5, {'title':'Recovery application','enabled':True,'fields':[{'key':'answer','label':'Answer'}]})
+    application = applications.submit(1,form['id'],3,987654321,{'answer':'Snapshot answer'},revision=1,roles=[],created_at=1,joined_at=1)
+    applications.transition(1,application['id'],5,'approved','Snapshot decision',revision=1)
     guilds.set_module(1, 'suggestions', enabled=True, settings={})
     suggestions = SuggestionRepository(settings.database_url)
     delivered = suggestions.create(1, 2, 3, {'idea': 'already delivered'})
@@ -59,6 +65,12 @@ async def seed():
 async def resume():
     settings = Settings.from_env()
     repository = SuggestionRepository(settings.database_url)
+    applications = ApplicationRepository(settings.database_url)
+    application = applications.items(1)[0]
+    assert application['snapshot']['title'] == 'Recovery application'
+    assert application['answers'] == {'answer':'Snapshot answer'} and application['status'] == 'approved'
+    assert applications.events(1,application['id'])[0]['reason'] == 'Snapshot decision'
+    assert applications.form(1,application['form_id'])['retention_days'] == 30
 
     class ExistingRemoteReceipt:
         calls = 0

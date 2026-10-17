@@ -14,7 +14,7 @@ const page = (overrides: Partial<FeaturePage> = {}): FeaturePage => ({ id: 'inbo
 
 describe('feature registration', () => {
   it('covers exactly the backend public catalog and retains existing navigation paths', () => {
-    expect(featureRegistry.features.map(item => item.id).sort()).toEqual(baseline.features.map(item => item.id).sort())
+    expect(featureRegistry.features.map(item => item.id).sort()).toEqual([...baseline.features.map(item => item.id),'applications'].sort())
     for (const source of baseline.features) {
       const target = featureRegistry.get(source.id)
       expect(target.category).toBe(source.category)
@@ -176,8 +176,8 @@ describe('feature registration', () => {
 
   it('declares every default settings field with bilingual presentation owned by that feature', () => {
     for (const definition of featureRegistry.features.filter(item => item.load === loadModuleSettings || (item.settingsPath && !item.settingsLoad))) {
-      const source = baseline.features.find(item => item.id === definition.id)!
-      expect(Object.keys(definition.fields ?? {}).sort(), definition.id).toEqual([...source.fields].sort())
+      const source = baseline.features.find(item => item.id === definition.id)
+      expect(Object.keys(definition.fields ?? {}).sort(), definition.id).toEqual([...(source?.fields??[])].sort())
       for (const field of Object.values(definition.fields ?? {})) {
         for (const language of [ja, en]) {
           const key = field.labelKey.replace('settingsFields.', '') as keyof typeof language.common.settingsFields

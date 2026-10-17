@@ -6,3 +6,4 @@ from .suggestions import *
 from .tickets import *
 from .reaction_roles import *
 from .guilds import *
+from .applications import *

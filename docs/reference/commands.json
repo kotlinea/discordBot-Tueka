@@ -1,4 +1,68 @@
 {
+  "apply": {
+    "contract": {
+      "description": "応募・申請フォームに回答します。",
+      "parameters": [
+        {
+          "name": "form",
+          "description": "回答するフォーム",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.community.applications"
+    },
+    "ja": {
+      "usage": "受付中の申請フォームを選び、本人だけに表示される入力画面で回答します。",
+      "permissions": "サーバーメンバー。提出時にフォームのロール・日数条件を満たす必要があります。",
+      "response": "受付番号を本人だけに表示します。",
+      "disabled": "受付全体またはフォームが無効な場合は受け付けません。",
+      "example": "apply form:1"
+    },
+    "en": {
+      "usage": "Choose an accepting application form and answer in a private modal.",
+      "permissions": "Server member meeting the form's role and age requirements at submission time.",
+      "response": "Privately displays the submission number.",
+      "disabled": "Refuses submissions while intake or the form is disabled.",
+      "example": "apply form:1"
+    }
+  },
+  "application-status": {
+    "contract": {
+      "description": "自分の申請状況を確認し、必要なら未審査の申請を取り下げます。",
+      "parameters": [
+        {
+          "name": "withdraw_id",
+          "description": "取り下げる申請番号。空欄なら状況確認だけを行います。",
+          "required": false,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.community.applications"
+    },
+    "ja": {
+      "usage": "自分の保存期限内の申請を直近10件まで確認します。withdraw_idで未審査の申請を取り下げます。",
+      "permissions": "申請本人。サーバー内で実行します。",
+      "response": "状況または取り下げ結果を本人だけに表示します。",
+      "disabled": "状況は確認できます。受付全体が無効な間は取り下げできません。",
+      "example": "application-status"
+    },
+    "en": {
+      "usage": "Check your latest ten applications within retention, or withdraw an open application using withdraw_id.",
+      "permissions": "The applicant, within the server.",
+      "response": "Privately displays status or the withdrawal result.",
+      "disabled": "Status remains readable. Withdrawals pause while intake is disabled.",
+      "example": "application-status"
+    }
+  },
   "ban": {
     "contract": {
       "description": "メンバーを追放します。",

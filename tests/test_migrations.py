@@ -11,6 +11,20 @@ from database.testing import temporary_database
 
 
 class MigrationTests(unittest.TestCase):
+    def test_applications_upgrade_from_phase4_preserves_data_and_reapplies(self):
+        for version,name,_,source in load()[:3]:
+            (self.directory/name).write_text(source,encoding='utf-8')
+        apply(self.url,self.directory)
+        with connect(self.url) as c:
+            c.execute("INSERT INTO app_metadata VALUES('phase4_preserved','keep')")
+            before=c.execute('SELECT version,name,checksum FROM schema_migrations ORDER BY version').fetchall()
+        self.assertEqual(apply(self.url)['applied'],['0004_applications.sql'])
+        self.assertEqual(apply(self.url),{'applied':[]})
+        with connect(self.url) as c:
+            self.assertEqual(c.execute("SELECT value FROM app_metadata WHERE key='phase4_preserved'").fetchone()['value'],'keep')
+            self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version<=3 ORDER BY version').fetchall(),before)
+            self.assertEqual(c.execute('SELECT COUNT(*) AS n FROM applications').fetchone()['n'],0)
+
     def setUp(self):
         self.context = temporary_database(migrate=False)
         self.url = self.context.__enter__()
@@ -61,7 +75,7 @@ class MigrationTests(unittest.TestCase):
             c.execute('INSERT INTO suggestion_votes(suggestion_id,user_id,value,created_at,updated_at) VALUES(%s,4,1,1,1)',(suggestion,))
             c.execute("INSERT INTO suggestion_events(suggestion_id,guild_id,actor_id,event_type,created_at) VALUES(%s,1,3,'created',1)",(suggestion,))
             c.execute("INSERT INTO suggestion_outbox(suggestion_id,action,available_at,created_at) VALUES(%s,'publish',1,1)",(suggestion,))
-        self.assertEqual(apply(self.url)['applied'],['0003_suggestion_review.sql'])
+        self.assertEqual(apply(self.url)['applied'],[row[1] for row in load()[2:]])
         self.assertEqual(apply(self.url),{'applied':[]})
         with connect(self.url) as c:
             row=c.execute('SELECT * FROM suggestions WHERE id=%s',(suggestion,)).fetchone()
@@ -125,8 +139,9 @@ class MigrationTests(unittest.TestCase):
         from social import SocialRepository
         from suggestions import SuggestionRepository
         from ticketing import TicketRepository
+        from applications.repository import ApplicationRepository
         repositories = (CommunityRepository, DashboardRepository, EngagementRepository, GuildSettingsRepository,
-            ModerationRepository, ReactionRoleRepository, SocialRepository, SuggestionRepository, TicketRepository)
+            ModerationRepository, ReactionRoleRepository, SocialRepository, SuggestionRepository, TicketRepository, ApplicationRepository)
         for repository in repositories:
             with self.subTest(repository=repository.__name__), self.assertRaises(SchemaNotReady):
                 repository(self.url)

@@ -2,6 +2,24 @@
 
 Find each command’s purpose, arguments, permissions and response visibility. Replace example IDs and targets with your server resources. Try sanction/deletion examples only in a test server.
 
+## /apply
+
+- **Purpose**: Choose an accepting application form and answer in a private modal.
+- **Arguments (* required)**: form*:string
+- **Permissions**: Server member meeting the form's role and age requirements at submission time.
+- **Response**: Privately displays the submission number.
+- **When disabled**: Refuses submissions while intake or the form is disabled.
+- **Example**: `/apply form:1`
+
+## /application-status
+
+- **Purpose**: Check your latest ten applications within retention, or withdraw an open application using withdraw_id.
+- **Arguments (* required)**: withdraw_id:integer
+- **Permissions**: The applicant, within the server.
+- **Response**: Privately displays status or the withdrawal result.
+- **When disabled**: Status remains readable. Withdrawals pause while intake is disabled.
+- **Example**: `/application-status`
+
 ## /ban
 
 - **Purpose**: Ban a member.

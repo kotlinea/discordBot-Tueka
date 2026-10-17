@@ -19,6 +19,14 @@ U4_PATHS = {
     '/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/events': 'get',
     '/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/review': 'post',
 }
+APPLICATION_PATHS = {
+    '/api/v1/guilds/{guild_id}/applications/forms': {'get','post'},
+    '/api/v1/guilds/{guild_id}/applications/forms/{form_id}': {'put'},
+    '/api/v1/guilds/{guild_id}/applications/items': {'get'},
+    '/api/v1/guilds/{guild_id}/applications/items/{item_id}/events': {'get'},
+    '/api/v1/guilds/{guild_id}/applications/items/{item_id}/review': {'post'},
+}
+ADDED_PATHS = {**{path:{method} for path,method in U4_PATHS.items()},**APPLICATION_PATHS}
 
 
 def request_path(template):
@@ -56,9 +64,9 @@ class ApiContractTests(unittest.TestCase):
         expected = json.loads(CONTRACT.read_text(encoding='utf-8'))
         actual = self.api.app.openapi()['paths']
         baseline = expected['openapi']['paths']
-        self.assertEqual(set(actual), set(baseline) | set(U4_PATHS))
-        for path, method in U4_PATHS.items():
-            self.assertEqual(set(actual[path]), {method})
+        self.assertEqual(set(actual), set(baseline) | set(ADDED_PATHS))
+        for path, methods in ADDED_PATHS.items():
+            self.assertEqual(set(actual[path]), methods)
         for path, methods in baseline.items():
             self.assertEqual(set(actual[path]), set(methods))
             for method, operation in methods.items():
@@ -77,9 +85,9 @@ class ApiContractTests(unittest.TestCase):
             elif isinstance(row['body'], dict) and 'items' in row['body']:
                 row['body'] = {'next': None, **row['body']}
         actual = boundary_responses(self.api)
-        self.assertEqual([row for row in actual if row['path'] not in U4_PATHS], baseline)
-        added = [row for row in actual if row['path'] in U4_PATHS]
-        self.assertEqual(len(added), 10)
+        self.assertEqual([row for row in actual if row['path'] not in ADDED_PATHS], baseline)
+        added = [row for row in actual if row['path'] in ADDED_PATHS]
+        self.assertEqual(len(added), 25)
         for row in added:
             # CSRF runs before authentication on writes, as for existing routes.
             expected_code = ('csrf_invalid' if row['method'] in {'PUT', 'POST'} and row['mode'] != 'forbidden'
