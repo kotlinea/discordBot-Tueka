@@ -28,6 +28,7 @@ export type Items_ModerationEvent_ = { "items": Array<ModerationEvent>; "next"?:
 export type Items_ReactionRoleEvent_ = { "items": Array<ReactionRoleEvent>; "next"?: (number | null) }
 export type Items_ReactionRoleLinkGroup_ = { "items": Array<ReactionRoleLinkGroup>; "next"?: (number | null) }
 export type Items_Rule_ = { "items": Array<Rule>; "next"?: (number | null) }
+export type Items_ScheduleItem_ = { "items": Array<ScheduleItem>; "next"?: (number | null) }
 export type Items_SuggestionEvent_ = { "items": Array<SuggestionEvent>; "next"?: (number | null) }
 export type Items_SuggestionItem_ = { "items": Array<SuggestionItem>; "next"?: (number | null) }
 export type Items_TicketForm_ = { "items": Array<TicketForm>; "next"?: (number | null) }
@@ -57,6 +58,11 @@ export type Resources = { "channels": Array<Resource>; "roles": Array<Resource>;
 export type Rule = { "id"?: number; "guild_id"?: string; "family": string; "event_type": string; "name": string; "enabled": boolean; "mode": ("monitor" | "enforce"); "priority": number; "stop_on_match": boolean; "trigger_type": string; "trigger_config": Record<string, unknown>; "conditions": Record<string, unknown>; "exemptions": Record<string, unknown>; "actions": Array<Record<string, unknown>>; "revision"?: number }
 export type RulePreview = { "matched": boolean; "reason": string; "trace": Array<string> }
 export type RulesResponse = { "items": Array<Rule>; "next"?: (number | null); "trigger_types": Array<string> }
+export type ScheduleDelivery = { "id": number; "due_at": number; "deadline": number; "status": string; "attempts": number; "delivery_started": boolean; "discord_receipt_id": (string | null) }
+export type ScheduleEvent = { "id": number; "post_id": number; "actor_id": string; "event_type": string; "detail": string; "created_at": number }
+export type ScheduleHistory = { "events": Array<ScheduleEvent>; "delivery": Array<ScheduleDelivery> }
+export type ScheduleItem = { "id": number; "guild_id": string; "actor_id": string; "payload": SchedulePayload; "next_due": number; "remaining": number; "status": "scheduled" | "completed" | "cancelled"; "revision": number; "retention_days": number; "created_at": number; "updated_at": number; "expires_at": number }
+export type SchedulePayload = { "kind": "message" | "event"; "title"?: string; "body"?: string; "color"?: number; "channel_id"?: (string | null); "run_at": number; "interval_seconds"?: 0 | 86400 | 604800; "occurrences"?: number; "event_start"?: (number | null); "event_end"?: (number | null); "event_location"?: (string | null) }
 export type Session = { "user": SessionUser; "csrf_token": string; "preferences": Preferences }
 export type SessionUser = { "id": string; "name": string; "avatar_url": string }
 export type SocialProviderSummary = { "id": string; "available": boolean; "events": Array<string>; "count": number; "limit": number }
@@ -325,6 +331,10 @@ export const constraints = {
     "items": {},
     "next": {}
   },
+  "Items_ScheduleItem_": {
+    "items": {},
+    "next": {}
+  },
   "Items_SuggestionEvent_": {
     "items": {},
     "next": {}
@@ -542,6 +552,64 @@ export const constraints = {
     "items": {},
     "next": {},
     "trigger_types": {}
+  },
+  "ScheduleDelivery": {
+    "attempts": {},
+    "deadline": {},
+    "delivery_started": {},
+    "discord_receipt_id": {},
+    "due_at": {},
+    "id": {},
+    "status": {}
+  },
+  "ScheduleEvent": {
+    "actor_id": {},
+    "created_at": {},
+    "detail": {},
+    "event_type": {},
+    "id": {},
+    "post_id": {}
+  },
+  "ScheduleHistory": {
+    "delivery": {},
+    "events": {}
+  },
+  "ScheduleItem": {
+    "actor_id": {},
+    "created_at": {},
+    "expires_at": {},
+    "guild_id": {},
+    "id": {},
+    "next_due": {},
+    "payload": {},
+    "remaining": {},
+    "retention_days": {},
+    "revision": {},
+    "status": {},
+    "updated_at": {}
+  },
+  "SchedulePayload": {
+    "body": {
+      "maxLength": 2000
+    },
+    "channel_id": {},
+    "color": {
+      "maximum": 16777215.0,
+      "minimum": 0.0
+    },
+    "event_end": {},
+    "event_location": {},
+    "event_start": {},
+    "interval_seconds": {},
+    "kind": {},
+    "occurrences": {
+      "maximum": 365.0,
+      "minimum": 1.0
+    },
+    "run_at": {},
+    "title": {
+      "maxLength": 100
+    }
   },
   "Session": {
     "csrf_token": {},
@@ -1096,6 +1164,12 @@ export interface Operations {
   "POST /api/v1/guilds/{guild_id}/reaction-roles/recoveries/{deleted_message_id}/restore": { response: ReactionRoleMessage; body: { "channel_id"?: (string | number); "message_id"?: (string | number) } }
   "PUT /api/v1/guilds/{guild_id}/reaction-roles/settings": { response: ReactionRoleSettings; body: { "guild_id"?: string; "enabled"?: boolean; "log_channel_id"?: (string | null); "denial_dm"?: boolean; "denial_dm_cooldown_seconds"?: number; "audit_retention_days"?: number; "revision"?: number } }
   "GET /api/v1/guilds/{guild_id}/resources": { response: Resources; body: never }
+  "GET /api/v1/guilds/{guild_id}/schedules/items": { response: Items_ScheduleItem_; body: never }
+  "POST /api/v1/guilds/{guild_id}/schedules/items": { response: ScheduleItem; body: { "payload": { "kind": "message" | "event"; "title"?: string; "body"?: string; "color"?: number; "channel_id"?: (string | null); "run_at": number; "interval_seconds"?: 0 | 86400 | 604800; "occurrences"?: number; "event_start"?: (number | null); "event_end"?: (number | null); "event_location"?: (string | null) }; "request_key": string } }
+  "PUT /api/v1/guilds/{guild_id}/schedules/items/{item_id}": { response: ScheduleItem; body: { "payload": { "kind": "message" | "event"; "title"?: string; "body"?: string; "color"?: number; "channel_id"?: (string | null); "run_at": number; "interval_seconds"?: 0 | 86400 | 604800; "occurrences"?: number; "event_start"?: (number | null); "event_end"?: (number | null); "event_location"?: (string | null) }; "revision": number } }
+  "POST /api/v1/guilds/{guild_id}/schedules/items/{item_id}/cancel": { response: ScheduleItem; body: { "revision": number } }
+  "POST /api/v1/guilds/{guild_id}/schedules/items/{item_id}/delivery/{job_id}/retry": { response: ScheduleItem; body: { "revision": number } }
+  "GET /api/v1/guilds/{guild_id}/schedules/items/{item_id}/history": { response: ScheduleHistory; body: never }
   "GET /api/v1/guilds/{guild_id}/social": { response: SocialSummary; body: never }
   "POST /api/v1/guilds/{guild_id}/social/{provider}/preview": { response: SocialTemplate; body: { "event"?: string; "template"?: { "content"?: string; "title"?: string; "description"?: string; "color"?: string; "url"?: string; "thumbnail_url"?: string; "image_url"?: string; "footer"?: string } } }
   "GET /api/v1/guilds/{guild_id}/social/{provider}/subscriptions": { response: SocialSubscriptions; body: never }

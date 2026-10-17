@@ -2,6 +2,7 @@
 from .repository import QueueSpec
 
 QUEUE_SPECS = {spec.table: spec for spec in (
+    QueueSpec('scheduled_post_outbox'),
     QueueSpec('appeal_outbox'),
     QueueSpec('ticket_outbox'),
     QueueSpec('ticket_schedules', due='due_at'),

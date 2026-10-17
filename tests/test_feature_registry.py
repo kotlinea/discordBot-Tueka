@@ -50,8 +50,8 @@ class FeatureRegistrationTests(unittest.TestCase):
             'cogs.social_updates': ('cogs.social.delivery',),
         }
         expected_extensions = [target for old in baseline['extensions'] for target in relocation[old]]
-        self.assertEqual(list(BOT_EXTENSIONS), expected_extensions + ['cogs.community.applications','cogs.moderation.appeals'])
-        self.assertEqual([item.id for item in FEATURES], [item['id'] for item in baseline['features']] + ['applications','appeals'])
+        self.assertEqual(list(BOT_EXTENSIONS), expected_extensions + ['cogs.community.applications','cogs.moderation.appeals','cogs.engagement.scheduled_messages'])
+        self.assertEqual([item.id for item in FEATURES], [item['id'] for item in baseline['features']] + ['applications','appeals','scheduled_messages'])
         for actual, expected in zip(FEATURES, baseline['features']):
             for key, value in expected.items():
                 if key == 'docs_files':
@@ -146,7 +146,7 @@ def audit(event, args):
 sys.addaudithook(audit)
 from features.registry import REGISTRY
 from features.defaults import ModuleSettingsAccess
-assert len(REGISTRY.features) == 30
+assert len(REGISTRY.features) == 31
 for name in ('discord', 'fastapi', 'psycopg', 'dashboard', 'cogs', 'config', 'database'):
     assert name not in sys.modules, name
 '''

@@ -31,6 +31,7 @@ COPY --from=python-builder /opt/venv /opt/venv
 COPY cogs cogs
 COPY applications applications
 COPY appeals appeals
+COPY scheduling scheduling
 COPY community community
 COPY dashboard dashboard
 COPY database database

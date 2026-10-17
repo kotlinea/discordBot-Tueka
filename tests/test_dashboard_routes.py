@@ -42,7 +42,8 @@ class DashboardRouteTests(unittest.TestCase):
                      '/servers/1/social', '/servers/1/social/youtube', '/servers/1/moderation/automod/rules/new',
                      '/servers/1/tickets/inbox/123', '/servers/1/tickets/panels/2', '/servers/1/reaction-roles/new',
                      '/servers/1/suggestions', '/servers/1/applications', '/servers/1/applications/review',
-                     '/servers/1/applications/settings', '/servers/1/appeals', '/servers/1/appeals/settings', '/tickets/transcripts/token']:
+                     '/servers/1/applications/settings', '/servers/1/appeals', '/servers/1/appeals/settings',
+                     '/servers/1/schedules', '/servers/1/schedules/settings', '/tickets/transcripts/token']:
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200, response.text)

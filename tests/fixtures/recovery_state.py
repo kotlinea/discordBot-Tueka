@@ -1,6 +1,7 @@
 """Real stored ciphertext and queue receipts; no Discord/provider network calls."""
 import asyncio
 import json
+import time
 
 from config import Settings
 from database import transaction
@@ -15,6 +16,8 @@ from ticketing import TicketRepository
 from applications.repository import ApplicationRepository
 from appeals.repository import AppealRepository
 from appeals.delivery import AppealDeliveryService
+from scheduling.repository import ScheduleRepository
+from scheduling.delivery import ScheduleDeliveryService
 
 
 async def seed():
@@ -46,6 +49,16 @@ async def seed():
     with transaction(settings.database_url) as c:
         c.execute('UPDATE appeal_outbox SET lease_until=0 WHERE id=%s',(pending_dm.id,))
     guilds.set_module(1, 'suggestions', enabled=True, settings={})
+    guilds.set_module(1, 'scheduled_messages', enabled=True)
+    instant=int(time.time())
+    schedules=ScheduleRepository(settings.database_url,clock=lambda:instant)
+    post=schedules.create(1,5,{'kind':'message','title':'Restored schedule','body':'Scheduled restore body','channel_id':2,'run_at':instant+30},'recovery-schedule')
+    instant+=30
+    schedules.enqueue_due()
+    scheduled=schedules.jobs.claim('crashed-schedule-worker')
+    assert schedules.start_delivery(scheduled.payload)=='send'
+    with transaction(settings.database_url) as c:
+        c.execute('UPDATE scheduled_post_outbox SET lease_until=0,available_at=0 WHERE id=%s',(scheduled.id,))
     suggestions = SuggestionRepository(settings.database_url)
     delivered = suggestions.create(1, 2, 3, {'idea': 'already delivered'})
     claim = suggestions.outbox_jobs.claim('before-snapshot')
@@ -97,6 +110,20 @@ async def resume():
     assert await run_batch(appeals.jobs,'restored-mail-worker',AppealDeliveryService(appeals,dm).deliver) == 0
     assert dm.calls == 1
     assert appeals.conversation(1,mail['id'])['delivery'][0]['discord_message_id'] == 444
+    schedules=ScheduleRepository(settings.database_url)
+    post=schedules.items(1)[0]
+    assert json.loads(post['payload_json'])['body']=='Scheduled restore body'
+    class ExistingScheduleReceipt:
+        calls=0
+        async def deliver(self,job,*,recover):
+            assert recover and job['payload']['title']=='Restored schedule'
+            self.calls+=1
+            return 555
+    schedule_port=ExistingScheduleReceipt()
+    assert await run_batch(schedules.jobs,'restored-schedule-worker',ScheduleDeliveryService(schedules,schedule_port).deliver)==1
+    assert await run_batch(schedules.jobs,'restored-schedule-worker',ScheduleDeliveryService(schedules,schedule_port).deliver)==0
+    assert schedule_port.calls==1
+    assert schedules.history(1,post['id'])['delivery'][0]['discord_receipt_id']==555
 
     class ExistingRemoteReceipt:
         calls = 0

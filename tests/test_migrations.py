@@ -18,7 +18,7 @@ class MigrationTests(unittest.TestCase):
         with connect(self.url) as c:
             form=c.execute("INSERT INTO application_forms(guild_id,config_json,created_at,updated_at) VALUES(1,'{}',1,1) RETURNING id").fetchone()['id']
             c.execute("INSERT INTO applications(guild_id,form_id,author_id,interaction_id,snapshot_json,answers_json,created_at,updated_at,expires_at) VALUES(1,%s,10,100,'{}','{\"proof\":\"preserved\"}',1,1,9999999999)",(form,))
-        self.assertEqual(apply(self.url)['applied'],['0005_appeals.sql'])
+        self.assertEqual(apply(self.url)['applied'],[row[1] for row in load()[4:]])
         with connect(self.url) as c:
             self.assertIn('preserved',c.execute('SELECT answers_json FROM applications').fetchone()['answers_json'])
         self.assertEqual(apply(self.url),{'applied':[]})
@@ -30,7 +30,7 @@ class MigrationTests(unittest.TestCase):
         with connect(self.url) as c:
             c.execute("INSERT INTO app_metadata VALUES('phase4_preserved','keep')")
             before=c.execute('SELECT version,name,checksum FROM schema_migrations ORDER BY version').fetchall()
-        self.assertEqual(apply(self.url)['applied'],['0004_applications.sql','0005_appeals.sql'])
+        self.assertEqual(apply(self.url)['applied'],[row[1] for row in load()[3:]])
         self.assertEqual(apply(self.url),{'applied':[]})
         with connect(self.url) as c:
             self.assertEqual(c.execute("SELECT value FROM app_metadata WHERE key='phase4_preserved'").fetchone()['value'],'keep')
@@ -153,8 +153,9 @@ class MigrationTests(unittest.TestCase):
         from ticketing import TicketRepository
         from applications.repository import ApplicationRepository
         from appeals.repository import AppealRepository
+        from scheduling.repository import ScheduleRepository
         repositories = (CommunityRepository, DashboardRepository, EngagementRepository, GuildSettingsRepository,
-            ModerationRepository, ReactionRoleRepository, SocialRepository, SuggestionRepository, TicketRepository, ApplicationRepository, AppealRepository)
+            ModerationRepository, ReactionRoleRepository, SocialRepository, SuggestionRepository, TicketRepository, ApplicationRepository, AppealRepository, ScheduleRepository)
         for repository in repositories:
             with self.subTest(repository=repository.__name__), self.assertRaises(SchemaNotReady):
                 repository(self.url)
