@@ -26,13 +26,32 @@ class XAdapter(ProviderAdapter):
             if not user.get("id"):
                 raise ValueError("X account was not found")
             external_id, handle, display_name, avatar = user["id"], user.get("username", handle), user.get("name", handle), user.get("profile_image_url")
-        params = {"max_results": 10, "exclude": "replies,retweets", "tweet.fields": "created_at,attachments,text"}
+        params = {"max_results": 10 if initialize else 100, "exclude": "replies,retweets", "tweet.fields": "created_at,attachments,text"}
         since_id = target.get("cursor", {}).get("since_id")
         if since_id:
             params["since_id"] = since_id
-        response = await self.client.get(f"https://api.x.com/2/users/{external_id}/tweets", params=params, headers=headers)
-        response.raise_for_status()
-        posts = response.json().get("data", [])
+        posts, identifiers, page_tokens = [], set(), set()
+        while True:
+            response = await self.client.get(f"https://api.x.com/2/users/{external_id}/tweets", params=params, headers=headers)
+            response.raise_for_status()
+            page = response.json()
+            items = page.get("data") or []
+            if page.get("errors") or not isinstance(items, list):
+                raise RuntimeError("X returned an incomplete posts response")
+            for item in items:
+                if not isinstance(item, dict) or not item.get("id"):
+                    raise RuntimeError("X returned a post without an identity")
+                identifier = str(item["id"])
+                if identifier not in identifiers:
+                    identifiers.add(identifier)
+                    posts.append(item)
+            next_token = (page.get("meta") or {}).get("next_token")
+            if initialize or not next_token:
+                break
+            if next_token in page_tokens:
+                raise RuntimeError("X pagination repeated a page token")
+            page_tokens.add(next_token)
+            params["pagination_token"] = next_token
         newest = posts[0]["id"] if posts else since_id
         events = [] if initialize else [SocialEvent(post["id"], "post", {
             "account": display_name or handle, "handle": handle, "title": f"@{handle} の新しい投稿", "text": post.get("text", ""),

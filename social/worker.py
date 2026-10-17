@@ -54,7 +54,7 @@ class SocialWorker:
                 self.repository.complete_social_target(target["id"], target["lease_owner"], status="orphaned", cursor=target.get("cursor", {}),
                     next_check_at=int(time.time()) + 3600, error=str(exc)[:500])
             return
-        initialize = target["status"] == "pending" or not target.get("cursor")
+        initialize = not target.get("cursor")
         try:
             result: PollResult = await adapter.poll(target, initialize=initialize)
             account_id = result.external_id or target["account_key"]

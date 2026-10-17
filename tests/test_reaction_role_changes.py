@@ -1,13 +1,15 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 from db_support import prepare_database
 from discord_io import DiscordFailure
 from reaction_roles.repository import ReactionRoleRepository
 from reaction_roles.roles import RoleChangeService
 from reaction_roles.service import ReactionRoleService
+from reaction_roles.discord_adapter import DiscordReactionRoleAdapter
 from test_reaction_roles import message
 
 
@@ -53,6 +55,18 @@ class RoleChangeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.port.roles, {20})
         self.assertEqual([row['role_id'] for row in self.repo.assignments(30, config_id=self.config['id'])], [20])
         self.assertEqual(self.repo.pending_role_changes(1), [])
+
+    async def test_link_selection_removes_previous_message_role_and_commits_both_assignments(self):
+        second = self.decisions.create(1, message(role_id=21))
+        self.repo.create_link_group(1, 'Linked', [self.config['id'], second['id']])
+        second = self.repo.message(1, second['id'])
+        mapping = second['mappings'][0]
+        decision = self.decisions.decide(second, mapping, event='add', user_id=30, member_role_ids={20})
+        self.assertEqual(len(decision.conflicting_assignments), 1)
+        await self.service.apply(second, mapping, 30, decision)
+        self.assertEqual(self.port.roles, {21})
+        self.assertEqual(self.repo.assignments(30, config_id=self.config['id']), [])
+        self.assertEqual([row['role_id'] for row in self.repo.assignments(30, config_id=second['id'])], [21])
 
     async def test_all_seven_types_apply_add_and_remove_with_persisted_assignments(self):
         cases = {
@@ -114,3 +128,38 @@ class RoleChangeTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(DiscordFailure):
             await self.service.recover(self.repo.pending_role_changes(1)[0])
         self.assertEqual(self.port.roles, {21})
+
+
+class RoleAdapterBoundaryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_changed_hierarchy_and_unmanageable_roles_never_call_discord_mutation(self):
+        class Role:
+            managed = False
+            position = 5
+            default = False
+            def is_default(self): return self.default
+            def __ge__(self, other): return self.position >= other
+        for condition in ('hierarchy', 'managed', 'default', 'permission'):
+            with self.subTest(condition=condition):
+                role = Role()
+                if condition == 'hierarchy': role.position = 10
+                if condition == 'managed': role.managed = True
+                if condition == 'default': role.default = True
+                member = SimpleNamespace(add_roles=AsyncMock(), remove_roles=AsyncMock())
+                guild = SimpleNamespace(get_member=lambda _: member, get_role=lambda _: role,
+                    me=SimpleNamespace(top_role=10, guild_permissions=SimpleNamespace(manage_roles=condition != 'permission')))
+                adapter = DiscordReactionRoleAdapter(SimpleNamespace(get_guild=lambda _: guild))
+                for adding in (True, False):
+                    with self.assertRaises(DiscordFailure):
+                        await adapter.role(1, 30, 20, add=adding, reason='Isolated permission test')
+                member.add_roles.assert_not_awaited()
+                member.remove_roles.assert_not_awaited()
+
+    async def test_missing_role_refuses_add_but_confirms_removal_without_mutation(self):
+        member = SimpleNamespace(add_roles=AsyncMock(), remove_roles=AsyncMock())
+        guild = SimpleNamespace(get_member=lambda _: member, get_role=lambda _: None)
+        adapter = DiscordReactionRoleAdapter(SimpleNamespace(get_guild=lambda _: guild))
+        with self.assertRaises(DiscordFailure):
+            await adapter.role(1, 30, 20, add=True, reason='Isolated missing role test')
+        await adapter.role(1, 30, 20, add=False, reason='Isolated missing role test')
+        member.add_roles.assert_not_awaited()
+        member.remove_roles.assert_not_awaited()

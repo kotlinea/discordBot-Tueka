@@ -7,6 +7,7 @@ from pathlib import Path
 from api_support import ApiFixture
 from moderation import default_rule
 from ticketing import TicketRepository
+from social import SocialRepository
 
 
 CONTRACT = Path(__file__).parent / 'fixtures' / 'api_v1_contract.json'
@@ -98,6 +99,29 @@ class ApiContractTests(unittest.TestCase):
         response = self.api.client.delete(url, headers={**self.api.headers, 'if-match': str(item['revision'])})
         self.assertEqual((response.status_code, response.content), (204, b''))
         self.assertEqual(self.api.client.get(root).json()['items'], [])
+
+    def test_social_preview_is_side_effect_free_and_retry_preserves_cursor(self):
+        root = '/api/v1/guilds/1/social/youtube'
+        value = {'account': 'UC' + 'a' * 22, 'channel_id': '10', 'events': ['video']}
+        saved = self.api.client.post(root + '/subscriptions', json=value, headers=self.api.headers).json()
+        repository = SocialRepository(self.api.database)
+        target = repository.claim_social_targets('fixture')[0]
+        repository.complete_social_target(target['id'], target['lease_owner'], status='degraded',
+            cursor={'seen': ['old']}, next_check_at=10 ** 12, error='fixture failure')
+        before = repository.social_target(target['id'])
+        preview = self.api.client.post(root + '/preview', json={'event': 'video', 'template': {'title': '{account}: {title}'}}, headers=self.api.headers)
+        self.assertEqual(preview.status_code, 200, preview.text)
+        self.assertIn('Sample Creator', preview.json()['title'])
+        self.assertEqual(repository.social_target(target['id']), before)
+        self.assertEqual(repository.pending_social_events(), [])
+        retry = root + '/subscriptions/' + str(saved['id']) + '/retry'
+        self.assertEqual(self.api.client.post(retry).status_code, 403)
+        self.assertEqual(self.api.client.post(retry.replace('/guilds/1/', '/guilds/2/'), headers=self.api.headers).status_code, 404)
+        self.assertEqual(repository.social_target(target['id']), before)
+        self.assertEqual(self.api.client.post(retry, headers=self.api.headers).status_code, 200)
+        after = repository.social_target(target['id'])
+        self.assertEqual((after['status'], after['next_check_at'], after['cursor']), ('pending', 0, {'seen': ['old']}))
+        self.assertEqual(repository.pending_social_events(), [])
 
     def test_moderation_rule_revision_and_guild_isolation(self):
         root = '/api/v1/guilds/1/moderation/automod/rules'
