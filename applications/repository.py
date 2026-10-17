@@ -92,6 +92,11 @@ class ApplicationRepository:
                 (guild,int(time.time()),author,author,before,before,max(1,min(limit,100)))).fetchall()
             return [self._item(r) for r in rows]
 
+    def item(self, guild, item_id, *, author):
+        with transaction(self.database_url) as c:
+            row=c.execute('SELECT * FROM applications WHERE guild_id=%s AND id=%s AND author_id=%s AND expires_at>%s',(guild,item_id,author,int(time.time()))).fetchone()
+            return self._item(row) if row else None
+
     def events(self, guild, item_id):
         with transaction(self.database_url) as c:
             if not c.execute('SELECT 1 FROM applications WHERE guild_id=%s AND id=%s AND expires_at>%s', (guild,item_id,int(time.time()))).fetchone():

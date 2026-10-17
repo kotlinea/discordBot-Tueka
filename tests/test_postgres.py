@@ -24,7 +24,7 @@ class PostgresTests(unittest.TestCase):
         require_current(self.url)
         self.assertEqual(apply(self.url)['applied'], [])
         with transaction(self.url) as c:
-            self.assertEqual(c.execute('SELECT count(*) count FROM information_schema.tables WHERE table_schema=current_schema()').fetchone()['count'], 72)
+            self.assertEqual(c.execute('SELECT count(*) count FROM information_schema.tables WHERE table_schema=current_schema()').fetchone()['count'], 76)
 
     def test_transaction_and_migration_failures_roll_back(self):
         apply(self.url)

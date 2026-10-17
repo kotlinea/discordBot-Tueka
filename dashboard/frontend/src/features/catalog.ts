@@ -2,7 +2,7 @@ import type { CategoryDefinition, FeatureDefinition, PresentationCategory, Scree
 import { loadModuleSettings } from './defaults'
 
 const identifier = /^[a-z][a-z0-9_]*$/
-const namespaces = new Set(['common', 'moderation', 'tickets', 'reactionRoles', 'social', 'suggestions', 'applications'])
+const namespaces = new Set(['common', 'moderation', 'tickets', 'reactionRoles', 'social', 'suggestions', 'applications', 'appeals'])
 
 export function createRegistry(categories: readonly CategoryDefinition[], presentationCategories: readonly PresentationCategory[] = categories) {
   const categoryIds = new Set<string>()

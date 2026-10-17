@@ -13,6 +13,8 @@ from suggestions import SuggestionRepository
 from suggestions.delivery import SuggestionDeliveryService
 from ticketing import TicketRepository
 from applications.repository import ApplicationRepository
+from appeals.repository import AppealRepository
+from appeals.delivery import AppealDeliveryService
 
 
 async def seed():
@@ -35,6 +37,14 @@ async def seed():
     form = applications.save_form(1, 5, {'title':'Recovery application','enabled':True,'fields':[{'key':'answer','label':'Answer'}]})
     application = applications.submit(1,form['id'],3,987654321,{'answer':'Snapshot answer'},revision=1,roles=[],created_at=1,joined_at=1)
     applications.transition(1,application['id'],5,'approved','Snapshot decision',revision=1)
+    guilds.set_module(1, 'appeals', enabled=True)
+    appeals = AppealRepository(settings.database_url)
+    mail = appeals.open(1,3,987654322,'Private restored ModMail',application_id=application['id'])
+    appeals.reply(1,mail['id'],5,'Private restored reply',revision=1,staff=True)
+    pending_dm = appeals.jobs.claim('crashed-mail-worker')
+    assert appeals.delivery_state(pending_dm.payload)
+    with transaction(settings.database_url) as c:
+        c.execute('UPDATE appeal_outbox SET lease_until=0 WHERE id=%s',(pending_dm.id,))
     guilds.set_module(1, 'suggestions', enabled=True, settings={})
     suggestions = SuggestionRepository(settings.database_url)
     delivered = suggestions.create(1, 2, 3, {'idea': 'already delivered'})
@@ -71,6 +81,22 @@ async def resume():
     assert application['answers'] == {'answer':'Snapshot answer'} and application['status'] == 'approved'
     assert applications.events(1,application['id'])[0]['reason'] == 'Snapshot decision'
     assert applications.form(1,application['form_id'])['retention_days'] == 30
+    appeals = AppealRepository(settings.database_url)
+    mail = appeals.items(1)[0]
+    detail = appeals.conversation(1,mail['id'])
+    assert [m['content'] for m in detail['messages']] == ['Private restored ModMail','Private restored reply']
+    assert mail['application_id'] == application['id']
+    class ExistingDmReceipt:
+        calls=0
+        async def notify(self,item,key,*,recover):
+            assert recover and item['body'] == 'Private restored reply'
+            self.calls+=1
+            return 444
+    dm = ExistingDmReceipt()
+    assert await run_batch(appeals.jobs,'restored-mail-worker',AppealDeliveryService(appeals,dm).deliver) == 1
+    assert await run_batch(appeals.jobs,'restored-mail-worker',AppealDeliveryService(appeals,dm).deliver) == 0
+    assert dm.calls == 1
+    assert appeals.conversation(1,mail['id'])['delivery'][0]['discord_message_id'] == 444
 
     class ExistingRemoteReceipt:
         calls = 0

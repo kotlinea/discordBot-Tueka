@@ -17,7 +17,7 @@ class ApiSchemaTests(unittest.TestCase):
             response=self.api.client.get('/api/v1/guilds/1/features')
             self.assertEqual(response.status_code,200,response.text)
             items=response.json()['items']
-            self.assertEqual(len(items),25)
+            self.assertEqual(len(items),26)
             self.assertTrue(all(item['maturity']=='improving' for item in items))
             self.assertEqual(next(item for item in items if item['id']=='suggestions')['enabled'],enabled)
 

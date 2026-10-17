@@ -9,6 +9,7 @@ from .moderation_actions import FEATURE as MODERATION_ACTIONS
 from .moderation_logs import FEATURE as MODERATION_LOGS
 from .audit_log import FEATURE as AUDIT_LOG
 from .trust_score import FEATURE as TRUST_SCORE
+from .appeals import FEATURE as APPEALS
 
 CATEGORY = Category('moderation', 'nav.moderation', (
     MODERATION,
@@ -20,6 +21,7 @@ CATEGORY = Category('moderation', 'nav.moderation', (
     MODERATION_LOGS,
     AUDIT_LOG,
     TRUST_SCORE,
+    APPEALS,
 ), bindings=(
     Binding('moderation_runtime', 'bot', 'cogs.moderation.runtime:setup', 6),
     Binding('moderation_api', 'api', 'dashboard.api.moderation.rules:create_router', 8),

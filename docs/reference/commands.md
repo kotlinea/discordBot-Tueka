@@ -946,3 +946,48 @@
 - **応答**: 公開応答。エラーは本人向け。
 - **無効時**: 対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。
 - **例**: `/welcome`
+
+## /appeal
+
+- **用途**: 本人のCaseへの異議申立てを非公開Modalで送ります。
+- **引数（*必須）**: guild_id*:string, case_id*:integer, application_id:integer
+- **権限**: Caseの本人。サーバー退出後もDMから利用できます。
+- **応答**: 本人だけに応答します。返信と審査結果のDM配送状態はDashboardで確認できます。
+- **無効時**: 受付がOFFの間は新しい受付・返信・取り下げを行いません。
+- **例**: `/appeal guild_id:123456789012345678 case_id:1`
+
+## /modmail
+
+- **用途**: 管理者への非公開問い合わせを作成します。
+- **引数（*必須）**: guild_id*:string, application_id:integer
+- **権限**: 送信時に対象サーバーへ所属する本人。
+- **応答**: 本人だけに応答します。返信と審査結果のDM配送状態はDashboardで確認できます。
+- **無効時**: 受付がOFFの間は新しい受付・返信・取り下げを行いません。
+- **例**: `/modmail guild_id:123456789012345678`
+
+## /appeal-status
+
+- **用途**: 自分のやり取り一覧と本文・返信を確認します。
+- **引数（*必須）**: guild_id*:string, conversation_id:integer
+- **権限**: やり取りの本人のみ。
+- **応答**: 本人だけに応答します。返信と審査結果のDM配送状態はDashboardで確認できます。
+- **無効時**: 期限内の本人照会は継続します。
+- **例**: `/appeal-status guild_id:123456789012345678 conversation_id:1`
+
+## /appeal-reply
+
+- **用途**: 自分の未解決のやり取りへ非公開で返信します。
+- **引数（*必須）**: guild_id*:string, conversation_id*:integer
+- **権限**: やり取りの本人のみ。
+- **応答**: 本人だけに応答します。返信と審査結果のDM配送状態はDashboardで確認できます。
+- **無効時**: 受付がOFFの間は新しい受付・返信・取り下げを行いません。
+- **例**: `/appeal-reply guild_id:123456789012345678 conversation_id:1`
+
+## /appeal-withdraw
+
+- **用途**: 自分の未解決のやり取りを取り下げます。
+- **引数（*必須）**: guild_id*:string, conversation_id*:integer
+- **権限**: やり取りの本人のみ。
+- **応答**: 本人だけに応答します。返信と審査結果のDM配送状態はDashboardで確認できます。
+- **無効時**: 受付がOFFの間は新しい受付・返信・取り下げを行いません。
+- **例**: `/appeal-withdraw guild_id:123456789012345678 conversation_id:1`

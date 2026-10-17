@@ -3998,5 +3998,225 @@
       "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
       "example": "welcome"
     }
+  },
+  "appeal": {
+    "contract": {
+      "description": "自分のCaseに異議を申し立てます。DMでも利用できます。",
+      "parameters": [
+        {
+          "name": "guild_id",
+          "description": "対象サーバーID",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "case_id",
+          "description": "自分のCase番号",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "application_id",
+          "description": "関連する自分の申請番号（任意）",
+          "required": false,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation.appeals"
+    },
+    "ja": {
+      "usage": "本人のCaseへの異議申立てを非公開Modalで送ります。",
+      "permissions": "Caseの本人。サーバー退出後もDMから利用できます。",
+      "response": "本人だけに応答します。返信と審査結果のDM配送状態はDashboardで確認できます。",
+      "disabled": "受付がOFFの間は新しい受付・返信・取り下げを行いません。",
+      "example": "appeal guild_id:123456789012345678 case_id:1"
+    },
+    "en": {
+      "usage": "Open a private modal to appeal your own case.",
+      "permissions": "The case owner; also available in DMs after leaving the server.",
+      "response": "Private response. Managers can inspect DM delivery state for replies and review decisions.",
+      "disabled": "New intake, replies and withdrawal are paused while intake is disabled.",
+      "example": "appeal guild_id:123456789012345678 case_id:1"
+    }
+  },
+  "modmail": {
+    "contract": {
+      "description": "管理者への非公開の問い合わせを作成します。",
+      "parameters": [
+        {
+          "name": "guild_id",
+          "description": "参加している対象サーバーID",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "application_id",
+          "description": "関連する自分の申請番号（任意）",
+          "required": false,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation.appeals"
+    },
+    "ja": {
+      "usage": "管理者への非公開問い合わせを作成します。",
+      "permissions": "送信時に対象サーバーへ所属する本人。",
+      "response": "本人だけに応答します。返信と審査結果のDM配送状態はDashboardで確認できます。",
+      "disabled": "受付がOFFの間は新しい受付・返信・取り下げを行いません。",
+      "example": "modmail guild_id:123456789012345678"
+    },
+    "en": {
+      "usage": "Start a private inquiry to server managers.",
+      "permissions": "Current member of the target server at submission.",
+      "response": "Private response. Managers can inspect DM delivery state for replies and review decisions.",
+      "disabled": "New intake, replies and withdrawal are paused while intake is disabled.",
+      "example": "modmail guild_id:123456789012345678"
+    }
+  },
+  "appeal-status": {
+    "contract": {
+      "description": "自分の異議申立て・ModMailと返信を確認します。",
+      "parameters": [
+        {
+          "name": "guild_id",
+          "description": "対象サーバーID",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "conversation_id",
+          "description": "やり取り番号。空欄なら自分の一覧",
+          "required": false,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation.appeals"
+    },
+    "ja": {
+      "usage": "自分のやり取り一覧と本文・返信を確認します。",
+      "permissions": "やり取りの本人のみ。",
+      "response": "本人だけに応答します。返信と審査結果のDM配送状態はDashboardで確認できます。",
+      "disabled": "期限内の本人照会は継続します。",
+      "example": "appeal-status guild_id:123456789012345678 conversation_id:1"
+    },
+    "en": {
+      "usage": "Read your own conversations, messages and replies.",
+      "permissions": "The conversation author only.",
+      "response": "Private response. Managers can inspect DM delivery state for replies and review decisions.",
+      "disabled": "Authors can still read unexpired conversations.",
+      "example": "appeal-status guild_id:123456789012345678 conversation_id:1"
+    }
+  },
+  "appeal-reply": {
+    "contract": {
+      "description": "自分の未解決のやり取りに返信します。",
+      "parameters": [
+        {
+          "name": "guild_id",
+          "description": "対象サーバーID",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "conversation_id",
+          "description": "自分のやり取り番号",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation.appeals"
+    },
+    "ja": {
+      "usage": "自分の未解決のやり取りへ非公開で返信します。",
+      "permissions": "やり取りの本人のみ。",
+      "response": "本人だけに応答します。返信と審査結果のDM配送状態はDashboardで確認できます。",
+      "disabled": "受付がOFFの間は新しい受付・返信・取り下げを行いません。",
+      "example": "appeal-reply guild_id:123456789012345678 conversation_id:1"
+    },
+    "en": {
+      "usage": "Reply privately to your own unresolved conversation.",
+      "permissions": "The conversation author only.",
+      "response": "Private response. Managers can inspect DM delivery state for replies and review decisions.",
+      "disabled": "New intake, replies and withdrawal are paused while intake is disabled.",
+      "example": "appeal-reply guild_id:123456789012345678 conversation_id:1"
+    }
+  },
+  "appeal-withdraw": {
+    "contract": {
+      "description": "自分の未解決のやり取りを取り下げます。",
+      "parameters": [
+        {
+          "name": "guild_id",
+          "description": "対象サーバーID",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "conversation_id",
+          "description": "自分のやり取り番号",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.moderation.appeals"
+    },
+    "ja": {
+      "usage": "自分の未解決のやり取りを取り下げます。",
+      "permissions": "やり取りの本人のみ。",
+      "response": "本人だけに応答します。返信と審査結果のDM配送状態はDashboardで確認できます。",
+      "disabled": "受付がOFFの間は新しい受付・返信・取り下げを行いません。",
+      "example": "appeal-withdraw guild_id:123456789012345678 conversation_id:1"
+    },
+    "en": {
+      "usage": "Withdraw your own unresolved conversation.",
+      "permissions": "The conversation author only.",
+      "response": "Private response. Managers can inspect DM delivery state for replies and review decisions.",
+      "disabled": "New intake, replies and withdrawal are paused while intake is disabled.",
+      "example": "appeal-withdraw guild_id:123456789012345678 conversation_id:1"
+    }
   }
 }

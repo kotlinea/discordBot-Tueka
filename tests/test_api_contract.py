@@ -26,7 +26,15 @@ APPLICATION_PATHS = {
     '/api/v1/guilds/{guild_id}/applications/items/{item_id}/events': {'get'},
     '/api/v1/guilds/{guild_id}/applications/items/{item_id}/review': {'post'},
 }
-ADDED_PATHS = {**{path:{method} for path,method in U4_PATHS.items()},**APPLICATION_PATHS}
+APPEAL_PATHS = {
+    '/api/v1/guilds/{guild_id}/appeals/items': {'get'},
+    '/api/v1/guilds/{guild_id}/appeals/items/{item_id}': {'get'},
+    '/api/v1/guilds/{guild_id}/appeals/items/{item_id}/reply': {'post'},
+    '/api/v1/guilds/{guild_id}/appeals/items/{item_id}/review': {'post'},
+    '/api/v1/guilds/{guild_id}/appeals/items/{item_id}/ticket': {'post'},
+    '/api/v1/guilds/{guild_id}/appeals/items/{item_id}/delivery/{job_id}/retry': {'post'},
+}
+ADDED_PATHS = {**{path:{method} for path,method in U4_PATHS.items()},**APPLICATION_PATHS,**APPEAL_PATHS}
 
 
 def request_path(template):
@@ -87,7 +95,7 @@ class ApiContractTests(unittest.TestCase):
         actual = boundary_responses(self.api)
         self.assertEqual([row for row in actual if row['path'] not in ADDED_PATHS], baseline)
         added = [row for row in actual if row['path'] in ADDED_PATHS]
-        self.assertEqual(len(added), 25)
+        self.assertEqual(len(added), 41)
         for row in added:
             # CSRF runs before authentication on writes, as for existing routes.
             expected_code = ('csrf_invalid' if row['method'] in {'PUT', 'POST'} and row['mode'] != 'forbidden'
