@@ -43,6 +43,7 @@ for(const locale of ['ja','en'] as const){
     await expect(editor.getByText('Generated conflict')).toBeVisible()
     await editor.getByRole('button',{name:copy.save,exact:true}).click()
     await expect(page.getByRole('heading',{name:'#1 · Updated announcement'})).toBeVisible()
+    await expect(page.getByRole('listitem').filter({hasText:new RegExp(copy.status.rescheduled)})).toBeVisible()
     page.once('dialog',dialog=>dialog.accept())
     await page.getByRole('button',{name:`${copy.cancel} #1`}).click()
     await expect(page.getByText(new RegExp(copy.status.cancelled))).toBeVisible()

@@ -31,7 +31,7 @@ export function ScheduleEditor({guildId,item,enabled,channels,onBusy}:{guildId:s
   const save=useSaveMutation({mutationFn:()=>{
     const {revision,...payload}=value
     return item?request('PUT /api/v1/guilds/{guild_id}/schedules/items/{item_id}',`/guilds/${guildId}/schedules/items/${item.id}`,{body:encodeBody('PUT /api/v1/guilds/{guild_id}/schedules/items/{item_id}',{payload,revision})}):request('POST /api/v1/guilds/{guild_id}/schedules/items',`/guilds/${guildId}/schedules/items`,{body:encodeBody('POST /api/v1/guilds/{guild_id}/schedules/items',{payload,request_key:key})})
-  },onSuccess:async result=>{draft.accept(item?{...result.payload,revision:result.revision}:initial);setKey(crypto.randomUUID());await qc.invalidateQueries({queryKey:['scheduleItems',guildId]})}})
+  },onSuccess:async result=>{draft.accept(item?{...result.payload,revision:result.revision}:initial);setKey(crypto.randomUUID());await Promise.all([qc.invalidateQueries({queryKey:['scheduleItems',guildId]}),...(item?[qc.invalidateQueries({queryKey:['scheduleHistory',guildId,item.id]})]:[])])}})
   useUnsavedChanges(draft.dirty,save.isPending)
   useEffect(()=>{onBusy?.(draft.dirty||save.isPending);return()=>onBusy?.(false)},[draft.dirty,save.isPending,onBusy])
   const change=<K extends keyof Draft>(field:K,next:Draft[K])=>draft.setDraft({...value,[field]:next})
@@ -60,7 +60,7 @@ export function ScheduleEditor({guildId,item,enabled,channels,onBusy}:{guildId:s
   </form>
 }
 
-function ScheduleCard({guildId,item,enabled,channels}:{guildId:string;item:ScheduleItem;enabled:boolean;channels:Resource[]}){
+export function ScheduleCard({guildId,item,enabled,channels}:{guildId:string;item:ScheduleItem;enabled:boolean;channels:Resource[]}){
   const {t,i18n}=useTranslation('scheduling');const qc=useQueryClient();const [expanded,setExpanded]=useState(false)
   const [editorBusy,setEditorBusy]=useState(false)
   const base=`/guilds/${guildId}/schedules/items/${item.id}`
@@ -72,7 +72,7 @@ function ScheduleCard({guildId,item,enabled,channels}:{guildId:string;item:Sched
     {item.payload.kind==='event'&&<p>{date(item.payload.event_start!)} — {date(item.payload.event_end!)} · {item.payload.event_location}</p>}
     <button aria-expanded={expanded} disabled={editorBusy} onClick={()=>setExpanded(!expanded)}>{t('scheduling.history')} #{item.id}</button>
     {expanded&&(detail.isLoading?<Loading/>:detail.error?<Failure error={detail.error} retry={()=>void detail.refetch()}/>:<>
-      <ul>{detail.data?.delivery.map(job=><li key={job.id}>#{job.id} · {date(job.due_at)} · {t(`scheduling.status.${job.status}`,{defaultValue:job.status})} · {job.discord_receipt_id??'—'}{job.status==='failed'&&<button disabled={!enabled||save.isPending||editorBusy||item.status==='cancelled'} onClick={()=>save.mutate(job.id)}>{t('scheduling.retry')} #{job.id}</button>}</li>)}</ul>
+      <ul>{detail.data?.delivery.map(job=><li key={job.id}>#{job.id} · {date(job.due_at)} · {job.status==='completed'?t('scheduling.delivered'):t(`scheduling.status.${job.status}`,{defaultValue:job.status})} · {job.discord_receipt_id??'—'}{job.status==='failed'&&<button disabled={!enabled||save.isPending||editorBusy||item.status==='cancelled'} onClick={()=>save.mutate(job.id)}>{t('scheduling.retry')} #{job.id}</button>}</li>)}</ul>
       <ol>{detail.data?.events.map(event=><li key={event.id}>{date(event.created_at)} · {event.actor_id} · {t(`scheduling.status.${event.event_type}`,{defaultValue:event.event_type})} {event.detail}</li>)}</ol>
       {((item.status==='scheduled'&&detail.data?.delivery.length===0)||editorBusy)&&<ScheduleEditor guildId={guildId} item={item} enabled={enabled&&item.status==='scheduled'} channels={channels} onBusy={setEditorBusy}/>}
     </>)}

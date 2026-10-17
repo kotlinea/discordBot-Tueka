@@ -6,19 +6,27 @@ import { I18nextProvider } from 'react-i18next'
 import { createInstance } from 'i18next'
 import en from '../locales/en'
 import ja from '../locales/ja'
-import { ScheduleEditor,localTime } from '../features/engagement/scheduling/Schedules'
+import { ScheduleEditor,ScheduleCard,localTime } from '../features/engagement/scheduling/Schedules'
 import { request } from '../api'
 import type { ScheduleItem } from '../generated/api'
 vi.mock('../api',async original=>({...await original<typeof import('../api')>(),request:vi.fn()}))
 const call=vi.mocked(request)
 const item:ScheduleItem={id:1,guild_id:'1',actor_id:'20',payload:{kind:'message',title:'Generated',body:'Test',channel_id:'10',run_at:2_000_000_000,interval_seconds:0,occurrences:1,color:0x5865F2},next_due:2_000_000_000,remaining:1,status:'scheduled',revision:3,retention_days:30,created_at:1,updated_at:1,expires_at:4_000_000_000}
-async function mount(locale='en',enabled=true){
+async function mount(locale='en',enabled=true,card=false){
   const i18n=createInstance();await i18n.init({lng:locale,resources:{en,ja},interpolation:{escapeValue:false}})
   const client=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}})
-  return render(<I18nextProvider i18n={i18n}><QueryClientProvider client={client}><MemoryRouter><ScheduleEditor guildId="1" item={item} enabled={enabled} channels={[]}/></MemoryRouter></QueryClientProvider></I18nextProvider>)
+  return render(<I18nextProvider i18n={i18n}><QueryClientProvider client={client}><MemoryRouter>{card?<ScheduleCard guildId="1" item={{...item,status:'completed',remaining:0}} enabled={enabled} channels={[]}/>:<ScheduleEditor guildId="1" item={item} enabled={enabled} channels={[]}/>}</MemoryRouter></QueryClientProvider></I18nextProvider>)
 }
 afterEach(()=>{cleanup();call.mockReset()})
 describe('Scheduling',()=>{
+  it.each(['ja','en'])('distinguishes reservation completion from actual delivery in %s',async locale=>{
+    const copy=(locale==='ja'?ja:en).scheduling.scheduling
+    call.mockResolvedValue({events:[],delivery:[{id:9,due_at:2_000_000_000,deadline:2_000_000_600,status:'completed',attempts:1,delivery_started:true,discord_receipt_id:'123'}]} as never)
+    await mount(locale,true,true)
+    fireEvent.click(screen.getByRole('button',{name:`${copy.history} #1`}))
+    await screen.findByText(new RegExp(copy.delivered))
+    expect(screen.getByText(new RegExp(copy.status.completed))).toBeInTheDocument()
+  })
   it.each(['ja','en'])('preserves draft and captured revision on conflict in %s',async locale=>{
     const copy=(locale==='ja'?ja:en).scheduling.scheduling
     call.mockRejectedValue(new Error('revision_conflict'))
