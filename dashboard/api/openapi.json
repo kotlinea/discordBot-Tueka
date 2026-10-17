@@ -808,6 +808,394 @@
         "title": "GuildOverview",
         "type": "object"
       },
+      "HighlightEntry": {
+        "additionalProperties": true,
+        "properties": {
+          "board_id": {
+            "title": "Board Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "integer"
+          },
+          "desired": {
+            "title": "Desired",
+            "type": "boolean"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "integer"
+          },
+          "guild_id": {
+            "title": "Guild Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/HighlightSource"
+          },
+          "source_channel_id": {
+            "title": "Source Channel Id",
+            "type": "string"
+          },
+          "source_message_id": {
+            "title": "Source Message Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "board_id",
+          "guild_id",
+          "source_channel_id",
+          "source_message_id",
+          "snapshot",
+          "score",
+          "desired",
+          "revision",
+          "created_at",
+          "updated_at",
+          "expires_at"
+        ],
+        "title": "HighlightEntry",
+        "type": "object"
+      },
+      "HighlightEvent": {
+        "additionalProperties": true,
+        "properties": {
+          "actor_id": {
+            "title": "Actor Id",
+            "type": "string"
+          },
+          "board_id": {
+            "title": "Board Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "integer"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "entry_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "board_id",
+          "entry_id",
+          "actor_id",
+          "event_type",
+          "detail",
+          "created_at"
+        ],
+        "title": "HighlightEvent",
+        "type": "object"
+      },
+      "HighlightHistory": {
+        "additionalProperties": true,
+        "properties": {
+          "delivery": {
+            "items": {
+              "$ref": "#/components/schemas/HighlightJob"
+            },
+            "title": "Delivery",
+            "type": "array"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/HighlightEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "publications": {
+            "items": {
+              "$ref": "#/components/schemas/HighlightPublication"
+            },
+            "title": "Publications",
+            "type": "array"
+          },
+          "source_fetches": {
+            "items": {
+              "$ref": "#/components/schemas/HighlightSourceJob"
+            },
+            "title": "Source Fetches",
+            "type": "array"
+          }
+        },
+        "required": [
+          "events",
+          "delivery",
+          "publications",
+          "source_fetches"
+        ],
+        "title": "HighlightHistory",
+        "type": "object"
+      },
+      "HighlightJob": {
+        "additionalProperties": true,
+        "properties": {
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "entry_id",
+          "status",
+          "attempts",
+          "last_error"
+        ],
+        "title": "HighlightJob",
+        "type": "object"
+      },
+      "HighlightPublication": {
+        "additionalProperties": true,
+        "properties": {
+          "delivery_started": {
+            "title": "Delivery Started",
+            "type": "boolean"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "boolean"
+          },
+          "target_channel_id": {
+            "title": "Target Channel Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "entry_id",
+          "target_channel_id",
+          "message_id",
+          "delivery_started",
+          "removed"
+        ],
+        "title": "HighlightPublication",
+        "type": "object"
+      },
+      "HighlightSource": {
+        "additionalProperties": true,
+        "properties": {
+          "author_bot": {
+            "default": false,
+            "title": "Author Bot",
+            "type": "boolean"
+          },
+          "author_id": {
+            "title": "Author Id",
+            "type": "string"
+          },
+          "author_name": {
+            "default": "",
+            "title": "Author Name",
+            "type": "string"
+          },
+          "channel_id": {
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "content": {
+            "default": "",
+            "title": "Content",
+            "type": "string"
+          },
+          "deleted": {
+            "default": false,
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "guild_id": {
+            "title": "Guild Id",
+            "type": "string"
+          },
+          "image_url": {
+            "default": "",
+            "title": "Image Url",
+            "type": "string"
+          },
+          "message_id": {
+            "title": "Message Id",
+            "type": "string"
+          },
+          "nsfw": {
+            "default": false,
+            "title": "Nsfw",
+            "type": "boolean"
+          },
+          "parent_channel_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Channel Id"
+          }
+        },
+        "required": [
+          "guild_id",
+          "channel_id",
+          "message_id",
+          "author_id"
+        ],
+        "title": "HighlightSource",
+        "type": "object"
+      },
+      "HighlightSourceJob": {
+        "additionalProperties": true,
+        "properties": {
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "channel_id": {
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "message_id": {
+            "title": "Message Id",
+            "type": "string"
+          },
+          "retry_actor_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Actor Id"
+          },
+          "retry_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel_id",
+          "message_id",
+          "status",
+          "attempts",
+          "last_error",
+          "retry_actor_id",
+          "retry_at"
+        ],
+        "title": "HighlightSourceJob",
+        "type": "object"
+      },
       "InfractionsResponse": {
         "additionalProperties": true,
         "properties": {
@@ -1003,6 +1391,34 @@
         "title": "Items[Guild]",
         "type": "object"
       },
+      "Items_HighlightEntry_": {
+        "additionalProperties": true,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HighlightEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Items[HighlightEntry]",
+        "type": "object"
+      },
       "Items_ModerationEvent_": {
         "additionalProperties": true,
         "properties": {
@@ -1141,6 +1557,34 @@
           "items"
         ],
         "title": "Items[ScheduleItem]",
+        "type": "object"
+      },
+      "Items_StarboardItem_": {
+        "additionalProperties": true,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StarboardItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Items[StarboardItem]",
         "type": "object"
       },
       "Items_SuggestionEvent_": {
@@ -3348,6 +3792,114 @@
           "footer"
         ],
         "title": "SocialTemplate",
+        "type": "object"
+      },
+      "StarboardConfig": {
+        "additionalProperties": true,
+        "properties": {
+          "emoji": {
+            "default": "⭐",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Emoji",
+            "type": "string"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "excluded_channel_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 25,
+            "title": "Excluded Channel Ids",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "retention_days": {
+            "default": 30,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "source_channel_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 25,
+            "minItems": 1,
+            "title": "Source Channel Ids",
+            "type": "array"
+          },
+          "target_channel_id": {
+            "title": "Target Channel Id",
+            "type": "string"
+          },
+          "threshold": {
+            "default": 3,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Threshold",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "target_channel_id",
+          "source_channel_ids"
+        ],
+        "title": "StarboardConfig",
+        "type": "object"
+      },
+      "StarboardItem": {
+        "additionalProperties": true,
+        "properties": {
+          "actor_id": {
+            "title": "Actor Id",
+            "type": "string"
+          },
+          "config": {
+            "$ref": "#/components/schemas/StarboardConfig"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "integer"
+          },
+          "guild_id": {
+            "title": "Guild Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "guild_id",
+          "actor_id",
+          "config",
+          "revision",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "StarboardItem",
         "type": "object"
       },
       "StatusResponse": {
@@ -14680,6 +15232,937 @@
           }
         },
         "summary": "Retry Social Subscription"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/starboard/boards": {
+      "get": {
+        "operationId": "boards_api_v1_guilds__guild_id__starboard_boards_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Items_StarboardItem_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Boards"
+      },
+      "post": {
+        "operationId": "create_api_v1_guilds__guild_id__starboard_boards_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "config": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "emoji": {
+                        "default": "⭐",
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "title": "Emoji",
+                        "type": "string"
+                      },
+                      "enabled": {
+                        "default": false,
+                        "title": "Enabled",
+                        "type": "boolean"
+                      },
+                      "excluded_channel_ids": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 25,
+                        "title": "Excluded Channel Ids",
+                        "type": "array"
+                      },
+                      "name": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "title": "Name",
+                        "type": "string"
+                      },
+                      "retention_days": {
+                        "default": 30,
+                        "maximum": 365,
+                        "minimum": 1,
+                        "title": "Retention Days",
+                        "type": "integer"
+                      },
+                      "source_channel_ids": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 25,
+                        "minItems": 1,
+                        "title": "Source Channel Ids",
+                        "type": "array"
+                      },
+                      "target_channel_id": {
+                        "title": "Target Channel Id",
+                        "type": "string"
+                      },
+                      "threshold": {
+                        "default": 3,
+                        "maximum": 100,
+                        "minimum": 1,
+                        "title": "Threshold",
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "target_channel_id",
+                      "source_channel_ids"
+                    ],
+                    "title": "StarboardConfig",
+                    "type": "object"
+                  },
+                  "request_key": {
+                    "maxLength": 100,
+                    "minLength": 1,
+                    "title": "Request Key",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "config",
+                  "request_key"
+                ],
+                "title": "StarboardCreateInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StarboardItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Create"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/starboard/boards/{board_id}": {
+      "put": {
+        "operationId": "edit_api_v1_guilds__guild_id__starboard_boards__board_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "board_id",
+            "required": true,
+            "schema": {
+              "title": "Board Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "config": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "emoji": {
+                        "default": "⭐",
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "title": "Emoji",
+                        "type": "string"
+                      },
+                      "enabled": {
+                        "default": false,
+                        "title": "Enabled",
+                        "type": "boolean"
+                      },
+                      "excluded_channel_ids": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 25,
+                        "title": "Excluded Channel Ids",
+                        "type": "array"
+                      },
+                      "name": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "title": "Name",
+                        "type": "string"
+                      },
+                      "retention_days": {
+                        "default": 30,
+                        "maximum": 365,
+                        "minimum": 1,
+                        "title": "Retention Days",
+                        "type": "integer"
+                      },
+                      "source_channel_ids": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 25,
+                        "minItems": 1,
+                        "title": "Source Channel Ids",
+                        "type": "array"
+                      },
+                      "target_channel_id": {
+                        "title": "Target Channel Id",
+                        "type": "string"
+                      },
+                      "threshold": {
+                        "default": 3,
+                        "maximum": 100,
+                        "minimum": 1,
+                        "title": "Threshold",
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "target_channel_id",
+                      "source_channel_ids"
+                    ],
+                    "title": "StarboardConfig",
+                    "type": "object"
+                  },
+                  "revision": {
+                    "minimum": 1,
+                    "title": "Revision",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "config",
+                  "revision"
+                ],
+                "title": "StarboardEditInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StarboardItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Edit"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/starboard/boards/{board_id}/delivery/{job_id}/retry": {
+      "post": {
+        "operationId": "retry_api_v1_guilds__guild_id__starboard_boards__board_id__delivery__job_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "board_id",
+            "required": true,
+            "schema": {
+              "title": "Board Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "revision": {
+                    "minimum": 1,
+                    "title": "Revision",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "revision"
+                ],
+                "title": "StarboardRevisionInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HighlightHistory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Retry"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/starboard/boards/{board_id}/entries": {
+      "get": {
+        "operationId": "entries_api_v1_guilds__guild_id__starboard_boards__board_id__entries_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "board_id",
+            "required": true,
+            "schema": {
+              "title": "Board Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Items_HighlightEntry_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Entries"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/starboard/boards/{board_id}/history": {
+      "get": {
+        "operationId": "history_api_v1_guilds__guild_id__starboard_boards__board_id__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "board_id",
+            "required": true,
+            "schema": {
+              "title": "Board Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HighlightHistory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "History"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/starboard/boards/{board_id}/source-jobs/{job_id}/retry": {
+      "post": {
+        "operationId": "retry_source_api_v1_guilds__guild_id__starboard_boards__board_id__source_jobs__job_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "board_id",
+            "required": true,
+            "schema": {
+              "title": "Board Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "revision": {
+                    "minimum": 1,
+                    "title": "Revision",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "revision"
+                ],
+                "title": "StarboardRevisionInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HighlightHistory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Retry Source"
       }
     },
     "/api/v1/guilds/{guild_id}/suggestions/items": {

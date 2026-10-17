@@ -17,6 +17,13 @@ export type ErrorResponse = { "detail": ErrorDetail }
 export type Feature = { "maturity"?: "stable" | "improving" | "unavailable"; "id": string; "category": string; "parent": (string | null); "docs_path": string; "title": string; "description": string; "fields": Array<string>; "required_fields": Array<string>; "required_bot_permissions": Array<string>; "enabled": boolean; "settings": Record<string, unknown>; "revision": number; "missing_permissions": Array<string> }
 export type Guild = { "id": string; "name": string; "icon": (string | null); "access"?: ("admin" | "ticket_staff") }
 export type GuildOverview = { "guild_id": string; "features": Array<Feature>; "resources": Resources; "moderation": ModerationOverview }
+export type HighlightEntry = { "id": number; "board_id": number; "guild_id": string; "source_channel_id": string; "source_message_id": string; "snapshot": HighlightSource; "score": number; "desired": boolean; "revision": number; "created_at": number; "updated_at": number; "expires_at": number }
+export type HighlightEvent = { "id": number; "board_id": number; "entry_id": (number | null); "actor_id": string; "event_type": string; "detail": Record<string, unknown>; "created_at": number }
+export type HighlightHistory = { "events": Array<HighlightEvent>; "delivery": Array<HighlightJob>; "publications": Array<HighlightPublication>; "source_fetches": Array<HighlightSourceJob> }
+export type HighlightJob = { "id": number; "entry_id": number; "status": string; "attempts": number; "last_error": (string | null) }
+export type HighlightPublication = { "id": number; "entry_id": number; "target_channel_id": string; "message_id": (string | null); "delivery_started": boolean; "removed": boolean }
+export type HighlightSource = { "guild_id": string; "channel_id": string; "message_id": string; "parent_channel_id"?: (string | null); "author_id": string; "author_name"?: string; "content"?: string; "image_url"?: string; "author_bot"?: boolean; "nsfw"?: boolean; "deleted"?: boolean }
+export type HighlightSourceJob = { "id": number; "channel_id": string; "message_id": string; "status": string; "attempts": number; "last_error": (string | null); "retry_actor_id": (string | null); "retry_at": (number | null) }
 export type InfractionsResponse = { "user_id": string; "active_points": number; "cases": Array<ModerationCase> }
 export type Items_AppealItem_ = { "items": Array<AppealItem>; "next"?: (number | null) }
 export type Items_ApplicationEvent_ = { "items": Array<ApplicationEvent>; "next"?: (number | null) }
@@ -24,11 +31,13 @@ export type Items_ApplicationForm_ = { "items": Array<ApplicationForm>; "next"?:
 export type Items_ApplicationItem_ = { "items": Array<ApplicationItem>; "next"?: (number | null) }
 export type Items_Feature_ = { "items": Array<Feature>; "next"?: (number | null) }
 export type Items_Guild_ = { "items": Array<Guild>; "next"?: (number | null) }
+export type Items_HighlightEntry_ = { "items": Array<HighlightEntry>; "next"?: (number | null) }
 export type Items_ModerationEvent_ = { "items": Array<ModerationEvent>; "next"?: (number | null) }
 export type Items_ReactionRoleEvent_ = { "items": Array<ReactionRoleEvent>; "next"?: (number | null) }
 export type Items_ReactionRoleLinkGroup_ = { "items": Array<ReactionRoleLinkGroup>; "next"?: (number | null) }
 export type Items_Rule_ = { "items": Array<Rule>; "next"?: (number | null) }
 export type Items_ScheduleItem_ = { "items": Array<ScheduleItem>; "next"?: (number | null) }
+export type Items_StarboardItem_ = { "items": Array<StarboardItem>; "next"?: (number | null) }
 export type Items_SuggestionEvent_ = { "items": Array<SuggestionEvent>; "next"?: (number | null) }
 export type Items_SuggestionItem_ = { "items": Array<SuggestionItem>; "next"?: (number | null) }
 export type Items_TicketForm_ = { "items": Array<TicketForm>; "next"?: (number | null) }
@@ -71,6 +80,8 @@ export type SocialSubscriptions = { "items": Array<SocialSubscription>; "next"?:
 export type SocialSummary = { "providers": Array<SocialProviderSummary>; "worker": Record<string, unknown> }
 export type SocialTarget = { "id": number; "provider": string; "account_key": string; "external_id"?: (string | null); "handle"?: (string | null); "display_name"?: (string | null); "avatar_url"?: (string | null); "status": ("pending" | "active" | "degraded" | "error"); "last_error"?: (string | null); "last_checked_at"?: (number | null); "revision": number }
 export type SocialTemplate = { "content": string; "title": string; "description": string; "color": string; "url": string; "thumbnail_url": string; "image_url": string; "footer": string }
+export type StarboardConfig = { "name": string; "enabled"?: boolean; "target_channel_id": string; "source_channel_ids": Array<string>; "excluded_channel_ids"?: Array<string>; "emoji"?: string; "threshold"?: number; "retention_days"?: number }
+export type StarboardItem = { "id": number; "guild_id": string; "actor_id": string; "config": StarboardConfig; "revision": number; "created_at": number; "updated_at": number }
 export type StatusResponse = { "status": string }
 export type SuggestionEvent = { "id": number; "actor_id": (string | null); "event_type": string; "detail": Record<string, unknown>; "created_at": number }
 export type SuggestionFeature = { "maturity"?: "stable" | "improving" | "unavailable"; "id": string; "category": string; "parent": (string | null); "docs_path": string; "title": string; "description": string; "fields": Array<string>; "required_fields": Array<string>; "required_bot_permissions": Array<string>; "enabled": boolean; "settings": SuggestionSettings; "revision": number; "missing_permissions": Array<string> }
@@ -286,6 +297,73 @@ export const constraints = {
     "moderation": {},
     "resources": {}
   },
+  "HighlightEntry": {
+    "board_id": {},
+    "created_at": {},
+    "desired": {},
+    "expires_at": {},
+    "guild_id": {},
+    "id": {},
+    "revision": {},
+    "score": {},
+    "snapshot": {},
+    "source_channel_id": {},
+    "source_message_id": {},
+    "updated_at": {}
+  },
+  "HighlightEvent": {
+    "actor_id": {},
+    "board_id": {},
+    "created_at": {},
+    "detail": {},
+    "entry_id": {},
+    "event_type": {},
+    "id": {}
+  },
+  "HighlightHistory": {
+    "delivery": {},
+    "events": {},
+    "publications": {},
+    "source_fetches": {}
+  },
+  "HighlightJob": {
+    "attempts": {},
+    "entry_id": {},
+    "id": {},
+    "last_error": {},
+    "status": {}
+  },
+  "HighlightPublication": {
+    "delivery_started": {},
+    "entry_id": {},
+    "id": {},
+    "message_id": {},
+    "removed": {},
+    "target_channel_id": {}
+  },
+  "HighlightSource": {
+    "author_bot": {},
+    "author_id": {},
+    "author_name": {},
+    "channel_id": {},
+    "content": {},
+    "deleted": {},
+    "guild_id": {},
+    "image_url": {},
+    "message_id": {},
+    "nsfw": {},
+    "parent_channel_id": {}
+  },
+  "HighlightSourceJob": {
+    "attempts": {},
+    "channel_id": {},
+    "id": {},
+    "last_error": {},
+    "message_id": {},
+    "retry_actor_id": {},
+    "retry_at": {},
+    "status": {}
+  },
   "InfractionsResponse": {
     "active_points": {},
     "cases": {},
@@ -315,6 +393,10 @@ export const constraints = {
     "items": {},
     "next": {}
   },
+  "Items_HighlightEntry_": {
+    "items": {},
+    "next": {}
+  },
   "Items_ModerationEvent_": {
     "items": {},
     "next": {}
@@ -332,6 +414,10 @@ export const constraints = {
     "next": {}
   },
   "Items_ScheduleItem_": {
+    "items": {},
+    "next": {}
+  },
+  "Items_StarboardItem_": {
     "items": {},
     "next": {}
   },
@@ -686,6 +772,42 @@ export const constraints = {
       "maxLength": 256
     },
     "url": {}
+  },
+  "StarboardConfig": {
+    "emoji": {
+      "maxLength": 80,
+      "minLength": 1
+    },
+    "enabled": {},
+    "excluded_channel_ids": {
+      "maxItems": 25
+    },
+    "name": {
+      "maxLength": 80,
+      "minLength": 1
+    },
+    "retention_days": {
+      "maximum": 365.0,
+      "minimum": 1.0
+    },
+    "source_channel_ids": {
+      "maxItems": 25,
+      "minItems": 1
+    },
+    "target_channel_id": {},
+    "threshold": {
+      "maximum": 100.0,
+      "minimum": 1.0
+    }
+  },
+  "StarboardItem": {
+    "actor_id": {},
+    "config": {},
+    "created_at": {},
+    "guild_id": {},
+    "id": {},
+    "revision": {},
+    "updated_at": {}
   },
   "StatusResponse": {
     "status": {}
@@ -1191,6 +1313,13 @@ export interface Operations {
   "DELETE /api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}": { response: void; body: never }
   "PUT /api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}": { response: SocialSubscription; body: { "account"?: string; "channel_id"?: (string | number | null); "role_id"?: (string | number | null); "events"?: Array<string>; "event_channels"?: Record<string, (string | number)>; "templates"?: Record<string, { "content"?: string; "title"?: string; "description"?: string; "color"?: string; "url"?: string; "thumbnail_url"?: string; "image_url"?: string; "footer"?: string }>; "enabled"?: boolean; "revision"?: (number | null) } }
   "POST /api/v1/guilds/{guild_id}/social/{provider}/subscriptions/{subscription_id}/retry": { response: StatusResponse; body: never }
+  "GET /api/v1/guilds/{guild_id}/starboard/boards": { response: Items_StarboardItem_; body: never }
+  "POST /api/v1/guilds/{guild_id}/starboard/boards": { response: StarboardItem; body: { "config": { "name": string; "enabled"?: boolean; "target_channel_id": string; "source_channel_ids": Array<string>; "excluded_channel_ids"?: Array<string>; "emoji"?: string; "threshold"?: number; "retention_days"?: number }; "request_key": string } }
+  "PUT /api/v1/guilds/{guild_id}/starboard/boards/{board_id}": { response: StarboardItem; body: { "config": { "name": string; "enabled"?: boolean; "target_channel_id": string; "source_channel_ids": Array<string>; "excluded_channel_ids"?: Array<string>; "emoji"?: string; "threshold"?: number; "retention_days"?: number }; "revision": number } }
+  "POST /api/v1/guilds/{guild_id}/starboard/boards/{board_id}/delivery/{job_id}/retry": { response: HighlightHistory; body: { "revision": number } }
+  "GET /api/v1/guilds/{guild_id}/starboard/boards/{board_id}/entries": { response: Items_HighlightEntry_; body: never }
+  "GET /api/v1/guilds/{guild_id}/starboard/boards/{board_id}/history": { response: HighlightHistory; body: never }
+  "POST /api/v1/guilds/{guild_id}/starboard/boards/{board_id}/source-jobs/{job_id}/retry": { response: HighlightHistory; body: { "revision": number } }
   "GET /api/v1/guilds/{guild_id}/suggestions/items": { response: Items_SuggestionItem_; body: never }
   "GET /api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}": { response: SuggestionItem; body: never }
   "GET /api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/events": { response: Items_SuggestionEvent_; body: never }

@@ -106,13 +106,14 @@ async def dashboard_page(guild_id: int, route: str = ''):
     valid |= bool(re.fullmatch(r'applications(?:/(?:review|settings))?', route))
     valid |= bool(re.fullmatch(r'appeals(?:/settings)?', route))
     valid |= bool(re.fullmatch(r'schedules(?:/settings)?', route))
+    valid |= bool(re.fullmatch(r'starboard(?:/settings)?', route))
     if route.startswith('modules/'):
         module_id = route.removeprefix('modules/')
         try:
             feature = get_feature(module_id)
         except ValueError:
             raise HTTPException(404, detail='Dashboard route not found')
-        valid = feature is not None and module_id not in {'tickets', 'reaction_roles', 'suggestions', 'applications', 'appeals', 'scheduled_messages'} and feature.category != 'social'
+        valid = feature is not None and module_id not in {'tickets', 'reaction_roles', 'suggestions', 'applications', 'appeals', 'scheduled_messages', 'starboard'} and feature.category != 'social'
     if not valid:
         raise HTTPException(404, detail='Dashboard route not found')
     return spa_response()

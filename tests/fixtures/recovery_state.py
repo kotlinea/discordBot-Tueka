@@ -18,6 +18,8 @@ from appeals.repository import AppealRepository
 from appeals.delivery import AppealDeliveryService
 from scheduling.repository import ScheduleRepository
 from scheduling.delivery import ScheduleDeliveryService
+from starboard.repository import StarboardRepository
+from starboard.delivery import HighlightDelivery
 
 
 async def seed():
@@ -59,6 +61,17 @@ async def seed():
     assert schedules.start_delivery(scheduled.payload)=='send'
     with transaction(settings.database_url) as c:
         c.execute('UPDATE scheduled_post_outbox SET lease_until=0,available_at=0 WHERE id=%s',(scheduled.id,))
+    guilds.set_module(1,'starboard',enabled=True)
+    highlights=StarboardRepository(settings.database_url)
+    board=highlights.save_board(1,5,{'name':'Recovery highlights','enabled':True,'target_channel_id':2,'source_channel_ids':[10],'threshold':2},request_key='recovery-highlight-board')
+    source={'guild_id':1,'channel_id':10,'message_id':778,'parent_channel_id':None,'author_id':3,'author_bot':False,'author_name':'Restored author','content':'Restored highlight body','nsfw':False,'deleted':False,'image_url':''}
+    highlights.observe(1,board['id'],1,source,2)
+    uncertain=highlights.jobs.claim('crashed-highlight-worker')
+    publication,action=highlights.publication_begin(uncertain.payload,2)
+    assert action=='send'
+    highlights.enqueue_refresh(1,10,778)
+    with transaction(settings.database_url) as c:
+        c.execute('UPDATE starboard_outbox SET lease_until=0,available_at=0 WHERE id=%s',(uncertain.id,))
     suggestions = SuggestionRepository(settings.database_url)
     delivered = suggestions.create(1, 2, 3, {'idea': 'already delivered'})
     claim = suggestions.outbox_jobs.claim('before-snapshot')
@@ -136,6 +149,30 @@ async def resume():
     assert await run_batch(schedules.jobs,'restored-schedule-worker',ScheduleDeliveryService(schedules,schedule_port).deliver)==0
     assert schedule_port.calls==1
     assert schedules.history(1,post['id'])['delivery'][0]['discord_receipt_id']==555
+
+    highlights=StarboardRepository(settings.database_url)
+    restored_board=highlights.boards(1)[0]
+    restored_source=highlights.entries(1,restored_board['id'])[0]['snapshot']
+    assert restored_source['content']=='Restored highlight body'
+    class ExistingHighlightReceipt:
+        reconciled=0
+        edited=0
+        async def source(self,*_):return restored_source,2
+        async def reconcile(self,guild,channel,marker):
+            assert guild==1 and channel==2 and marker.startswith('Tueka highlight:')
+            self.reconciled+=1;return 666
+        async def edit(self,guild,channel,message,*_):
+            assert message==666;self.edited+=1
+        async def send(self,*_):raise AssertionError('Uncertain restored highlight must not be resent')
+        async def delete(self,*_):raise AssertionError('Restored highlight remains eligible')
+    highlight_port=ExistingHighlightReceipt()
+    assert await run_batch(highlights.jobs,'restored-highlight-worker',HighlightDelivery(highlights,highlight_port).handle)==1
+    assert await run_batch(highlights.jobs,'restored-highlight-worker',HighlightDelivery(highlights,highlight_port).handle)==0
+    assert (highlight_port.reconciled,highlight_port.edited)==(1,1)
+    assert highlights.delivery_history(1,restored_board['id'])['publications'][0]['message_id']==666
+    source_job=highlights.refresh_jobs.claim('restored-highlight-source')
+    assert source_job.payload['channel_id']==10 and source_job.payload['message_id']==778
+    assert highlights.refresh_jobs.finish(source_job,Outcome())
 
     class ExistingRemoteReceipt:
         calls = 0

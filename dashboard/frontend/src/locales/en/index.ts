@@ -7,4 +7,5 @@ import suggestions from './suggestions'
 import applications from './applications'
 import appeals from './appeals'
 import scheduling from './scheduling'
-export default { common, moderation, reactionRoles, tickets, social, suggestions, applications, appeals, scheduling }
+import starboard from './starboard'
+export default { common, moderation, reactionRoles, tickets, social, suggestions, applications, appeals, scheduling,starboard }

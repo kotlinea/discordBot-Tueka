@@ -206,6 +206,16 @@ class DiscordAPI:
                 return None
             raise
 
+    async def guild_channel(self,guild_id:int,channel_id:int)->dict[str,Any]|None:
+        """Fresh channel metadata, including threads, fenced to one Guild."""
+        try:
+            value=(await self._request('GET',f'/channels/{channel_id}',headers={'Authorization':f'Bot {self.bot_token}'})).json()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code==404:return None
+            raise
+        if str(value.get('guild_id'))!=str(guild_id):return None
+        return {key:value.get(key) for key in ('id','type','parent_id','nsfw')}
+
     async def guild_member(self, guild_id: int, user_id: int, *, use_cache: bool = True) -> dict[str, Any] | None:
         key = f"{guild_id}:{user_id}"
         if use_cache and (cached := self._get_cached("guild_member", key)) is not None:

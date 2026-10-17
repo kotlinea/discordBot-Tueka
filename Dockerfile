@@ -50,6 +50,7 @@ COPY recovery recovery
 COPY runtime runtime
 COPY scripts scripts
 COPY social social
+COPY starboard starboard
 COPY suggestions suggestions
 COPY tests tests
 COPY ticketing ticketing

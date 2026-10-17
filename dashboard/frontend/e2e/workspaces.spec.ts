@@ -13,7 +13,7 @@ for (const locale of ['ja', 'en'] as const) {
     let rrSettings = { enabled: false, revision: 0, log_channel_id: null, denial_dm: true, denial_dm_cooldown_seconds: 300 }
     const writes: string[] = []
     const forbidden: string[] = []
-    const features = [...baseline.features,{id:'applications',category:'community',docs_path:'/docs/features/applications',fields:[],required_fields:[],required_bot_permissions:[]},{id:'appeals',category:'moderation',docs_path:'/docs/features/appeals',fields:['retention_days'],required_fields:[],required_bot_permissions:[]},{id:'scheduled_messages',category:'engagement',docs_path:'/docs/features/scheduled-messages',fields:['retention_days'],required_fields:[],required_bot_permissions:[]}].map(feature => ({ ...feature, title: feature.id, description: '', enabled: false, settings: {}, revision: 1, missing_permissions: [] }))
+    const features = [...baseline.features,{id:'applications',category:'community',docs_path:'/docs/features/applications',fields:[],required_fields:[],required_bot_permissions:[]},{id:'appeals',category:'moderation',docs_path:'/docs/features/appeals',fields:['retention_days'],required_fields:[],required_bot_permissions:[]},{id:'scheduled_messages',category:'engagement',docs_path:'/docs/features/scheduled-messages',fields:['retention_days'],required_fields:[],required_bot_permissions:[]},{id:'starboard',category:'engagement',docs_path:'/docs/features/starboard',fields:[],required_fields:[],required_bot_permissions:[]}].map(feature => ({ ...feature, title: feature.id, description: '', enabled: false, settings: {}, revision: 1, missing_permissions: [] }))
     await page.route('**/api/v1/session', route => route.fulfill({ json: { user: { id: '1', name: 'Reviewer', avatar_url: '' }, csrf_token: 'offline', preferences: { locale, appearance: 'precision', color_scheme: 'light', navigation_collapsed: false, revision: 1 } } }))
     await page.route('**/api/v1/guilds', route => route.fulfill({ json: { items: [{ id: '1', name: 'Workspace fixture', icon: null, access: staff ? 'ticket_staff' : 'manager' }] } }))
     await page.route('**/api/v1/guilds/1/**', route => {
@@ -65,7 +65,7 @@ for (const locale of ['ja', 'en'] as const) {
       [copy.common.nav.moderation, ['modules/moderation', 'moderation/automod', 'moderation/anti_spam', 'moderation/anti_raid', 'moderation/infractions', 'moderation/moderation_actions', 'moderation/moderation_logs', 'moderation/audit_log', 'moderation/trust_score','appeals']],
       [copy.common.nav.social, ['social/youtube', 'social/twitch', 'social/tiktok', 'social/x', 'social/instagram']],
     ] as const
-    await expect(nav.getByRole('link')).toHaveCount(29)
+    await expect(nav.getByRole('link')).toHaveCount(30)
     for (const [name, paths] of groups) {
       const links = nav.getByRole('group', { name, exact: true }).getByRole('link')
       expect(await links.evaluateAll(nodes => nodes.map(node => node.getAttribute('href')))).toEqual(paths.map(path => `/servers/1/${path}`))

@@ -11,6 +11,20 @@ from database.testing import temporary_database
 
 
 class MigrationTests(unittest.TestCase):
+    def test_starboard_upgrade_preserves_roadmap_data_and_all_seven_checksums(self):
+        for _,name,_,source in load()[:7]:(self.directory/name).write_text(source,encoding='utf-8')
+        apply(self.url,self.directory)
+        with connect(self.url) as c:
+            item=c.execute("INSERT INTO suggestions(guild_id,channel_id,author_id,answers_json,created_at,updated_at,category,tags_json) VALUES(1,10,20,'{}',1,1,'Preserved','[\"Snapshot\"]') RETURNING id").fetchone()['id']
+            c.execute('INSERT INTO suggestion_votes VALUES(%s,30,0,1,1)',(item,))
+            checksums=c.execute('SELECT version,name,checksum FROM schema_migrations ORDER BY version').fetchall()
+        self.assertEqual(apply(self.url)['applied'],[row[1] for row in load()[7:]])
+        with connect(self.url) as c:
+            self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version<=7 ORDER BY version').fetchall(),checksums)
+            self.assertEqual(c.execute('SELECT category FROM suggestions').fetchone()['category'],'Preserved')
+            self.assertEqual(c.execute('SELECT value FROM suggestion_votes').fetchone()['value'],0)
+            self.assertEqual(c.execute('SELECT count(*) AS n FROM starboards').fetchone()['n'],0)
+        self.assertEqual(apply(self.url),{'applied':[]})
     def test_suggestion_roadmap_upgrade_preserves_original_votes_and_unlimited_legacy_history(self):
         for _,name,_,source in load()[:6]:(self.directory/name).write_text(source,encoding='utf-8')
         apply(self.url,self.directory)
@@ -171,8 +185,9 @@ class MigrationTests(unittest.TestCase):
         from applications.repository import ApplicationRepository
         from appeals.repository import AppealRepository
         from scheduling.repository import ScheduleRepository
+        from starboard.repository import StarboardRepository
         repositories = (CommunityRepository, DashboardRepository, EngagementRepository, GuildSettingsRepository,
-            ModerationRepository, ReactionRoleRepository, SocialRepository, SuggestionRepository, TicketRepository, ApplicationRepository, AppealRepository, ScheduleRepository)
+            ModerationRepository, ReactionRoleRepository, SocialRepository, SuggestionRepository, TicketRepository, ApplicationRepository, AppealRepository, ScheduleRepository,StarboardRepository)
         for repository in repositories:
             with self.subTest(repository=repository.__name__), self.assertRaises(SchemaNotReady):
                 repository(self.url)
