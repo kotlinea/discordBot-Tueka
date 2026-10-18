@@ -92,7 +92,7 @@ class BackupJobTests(unittest.TestCase):
         self.assertEqual(self.backup.call_args.kwargs, {'resume_source': True})
         self.assertEqual(len(result['bundles']), 1)
         self.notify.assert_not_called()
-        self.assertFalse(self.config.with_name('backup.json.lock').exists())
+        self.assertTrue(self.config.with_name('backup.json.lock').exists())
 
     def test_stopped_source_is_not_started_or_read_for_credentials(self):
         self.running.return_value = set()
@@ -140,13 +140,64 @@ class BackupJobTests(unittest.TestCase):
         self.assertEqual(len(result['bundles']), 2)
         self.assertEqual([call.args[0] for call in self.backup.call_args_list], [self.directory, stage])
 
+    def lock_holder(self):
+        child = subprocess.Popen([sys.executable, '-u', '-c',
+            "import pathlib,sys; from deploy.backup_job import _job_lock; "
+            "lock=_job_lock(pathlib.Path(sys.argv[1])); "
+            "assert lock.__enter__(); print('locked',flush=True); sys.stdin.read()",
+            str(self.config)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        def cleanup():
+            if child.poll() is None:
+                child.kill()
+            child.communicate(timeout=10)
+        self.addCleanup(cleanup)
+        self.assertEqual(child.stdout.readline().strip(), 'locked')
+        return child
+
     def test_busy_job_does_not_overlap_or_remove_someone_elses_lock(self):
+        self.lock_holder()
         lock = self.config.with_name('backup.json.lock')
-        lock.write_text('another job')
+        inode = lock.stat().st_ino
         self.assertEqual(job.run(self.config), {'status': 'busy'})
-        self.assertEqual(lock.read_text(), 'another job')
+        self.assertEqual(lock.stat().st_ino, inode)
+        self.assertEqual(job.run(self.config), {'status': 'busy'})
         self.read_metadata.assert_not_called()
         self.backup.assert_not_called()
+
+    def test_killed_holder_releases_lock_and_next_job_backs_up(self):
+        child = self.lock_holder()
+        lock = self.config.with_name('backup.json.lock')
+        inode = lock.stat().st_ino
+        child.kill()
+        child.wait(timeout=10)
+        self.assertTrue(lock.exists())
+        self.assertEqual(job.run(self.config)['status'], 'backed-up')
+        self.assertEqual(lock.stat().st_ino, inode)
+        self.backup.assert_called_once()
+
+    def test_old_residual_file_does_not_skip_backup_or_failure_notification(self):
+        lock = self.config.with_name('backup.json.lock')
+        lock.write_text('old interrupted job')
+        self.assertEqual(job.run(self.config)['status'], 'backed-up')
+        self.options['smtp'] = self.smtp()
+        self.write()
+        self.backup.side_effect = RuntimeError('PRIVATE_DATABASE_URL')
+        with self.assertRaises(job.BackupJobError):
+            job.run(self.config)
+        self.assertEqual(self.notify.call_args.args[1], 'failed')
+        self.backup.side_effect = self.make_bundle
+        self.assertEqual(job.run(self.config)['status'], 'backed-up')
+
+    def test_interrupted_recovery_is_not_hidden_by_residual_job_lock(self):
+        self.config.with_name('backup.json.lock').write_text('interrupted job')
+        (self.directory / '.recovery.lock').write_text('recovery requires inspection')
+        self.options['smtp'] = self.smtp()
+        self.write()
+        with self.assertRaises(job.BackupConfigurationError):
+            job.run(self.config)
+        self.backup.assert_not_called()
+        self.notify.assert_called_once()
+        self.assertEqual(self.notify.call_args.args[1], 'failed')
 
     def test_invalid_inputs_never_invoke_backup_or_smtp(self):
         original = json.loads(json.dumps(self.options))
@@ -221,7 +272,7 @@ class BackupJobTests(unittest.TestCase):
             job.run(self.config)
         self.notify.assert_called_once()
         self.assertEqual(self.notify.call_args.args[1], 'failed')
-        self.assertFalse(self.config.with_name('backup.json.lock').exists())
+        self.assertTrue(self.config.with_name('backup.json.lock').exists())
 
     def test_success_notice_is_separate_opt_in_and_failure_keeps_backup(self):
         self.options['smtp'] = self.smtp()

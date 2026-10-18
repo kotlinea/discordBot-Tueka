@@ -124,17 +124,21 @@ def load_options(config_file):
 
 @contextmanager
 def _job_lock(config_file):
+    import fcntl
+
     path = config_file.with_name(config_file.name + '.lock')
+    descriptor = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    except FileExistsError:
-        yield False
-        return
-    try:
-        os.close(descriptor)
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
         yield True
     finally:
-        path.unlink()
+        # Keep the inode: unlinking lets another process lock a different file
+        # at the same path. Closing also releases the lock after SIGKILL/reboot.
+        os.close(descriptor)
 
 
 def _notify(options, outcome):
