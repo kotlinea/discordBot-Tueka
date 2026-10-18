@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTex
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.exceptions import HTTPException as StaticHTTPException
 
 from config import Settings
 from dashboard.repository import DashboardRepository
@@ -75,7 +76,22 @@ DOCS_DIST = Path(os.getenv("TUEKA_DOCS_DIST", str(BASE_DIR.parent / "docs" / ".v
 app.include_router(health_router(settings.database_url, (FRONTEND_DIST, DOCS_DIST), os.getenv('MONITORING_TOKEN'),
     **thresholds()))
 app.middleware('http')(observe_request)
-app.mount("/docs", StaticFiles(directory=DOCS_DIST, html=True, check_dir=False), name="documentation")
+class DocumentationFiles(StaticFiles):
+    """Serve VitePress clean URLs while preserving static-file path checks."""
+
+    async def get_response(self, path, scope):
+        try:
+            response = await super().get_response(path, scope)
+        except StaticHTTPException as error:
+            if error.status_code != 404 or Path(path).suffix:
+                raise
+        else:
+            if response.status_code != 404 or Path(path).suffix:
+                return response
+        return await super().get_response(path + '.html', scope)
+
+
+app.mount("/docs", DocumentationFiles(directory=DOCS_DIST, html=True, check_dir=False), name="documentation")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 app.include_router(create_api_router(settings.database_url, api, settings))
 
