@@ -74,11 +74,22 @@ class InsightsRepositoryTests(unittest.TestCase):
         self.now += 100
         self.assertFalse(self.repo.event(1, 'observer', 'joins', 'after-disconnect'))
         self.repo.heartbeat(1, 'observer', {30: 20})
+        self.assertFalse(self.repo.event(1, 'observer', 'messages', 'from-gap', channel=20, occurred_at=self.now - 1))
         self.assertEqual(self.today()['voice_seconds'], 0)
         self.assertEqual(self.today()['observed_seconds'], 20)
         self.now += 10
         self.repo.heartbeat(1, 'observer', {30: 20})
         self.assertEqual(self.today()['voice_seconds'], 10)
+
+    def test_delayed_messages_cannot_cross_collection_start_or_off_on_boundary(self):
+        self.assertFalse(self.repo.event(1, 'observer', 'messages', 'before-start', channel=20, occurred_at=self.now - 1))
+        self.now += 10
+        self.repo.settings.set_module(1, 'insights', enabled=False, settings=self.config)
+        self.now += 10
+        self.repo.settings.set_module(1, 'insights', enabled=True, settings=self.config)
+        self.assertFalse(self.repo.event(1, 'observer', 'messages', 'created-while-off', channel=20, occurred_at=self.now - 1))
+        self.assertTrue(self.repo.event(1, 'observer', 'messages', 'new-observation', channel=20, occurred_at=self.now))
+        self.assertEqual(self.today()['messages'], 1)
 
     def test_exclusive_observer_lease_and_restart_have_no_backfill(self):
         self.repo.heartbeat(1, 'observer', {30: 20})

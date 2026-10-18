@@ -36,8 +36,8 @@ class InsightsRepository:
             if old and old['last_seen'] > now:
                 raise ValueError('clock_reversed')
             c.execute('DELETE FROM insights_voice WHERE guild_id=%s', (guild,))
-            c.execute('INSERT INTO insights_observers(guild_id,owner,revision,last_seen) VALUES(%s,%s,%s,%s) ON CONFLICT(guild_id) DO UPDATE SET owner=excluded.owner,revision=excluded.revision,last_seen=excluded.last_seen',
-                      (guild, owner, module['revision'], now))
+            c.execute('INSERT INTO insights_observers(guild_id,owner,revision,last_seen,started_at) VALUES(%s,%s,%s,%s,%s) ON CONFLICT(guild_id) DO UPDATE SET owner=excluded.owner,revision=excluded.revision,last_seen=excluded.last_seen,started_at=excluded.started_at',
+                      (guild, owner, module['revision'], now, now))
             return True
 
     def _active(self, c, guild, owner, now):
@@ -53,8 +53,8 @@ class InsightsRepository:
         if row['revision'] != module['revision']:
             # OFF/ON and collection changes establish a new observation boundary.
             c.execute('DELETE FROM insights_voice WHERE guild_id=%s', (guild,))
-            c.execute('UPDATE insights_observers SET revision=%s,last_seen=%s WHERE guild_id=%s', (module['revision'], now, guild))
-            row = {**row, 'revision': module['revision'], 'last_seen': now}
+            c.execute('UPDATE insights_observers SET revision=%s,last_seen=%s,started_at=%s WHERE guild_id=%s', (module['revision'], now, now, guild))
+            row = {**row, 'revision': module['revision'], 'last_seen': now, 'started_at': now}
         return row, config
 
     @staticmethod
@@ -90,6 +90,8 @@ class InsightsRepository:
             row, config = self._active(c, guild, owner, now)
             if not row or now - row['last_seen'] > MAX_GAP:
                 return False
+            if happened < row['started_at']:
+                return False
             if kind == 'messages' and channel not in config['channel_ids']:
                 return False
             if kind != 'messages' and not config['track_members']:
@@ -113,6 +115,10 @@ class InsightsRepository:
             row, config = self._active(c, guild, owner, now)
             if not row:
                 return False
+            if now - row['last_seen'] > MAX_GAP:
+                c.execute('DELETE FROM insights_voice WHERE guild_id=%s', (guild,))
+                c.execute('UPDATE insights_observers SET started_at=%s WHERE guild_id=%s', (now, guild))
+                row = {**row, 'last_seen': now, 'started_at': now}
             for day, seconds in segments(row['last_seen'], now):
                 self._add(c, guild, config, day, now, observed_since=row['last_seen'], observed_seconds=seconds)
             self._add(c, guild, config, day_key(now), now)

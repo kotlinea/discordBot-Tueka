@@ -11,6 +11,19 @@ from database.testing import temporary_database
 
 
 class MigrationTests(unittest.TestCase):
+    def test_observation_boundary_upgrade_preserves_schema_ten_checksums(self):
+        for _, name, _, source in load()[:10]:
+            (self.directory / name).write_text(source, encoding='utf-8')
+        apply(self.url, self.directory)
+        with connect(self.url) as c:
+            c.execute("INSERT INTO insights_observers(guild_id,owner,revision,last_seen) VALUES(1,'legacy-observer',1,100)")
+            before = c.execute('SELECT version,name,checksum FROM schema_migrations ORDER BY version').fetchall()
+        self.assertEqual(apply(self.url)['applied'], [row[1] for row in load()[10:]])
+        with connect(self.url) as c:
+            self.assertEqual(c.execute('SELECT started_at FROM insights_observers').fetchone()['started_at'], 100)
+            self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version<=10 ORDER BY version').fetchall(), before)
+        self.assertEqual(apply(self.url), {'applied': []})
+
     def test_insights_upgrade_preserves_giveaway_and_all_nine_checksums(self):
         for _, name, _, source in load()[:9]:
             (self.directory / name).write_text(source, encoding='utf-8')

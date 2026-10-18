@@ -69,6 +69,10 @@ class InsightsCog(commands.Cog):
         self._ready = False
         self._release_all()
 
+    @commands.Cog.listener()
+    async def on_resumed(self):
+        await self.on_ready()
+
     @tasks.loop(seconds=30)
     async def collect(self):
         if not self._ready or not self.bot.is_ready():

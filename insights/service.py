@@ -32,7 +32,8 @@ class InsightsService:
         if type(joining) is not bool:
             raise ValueError('membership_action')
         action = 'join' if joining else 'leave'
-        return self.repository.event(guild, self.owner, 'joins' if joining else 'leaves', membership_key(action, user, joined_at))
+        values = {'occurred_at': joined_at // 1000000} if joining else {}
+        return self.repository.event(guild, self.owner, 'joins' if joining else 'leaves', membership_key(action, user, joined_at), **values)
 
     def voice(self, guild, user, before, after, *, bot=False):
         if bot is not False:

@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import discord
 from cogs.community.insights import InsightsCog
@@ -71,3 +71,10 @@ class InsightsDiscordTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.cog._ready)
         self.cog.service.release.assert_called_once_with(1)
         self.assertEqual(self.cog._claimed, set())
+
+    async def test_resumed_session_reestablishes_observation_without_waiting_for_ready_event(self):
+        await self.cog.on_disconnect()
+        self.cog.collect = AsyncMock()
+        await self.cog.on_resumed()
+        self.assertTrue(self.cog._ready)
+        self.cog.collect.assert_awaited_once()

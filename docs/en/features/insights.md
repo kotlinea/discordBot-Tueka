@@ -19,6 +19,6 @@ Collection starts with new events while the Bot is connected. Bots, webhooks, NS
 
 Select up to 90 days inside the retention window. **Not observed** differs from zero. Observed seconds measure continuous Bot observation; days with outages or downtime do not represent complete daily activity. Voice time measures connection duration rather than speech, summed across participants.
 
-Intervals spanning a restart, disconnect, disabled collection, or collection settings change are not filled in. Observation gaps longer than 90 seconds are excluded. Membership events without a known join timestamp and messages arriving more than 90 seconds late are excluded. Historical messages are not fetched.
+Intervals spanning a restart, disconnect, disabled collection, or collection settings change are not filled in. Observation gaps longer than 90 seconds are excluded. Membership events without a known join timestamp, messages or join notifications more than 90 seconds late, and delayed messages created before collection or during an observation gap are excluded. Historical messages are not fetched.
 
 Retained reports remain readable with collection OFF. A daily record expires the configured number of days after its UTC day begins; later updates do not extend that expiry. Shortening retention removes older aggregates during maintenance. Deduplication identifiers last at most one day, and voice participant IDs last only during observation before expiry cleanup. Cleanup also runs while collection is OFF. Increasing retention cannot restore deleted data.
