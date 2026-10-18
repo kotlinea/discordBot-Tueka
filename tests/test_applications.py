@@ -32,6 +32,50 @@ class ApplicationsTests(unittest.TestCase):
         args.update(changes)
         return self.repo.submit(1,self.form['id'],author,interaction,{'why':'A generated test answer'},**args)
 
+    def command_status(self, *, guild=1, author=10, withdraw_id=None):
+        import asyncio
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+        from cogs.community.applications import ApplicationsCog
+        interaction = SimpleNamespace(guild=SimpleNamespace(id=guild), user=SimpleNamespace(id=author),
+            response=SimpleNamespace(defer=AsyncMock()), followup=SimpleNamespace(send=AsyncMock()))
+        asyncio.run(ApplicationsCog.status.callback(SimpleNamespace(repository=self.repo), interaction, withdraw_id))
+        return interaction.followup.send.call_args
+
+    def test_withdraw_by_id_reaches_pending_and_reviewing_beyond_latest_ten(self):
+        oldest = self.submit()
+        created = [oldest]
+        for index in range(11):
+            form = self.repo.save_form(1, 900, definition(title=f'Form {index}'))
+            created.append(self.repo.submit(1, form['id'], 10, 101 + index, {'why': 'Generated'},
+                revision=1, roles=[], created_at=1, joined_at=1))
+        self.repo.transition(1, created[1]['id'], 900, 'reviewing', 'Generated review', revision=1)
+        self.assertTrue(all(item['id'] not in {r['id'] for r in self.repo.items(1, author=10, limit=10)} for item in created[:2]))
+        listing = self.command_status()
+        self.assertEqual(len(listing.args[0].splitlines()), 10)
+        self.assertTrue(listing.kwargs['ephemeral'])
+        for item in created[:2]:
+            with self.subTest(item_id=item['id']):
+                reply = self.command_status(withdraw_id=item['id'])
+                self.assertEqual(reply.args[0], '申請を取り下げました。')
+                self.assertTrue(reply.kwargs['ephemeral'])
+                self.assertEqual(self.repo.item(1, item['id'], author=10)['status'], 'withdrawn')
+                self.assertEqual(self.repo.events(1, item['id'])[0]['actor_id'], 10)
+
+    def test_withdraw_command_rejects_foreign_owner_guild_missing_and_expired(self):
+        item = self.submit()
+        for guild, author, item_id in ((1, 11, item['id']), (2, 10, item['id']), (1, 10, item['id'] + 1)):
+            with self.subTest(guild=guild, author=author, item_id=item_id):
+                reply = self.command_status(guild=guild, author=author, withdraw_id=item_id)
+                self.assertEqual(reply.args[0], '取り下げられる申請が見つかりません。')
+                self.assertTrue(reply.kwargs['ephemeral'])
+        with transaction(self.url) as c:
+            c.execute('UPDATE applications SET expires_at=0 WHERE id=%s', (item['id'],))
+        self.assertEqual(self.command_status(withdraw_id=item['id']).args[0], '取り下げられる申請が見つかりません。')
+        with transaction(self.url) as c:
+            self.assertEqual(c.execute('SELECT status FROM applications WHERE id=%s', (item['id'],)).fetchone()['status'], 'pending')
+            self.assertEqual(c.execute('SELECT COUNT(*) AS n FROM application_events WHERE application_id=%s', (item['id'],)).fetchone()['n'], 1)
+
     def test_submission_replay_snapshot_and_open_limit(self):
         item=self.submit()
         self.assertEqual(self.submit()['id'],item['id'])

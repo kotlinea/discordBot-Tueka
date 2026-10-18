@@ -34,6 +34,7 @@ def suggestion_embed(item: dict[str, Any], settings: dict[str, Any]) -> discord.
             continue
         label = fields_by_key.get(key, {}).get("label", key)
         embed.add_field(name=str(label)[:256], value=str(value)[:1024], inline=False)
+    answer_count = len(embed.fields)
     if settings.get("show_author", True):
         embed.set_author(name=f"投稿者: {item['author_id']}")
     if item.get('review_reason'):
@@ -52,6 +53,16 @@ def suggestion_embed(item: dict[str, Any], settings: dict[str, Any]) -> discord.
         embed.add_field(name='Discussion', value=f"https://discord.com/channels/{item['guild_id']}/{item['discussion_thread_id']}", inline=False)
     reviewer = f" · 担当 <@{item['reviewer_id']}>" if item.get("reviewer_id") else ""
     embed.set_footer(text=f"賛成 {item.get('upvotes', 0)} · 反対 {item.get('downvotes', 0)}{reviewer} · Tueka suggestion:{item['id']}:{item['created_at']}")
+    # Reserve all review metadata and receipt markers; shorten answer previews
+    # only after the complete card (including author/footer/links) is counted.
+    for index in reversed(range(answer_count)):
+        excess = len(embed) - 6000
+        if excess <= 0:
+            break
+        field = embed.fields[index]
+        limit = max(1, len(field.value) - excess)
+        if limit < len(field.value):
+            embed.set_field_at(index, name=field.name, value=field.value[:limit - 1] + '…', inline=field.inline)
     return embed
 
 

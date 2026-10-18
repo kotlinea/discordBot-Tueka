@@ -104,9 +104,8 @@ class ApplicationsCog(commands.Cog):
         if not interaction.guild:
             return
         await interaction.response.defer(ephemeral=True,thinking=True)
-        items=self.repository.items(interaction.guild.id,author=interaction.user.id,limit=10)
         if withdraw_id is not None:
-            item=next((i for i in items if i['id']==withdraw_id),None)
+            item=self.repository.item(interaction.guild.id,withdraw_id,author=interaction.user.id)
             if not item:
                 await interaction.followup.send('取り下げられる申請が見つかりません。',ephemeral=True)
                 return
@@ -117,6 +116,7 @@ class ApplicationsCog(commands.Cog):
                 return
             await interaction.followup.send('申請を取り下げました。',ephemeral=True)
             return
+        items=self.repository.items(interaction.guild.id,author=interaction.user.id,limit=10)
         labels={'pending':'受付済み','reviewing':'審査中','approved':'承認','rejected':'却下','withdrawn':'取り下げ済み'}
         text='\n'.join(f"#{i['id']} {i['snapshot']['title']} — {labels[i['status']]}" for i in items) or '保存期限内の申請はありません。'
         await interaction.followup.send(text[:1900],ephemeral=True,allowed_mentions=discord.AllowedMentions.none())
