@@ -9,6 +9,7 @@ from .roll import FEATURE as ROLL
 from .gemini import FEATURE as GEMINI
 from .scheduled_messages import FEATURE as SCHEDULED_MESSAGES
 from .starboard import FEATURE as STARBOARD
+from .giveaways import FEATURE as GIVEAWAYS
 
 CATEGORY = Category('engagement', 'nav.engagement', (
     ADVANCED_POLLS,
@@ -20,4 +21,5 @@ CATEGORY = Category('engagement', 'nav.engagement', (
     GEMINI,
     SCHEDULED_MESSAGES,
     STARBOARD,
+    GIVEAWAYS,
 ))

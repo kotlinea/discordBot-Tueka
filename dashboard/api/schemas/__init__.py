@@ -10,3 +10,4 @@ from .applications import *
 from .appeals import *
 from .scheduling import *
 from .starboard import *
+from .giveaways import *

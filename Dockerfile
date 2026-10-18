@@ -41,6 +41,7 @@ COPY docs docs
 COPY engagement engagement
 COPY features features
 COPY guild_settings guild_settings
+COPY giveaways giveaways
 COPY jobs jobs
 COPY migrations migrations
 COPY moderation moderation

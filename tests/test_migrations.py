@@ -11,6 +11,20 @@ from database.testing import temporary_database
 
 
 class MigrationTests(unittest.TestCase):
+    def test_giveaway_upgrade_preserves_starboard_and_eight_checksums(self):
+        for _, name, _, source in load()[:8]:
+            (self.directory / name).write_text(source, encoding='utf-8')
+        apply(self.url, self.directory)
+        with connect(self.url) as c:
+            c.execute("INSERT INTO starboards(guild_id,actor_id,request_key,config_json,created_at,updated_at) VALUES(1,20,'preserved','{}',1,1)")
+            before = c.execute('SELECT version,name,checksum FROM schema_migrations ORDER BY version').fetchall()
+        self.assertEqual(apply(self.url)['applied'], [row[1] for row in load()[8:]])
+        with connect(self.url) as c:
+            self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version<=8 ORDER BY version').fetchall(), before)
+            self.assertEqual(c.execute('SELECT request_key FROM starboards').fetchone()['request_key'], 'preserved')
+            self.assertEqual(c.execute('SELECT count(*) AS n FROM giveaways').fetchone()['n'], 0)
+        self.assertEqual(apply(self.url), {'applied': []})
+
     def test_starboard_upgrade_preserves_roadmap_data_and_all_seven_checksums(self):
         for _,name,_,source in load()[:7]:(self.directory/name).write_text(source,encoding='utf-8')
         apply(self.url,self.directory)
@@ -186,8 +200,9 @@ class MigrationTests(unittest.TestCase):
         from appeals.repository import AppealRepository
         from scheduling.repository import ScheduleRepository
         from starboard.repository import StarboardRepository
+        from giveaways.repository import GiveawayRepository
         repositories = (CommunityRepository, DashboardRepository, EngagementRepository, GuildSettingsRepository,
-            ModerationRepository, ReactionRoleRepository, SocialRepository, SuggestionRepository, TicketRepository, ApplicationRepository, AppealRepository, ScheduleRepository,StarboardRepository)
+            ModerationRepository, ReactionRoleRepository, SocialRepository, SuggestionRepository, TicketRepository, ApplicationRepository, AppealRepository, ScheduleRepository,StarboardRepository,GiveawayRepository)
         for repository in repositories:
             with self.subTest(repository=repository.__name__), self.assertRaises(SchemaNotReady):
                 repository(self.url)

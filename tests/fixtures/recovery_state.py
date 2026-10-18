@@ -20,6 +20,8 @@ from scheduling.repository import ScheduleRepository
 from scheduling.delivery import ScheduleDeliveryService
 from starboard.repository import StarboardRepository
 from starboard.delivery import HighlightDelivery
+from giveaways.repository import GiveawayRepository
+from giveaways.service import GiveawayService
 
 
 async def seed():
@@ -72,6 +74,32 @@ async def seed():
     highlights.enqueue_refresh(1,10,778)
     with transaction(settings.database_url) as c:
         c.execute('UPDATE starboard_outbox SET lease_until=0,available_at=0 WHERE id=%s',(uncertain.id,))
+    guilds.set_module(1, 'giveaways', enabled=True)
+    campaigns = GiveawayRepository(settings.database_url)
+    registration = campaigns.create(1, 5, {'title': 'Restored uncertain campaign', 'channel_id': 2, 'ends_at': instant + 3600}, 'recovery-uncertain')
+    registration = campaigns.launch(1, registration['id'], 5, registration['revision'])
+    unknown = campaigns.jobs.claim('crashed-campaign-publication')
+    assert campaigns.publication_begin(unknown.payload) == 'send'
+    completed = campaigns.create(1, 5, {'title': 'Restored draw history', 'channel_id': 2, 'ends_at': instant + 3600}, 'recovery-draw')
+    completed = campaigns.launch(1, completed['id'], 5, completed['revision'])
+    receipt = campaigns.jobs.claim('known-campaign-publication')
+    assert receipt.payload['campaign_id'] == completed['id']
+    campaigns.publication_begin(receipt.payload)
+    campaigns.publication_receipt(receipt.payload, 888)
+    assert campaigns.jobs.finish(receipt, Outcome())
+    for user in (30, 31):
+        campaigns.enter(1, completed['id'], user, 888, 987660000 + user, join=True)
+    completed = campaigns.item(1, completed['id'])
+    campaigns.close(1, completed['id'], 5, completed['revision'], 'Recovery early close')
+    draw = campaigns.draw_jobs.claim('crashed-draw-commit')
+    plan = campaigns.draw_plan(draw.payload)
+    import random
+    campaigns.complete_draw(draw.payload, plan['campaign']['revision'], [30, 31], rng=random.Random(1))
+    completed = campaigns.item(1, completed['id'])
+    campaigns.reroll(1, completed['id'], 5, completed['revision'], 'Recovery reroll')
+    with transaction(settings.database_url) as c:
+        c.execute('UPDATE giveaway_outbox SET lease_until=0,available_at=0 WHERE id=%s', (unknown.id,))
+        c.execute('UPDATE giveaway_draw_jobs SET lease_until=0,available_at=0 WHERE id=%s', (draw.id,))
     suggestions = SuggestionRepository(settings.database_url)
     delivered = suggestions.create(1, 2, 3, {'idea': 'already delivered'})
     claim = suggestions.outbox_jobs.claim('before-snapshot')
@@ -173,6 +201,31 @@ async def resume():
     source_job=highlights.refresh_jobs.claim('restored-highlight-source')
     assert source_job.payload['channel_id']==10 and source_job.payload['message_id']==778
     assert highlights.refresh_jobs.finish(source_job,Outcome())
+
+    campaigns = GiveawayRepository(settings.database_url)
+    class ExistingCampaignReceipts:
+        reconciled = 0
+        edited = []
+        async def member(self, guild, user):
+            return {'id': user, 'guild_id': guild, 'bot': False, 'role_ids': [], 'created_at': 1, 'joined_at': 1}
+        async def reconcile(self, guild, channel, marker):
+            assert guild == 1 and channel == 2 and marker.startswith('Tueka campaign:')
+            self.reconciled += 1
+            return 777
+        async def send(self, *_):
+            raise AssertionError('Restored campaign must not be blindly republished')
+        async def edit(self, plan, receipt, marker):
+            self.edited.append(receipt)
+    campaign_port = ExistingCampaignReceipts()
+    campaign_service = GiveawayService(campaigns, campaign_port)
+    assert await run_batch(campaigns.draw_jobs, 'restored-campaign-draw', campaign_service.draw) == 2
+    assert await run_batch(campaigns.draw_jobs, 'restored-campaign-draw', campaign_service.draw) == 0
+    restored_campaign = next(row for row in campaigns.items(1) if row['config']['title'] == 'Restored draw history')
+    draws = campaigns.history(1, restored_campaign['id'])['draws']
+    assert [json.loads(row['winners_json']) for row in draws] == [[30], [31]]
+    assert await run_batch(campaigns.jobs, 'restored-campaign-publication', campaign_service.publish) == 2
+    assert await run_batch(campaigns.jobs, 'restored-campaign-publication', campaign_service.publish) == 0
+    assert campaign_port.reconciled == 1 and sorted(campaign_port.edited) == [777, 888]
 
     class ExistingRemoteReceipt:
         calls = 0

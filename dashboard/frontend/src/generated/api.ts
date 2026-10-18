@@ -15,6 +15,13 @@ export type ErrorDetail = { "code": string; "message": string; "errors"?: Array<
 export type ErrorField = { "path": string; "message": string }
 export type ErrorResponse = { "detail": ErrorDetail }
 export type Feature = { "maturity"?: "stable" | "improving" | "unavailable"; "id": string; "category": string; "parent": (string | null); "docs_path": string; "title": string; "description": string; "fields": Array<string>; "required_fields": Array<string>; "required_bot_permissions": Array<string>; "enabled": boolean; "settings": Record<string, unknown>; "revision": number; "missing_permissions": Array<string> }
+export type GiveawayConfig = { "kind"?: "giveaway" | "event"; "title": string; "description"?: string; "channel_id": string; "ends_at": number; "winner_count"?: number; "capacity"?: number; "required_role_ids"?: Array<string>; "denied_role_ids"?: Array<string>; "min_account_days"?: number; "min_member_days"?: number; "retention_days"?: number }
+export type GiveawayDraw = { "id": number; "campaign_id": number; "round_number": number; "actor_id": string; "reason": string; "candidates": Array<string>; "winners": Array<string>; "excluded_count": number; "candidate_hash": string; "created_at": number }
+export type GiveawayEntry = { "campaign_id": number; "user_id": string; "active": boolean; "joined_at": number; "updated_at": number }
+export type GiveawayEvent = { "id": number; "campaign_id": number; "actor_id": string; "event_type": string; "detail": Record<string, unknown>; "created_at": number }
+export type GiveawayHistory = { "events": Array<GiveawayEvent>; "draws": Array<GiveawayDraw>; "entries": Array<GiveawayEntry>; "delivery": Array<GiveawayJob>; "draw_jobs": Array<GiveawayJob> }
+export type GiveawayItem = { "id": number; "guild_id": string; "actor_id": string; "config": GiveawayConfig; "status": "draft" | "open" | "closing" | "closed" | "cancelled"; "revision": number; "message_id": (string | null); "delivery_started": boolean; "round_number": number; "ends_at": number; "created_at": number; "updated_at": number; "expires_at": number }
+export type GiveawayJob = { "id": number; "status": string; "attempts": number; "last_error": (string | null); "round_number"?: (number | null) }
 export type Guild = { "id": string; "name": string; "icon": (string | null); "access"?: ("admin" | "ticket_staff") }
 export type GuildOverview = { "guild_id": string; "features": Array<Feature>; "resources": Resources; "moderation": ModerationOverview }
 export type HighlightEntry = { "id": number; "board_id": number; "guild_id": string; "source_channel_id": string; "source_message_id": string; "snapshot": HighlightSource; "score": number; "desired": boolean; "revision": number; "created_at": number; "updated_at": number; "expires_at": number }
@@ -30,6 +37,7 @@ export type Items_ApplicationEvent_ = { "items": Array<ApplicationEvent>; "next"
 export type Items_ApplicationForm_ = { "items": Array<ApplicationForm>; "next"?: (number | null) }
 export type Items_ApplicationItem_ = { "items": Array<ApplicationItem>; "next"?: (number | null) }
 export type Items_Feature_ = { "items": Array<Feature>; "next"?: (number | null) }
+export type Items_GiveawayItem_ = { "items": Array<GiveawayItem>; "next"?: (number | null) }
 export type Items_Guild_ = { "items": Array<Guild>; "next"?: (number | null) }
 export type Items_HighlightEntry_ = { "items": Array<HighlightEntry>; "next"?: (number | null) }
 export type Items_ModerationEvent_ = { "items": Array<ModerationEvent>; "next"?: (number | null) }
@@ -285,6 +293,102 @@ export const constraints = {
     "settings": {},
     "title": {}
   },
+  "GiveawayConfig": {
+    "capacity": {
+      "maximum": 1000.0,
+      "minimum": 1.0
+    },
+    "channel_id": {},
+    "denied_role_ids": {
+      "maxItems": 25
+    },
+    "description": {
+      "maxLength": 2000
+    },
+    "ends_at": {
+      "minimum": 1.0
+    },
+    "kind": {},
+    "min_account_days": {
+      "maximum": 3650.0,
+      "minimum": 0.0
+    },
+    "min_member_days": {
+      "maximum": 3650.0,
+      "minimum": 0.0
+    },
+    "required_role_ids": {
+      "maxItems": 25
+    },
+    "retention_days": {
+      "maximum": 365.0,
+      "minimum": 1.0
+    },
+    "title": {
+      "maxLength": 120,
+      "minLength": 1
+    },
+    "winner_count": {
+      "maximum": 20.0,
+      "minimum": 0.0
+    }
+  },
+  "GiveawayDraw": {
+    "actor_id": {},
+    "campaign_id": {},
+    "candidate_hash": {},
+    "candidates": {},
+    "created_at": {},
+    "excluded_count": {},
+    "id": {},
+    "reason": {},
+    "round_number": {},
+    "winners": {}
+  },
+  "GiveawayEntry": {
+    "active": {},
+    "campaign_id": {},
+    "joined_at": {},
+    "updated_at": {},
+    "user_id": {}
+  },
+  "GiveawayEvent": {
+    "actor_id": {},
+    "campaign_id": {},
+    "created_at": {},
+    "detail": {},
+    "event_type": {},
+    "id": {}
+  },
+  "GiveawayHistory": {
+    "delivery": {},
+    "draw_jobs": {},
+    "draws": {},
+    "entries": {},
+    "events": {}
+  },
+  "GiveawayItem": {
+    "actor_id": {},
+    "config": {},
+    "created_at": {},
+    "delivery_started": {},
+    "ends_at": {},
+    "expires_at": {},
+    "guild_id": {},
+    "id": {},
+    "message_id": {},
+    "revision": {},
+    "round_number": {},
+    "status": {},
+    "updated_at": {}
+  },
+  "GiveawayJob": {
+    "attempts": {},
+    "id": {},
+    "last_error": {},
+    "round_number": {},
+    "status": {}
+  },
   "Guild": {
     "access": {},
     "icon": {},
@@ -386,6 +490,10 @@ export const constraints = {
     "next": {}
   },
   "Items_Feature_": {
+    "items": {},
+    "next": {}
+  },
+  "Items_GiveawayItem_": {
     "items": {},
     "next": {}
   },
@@ -1269,6 +1377,16 @@ export interface Operations {
   "GET /api/v1/guilds/{guild_id}/applications/items/{item_id}/events": { response: Items_ApplicationEvent_; body: never }
   "POST /api/v1/guilds/{guild_id}/applications/items/{item_id}/review": { response: ApplicationItem; body: { "status": "reviewing" | "approved" | "rejected"; "reason": string; "revision": number } }
   "GET /api/v1/guilds/{guild_id}/features": { response: Items_Feature_; body: never }
+  "GET /api/v1/guilds/{guild_id}/giveaways": { response: Items_GiveawayItem_; body: never }
+  "POST /api/v1/guilds/{guild_id}/giveaways": { response: GiveawayItem; body: { "config": { "kind"?: "giveaway" | "event"; "title": string; "description"?: string; "channel_id": string; "ends_at": number; "winner_count"?: number; "capacity"?: number; "required_role_ids"?: Array<string>; "denied_role_ids"?: Array<string>; "min_account_days"?: number; "min_member_days"?: number; "retention_days"?: number }; "request_key": string } }
+  "GET /api/v1/guilds/{guild_id}/giveaways/{item_id}": { response: GiveawayItem; body: never }
+  "PUT /api/v1/guilds/{guild_id}/giveaways/{item_id}": { response: GiveawayItem; body: { "config": { "kind"?: "giveaway" | "event"; "title": string; "description"?: string; "channel_id": string; "ends_at": number; "winner_count"?: number; "capacity"?: number; "required_role_ids"?: Array<string>; "denied_role_ids"?: Array<string>; "min_account_days"?: number; "min_member_days"?: number; "retention_days"?: number }; "revision": number } }
+  "POST /api/v1/guilds/{guild_id}/giveaways/{item_id}/cancel": { response: GiveawayItem; body: { "revision": number; "reason": string } }
+  "POST /api/v1/guilds/{guild_id}/giveaways/{item_id}/close": { response: GiveawayItem; body: { "revision": number; "reason": string } }
+  "GET /api/v1/guilds/{guild_id}/giveaways/{item_id}/history": { response: GiveawayHistory; body: never }
+  "POST /api/v1/guilds/{guild_id}/giveaways/{item_id}/jobs/{job_id}/retry": { response: GiveawayHistory; body: { "revision": number } }
+  "POST /api/v1/guilds/{guild_id}/giveaways/{item_id}/launch": { response: GiveawayItem; body: { "revision": number } }
+  "POST /api/v1/guilds/{guild_id}/giveaways/{item_id}/reroll": { response: GiveawayItem; body: { "revision": number; "reason": string } }
   "POST /api/v1/guilds/{guild_id}/moderation/actions": { response: ActionResponse; body: { "action"?: string; "target_user_id"?: (string | number | null); "channel_id"?: (string | number | null); "reason"?: string; "confirmed"?: boolean; "confirmation"?: string; "duration_minutes"?: number; "count"?: number } }
   "GET /api/v1/guilds/{guild_id}/moderation/events": { response: Items_ModerationEvent_; body: never }
   "GET /api/v1/guilds/{guild_id}/moderation/infractions/{user_id}": { response: InfractionsResponse; body: never }

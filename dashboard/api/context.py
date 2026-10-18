@@ -12,6 +12,7 @@ from applications.repository import ApplicationRepository
 from appeals.repository import AppealRepository
 from scheduling.repository import ScheduleRepository
 from starboard.repository import StarboardRepository
+from giveaways.repository import GiveawayRepository
 from dataclasses import dataclass, field
 from features.defaults import SettingsAccess
 
@@ -33,6 +34,7 @@ class ApiContext:
     appeal_repository: AppealRepository
     schedule_repository: ScheduleRepository
     starboard_repository: StarboardRepository
+    giveaway_repository: GiveawayRepository
     feature_settings: dict[str, SettingsAccess] = field(default_factory=dict)
 
 def create_context(database_url: str, discord: Any, settings: Any | None=None) -> ApiContext:
@@ -46,7 +48,7 @@ def create_context(database_url: str, discord: Any, settings: Any | None=None) -
     reaction_role_repository = ReactionRoleRepository(settings.database_url) if settings is not None else None
     reaction_role_service = ReactionRoleService(reaction_role_repository, max_mappings=settings.reaction_role_max_mappings_per_message) if reaction_role_repository and settings else None
     suggestion_repository = SuggestionRepository(database_url)
-    context = ApiContext(discord=discord, settings=settings, social_repository=social_repository, moderation_repository=moderation_repository, dashboard_repository=dashboard_repository, guild_settings_repository=guild_settings_repository, ticket_repository=ticket_repository, ticket_transcripts=ticket_transcripts, ticket_service=ticket_service, reaction_role_repository=reaction_role_repository, reaction_role_service=reaction_role_service, suggestion_repository=suggestion_repository, application_repository=ApplicationRepository(database_url), appeal_repository=AppealRepository(database_url), schedule_repository=ScheduleRepository(database_url), starboard_repository=StarboardRepository(database_url))
+    context = ApiContext(discord=discord, settings=settings, social_repository=social_repository, moderation_repository=moderation_repository, dashboard_repository=dashboard_repository, guild_settings_repository=guild_settings_repository, ticket_repository=ticket_repository, ticket_transcripts=ticket_transcripts, ticket_service=ticket_service, reaction_role_repository=reaction_role_repository, reaction_role_service=reaction_role_service, suggestion_repository=suggestion_repository, application_repository=ApplicationRepository(database_url), appeal_repository=AppealRepository(database_url), schedule_repository=ScheduleRepository(database_url), starboard_repository=StarboardRepository(database_url), giveaway_repository=GiveawayRepository(database_url))
 
     from .settings import create_settings_access
     context.feature_settings.update(create_settings_access(context))
