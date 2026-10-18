@@ -102,6 +102,42 @@ class BackupJobTests(unittest.TestCase):
         self.notify.assert_not_called()
         self.assertFalse((self.root / 'backups').exists())
 
+    def test_stopped_recovery_holds_fail_before_skip_and_notify_when_enabled(self):
+        self.running.return_value = set()
+        for marker in ('.recovery.lock', 'recovery-pending.json', 'recovery-fence.json'):
+            for smtp_enabled in (False, True):
+                with self.subTest(marker=marker, smtp_enabled=smtp_enabled):
+                    self.options['smtp'] = self.smtp() if smtp_enabled else {'enabled': False}
+                    self.write()
+                    hold = self.directory / marker
+                    hold.write_text('preserve recovery state')
+                    self.notify.reset_mock()
+                    with self.assertRaises(job.BackupConfigurationError):
+                        job.run(self.config)
+                    self.assertEqual(hold.read_text(), 'preserve recovery state')
+                    self.assertEqual(self.notify.call_count, int(smtp_enabled))
+                    if smtp_enabled:
+                        self.assertEqual(self.notify.call_args.args[1], 'failed')
+                    hold.unlink()
+        self.read.assert_not_called()
+        self.backup.assert_not_called()
+        self.assertFalse((self.root / 'backups').exists())
+
+    def test_stopped_held_environment_prevents_backup_of_other_active_environment(self):
+        held = self.root / 'envs/stage'
+        held.mkdir()
+        (held / 'recovery-pending.json').write_text('{}')
+        self.options['environments'].append({'config_dir': 'envs/stage', 'backup_root': 'backups/stage'})
+        self.options['smtp'] = self.smtp()
+        self.write()
+        self.read_metadata.side_effect = lambda directory: {'environment': directory.name, 'project': 'tueka-' + directory.name + '-test'}
+        self.running.side_effect = lambda directory: set(APPLICATIONS) if directory == self.directory else set()
+        with self.assertRaises(job.BackupConfigurationError):
+            job.run(self.config)
+        self.backup.assert_not_called()
+        self.notify.assert_called_once()
+        self.assertEqual(self.notify.call_args.args[1], 'failed')
+
     def test_partial_source_hold_and_low_space_fail_before_backup(self):
         self.running.return_value = {'bot'}
         with self.assertRaises(job.BackupConfigurationError):

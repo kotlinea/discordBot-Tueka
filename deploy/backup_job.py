@@ -212,10 +212,10 @@ def _active_environments(environments, minimum_free_gib):
             raise BackupConfigurationError('Backup requires distinct immutable Stage/Prod projects')
         projects.add(metadata['project'])
         services = running(directory)
-        if not services:
-            continue
         if any((directory / marker).exists() for marker in ('.recovery.lock', 'recovery-pending.json', 'recovery-fence.json')):
             raise BackupConfigurationError('Backup refused an active deployment/recovery operation')
+        if not services:
+            continue
         _, values = read(directory)
         if services != set(APPLICATIONS):
             raise BackupConfigurationError('Backup refused a partially running environment')
