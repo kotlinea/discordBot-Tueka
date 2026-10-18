@@ -151,6 +151,52 @@ class AppealTests(unittest.TestCase):
         self.assertEqual(detail['delivery'][0]['delivery_started'],1)
         self.assertEqual(detail['events'][0]['event_type'],'delivery_retry')
 
+    def test_disabled_outbox_pauses_pending_retry_and_expired_lease_without_mutation(self):
+        import asyncio
+        from types import SimpleNamespace
+        for state, attempts, started in (('pending', 0, 0), ('retry', 7, 0), ('processing', 7, 1), ('processing', 8, 1)):
+            with self.subTest(state=state, attempts=attempts):
+                item = self.repo.open(1, 10, 100 + attempts + started, 'Generated mail')
+                self.repo.reply(1, item['id'], 91, 'Generated reply', revision=1, staff=True)
+                with transaction(self.url) as c:
+                    c.execute("UPDATE appeal_outbox SET status=%s,attempts=%s,delivery_started=%s,available_at=0,lease_until=0 WHERE thread_id=%s",
+                              (state, attempts, started, item['id']))
+                    before = dict(c.execute('SELECT * FROM appeal_outbox WHERE thread_id=%s', (item['id'],)).fetchone())
+                self.settings.set_module(1, 'appeals', enabled=False)
+                restarted = AppealRepository(self.url)
+                for _ in range(10):
+                    self.assertIsNone(restarted.jobs.claim('paused-worker'))
+                with transaction(self.url) as c:
+                    self.assertEqual(dict(c.execute('SELECT * FROM appeal_outbox WHERE thread_id=%s', (item['id'],)).fetchone()), before)
+                self.settings.set_module(1, 'appeals', enabled=True)
+                claim = restarted.jobs.claim('resumed-worker')
+                if attempts < 8:
+                    self.assertIsNotNone(claim)
+                    self.assertEqual(claim.payload['delivery_started'], started)
+                    self.assertEqual(restarted.delivery(claim.payload)['body'], 'Generated reply')
+                    port = SimpleNamespace(notify=AsyncMock(return_value=123))
+                    outcome = asyncio.run(AppealDeliveryService(restarted, port).deliver(claim.payload))
+                    self.assertIsNone(outcome.error)
+                    self.assertEqual(port.notify.call_args.kwargs['recover'], bool(started))
+                    self.assertTrue(restarted.jobs.finish(claim, outcome))
+                    self.assertEqual(self.repo.conversation(1, item['id'])['delivery'][0]['discord_message_id'], 123)
+                else:
+                    self.assertIsNone(claim)
+                    self.assertEqual(self.repo.conversation(1, item['id'])['delivery'][0]['status'], 'failed')
+                with transaction(self.url) as c:
+                    c.execute('DELETE FROM appeal_threads WHERE id=%s', (item['id'],))
+
+    def test_disabled_low_id_guild_does_not_starve_enabled_outbox(self):
+        item = self.open()
+        self.repo.reply(1, item['id'], 91, 'Paused reply', revision=1, staff=True)
+        self.settings.set_module(2, 'appeals', enabled=True, settings={'retention_days': 1})
+        other = self.repo.open(2, 20, 200, 'Generated mail')
+        self.repo.reply(2, other['id'], 91, 'Enabled reply', revision=1, staff=True)
+        self.settings.set_module(1, 'appeals', enabled=False)
+        claim = self.repo.jobs.claim('worker')
+        self.assertEqual(claim.payload['thread_id'], other['id'])
+        self.assertEqual(self.repo.conversation(1, item['id'])['delivery'][0]['attempts'], 0)
+
 
 class AppealDeliveryTests(unittest.IsolatedAsyncioTestCase):
     async def test_uncertain_receipt_reconciles_and_logs_no_body(self):

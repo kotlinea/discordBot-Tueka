@@ -7,12 +7,18 @@ from jobs.catalog import QUEUE_SPECS
 from .service import text, review
 
 
+class AppealQueue(QueueRepository):
+    def _claim_scope(self):
+        return (' AND EXISTS(SELECT 1 FROM appeal_threads t JOIN guild_modules g ON g.guild_id=t.guild_id'
+                ' WHERE t.id=appeal_outbox.thread_id AND g.module_id=%s AND g.enabled=1)', ('appeals',))
+
+
 class AppealRepository:
     def __init__(self, url):
         self.database_url = url
         require_current(url)
         self.settings = GuildSettingsRepository(url)
-        self.jobs = QueueRepository(url, QUEUE_SPECS['appeal_outbox'])
+        self.jobs = AppealQueue(url, QUEUE_SPECS['appeal_outbox'])
 
     def _enabled(self, c, guild):
         lock_resource(c, 'guild-module', f'{guild}:appeals')

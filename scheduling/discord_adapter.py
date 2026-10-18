@@ -26,8 +26,13 @@ class DiscordScheduleAdapter:
                     raise DiscordFailure('event_deadline_passed')
                 if not guild.me.guild_permissions.manage_events:
                     raise DiscordFailure('manage_events_required')
+                # Discord allows 1000 characters including the receipt suffix.
+                budget = 1000 - len(marker) - 1
+                body = payload['body']
+                if len(body) > budget:
+                    body = body[:budget - 1] + '…'
                 event = await guild.create_scheduled_event(
-                    name=payload['title'], description=payload['body']+'\n'+marker,
+                    name=payload['title'], description=body+'\n'+marker,
                     start_time=datetime.fromtimestamp(payload['event_start'],timezone.utc),
                     end_time=datetime.fromtimestamp(payload['event_end'],timezone.utc),
                     entity_type=discord.EntityType.external, privacy_level=discord.PrivacyLevel.guild_only,

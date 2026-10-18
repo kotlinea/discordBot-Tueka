@@ -230,3 +230,26 @@ class ScheduleAdapterTests(unittest.IsolatedAsyncioTestCase):
         event.creator_id=1
         with self.assertRaises(DiscordFailure):await port.deliver(job,recover=True)
         self.assertEqual(guild.create_scheduled_event.await_count,1)
+
+    async def test_event_description_budget_preserves_receipt_and_saved_body(self):
+        for job_id in (5, 9223372036854775807):
+            marker = f'Tueka schedule:{job_id}'
+            budget = 1000 - len(marker) - 1
+            for length in (0, budget, budget + 1, 1000, 2000):
+                with self.subTest(job_id=job_id, length=length):
+                    port, _, guild = self.setup_port()
+                    job = self.job()
+                    job['id'] = job_id
+                    job['payload'].update(kind='event', body='文' * length,
+                        event_start=3_000_000_000, event_end=3_000_000_100, event_location='Test venue')
+                    await port.deliver(job, recover=False)
+                    description = guild.create_scheduled_event.call_args.kwargs['description']
+                    self.assertLessEqual(len(description), 1000)
+                    self.assertTrue(description.endswith('\n' + marker))
+                    self.assertEqual(job['payload']['body'], '文' * length)
+                    if length <= budget:
+                        self.assertEqual(description, '文' * length + '\n' + marker)
+                    guild.fetch_scheduled_events.return_value = [SimpleNamespace(
+                        id=66, creator_id=99, description=description)]
+                    self.assertEqual(await port.deliver(job, recover=True), 66)
+                    self.assertEqual(guild.create_scheduled_event.await_count, 1)

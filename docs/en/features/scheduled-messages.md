@@ -14,6 +14,8 @@ For a message, choose a server text channel and Embed color. The Bot needs View 
 
 For an event, set its creation time, start, end and external location. Start must be at least 60 seconds after creation; end must be at least 60 seconds after start and within 7 days. The Bot needs Manage Events. Events are created once and do not repeat.
 
+Discord event descriptions allow 1,000 characters including the receipt identifier. Longer bodies end with “…” in the event, while the full body remains saved in the schedule.
+
 ## Editing, cancellation and history
 
 Expand delivery and audit history from the list. Editing is available before the first occurrence is reserved. Concurrent updates require reloading; failed saves preserve your draft.
