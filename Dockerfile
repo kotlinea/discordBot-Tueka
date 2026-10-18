@@ -42,6 +42,7 @@ COPY engagement engagement
 COPY features features
 COPY guild_settings guild_settings
 COPY giveaways giveaways
+COPY insights insights
 COPY jobs jobs
 COPY migrations migrations
 COPY moderation moderation

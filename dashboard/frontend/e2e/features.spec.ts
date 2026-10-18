@@ -4,7 +4,7 @@ import baseline from '../src/test/fixtures/feature_metadata.json' with { type: '
 import ja from '../src/locales/ja'
 import en from '../src/locales/en'
 
-const metadata = (id: string, settings: Record<string, unknown> = {}) => ({ ...(['applications','appeals','scheduled_messages','starboard','giveaways'].includes(id)?{id,category:id==='appeals'?'moderation':['scheduled_messages','starboard','giveaways'].includes(id)?'engagement':'community',docs_path:`/docs/features/${id}`,fields:[],required_fields:[],required_bot_permissions:[]}:baseline.features.find(feature => feature.id === id)!), title: id, description: `${id} settings`, enabled: true, revision: 1, missing_permissions: [], settings })
+const metadata = (id: string, settings: Record<string, unknown> = {}) => ({ ...(['applications','appeals','scheduled_messages','starboard','giveaways','insights'].includes(id)?{id,category:id==='appeals'?'moderation':['scheduled_messages','starboard','giveaways'].includes(id)?'engagement':'community',docs_path:`/docs/features/${id}`,fields:[],required_fields:[],required_bot_permissions:[]}:baseline.features.find(feature => feature.id === id)!), title: id, description: `${id} settings`, enabled: true, revision: 1, missing_permissions: [], settings })
 const resources = { channels: [{ id: '123456789012345678', name: 'general', type: 0 }, { id: '123456789012345679', name: 'Voice', type: 2 }, { id: '123456789012345680', name: 'Category', type: 4 }], roles: [{ id: '123456789012345681', name: 'Member' }], bot_permissions: '8' }
 async function session(page: Page, locale: 'ja' | 'en', access = 'manager') {
   await page.route('**/api/v1/session', route => route.fulfill({ json: { user: { id: '1', name: 'Viewer', avatar_url: '' }, csrf_token: 'csrf', preferences: { locale, appearance: 'precision', color_scheme: 'light', navigation_collapsed: false, revision: 1 } } }))
@@ -130,14 +130,14 @@ for (const locale of ['ja', 'en'] as const) {
     await session(page, locale)
     let overviewRequests = 0
     await page.route('**/api/v1/guilds/1/overview', route => { overviewRequests++; return route.fulfill(failure(503)) })
-    await page.route('**/api/v1/guilds/1/features', route => route.fulfill({ json: { items: [...baseline.features.map(item => metadata(item.id)),metadata('applications'),metadata('appeals'),metadata('scheduled_messages'),metadata('starboard'),metadata('giveaways')] } }))
+    await page.route('**/api/v1/guilds/1/features', route => route.fulfill({ json: { items: [...baseline.features.map(item => metadata(item.id)),metadata('applications'),metadata('appeals'),metadata('scheduled_messages'),metadata('starboard'),metadata('giveaways'),metadata('insights')] } }))
     await page.route('**/api/v1/guilds/1/tickets', route => route.fulfill({ json: { can_manage: true, summary: { open: 0, unclaimed: 0, closed_30d: 0 }, transcript_storage: { available: true } } }))
     await page.goto('/servers/1/tickets')
     await expect(page.getByRole('heading', { name: copy.tickets.tickets.title, exact: true })).toBeVisible()
     const menu = page.getByRole('button', { name: 'Navigation', exact: true })
     if (await menu.isVisible()) await menu.click()
     const nav = page.getByRole('navigation', { name: 'Dashboard' }).filter({ visible: true })
-    await expect(nav.getByRole('link')).toHaveCount(baseline.features.length + 7)
+    await expect(nav.getByRole('link')).toHaveCount(baseline.features.length + 8)
     await expect(nav.locator('a[href="/servers/1/modules/welcome"]')).toBeVisible()
     await expect(nav.locator('a[href="/servers/1/moderation/automod"]')).toBeVisible()
     await expect(nav.locator('a[href="/servers/1/social/youtube"]')).toBeVisible()

@@ -32,6 +32,10 @@ export type HighlightPublication = { "id": number; "entry_id": number; "target_c
 export type HighlightSource = { "guild_id": string; "channel_id": string; "message_id": string; "parent_channel_id"?: (string | null); "author_id": string; "author_name"?: string; "content"?: string; "image_url"?: string; "author_bot"?: boolean; "nsfw"?: boolean; "deleted"?: boolean }
 export type HighlightSourceJob = { "id": number; "channel_id": string; "message_id": string; "status": string; "attempts": number; "last_error": (string | null); "retry_actor_id": (string | null); "retry_at": (number | null) }
 export type InfractionsResponse = { "user_id": string; "active_points": number; "cases": Array<ModerationCase> }
+export type InsightsConfig = { "channel_ids"?: Array<string>; "retention_days"?: number; "track_members"?: boolean }
+export type InsightsDay = { "day": string; "observed": boolean; "messages": (number | null); "joins": (number | null); "leaves": (number | null); "voice_seconds": (number | null); "observed_seconds": (number | null); "first_observed": (number | null); "last_observed": (number | null) }
+export type InsightsReport = { "enabled": boolean; "collecting": boolean; "timezone": "UTC"; "retention_days": number; "last_observed": (number | null); "days": Array<InsightsDay> }
+export type InsightsSettings = { "enabled": boolean; "settings": InsightsConfig; "revision": number }
 export type Items_AppealItem_ = { "items": Array<AppealItem>; "next"?: (number | null) }
 export type Items_ApplicationEvent_ = { "items": Array<ApplicationEvent>; "next"?: (number | null) }
 export type Items_ApplicationForm_ = { "items": Array<ApplicationForm>; "next"?: (number | null) }
@@ -472,6 +476,40 @@ export const constraints = {
     "active_points": {},
     "cases": {},
     "user_id": {}
+  },
+  "InsightsConfig": {
+    "channel_ids": {
+      "maxItems": 25
+    },
+    "retention_days": {
+      "maximum": 365.0,
+      "minimum": 1.0
+    },
+    "track_members": {}
+  },
+  "InsightsDay": {
+    "day": {},
+    "first_observed": {},
+    "joins": {},
+    "last_observed": {},
+    "leaves": {},
+    "messages": {},
+    "observed": {},
+    "observed_seconds": {},
+    "voice_seconds": {}
+  },
+  "InsightsReport": {
+    "collecting": {},
+    "days": {},
+    "enabled": {},
+    "last_observed": {},
+    "retention_days": {},
+    "timezone": {}
+  },
+  "InsightsSettings": {
+    "enabled": {},
+    "revision": {},
+    "settings": {}
   },
   "Items_AppealItem_": {
     "items": {},
@@ -1387,6 +1425,9 @@ export interface Operations {
   "POST /api/v1/guilds/{guild_id}/giveaways/{item_id}/jobs/{job_id}/retry": { response: GiveawayHistory; body: { "revision": number } }
   "POST /api/v1/guilds/{guild_id}/giveaways/{item_id}/launch": { response: GiveawayItem; body: { "revision": number } }
   "POST /api/v1/guilds/{guild_id}/giveaways/{item_id}/reroll": { response: GiveawayItem; body: { "revision": number; "reason": string } }
+  "GET /api/v1/guilds/{guild_id}/insights": { response: InsightsReport; body: never }
+  "GET /api/v1/guilds/{guild_id}/insights/settings": { response: InsightsSettings; body: never }
+  "PUT /api/v1/guilds/{guild_id}/insights/settings": { response: InsightsSettings; body: { "enabled": boolean; "settings": { "channel_ids"?: Array<string>; "retention_days"?: number; "track_members"?: boolean }; "revision": number } }
   "POST /api/v1/guilds/{guild_id}/moderation/actions": { response: ActionResponse; body: { "action"?: string; "target_user_id"?: (string | number | null); "channel_id"?: (string | number | null); "reason"?: string; "confirmed"?: boolean; "confirmation"?: string; "duration_minutes"?: number; "count"?: number } }
   "GET /api/v1/guilds/{guild_id}/moderation/events": { response: Items_ModerationEvent_; body: never }
   "GET /api/v1/guilds/{guild_id}/moderation/infractions/{user_id}": { response: InfractionsResponse; body: never }

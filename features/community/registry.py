@@ -8,6 +8,7 @@ from .live_stats import FEATURE as LIVE_STATS
 from .temporary_voice import FEATURE as TEMPORARY_VOICE
 from .tickets import FEATURE as TICKETS
 from .applications import FEATURE as APPLICATIONS
+from .insights import FEATURE as INSIGHTS
 
 CATEGORY = Category('community', 'nav.community', (
     WELCOME,
@@ -18,4 +19,5 @@ CATEGORY = Category('community', 'nav.community', (
     TEMPORARY_VOICE,
     TICKETS,
     APPLICATIONS,
+    INSIGHTS,
 ))

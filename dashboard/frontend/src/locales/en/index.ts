@@ -9,4 +9,5 @@ import appeals from './appeals'
 import scheduling from './scheduling'
 import starboard from './starboard'
 import giveaways from './giveaways'
-export default { common, moderation, reactionRoles, tickets, social, suggestions, applications, appeals, scheduling,starboard,giveaways }
+import insights from './insights'
+export default { common, moderation, reactionRoles, tickets, social, suggestions, applications, appeals, scheduling,starboard,giveaways,insights }

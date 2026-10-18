@@ -14,7 +14,7 @@ const page = (overrides: Partial<FeaturePage> = {}): FeaturePage => ({ id: 'inbo
 
 describe('feature registration', () => {
   it('covers exactly the backend public catalog and retains existing navigation paths', () => {
-    expect(featureRegistry.features.map(item => item.id).sort()).toEqual([...baseline.features.map(item => item.id),'applications','appeals','scheduled_messages','starboard','giveaways'].sort())
+    expect(featureRegistry.features.map(item => item.id).sort()).toEqual([...baseline.features.map(item => item.id),'applications','appeals','scheduled_messages','starboard','giveaways','insights'].sort())
     for (const source of baseline.features) {
       const target = featureRegistry.get(source.id)
       expect(target.category).toBe(source.category)

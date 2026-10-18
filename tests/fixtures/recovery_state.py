@@ -22,6 +22,8 @@ from starboard.repository import StarboardRepository
 from starboard.delivery import HighlightDelivery
 from giveaways.repository import GiveawayRepository
 from giveaways.service import GiveawayService
+from insights.repository import InsightsRepository
+from insights.models import day_key
 
 
 async def seed():
@@ -39,6 +41,16 @@ async def seed():
     cipher = SocialTokenCipher(settings.social_token_encryption_key)
     SocialRepository(settings.database_url).save_social_connection(1, 'twitch', 'offline', 'Offline', cipher.encrypt('private access'), cipher.encrypt('private refresh'), 9999999999)
     guilds = GuildSettingsRepository(settings.database_url)
+    insight_now = int(time.time()) - 20
+    insights = InsightsRepository(settings.database_url, clock=lambda: insight_now)
+    guilds.set_module(1, 'insights', enabled=True, settings={'channel_ids': [10], 'retention_days': 30, 'track_members': True})
+    assert insights.claim(1, 'before-snapshot-observer')
+    insights.heartbeat(1, 'before-snapshot-observer', {30: 10})
+    assert insights.event(1, 'before-snapshot-observer', 'messages', 'generated-recovery-message', channel=10)
+    insight_now += 10
+    insights.heartbeat(1, 'before-snapshot-observer', {30: 10})
+    with transaction(settings.database_url) as c:
+        c.execute("INSERT INTO app_metadata(key,value) VALUES('insights_snapshot_time',%s)", (str(insight_now),))
     guilds.set_module(1, 'applications', enabled=True)
     applications = ApplicationRepository(settings.database_url)
     form = applications.save_form(1, 5, {'title':'Recovery application','enabled':True,'fields':[{'key':'answer','label':'Answer'}]})
@@ -226,6 +238,19 @@ async def resume():
     assert await run_batch(campaigns.jobs, 'restored-campaign-publication', campaign_service.publish) == 2
     assert await run_batch(campaigns.jobs, 'restored-campaign-publication', campaign_service.publish) == 0
     assert campaign_port.reconciled == 1 and sorted(campaign_port.edited) == [777, 888]
+    with transaction(settings.database_url) as c:
+        insight_snapshot = int(c.execute("SELECT value FROM app_metadata WHERE key='insights_snapshot_time'").fetchone()['value'])
+    insight_now = insight_snapshot + 91
+    insights = InsightsRepository(settings.database_url, clock=lambda: insight_now)
+    assert insights.claim(1, 'restored-observer')
+    insights.heartbeat(1, 'restored-observer', {30: 10})
+    assert not insights.event(1, 'restored-observer', 'messages', 'generated-recovery-message', channel=10)
+    insight_now += 10
+    insights.heartbeat(1, 'restored-observer', {30: 10})
+    observed = insights.report(1, day_key(insight_snapshot - 10), day_key(insight_now))
+    assert sum(day['messages'] or 0 for day in observed['days']) == 1
+    assert sum(day['voice_seconds'] or 0 for day in observed['days']) == 20
+    assert sum(day['observed_seconds'] or 0 for day in observed['days']) == 20
 
     class ExistingRemoteReceipt:
         calls = 0
