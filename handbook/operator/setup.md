@@ -16,6 +16,8 @@ cd discordBot-Tueka
 
 ## 1. check
 
+この版は、新しいDBへ `0001_initial.sql` で全機能のスキーマを作成します。以前の11段階のMigrationを適用したDBには対応する旧Imageを使用してください。この版を導入する場合は、データを保持する必要がないことを確認し、対象環境のDBを新規作成してから起動します。既存DBのMigration履歴を書き換えて流用する方法は対象外です。
+
 ```text
 docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build check
 ```

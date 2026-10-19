@@ -11,103 +11,40 @@ from database.testing import temporary_database
 
 
 class MigrationTests(unittest.TestCase):
-    def test_observation_boundary_upgrade_preserves_schema_ten_checksums(self):
-        for _, name, _, source in load()[:10]:
-            (self.directory / name).write_text(source, encoding='utf-8')
-        apply(self.url, self.directory)
+    def test_initial_baseline_contains_final_defaults_and_vote_constraint(self):
+        self.assertEqual([row[:2] for row in load()], [(1, '0001_initial.sql')])
+        self.assertEqual(apply(self.url), {'applied': ['0001_initial.sql']})
         with connect(self.url) as c:
-            c.execute("INSERT INTO insights_observers(guild_id,owner,revision,last_seen) VALUES(1,'legacy-observer',1,100)")
-            before = c.execute('SELECT version,name,checksum FROM schema_migrations ORDER BY version').fetchall()
-        self.assertEqual(apply(self.url)['applied'], [row[1] for row in load()[10:]])
-        with connect(self.url) as c:
-            self.assertEqual(c.execute('SELECT started_at FROM insights_observers').fetchone()['started_at'], 100)
-            self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version<=10 ORDER BY version').fetchall(), before)
+            item = c.execute("INSERT INTO suggestions(guild_id,channel_id,author_id,answers_json,created_at,updated_at) VALUES(1,2,3,'{}',1,1) RETURNING *").fetchone()
+            self.assertEqual(item['review_reason'], '')
+            self.assertEqual(item['category'], '')
+            self.assertEqual(item['tags_json'], '[]')
+            for name in ('discussion_thread_id', 'implemented_at', 'merged_into', 'expires_at'):
+                self.assertIsNone(item[name])
+            for user, value in enumerate((-1, 0, 1), start=10):
+                c.execute('INSERT INTO suggestion_votes VALUES(%s,%s,%s,1,1)', (item['id'], user, value))
+            c.execute("INSERT INTO insights_observers(guild_id,owner,revision,last_seen) VALUES(1,'baseline',1,100)")
+            self.assertEqual(c.execute('SELECT started_at FROM insights_observers').fetchone()['started_at'], 0)
+        with self.assertRaises(psycopg.errors.CheckViolation), connect(self.url) as c:
+            c.execute('INSERT INTO suggestion_votes VALUES(%s,20,2,1,1)', (item['id'],))
         self.assertEqual(apply(self.url), {'applied': []})
+        require_current(self.url)
 
-    def test_insights_upgrade_preserves_giveaway_and_all_nine_checksums(self):
-        for _, name, _, source in load()[:9]:
-            (self.directory / name).write_text(source, encoding='utf-8')
-        apply(self.url, self.directory)
+    def test_longer_history_is_rejected_without_resetting_data(self):
+        apply(self.url)
         with connect(self.url) as c:
-            c.execute("INSERT INTO giveaways(guild_id,actor_id,request_key,config_json,ends_at,created_at,updated_at,expires_at) VALUES(1,20,'preserved','{}',100,1,1,200)")
-            before = c.execute('SELECT version,name,checksum FROM schema_migrations ORDER BY version').fetchall()
-        self.assertEqual(apply(self.url)['applied'], [row[1] for row in load()[9:]])
+            c.execute("INSERT INTO app_metadata VALUES('preserved','keep')")
+            for version in range(2, 12):
+                c.execute('INSERT INTO schema_migrations VALUES(%s,%s,%s,1)',
+                    (version, f'{version:04d}_previous.sql', 'previous-checksum'))
+            before = c.execute('SELECT * FROM schema_migrations ORDER BY version').fetchall()
+        with self.assertRaisesRegex(ValueError, 'Applied migration history differs'):
+            apply(self.url)
+        with self.assertRaises(SchemaNotReady):
+            require_current(self.url)
         with connect(self.url) as c:
-            self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version<=9 ORDER BY version').fetchall(), before)
-            self.assertEqual(c.execute('SELECT request_key FROM giveaways').fetchone()['request_key'], 'preserved')
-            self.assertEqual(c.execute('SELECT count(*) AS n FROM insights_daily').fetchone()['n'], 0)
-        self.assertEqual(apply(self.url), {'applied': []})
-
-    def test_giveaway_upgrade_preserves_starboard_and_eight_checksums(self):
-        for _, name, _, source in load()[:8]:
-            (self.directory / name).write_text(source, encoding='utf-8')
-        apply(self.url, self.directory)
-        with connect(self.url) as c:
-            c.execute("INSERT INTO starboards(guild_id,actor_id,request_key,config_json,created_at,updated_at) VALUES(1,20,'preserved','{}',1,1)")
-            before = c.execute('SELECT version,name,checksum FROM schema_migrations ORDER BY version').fetchall()
-        self.assertEqual(apply(self.url)['applied'], [row[1] for row in load()[8:]])
-        with connect(self.url) as c:
-            self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version<=8 ORDER BY version').fetchall(), before)
-            self.assertEqual(c.execute('SELECT request_key FROM starboards').fetchone()['request_key'], 'preserved')
-            self.assertEqual(c.execute('SELECT count(*) AS n FROM giveaways').fetchone()['n'], 0)
-        self.assertEqual(apply(self.url), {'applied': []})
-
-    def test_starboard_upgrade_preserves_roadmap_data_and_all_seven_checksums(self):
-        for _,name,_,source in load()[:7]:(self.directory/name).write_text(source,encoding='utf-8')
-        apply(self.url,self.directory)
-        with connect(self.url) as c:
-            item=c.execute("INSERT INTO suggestions(guild_id,channel_id,author_id,answers_json,created_at,updated_at,category,tags_json) VALUES(1,10,20,'{}',1,1,'Preserved','[\"Snapshot\"]') RETURNING id").fetchone()['id']
-            c.execute('INSERT INTO suggestion_votes VALUES(%s,30,0,1,1)',(item,))
-            checksums=c.execute('SELECT version,name,checksum FROM schema_migrations ORDER BY version').fetchall()
-        self.assertEqual(apply(self.url)['applied'],[row[1] for row in load()[7:]])
-        with connect(self.url) as c:
-            self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version<=7 ORDER BY version').fetchall(),checksums)
-            self.assertEqual(c.execute('SELECT category FROM suggestions').fetchone()['category'],'Preserved')
-            self.assertEqual(c.execute('SELECT value FROM suggestion_votes').fetchone()['value'],0)
-            self.assertEqual(c.execute('SELECT count(*) AS n FROM starboards').fetchone()['n'],0)
-        self.assertEqual(apply(self.url),{'applied':[]})
-    def test_suggestion_roadmap_upgrade_preserves_original_votes_and_unlimited_legacy_history(self):
-        for _,name,_,source in load()[:6]:(self.directory/name).write_text(source,encoding='utf-8')
-        apply(self.url,self.directory)
-        with connect(self.url) as c:
-            item=c.execute("INSERT INTO suggestions(guild_id,channel_id,author_id,answers_json,created_at,updated_at) VALUES(1,10,20,'{\"idea\":\"Preserved legacy\"}',1,1) RETURNING id").fetchone()['id']
-            c.execute('INSERT INTO suggestion_votes VALUES(%s,30,1,1,1)',(item,))
-            c.execute("INSERT INTO suggestion_events(suggestion_id,guild_id,actor_id,event_type,created_at) VALUES(%s,1,20,'created',1)",(item,))
-            before=c.execute('SELECT version,name,checksum FROM schema_migrations ORDER BY version').fetchall()
-        self.assertEqual(apply(self.url)['applied'],[row[1] for row in load()[6:]])
-        with connect(self.url) as c:
-            row=c.execute('SELECT * FROM suggestions WHERE id=%s',(item,)).fetchone()
-            self.assertIsNone(row['expires_at']);self.assertEqual(row['category'],'');self.assertEqual(row['tags_json'],'[]')
-            self.assertIn('Preserved legacy',row['answers_json'])
-            self.assertEqual(c.execute('SELECT value FROM suggestion_votes').fetchone()['value'],1)
-            self.assertEqual(c.execute('SELECT count(*) AS n FROM suggestion_events').fetchone()['n'],1)
-            self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version<=6 ORDER BY version').fetchall(),before)
-        self.assertEqual(apply(self.url),{'applied':[]})
-    def test_appeals_upgrade_preserves_nonempty_phase5_applications(self):
-        for _,name,_,source in load()[:4]:
-            (self.directory/name).write_text(source,encoding='utf-8')
-        apply(self.url,self.directory)
-        with connect(self.url) as c:
-            form=c.execute("INSERT INTO application_forms(guild_id,config_json,created_at,updated_at) VALUES(1,'{}',1,1) RETURNING id").fetchone()['id']
-            c.execute("INSERT INTO applications(guild_id,form_id,author_id,interaction_id,snapshot_json,answers_json,created_at,updated_at,expires_at) VALUES(1,%s,10,100,'{}','{\"proof\":\"preserved\"}',1,1,9999999999)",(form,))
-        self.assertEqual(apply(self.url)['applied'],[row[1] for row in load()[4:]])
-        with connect(self.url) as c:
-            self.assertIn('preserved',c.execute('SELECT answers_json FROM applications').fetchone()['answers_json'])
-        self.assertEqual(apply(self.url),{'applied':[]})
-
-    def test_applications_upgrade_from_phase4_preserves_data_and_reapplies(self):
-        for version,name,_,source in load()[:3]:
-            (self.directory/name).write_text(source,encoding='utf-8')
-        apply(self.url,self.directory)
-        with connect(self.url) as c:
-            c.execute("INSERT INTO app_metadata VALUES('phase4_preserved','keep')")
-            before=c.execute('SELECT version,name,checksum FROM schema_migrations ORDER BY version').fetchall()
-        self.assertEqual(apply(self.url)['applied'],[row[1] for row in load()[3:]])
-        self.assertEqual(apply(self.url),{'applied':[]})
-        with connect(self.url) as c:
-            self.assertEqual(c.execute("SELECT value FROM app_metadata WHERE key='phase4_preserved'").fetchone()['value'],'keep')
-            self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version<=3 ORDER BY version').fetchall(),before)
-            self.assertEqual(c.execute('SELECT COUNT(*) AS n FROM applications').fetchone()['n'],0)
+            self.assertEqual(c.execute('SELECT * FROM schema_migrations ORDER BY version').fetchall(), before)
+            self.assertEqual(c.execute('SELECT value FROM app_metadata').fetchone()['value'], 'keep')
 
     def setUp(self):
         self.context = temporary_database(migrate=False)
@@ -126,20 +63,6 @@ class MigrationTests(unittest.TestCase):
             c.execute('CREATE TABLE preserved(id BIGINT PRIMARY KEY, value TEXT)')
             c.execute("INSERT INTO preserved VALUES(1,'keep')")
 
-    def test_observability_upgrade_preserves_existing_application_data(self):
-        initial = MIGRATIONS / '0001_initial.sql'
-        (self.directory / initial.name).write_bytes(initial.read_bytes())
-        apply(self.url, self.directory)
-        with connect(self.url) as c:
-            c.execute("INSERT INTO app_metadata VALUES('upgrade_probe','preserved')")
-            before = c.execute('SELECT version,name,checksum FROM schema_migrations').fetchall()
-        self.assertEqual(apply(self.url)['applied'], [row[1] for row in load()[1:]])
-        with connect(self.url) as c:
-            self.assertEqual(c.execute("SELECT value FROM app_metadata WHERE key='upgrade_probe'").fetchone()['value'], 'preserved')
-            self.assertEqual(c.execute('SELECT version,name,checksum FROM schema_migrations WHERE version=1').fetchall(), before)
-            self.assertEqual(c.execute('SELECT COUNT(*) AS count FROM runtime_heartbeats').fetchone()['count'], 0)
-        self.assertEqual(apply(self.url), {'applied': []})
-
     def test_failed_ddl_preserves_original_data_and_removes_partial_history(self):
         self.seed()
         self.sql('DROP TABLE preserved; CREATE TABLE partial(id BIGINT); INSERT INTO absent VALUES(1);')
@@ -149,25 +72,6 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(c.execute('SELECT value FROM preserved').fetchone()['value'], 'keep')
             self.assertIsNone(c.execute("SELECT to_regclass('partial') AS relation").fetchone()['relation'])
             self.assertIsNone(c.execute("SELECT to_regclass('schema_migrations') AS relation").fetchone()['relation'])
-
-    def test_suggestion_review_upgrade_preserves_votes_history_and_delivery(self):
-        for migration in load()[:2]:
-            (self.directory/migration[1]).write_text(migration[3],encoding='utf-8')
-        apply(self.url,self.directory)
-        with connect(self.url) as c:
-            suggestion=c.execute("INSERT INTO suggestions(guild_id,channel_id,author_id,answers_json,created_at,updated_at) VALUES(1,2,3,'{}',1,1) RETURNING id").fetchone()['id']
-            c.execute('INSERT INTO suggestion_votes(suggestion_id,user_id,value,created_at,updated_at) VALUES(%s,4,1,1,1)',(suggestion,))
-            c.execute("INSERT INTO suggestion_events(suggestion_id,guild_id,actor_id,event_type,created_at) VALUES(%s,1,3,'created',1)",(suggestion,))
-            c.execute("INSERT INTO suggestion_outbox(suggestion_id,action,available_at,created_at) VALUES(%s,'publish',1,1)",(suggestion,))
-        self.assertEqual(apply(self.url)['applied'],[row[1] for row in load()[2:]])
-        self.assertEqual(apply(self.url),{'applied':[]})
-        with connect(self.url) as c:
-            row=c.execute('SELECT * FROM suggestions WHERE id=%s',(suggestion,)).fetchone()
-            self.assertEqual(row['review_reason'],'')
-            self.assertIsNone(row['discussion_thread_id'])
-            self.assertIsNone(row['implemented_at'])
-            for table in ('suggestion_votes','suggestion_events','suggestion_outbox'):
-                self.assertEqual(c.execute(f'SELECT COUNT(*) AS n FROM {table} WHERE suggestion_id=%s',(suggestion,)).fetchone()['n'],1)
 
     def test_transaction_and_session_control_cannot_escape_rollback(self):
         self.seed()
