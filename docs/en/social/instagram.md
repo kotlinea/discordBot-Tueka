@@ -1,3 +1,7 @@
+---
+feature_id: instagram_updates
+---
+
 # Instagram
 
 Use the account connection flow when available. Public-account monitoring is available only when configured by the system operator, and its unofficial feed path is best effort.

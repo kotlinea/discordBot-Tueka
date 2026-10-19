@@ -47,6 +47,19 @@ class FakePort:
 
 
 class ModerationAdapterTests(unittest.IsolatedAsyncioTestCase):
+    def test_timeout_administrator_is_rejected_even_below_bot_role(self):
+        from types import SimpleNamespace
+        from moderation.discord_adapter import DiscordModerationAdapter
+        administrator = SimpleNamespace(id=2, top_role=1, guild_permissions=SimpleNamespace(administrator=True))
+        moderator = SimpleNamespace(id=3, top_role=3)
+        guild = SimpleNamespace(owner_id=3, get_member=lambda identifier: administrator if identifier == 2 else moderator,
+                                me=SimpleNamespace(top_role=2, guild_permissions=SimpleNamespace(moderate_members=True)))
+        adapter = DiscordModerationAdapter(SimpleNamespace(get_guild=lambda identifier: guild))
+        for action in ('timeout', 'untimeout'):
+            self.assertIn('Administrator', adapter.manageable(MemberRef(3, 1), MemberRef(2, 1), action))
+        administrator.guild_permissions.administrator = False
+        self.assertIsNone(adapter.manageable(MemberRef(3, 1), MemberRef(2, 1), 'timeout'))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

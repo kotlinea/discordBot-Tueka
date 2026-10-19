@@ -41,9 +41,11 @@ class AutoModCog(commands.Cog):
 
     async def cog_load(self) -> None:
         self.maintenance.start()
+        self.dispatch_actions.start()
 
     async def cog_unload(self) -> None:
         self.maintenance.cancel()
+        self.dispatch_actions.cancel()
         await self.http.aclose()
 
     def invalidate(self, guild_id: int) -> None:
@@ -265,6 +267,9 @@ class AutoModCog(commands.Cog):
             self.moderation_repository.create_moderation_event(guild_id, family="anti_raid", event_type="member_join",
                 source="raid_state", reason="5分間シグナルがなかったためRaid状態を自動解除しました", mode="monitor",
                 dedupe_key=f"raid-clear:{guild_id}:{raid['last_signal_at']}")
+
+    @tasks.loop(seconds=5)
+    async def dispatch_actions(self) -> None:
         await run_batch(self.moderation_repository.request_jobs, self.owner, self._execute_requested_action, limit=50)
 
     async def _expire_moderation_action(self, pending: dict) -> Outcome:
@@ -336,6 +341,7 @@ class AutoModCog(commands.Cog):
             return Outcome(str(exc), result={"event_id": event_id, "actions": results})
 
     @maintenance.before_loop
+    @dispatch_actions.before_loop
     async def before_maintenance(self) -> None:
         await self.bot.wait_until_ready()
 

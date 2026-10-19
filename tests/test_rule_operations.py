@@ -16,6 +16,19 @@ from moderation.rules import FAMILY_TRIGGERS
 
 
 class RuleOperationsTests(unittest.TestCase):
+    def test_preview_evaluates_disabled_drafts_without_enabling_or_executing_them(self):
+        value = self.create()
+        self.assertFalse(value['enabled'])
+        before = self.snapshot()
+        root = '/api/v1/guilds/1/moderation/automod/preview'
+        for content, channel, expected in (('blocked',10,True),('safe',10,False),('blocked',11,False)):
+            response = self.api.client.post(root,json={'rule':value,'input':{'content':content,'channel_id':channel}},headers=self.api.headers)
+            self.assertEqual(response.status_code,200,response.text)
+            self.assertEqual(response.json()['matched'],expected)
+        self.assertEqual(self.snapshot(),before)
+        with self.repo._connection() as connection:
+            self.assertEqual(connection.execute('SELECT COUNT(*) AS count FROM moderation_action_requests').fetchone()['count'],0)
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)

@@ -14,6 +14,8 @@ Warn、Timeout、Timeout解除、Kick、Ban、Unban、Tempban、Softban、メッ
 
 影響が大きいBanやLockdownは、ダッシュボードに表示された対象ユーザーIDまたはサーバーIDを入力して確認します。処置の実行直前に権限、ロール階層、対象の状態を確認し直します。
 
+ダッシュボードのTimeoutは1分〜28日、Lockdownは1分〜24時間で指定します。Banは自動解除されません。サーバー所有者やAdministrator権限を持つメンバーのTimeoutは変更できません。
+
 ## Discordコマンド
 
 処置は`/mod`グループから実行できます。`/warn`、`/timeout`、`/kick`、`/ban`、`/clear`からも対応する処置を実行できます。引数と必要権限は[コマンド一覧](../reference/commands.md)を確認してください。

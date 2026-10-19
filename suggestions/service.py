@@ -32,5 +32,6 @@ class SuggestionService:
             raise PermissionError("voting_disabled")
         return self.repository.vote(guild_id, suggestion_id, user_id, value)
 
-    def review(self, guild_id: int, suggestion_id: int, reviewer_id: int, status: str) -> dict[str, Any]:
-        return self.repository.review(guild_id, suggestion_id, reviewer_id, status)
+    def review(self, guild_id: int, suggestion_id: int, reviewer_id: int, status: str,
+               reason: str = '', *, expected_revision: int | None = None) -> dict[str, Any]:
+        return self.repository.review(guild_id, suggestion_id, reviewer_id, status, reason, expected_revision=expected_revision)

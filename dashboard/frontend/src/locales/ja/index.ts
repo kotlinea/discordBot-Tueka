@@ -4,4 +4,10 @@ import reactionRoles from './reactionRoles'
 import tickets from './tickets'
 import social from './social'
 import suggestions from './suggestions'
-export default { common, moderation, reactionRoles, tickets, social, suggestions }
+import applications from './applications'
+import appeals from './appeals'
+import scheduling from './scheduling'
+import starboard from './starboard'
+import giveaways from './giveaways'
+import insights from './insights'
+export default { common, moderation, reactionRoles, tickets, social, suggestions, applications, appeals, scheduling,starboard,giveaways,insights }

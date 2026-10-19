@@ -1,8 +1,9 @@
 import type { CategoryDefinition, FeatureDefinition, PresentationCategory, ScreenLoader, ScreenModule } from './contracts'
+import {NAMESPACES} from './contracts'
 import { loadModuleSettings } from './defaults'
 
 const identifier = /^[a-z][a-z0-9_]*$/
-const namespaces = new Set(['common', 'moderation', 'tickets', 'reactionRoles', 'social', 'suggestions'])
+const namespaces = new Set<string>(NAMESPACES)
 
 export function createRegistry(categories: readonly CategoryDefinition[], presentationCategories: readonly PresentationCategory[] = categories) {
   const categoryIds = new Set<string>()

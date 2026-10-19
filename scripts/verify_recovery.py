@@ -12,8 +12,10 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / 'tests'), str(ROOT / 'scripts')]
 from cryptography.fernet import Fernet
+from database.migrations import load as load_migrations
 from deploy import compose
-from deploy.recovery import backup, restore, release, abort, digest
+from deploy.recovery import restore, release, abort, digest, load_bundle
+from deploy.backup_job import run as scheduled_backup
 from test_deployment import configure
 from verify_compose import docker, container, free_port, ready, sql
 
@@ -23,6 +25,8 @@ def main():
     parser.add_argument('--image', required=True)
     args = parser.parse_args()
     image = docker('image', 'inspect', '--format', '{{.Id}}', args.image).stdout.strip()
+    baseline_version = load_migrations()[-1][0]
+    probe_name = f'{baseline_version + 1:04d}_recovery_probe.sql'
     unique = uuid.uuid4().hex[:12]
     directories = []
     upgraded_tag = 'tueka-recovery-upgrade:' + unique
@@ -53,8 +57,19 @@ def main():
                 ready(source)
                 fixture = (ROOT / 'tests/fixtures/recovery_state.py').read_text()
                 docker('exec', container(source, 'bot'), 'python', '-c', fixture + '\nasyncio.run(seed())')
-                bundle = root / 'snapshot'
-                manifest = backup(source, bundle, resume_source=True)
+                job_config = root / 'backup.json'
+                job_options = {'version': 1, 'enabled': False, 'minimum_free_gib': 1,
+                    'environments': [{'config_dir': str(source), 'backup_root': str(root / 'snapshots')}],
+                    'smtp': {'enabled': False}}
+                job_config.write_text(json.dumps(job_options))
+                assert scheduled_backup(job_config) == {'status': 'disabled'}
+                assert not (root / 'snapshots').exists()
+                job_options['enabled'] = True
+                job_config.write_text(json.dumps(job_options))
+                job_result = scheduled_backup(job_config)
+                assert job_result['status'] == 'backed-up' and len(job_result['bundles']) == 1
+                bundle = Path(job_result['bundles'][0])
+                manifest = load_bundle(bundle)
                 assert manifest['observations']['verified_blobs'] == 2
                 assert manifest['observations']['verified_encrypted_values'] == 3
                 ready(source)
@@ -96,9 +111,9 @@ def main():
                 # Exercise a genuine newer image and schema, then return to the snapshot image/schema.
                 upgrade = root / 'upgrade'
                 upgrade.mkdir()
-                (upgrade / '0003_recovery_probe.sql').write_text('CREATE TABLE recovery_upgrade_probe(id BIGINT);\n')
+                (upgrade / probe_name).write_text('CREATE TABLE recovery_upgrade_probe(id BIGINT);\n')
                 docker('tag', image, base_tag)
-                (upgrade / 'Dockerfile').write_text(f'FROM {base_tag}\nCOPY 0003_recovery_probe.sql /app/migrations/postgresql/0003_recovery_probe.sql\n')
+                (upgrade / 'Dockerfile').write_text(f'FROM {base_tag}\nCOPY {probe_name} /app/migrations/postgresql/{probe_name}\n')
                 result = docker('build', '-t', upgraded_tag, str(upgrade), check=False)
                 if result.returncode:
                     raise RuntimeError('Isolated upgrade image build failed: ' + result.stderr)
@@ -132,8 +147,8 @@ def main():
                 compose.up(target)
                 ready(target)
                 assert docker('inspect', '--format', '{{.Image}}', container(target, 'dashboard')).stdout.strip() == image
-                assert sql(target, 'SELECT MAX(version) FROM schema_migrations') == '2'
-                assert sql(source, 'SELECT MAX(version) FROM schema_migrations') == '3'
+                assert sql(target, 'SELECT MAX(version) FROM schema_migrations') == str(baseline_version)
+                assert sql(source, 'SELECT MAX(version) FROM schema_migrations') == str(baseline_version + 1)
                 assert sql(source, "SELECT value FROM app_metadata WHERE key='recovery_version'") == 'new'
                 def volume(directory, service, destination):
                     return next(m['Name'] for m in json.loads(docker('inspect', container(directory, service)).stdout)[0]['Mounts'] if m['Destination'] == destination)
@@ -141,7 +156,7 @@ def main():
                 target_volume = volume(target, 'postgres', '/var/lib/postgresql')
                 assert source_volume != target_volume
                 assert volume(source, 'bot', '/data') != volume(target, 'bot', '/data')
-                print('backup job/resume, separate-volume DB+encrypted blobs/keys, failed restore/abort, held writers, receipt recovery, older image/schema rollback: OK', flush=True)
+                print('config opt-in backup job/resume, separate-volume DB+encrypted blobs/keys, failed restore/abort, held writers, receipt recovery, older image/schema rollback: OK', flush=True)
             finally:
                 for directory in reversed(directories):
                     try:

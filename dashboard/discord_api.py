@@ -33,7 +33,7 @@ PERMISSION_BITS = {
     "add_reactions": 1 << 6, "view_channel": 1 << 10,
     "moderate_members": 1 << 40, "kick_members": 1 << 1, "ban_members": 1 << 2,
     "read_message_history": 1 << 16, "embed_links": 1 << 14, "attach_files": 1 << 15,
-    "manage_threads": 1 << 34, "create_private_threads": 1 << 36, "send_messages_in_threads": 1 << 38,
+    "manage_threads": 1 << 34, "create_public_threads": 1 << 35, "create_private_threads": 1 << 36, "send_messages_in_threads": 1 << 38,
 }
 
 
@@ -205,6 +205,16 @@ class DiscordAPI:
             if exc.response.status_code == 404:
                 return None
             raise
+
+    async def guild_channel(self,guild_id:int,channel_id:int)->dict[str,Any]|None:
+        """Fresh channel metadata, including threads, fenced to one Guild."""
+        try:
+            value=(await self._request('GET',f'/channels/{channel_id}',headers={'Authorization':f'Bot {self.bot_token}'})).json()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code==404:return None
+            raise
+        if str(value.get('guild_id'))!=str(guild_id):return None
+        return {key:value.get(key) for key in ('id','type','parent_id','nsfw')}
 
     async def guild_member(self, guild_id: int, user_id: int, *, use_cache: bool = True) -> dict[str, Any] | None:
         key = f"{guild_id}:{user_id}"

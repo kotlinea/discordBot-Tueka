@@ -1,5 +1,5 @@
 """Operation inputs; omitted values are normalized by each domain."""
-from typing import Any
+from typing import Any, Literal
 from pydantic import Field
 from .base import ApiModel, input_model
 from .common import Preferences, ModuleValue
@@ -127,6 +127,12 @@ class TicketActionInput(ApiModel):
     reason: str = Field(default='', max_length=1000)
     revision: int | None = None
     excluded: bool = True
+
+
+class SuggestionReviewInput(ApiModel):
+    status: Literal['reviewing', 'approved', 'rejected', 'implemented']
+    reason: str = Field(min_length=1, max_length=1000)
+    revision: int = Field(ge=1)
 
 
 class FeedbackInput(ApiModel):

@@ -23,6 +23,8 @@ class Registry:
                     raise ValueError(f'Invalid or duplicate feature: {feature.id}')
                 if feature.category != category.id:
                     raise ValueError(f'Unregistered category for {feature.id}: {feature.category}')
+                if feature.maturity not in {'stable', 'improving', 'unavailable'}:
+                    raise ValueError(f'Invalid feature maturity: {feature.id}')
                 if len(set(feature.fields)) != len(feature.fields) or not set(feature.required_fields) <= set(feature.fields):
                     raise ValueError(f'Invalid fields: {feature.id}')
                 if feature.dashboard and (not all((feature.title_key, feature.description_key, feature.icon, *feature.copy_ja))

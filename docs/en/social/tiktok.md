@@ -1,3 +1,7 @@
+---
+feature_id: tiktok_updates
+---
+
 # TikTok
 
 Select the account and destination in Dashboard. Use the account connection flow when available; the official connected-account path is preferred. Public-account monitoring is best effort and may stop working when the provider changes.

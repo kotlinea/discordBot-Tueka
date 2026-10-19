@@ -36,6 +36,12 @@ class DiscordResilienceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(json.loads(logged)['status'], 429)
         self.assertNotIn('private', logged)
 
+    async def test_fresh_thread_metadata_is_guild_fenced_and_returns_only_resource_fields(self):
+        api=self.api([httpx.Response(200,json={'id':'11','guild_id':'1','type':11,'parent_id':'10','nsfw':False,'topic':'not exported'}),httpx.Response(200,json={'id':'11','guild_id':'2','type':11}),httpx.Response(404,json={'message':'Generated missing channel'})])
+        self.assertEqual(await api.guild_channel(1,11),{'id':'11','type':11,'parent_id':'10','nsfw':False})
+        self.assertIsNone(await api.guild_channel(1,11))
+        self.assertIsNone(await api.guild_channel(1,11))
+
     async def test_long_malformed_and_repeated_limits_fail_without_unbounded_wait(self):
         for delay in (3, -1, 'nan', 'inf', None, 'not-a-number'):
             with self.subTest(delay=delay):

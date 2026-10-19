@@ -397,6 +397,10 @@ class ModerationRepository:
             cursor = c.execute("DELETE FROM trust_events WHERE guild_id=%s AND created_at<%s", (guild_id, cutoff))
         return cursor.rowcount
 
+    def case(self, guild_id: int, case_id: int) -> dict[str, Any] | None:
+        with self._connection() as c:
+            return c.execute('SELECT * FROM moderation_cases WHERE guild_id=%s AND id=%s', (guild_id,case_id)).fetchone()
+
     def recent_cases(self, guild_id: int, user_id: int, limit: int = 50) -> list[dict[str, Any]]:
         with self._connection() as c:
             rows = c.execute("SELECT * FROM moderation_cases WHERE guild_id=%s AND user_id=%s ORDER BY id DESC LIMIT %s", (guild_id, user_id, limit)).fetchall()

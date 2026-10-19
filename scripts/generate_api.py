@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 from fastapi import FastAPI
 from dashboard.api_v1 import create_api_router
 from database.testing import temporary_database
+from features.registry import FEATURES
 
 
 def identifier(value: str) -> str:
@@ -75,6 +76,7 @@ def artifacts() -> dict[Path, str]:
     return {
         ROOT / 'dashboard' / 'api' / 'openapi.json': json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + '\n',
         ROOT / 'dashboard' / 'frontend' / 'src' / 'generated' / 'api.ts': '\n'.join(lines),
+        ROOT / 'docs' / 'reference' / 'feature-maturity.json': json.dumps({feature.id: feature.maturity for feature in FEATURES}, sort_keys=True, indent=2) + '\n',
     }
 
 

@@ -53,6 +53,8 @@ class DiscordModerationAdapter:
             return '自分自身にはこの処置を実行できません。'
         if target.id == guild.owner_id:
             return 'サーバー所有者にはこの処置を実行できません。'
+        if action in {'timeout', 'untimeout'} and member.guild_permissions.administrator:
+            return 'Administrator権限を持つメンバーのTimeoutは変更できません。'
         if guild.me is None or member.top_role >= guild.me.top_role:
             return 'Botより同等以上のロールを持つメンバーには実行できません。'
         if moderator and member.top_role >= moderator.top_role and moderator.id != guild.owner_id:

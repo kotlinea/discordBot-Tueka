@@ -47,6 +47,7 @@ export function ConfigurationState() {
   const issues = configurationIssues(feature, features, resources.data, fields)
   return <aside className={s.configurationState} aria-label={t('editing.savedState')}>
     <strong>{t(feature ? feature.enabled ? 'editing.on' : 'editing.off' : 'editing.unknown')}</strong>
+    {feature?.maturity&&<span>{t('featureMaturity.label')}: {t(`featureMaturity.${feature.maturity}`)}</span>}
     <span>{t('editing.configurationOnly')}</span>
     {resources.isLoading && <p role="status">{t('common.loading')}</p>}
     {resources.error && <Failure error={resources.error} retry={() => void resources.refetch()}/>}

@@ -1,4 +1,5 @@
 export default {
+featureMaturity: {label:'完成度',stable:'安定',improving:'改善中',unavailable:'利用不可'},
 editing: { noChanges: '未保存の変更はありません', queued: '操作を受け付けました。処理結果は一覧で確認してください。', resetDefaults: '既定値に戻す', partialDeleted: '{{count}}件の削除は完了しました。残りの変更は未保存です。', deleteConfirm: '{{count}}件を削除しますか？', saved: '保存しました。', remoteChanged: 'サーバー側の設定が更新されています。入力した内容はそのまま残っています。変更を破棄すると最新の設定を読み込みます。', missingResource: '削除済み、または参照できない項目', discardConfirm: '未保存の変更を破棄して閉じますか？', conflict: '別の更新と競合しました。入力した内容はそのまま残っています。最新の設定を確認して再編集してください。', forbidden: '操作権限を確認してください。入力した内容はそのまま残っています。', invalid: '入力を修正して保存してください。', savedState: '保存済みの設定', on: '設定ON', off: '設定OFF', unknown: '設定を取得できません', parentOff: '親機能が停止しています', required: '必要な設定がそろっていません', permissions: 'Botの必要権限が不足しています', resourceMissing: '設定先のチャンネルまたはロールを参照できません', noRules: '有効なルールがありません', unavailable: '接続・実行条件を確認してください', configurationOnly: '設定がONでも、実際に動作しているか、通知が届いたかは別に確認してください。' },
 settingsFields: {
   point_thresholds: '警告ポイントの制裁しきい値',

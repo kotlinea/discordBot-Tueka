@@ -42,14 +42,40 @@ class SuggestionTests(unittest.TestCase):
     def test_review_closes_voting(self):
         settings = normalize_settings({"channel_id": 10})
         item = self.service.submit(1, 10, 20, settings, {"idea": "Add a guide"})
-        item = self.service.review(1, item["id"], 40, "approved")
+        item = self.service.review(1, item["id"], 40, "approved", 'Accepted')
         self.assertEqual(item["status"], "approved")
         self.assertEqual(item["reviewer_id"], 40)
         with self.assertRaises(RuntimeError):
             self.service.vote(1, item["id"], 30, 1, settings)
         with self.assertRaises(RuntimeError):
-            self.service.review(1, item["id"], 41, "rejected")
+            self.service.review(1, item["id"], 41, "rejected", 'Declined')
         self.assertEqual(self.repository.get(1, item["id"])["status"], "approved")
+
+    def test_reason_history_implemented_and_revision_conflict_are_atomic(self):
+        item = self.repository.create(1,10,20,{'idea':'Add guide'})
+        for reason in ('', '   ', 'x'*1001):
+            with self.assertRaisesRegex(ValueError,'invalid_reason'):
+                self.repository.review(1,item['id'],40,'approved',reason)
+        self.assertEqual(len(self.repository.events(1,item['id'])),1)
+        with self.assertRaisesRegex(RuntimeError,'suggestion_closed'):
+            self.service.review(1,item['id'],40,'implemented','Not approved')
+        approved=self.service.review(1,item['id'],40,'approved','Useful',expected_revision=item['revision'])
+        self.assertEqual(approved['review_reason'],'Useful')
+        before=self.repository.events(1,item['id'])
+        with self.assertRaisesRegex(RuntimeError,'revision_conflict'):
+            self.service.review(1,item['id'],40,'implemented','Done',expected_revision=item['revision'])
+        self.assertEqual(self.repository.events(1,item['id']),before)
+        result=self.service.review(1,item['id'],40,'implemented','Released',expected_revision=approved['revision'])
+        self.assertIsNotNone(result['implemented_at'])
+        events=self.repository.events(1,item['id'],limit=1)
+        self.assertEqual(events[0]['detail'],{'status':'implemented','previous_status':'approved','reason':'Released'})
+        self.assertEqual(len(self.repository.events(1,item['id'],before=events[0]['id'])),2)
+        with self.assertRaises(LookupError):self.repository.events(2,item['id'])
+        with self.assertRaises(RuntimeError):self.repository.vote(1,item['id'],30,1)
+        with self.assertRaises(RuntimeError):self.service.review(1,item['id'],40,'implemented','Again')
+        with self.repository._connection() as connection:
+            rows=connection.execute("SELECT payload_json FROM suggestion_outbox WHERE suggestion_id=%s AND action='review_log'",(item['id'],)).fetchall()
+        self.assertEqual(len(rows),2)
 
     def test_disabled_voting_is_rejected(self):
         settings = normalize_settings({"channel_id": 10, "allow_voting": False})
@@ -63,7 +89,7 @@ class SuggestionTests(unittest.TestCase):
         self.assertEqual(self.repository.list(2), [])
         for operation in (
             lambda: self.repository.vote(2, item["id"], 30, 1),
-            lambda: self.repository.review(2, item["id"], 30, "approved"),
+            lambda: self.repository.review(2, item["id"], 30, "approved", 'Cross guild'),
             lambda: self.repository.attach_message(2, item["id"], 100),
         ):
             with self.assertRaises(LookupError):
@@ -79,7 +105,7 @@ class SuggestionTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             restarted.vote(1, item["id"], 30, 1)
         with self.assertRaises(RuntimeError):
-            restarted.review(1, item["id"], 30, "approved")
+            restarted.review(1, item["id"], 30, "approved", 'After restart')
 
     def test_message_and_votes_survive_repository_restart(self):
         item = self.repository.create(1, 10, 20, {"idea": "Idea"})
