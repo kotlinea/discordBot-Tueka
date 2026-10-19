@@ -2,6 +2,24 @@
 
 Find each command’s purpose, arguments, permissions and response visibility. Replace example IDs and targets with your server resources. Try sanction/deletion examples only in a test server.
 
+## /apply
+
+- **Purpose**: Choose an accepting application form and answer in a private modal.
+- **Arguments (* required)**: form*:string
+- **Permissions**: Server member meeting the form's role and age requirements at submission time.
+- **Response**: Privately displays the submission number.
+- **When disabled**: Refuses submissions while intake or the form is disabled.
+- **Example**: `/apply form:1`
+
+## /application-status
+
+- **Purpose**: Check your latest ten applications within retention, or withdraw an open application using withdraw_id.
+- **Arguments (* required)**: withdraw_id:integer
+- **Permissions**: The applicant, within the server.
+- **Response**: Privately displays status or the withdrawal result.
+- **When disabled**: Status remains readable. Withdrawals pause while intake is disabled.
+- **Example**: `/application-status`
+
 ## /ban
 
 - **Purpose**: Ban a member.
@@ -928,3 +946,48 @@ Find each command’s purpose, arguments, permissions and response visibility. R
 - **Response**: Public response; errors are private.
 - **When disabled**: Disabled features cannot start new actions; see the feature guide for retained data and existing actions.
 - **Example**: `/welcome`
+
+## /appeal
+
+- **Purpose**: Open a private modal to appeal your own case.
+- **Arguments (* required)**: guild_id*:string, case_id*:integer, application_id:integer
+- **Permissions**: The case owner; also available in DMs after leaving the server.
+- **Response**: Private response. Managers can inspect DM delivery state for replies and review decisions.
+- **When disabled**: New intake, replies and withdrawal are paused while intake is disabled.
+- **Example**: `/appeal guild_id:123456789012345678 case_id:1`
+
+## /modmail
+
+- **Purpose**: Start a private inquiry to server managers.
+- **Arguments (* required)**: guild_id*:string, application_id:integer
+- **Permissions**: Current member of the target server at submission.
+- **Response**: Private response. Managers can inspect DM delivery state for replies and review decisions.
+- **When disabled**: New intake, replies and withdrawal are paused while intake is disabled.
+- **Example**: `/modmail guild_id:123456789012345678`
+
+## /appeal-status
+
+- **Purpose**: Read your own conversations, messages and replies.
+- **Arguments (* required)**: guild_id*:string, conversation_id:integer
+- **Permissions**: The conversation author only.
+- **Response**: Private response. Managers can inspect DM delivery state for replies and review decisions.
+- **When disabled**: Authors can still read unexpired conversations.
+- **Example**: `/appeal-status guild_id:123456789012345678 conversation_id:1`
+
+## /appeal-reply
+
+- **Purpose**: Reply privately to your own unresolved conversation.
+- **Arguments (* required)**: guild_id*:string, conversation_id*:integer
+- **Permissions**: The conversation author only.
+- **Response**: Private response. Managers can inspect DM delivery state for replies and review decisions.
+- **When disabled**: New intake, replies and withdrawal are paused while intake is disabled.
+- **Example**: `/appeal-reply guild_id:123456789012345678 conversation_id:1`
+
+## /appeal-withdraw
+
+- **Purpose**: Withdraw your own unresolved conversation.
+- **Arguments (* required)**: guild_id*:string, conversation_id*:integer
+- **Permissions**: The conversation author only.
+- **Response**: Private response. Managers can inspect DM delivery state for replies and review decisions.
+- **When disabled**: New intake, replies and withdrawal are paused while intake is disabled.
+- **Example**: `/appeal-withdraw guild_id:123456789012345678 conversation_id:1`

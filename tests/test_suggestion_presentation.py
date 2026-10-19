@@ -52,6 +52,10 @@ class SuggestionPresentationTests(unittest.TestCase):
         embed = suggestion_embed(item, settings)
         self.assertLessEqual(len(embed), 6000)
         self.assertEqual(next(field.value for field in embed.fields if field.name == '審査理由'), item['review_reason'])
+        self.assertEqual(next(field.value for field in embed.fields if field.name == 'カテゴリー'), item['category'])
+        self.assertEqual(next(field.value for field in embed.fields if field.name == 'タグ'), ' · '.join(item['tags']))
+        self.assertIn(str(item['merged_into']), next(field.value for field in embed.fields if field.name == '統合先'))
+        self.assertTrue(all(1 <= len(field.value) <= 1024 for field in embed.fields))
         self.assertEqual(len(embed.fields[:5]), 5)
 
     def test_card_below_limit_is_unchanged_including_short_and_missing_answers(self):
@@ -68,6 +72,7 @@ class SuggestionPresentationTests(unittest.TestCase):
 class SuggestionPresentationAdapterTests(unittest.IsolatedAsyncioTestCase):
     async def test_review_sync_sends_valid_complete_card_and_closed_controls(self):
         item, settings = maximum_card()
+        item.update(category='分' * 40, tags=[str(i) + '標' * 39 for i in range(10)])
         message = SimpleNamespace(edit=AsyncMock())
         channel = SimpleNamespace(fetch_message=AsyncMock(return_value=message))
         adapter = DiscordSuggestionAdapter(SimpleNamespace())

@@ -16,6 +16,9 @@ class SuggestionFormField(ApiModel):
 
 
 class SuggestionSettings(ApiModel):
+    categories: list[str] = Field(default_factory=list,max_length=20)
+    tags: list[str] = Field(default_factory=list,max_length=50)
+    retention_days: int = Field(default=30,ge=1,le=365)
     channel_id: str | None
     log_channel_id: str | None
     review_role_ids: list[str] = Field(max_length=25)
@@ -30,7 +33,11 @@ class SuggestionItem(ApiModel):
     id: int
     author_id: str
     message_id: str | None
-    status: Literal["pending", "reviewing", "approved", "rejected", "delivery_failed", "implemented"]
+    status: Literal["pending", "reviewing", "approved", "rejected", "delivery_failed", "implemented",'merged']
+    category: str = ''
+    tags: list[str] = Field(default_factory=list)
+    merged_into: int | None = None
+    expires_at: int | None = None
     review_reason: str = ''
     discussion_thread_id: str | None = None
     implemented_at: int | None = None
@@ -55,3 +62,16 @@ class SuggestionEvent(ApiModel):
     event_type: str
     detail: dict[str, Any]
     created_at: int
+
+
+class SuggestionLabelsInput(ApiModel):
+    category: str = Field(default='',max_length=40)
+    tags: list[str] = Field(default_factory=list,max_length=10)
+    revision: int = Field(ge=1)
+
+
+class SuggestionMergeInput(ApiModel):
+    target_id: int = Field(ge=1)
+    target_revision: int = Field(ge=1)
+    revision: int = Field(ge=1)
+    reason: str = Field(min_length=1,max_length=1000)

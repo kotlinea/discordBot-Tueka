@@ -9,6 +9,7 @@ class DashboardIcon:
 
 
 ICONS: dict[str, DashboardIcon] = {
+    'star': DashboardIcon('Star','<path d="m12 3 2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3L2.9 9.6l6.3-.9z"/>'),
     "door-open": DashboardIcon("Door open", '<path d="M14 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M14 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8z"/><path d="M10 12h.01"/><path d="m14 8 4 4-4 4"/>'),
     "badge-check": DashboardIcon("Verified badge", '<path d="m12 2.7 2.1 2.3 3.1-.2.7 3 2.7 1.6-1.5 2.7 1.5 2.7-2.7 1.6-.7 3-3.1-.2-2.1 2.3-2.1-2.3-3.1.2-.7-3-2.7-1.6 1.5-2.7-1.5-2.7 2.7-1.6.7-3 3.1.2z"/><path d="m8.5 12 2.2 2.2 4.8-4.8"/>'),
     "trophy": DashboardIcon("Trophy", '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a4 4 0 0 0 4 4M17 6h3v1a4 4 0 0 1-4 4"/>'),

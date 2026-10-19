@@ -41,7 +41,9 @@ class DashboardRouteTests(unittest.TestCase):
         for path in ['/servers', '/servers/1', '/servers/1/settings', '/servers/1/modules/welcome',
                      '/servers/1/social', '/servers/1/social/youtube', '/servers/1/moderation/automod/rules/new',
                      '/servers/1/tickets/inbox/123', '/servers/1/tickets/panels/2', '/servers/1/reaction-roles/new',
-                     '/servers/1/suggestions', '/tickets/transcripts/token']:
+                     '/servers/1/suggestions', '/servers/1/applications', '/servers/1/applications/review',
+                     '/servers/1/applications/settings', '/servers/1/appeals', '/servers/1/appeals/settings',
+                     '/servers/1/schedules', '/servers/1/schedules/settings', '/servers/1/insights', '/servers/1/insights/settings', '/tickets/transcripts/token']:
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200, response.text)
@@ -53,7 +55,8 @@ class DashboardRouteTests(unittest.TestCase):
         (self.module.FRONTEND_DIST / 'index.html').unlink()
         self.assertEqual(self.client.get('/servers').status_code, 503)
         for path in ['/servers/1/automod', '/servers/1/modules/reaction_roles', '/servers/1/modules/unknown',
-                     '/servers/1/moderation/automod/rules/1.json']:
+                     '/servers/1/moderation/automod/rules/1.json', '/servers/1/modules/applications',
+                     '/servers/1/applications/unknown', '/servers/1/applications/review/1.json']:
             self.assertEqual(self.client.get(path).status_code, 404, path)
         for path in ['/servers/1/modules/welcome', '/servers/1/automod/settings', '/servers/1/social/subscriptions',
                      '/servers/1/moderation/settings']:
@@ -180,9 +183,32 @@ class DashboardRouteTests(unittest.TestCase):
             (directory / 'assets').mkdir()
             (directory / 'assets' / 'app.js').write_text('/* asset */')
             mount = next(route for route in self.module.app.routes if getattr(route, 'path', None) == f'/{prefix}')
-            mount.app = StaticFiles(directory=directory, html=True)
+            files = self.module.DocumentationFiles if prefix == 'docs' else StaticFiles
+            mount.app = files(directory=directory, html=True)
         response = self.client.get('/docs/')
         self.assertEqual(response.status_code, 200)
         self.assertIn('frame-ancestors', response.headers['content-security-policy'])
         self.assertIn('immutable', self.client.get('/docs/assets/app.js').headers['cache-control'])
         self.assertEqual(self.client.get('/ui/assets/app.js').status_code, 200)
+
+    def test_documentation_clean_urls_serve_only_existing_html_files(self):
+        directory = Path(self.temp.name) / 'docs'
+        for language in ('', 'en'):
+            page = directory / language / 'features' / 'insights.html'
+            page.parent.mkdir(parents=True, exist_ok=True)
+            page.write_text('<h1>Insights proof</h1>')
+        (directory.parent / 'outside.html').write_text('private outside root')
+        mount = next(route for route in self.module.app.routes if getattr(route, 'path', None) == '/docs')
+        mount.app = self.module.DocumentationFiles(directory=directory, html=True)
+        for language in ('', 'en/'):
+            url = '/docs/' + language + 'features/insights'
+            for method in (self.client.get, self.client.head):
+                response = method(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('text/html', response.headers['content-type'])
+            self.assertIn('Insights proof', self.client.get(url).text)
+            self.assertEqual(self.client.get(url + '.html').status_code, 200)
+        for url in ('/docs/features/missing', '/docs/features/insights.json',
+                    '/docs/%2e%2e/outside', '/docs/features/missing.js'):
+            self.assertEqual(self.client.get(url).status_code, 404, url)
+        self.assertEqual(self.client.post('/docs/features/insights').status_code, 405)

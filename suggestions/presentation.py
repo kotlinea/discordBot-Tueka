@@ -4,6 +4,7 @@ import discord
 from .models import normalize_settings
 
 STATUS_LABELS = {
+    'merged':'重複として統合済み',
     "pending": "審査待ち",
     "reviewing": "審査中",
     "approved": "承認済み",
@@ -38,6 +39,16 @@ def suggestion_embed(item: dict[str, Any], settings: dict[str, Any]) -> discord.
         embed.set_author(name=f"投稿者: {item['author_id']}")
     if item.get('review_reason'):
         embed.add_field(name='審査理由', value=item['review_reason'][:1000], inline=False)
+    if item.get('category'):
+        embed.add_field(name='カテゴリー',value=item['category'],inline=True)
+    if item.get('tags'):
+        embed.add_field(name='タグ',value=' · '.join(item['tags'])[:1000],inline=True)
+    if item.get('merged_into'):
+        target=item.get('merged_target') or {}
+        value=f"提案 #{item['merged_into']}"
+        if target.get('message_id'):
+            value=f"[{value}](https://discord.com/channels/{item['guild_id']}/{target['channel_id']}/{target['message_id']})"
+        embed.add_field(name='統合先',value=value,inline=False)
     if item.get('discussion_thread_id'):
         embed.add_field(name='Discussion', value=f"https://discord.com/channels/{item['guild_id']}/{item['discussion_thread_id']}", inline=False)
     reviewer = f" · 担当 <@{item['reviewer_id']}>" if item.get("reviewer_id") else ""
@@ -57,7 +68,7 @@ def suggestion_embed(item: dict[str, Any], settings: dict[str, Any]) -> discord.
 
 def suggestion_view(item: dict[str, Any], settings: dict[str, Any]) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
-    closed = item["status"] in {"approved", "rejected", "implemented", "delivery_failed"}
+    closed = item["status"] in {"approved", "rejected", "implemented", "delivery_failed",'merged'}
     if settings.get("allow_voting", True):
         view.add_item(discord.ui.Button(
             label=f"賛成 {item.get('upvotes', 0)}", emoji="👍", style=discord.ButtonStyle.secondary,

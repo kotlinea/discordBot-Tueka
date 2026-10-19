@@ -50,8 +50,8 @@ class FeatureRegistrationTests(unittest.TestCase):
             'cogs.social_updates': ('cogs.social.delivery',),
         }
         expected_extensions = [target for old in baseline['extensions'] for target in relocation[old]]
-        self.assertEqual(list(BOT_EXTENSIONS), expected_extensions)
-        self.assertEqual([item.id for item in FEATURES], [item['id'] for item in baseline['features']])
+        self.assertEqual(list(BOT_EXTENSIONS), expected_extensions + ['cogs.community.applications','cogs.moderation.appeals','cogs.engagement.scheduled_messages','cogs.engagement.starboard','cogs.engagement.giveaways','cogs.community.insights'])
+        self.assertEqual([item.id for item in FEATURES], [item['id'] for item in baseline['features']] + ['applications','appeals','scheduled_messages','starboard','giveaways','insights'])
         for actual, expected in zip(FEATURES, baseline['features']):
             for key, value in expected.items():
                 if key == 'docs_files':
@@ -61,7 +61,7 @@ class FeatureRegistrationTests(unittest.TestCase):
                 result = getattr(actual, key)
                 if actual.id == 'suggestions' and key == 'fields':
                     self.assertEqual(result.count('discussion_enabled'), 1)
-                    result = tuple(field for field in result if field != 'discussion_enabled')
+                    result = tuple(field for field in result if field not in {'discussion_enabled','categories','tags','retention_days'})
                 self.assertEqual(list(result) if isinstance(result, tuple) else result, value, (actual.id, key))
         self.assertEqual({item.id for item in REGISTRY.features if not item.dashboard}, {'echo', 'calculate', 'roll', 'gemini'})
 
@@ -146,7 +146,7 @@ def audit(event, args):
 sys.addaudithook(audit)
 from features.registry import REGISTRY
 from features.defaults import ModuleSettingsAccess
-assert len(REGISTRY.features) == 28
+assert len(REGISTRY.features) == 34
 for name in ('discord', 'fastapi', 'psycopg', 'dashboard', 'cogs', 'config', 'database'):
     assert name not in sys.modules, name
 '''
@@ -155,7 +155,7 @@ for name in ('discord', 'fastapi', 'psycopg', 'dashboard', 'cogs', 'config', 'da
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_domains_do_not_import_registry_and_feature_declarations_do_not_import_adapters(self):
-        for folder in ('moderation', 'ticketing', 'reaction_roles', 'social', 'suggestions', 'community', 'engagement', 'guild_settings', 'features'):
+        for folder in ('moderation', 'ticketing', 'reaction_roles', 'social', 'suggestions', 'community', 'engagement', 'guild_settings', 'applications', 'appeals', 'scheduling', 'starboard', 'giveaways', 'insights', 'features'):
             for path in (ROOT / folder).rglob('*.py'):
                 for node in ast.walk(ast.parse(path.read_text())):
                     modules = [alias.name for alias in node.names] if isinstance(node, ast.Import) else [node.module or ''] if isinstance(node, ast.ImportFrom) else []

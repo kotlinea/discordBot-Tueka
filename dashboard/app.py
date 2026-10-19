@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTex
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.exceptions import HTTPException as StaticHTTPException
 
 from config import Settings
 from dashboard.repository import DashboardRepository
@@ -75,7 +76,22 @@ DOCS_DIST = Path(os.getenv("TUEKA_DOCS_DIST", str(BASE_DIR.parent / "docs" / ".v
 app.include_router(health_router(settings.database_url, (FRONTEND_DIST, DOCS_DIST), os.getenv('MONITORING_TOKEN'),
     **thresholds()))
 app.middleware('http')(observe_request)
-app.mount("/docs", StaticFiles(directory=DOCS_DIST, html=True, check_dir=False), name="documentation")
+class DocumentationFiles(StaticFiles):
+    """Serve VitePress clean URLs while preserving static-file path checks."""
+
+    async def get_response(self, path, scope):
+        try:
+            response = await super().get_response(path, scope)
+        except StaticHTTPException as error:
+            if error.status_code != 404 or Path(path).suffix:
+                raise
+        else:
+            if response.status_code != 404 or Path(path).suffix:
+                return response
+        return await super().get_response(path + '.html', scope)
+
+
+app.mount("/docs", DocumentationFiles(directory=DOCS_DIST, html=True, check_dir=False), name="documentation")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 app.include_router(create_api_router(settings.database_url, api, settings))
 
@@ -98,17 +114,24 @@ async def dashboard_page(guild_id: int, route: str = ''):
     # Only current SPA routes receive the shell. Obsolete form/JSON URLs are gone.
     from features.registry import get_feature
     valid = route in {'', 'settings', 'suggestions'}
+    valid |= route == 'suggestions/roadmap'
     valid |= bool(re.fullmatch(r'moderation(?:/(?:automod|anti_spam|anti_raid|infractions|moderation_actions|moderation_logs)(?:/rules(?:/(?:new|\d+))?)?)?', route))
     valid |= bool(re.fullmatch(r'social(?:/(?:youtube|twitch|x|tiktok|instagram))?', route))
     valid |= bool(re.fullmatch(r'tickets(?:/(?:inbox(?:/\d+)?|forms|teams|settings|transcripts|tags|stats|panel-messages|panels(?:/(?:new|\d+))?))?', route))
     valid |= bool(re.fullmatch(r'reaction-roles(?:/(?:new|\d+))?', route))
+    valid |= bool(re.fullmatch(r'applications(?:/(?:review|settings))?', route))
+    valid |= bool(re.fullmatch(r'appeals(?:/settings)?', route))
+    valid |= bool(re.fullmatch(r'schedules(?:/settings)?', route))
+    valid |= bool(re.fullmatch(r'starboard(?:/settings)?', route))
+    valid |= bool(re.fullmatch(r'giveaways(?:/settings)?', route))
+    valid |= bool(re.fullmatch(r'insights(?:/settings)?', route))
     if route.startswith('modules/'):
         module_id = route.removeprefix('modules/')
         try:
             feature = get_feature(module_id)
         except ValueError:
             raise HTTPException(404, detail='Dashboard route not found')
-        valid = feature is not None and module_id not in {'tickets', 'reaction_roles', 'suggestions'} and feature.category != 'social'
+        valid = feature is not None and module_id not in {'tickets', 'reaction_roles', 'suggestions', 'applications', 'appeals', 'scheduled_messages', 'starboard', 'giveaways', 'insights'} and feature.category != 'social'
     if not valid:
         raise HTTPException(404, detail='Dashboard route not found')
     return spa_response()

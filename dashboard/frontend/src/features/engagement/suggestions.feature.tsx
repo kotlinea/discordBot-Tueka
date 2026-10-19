@@ -8,4 +8,5 @@ export const feature = defineFeature({
   path: 'suggestions', namespaces: ['suggestions', 'common'],
   titleKey: 'suggestions.title',
   load: loadSettings, settingsPath: 'modules/suggestions', settingsLoad: loadSettings,
+  pages:[{id:'roadmap',path:'roadmap',titleKey:'suggestions.roadmap',kind:'navigation',access:'manager',load:()=>import('./suggestions/Roadmap')}],
 })

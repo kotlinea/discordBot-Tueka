@@ -92,7 +92,11 @@ class SuggestionsCog(commands.Cog):
 
     @tasks.loop(seconds=5)
     async def deliver_outbox(self):
-        await run_batch(self.repository.outbox_jobs, self.owner, self.delivery.deliver)
+        try:
+            self.repository.purge_expired()
+            await run_batch(self.repository.outbox_jobs, self.owner, self.delivery.deliver)
+        except Exception as exc:
+            LOGGER.error('Suggestion maintenance failed type=%s',type(exc).__name__)
 
     @deliver_outbox.before_loop
     async def before_outbox(self):

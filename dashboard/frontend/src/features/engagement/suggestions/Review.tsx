@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect,useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { request, encodeBody } from '../../../api'
@@ -8,7 +8,7 @@ import { useUnsavedChanges } from '../../../components/forms/useUnsavedChanges'
 import { Failure, Loading } from '../../../components/Feedback'
 import s from '../../../styles/App.module.css'
 
-export function SuggestionReview({guildId,item,enabled}:{guildId:string;item:SuggestionItem;enabled:boolean}) {
+export function SuggestionReview({guildId,item,enabled,onBusy}:{guildId:string;item:SuggestionItem;enabled:boolean;onBusy?:(busy:boolean)=>void}) {
   const {t,i18n}=useTranslation(['suggestions','common']); const qc=useQueryClient()
   const [reason,setReason]=useState(''); const [history,setHistory]=useState(false)
   const [revision,setRevision]=useState<number|null>(null)
@@ -17,8 +17,9 @@ export function SuggestionReview({guildId,item,enabled}:{guildId:string;item:Sug
   const save=useSaveMutation({mutationFn:(status:'reviewing'|'approved'|'rejected'|'implemented')=>request(
     'POST /api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/review',`/guilds/${guildId}/suggestions/items/${item.id}/review`,
     {method:'POST',body:encodeBody('POST /api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/review',{status,reason,revision:revision??item.revision})}),
-    onSuccess:async()=>{setReason('');setRevision(null); await Promise.all([qc.invalidateQueries({queryKey:['suggestionsItems',guildId]}),qc.invalidateQueries({queryKey:['suggestionEvents',guildId,item.id]})])}})
+    onSuccess:async()=>{setReason('');setRevision(null); await Promise.all([qc.invalidateQueries({queryKey:['suggestionsItems',guildId]}),qc.invalidateQueries({queryKey:['roadmapDetail',guildId,item.id]}),qc.invalidateQueries({queryKey:['suggestionEvents',guildId,item.id]})])}})
   useUnsavedChanges(Boolean(reason),save.isPending)
+  useEffect(()=>{onBusy?.(Boolean(reason)||save.isPending);return()=>onBusy?.(false)},[reason,save.isPending,onBusy])
   const statuses:('reviewing'|'approved'|'rejected'|'implemented')[]=item.status==='approved'?['implemented']:['pending','reviewing'].includes(item.status)?['reviewing','approved','rejected']:[]
   return <section className={s.suggestionReview} aria-label={t('suggestions.reviewItem',{id:item.id})}>
     {item.review_reason&&<p>{t('suggestions.reason')}: {item.review_reason}</p>}
