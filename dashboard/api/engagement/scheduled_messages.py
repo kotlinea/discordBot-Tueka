@@ -50,7 +50,7 @@ def create_router(context):
             values['channel_id'] = int(text)
         if values['kind'] == 'message':
             snapshot = await GuildResources.fetch(context.discord,guild,live=True)
-            if values['channel_id'] not in snapshot.channel_ids(0):
+            if values.get('channel_id') not in snapshot.channel_ids(0):
                 raise ValueError('channel_id')
         return values
 

@@ -28,6 +28,9 @@ class GuildResources:
         return {key for key, item in self.channels.items()
                 if not types or int(item.get('type', -1)) in types}
 
+    def channel_permissions(self, channel_id: int) -> int:
+        return int(self.channels[channel_id].get('bot_permissions', 0))
+
     def missing_permissions(self, names) -> list[str]:
         if self.permissions & ADMINISTRATOR:
             return []

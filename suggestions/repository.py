@@ -11,12 +11,19 @@ from discord_io import DiscordFailure
 from .roadmap import labels as normalize_labels, merge as validate_merge
 
 
+class SuggestionQueue(QueueRepository):
+    def _claim_scope(self):
+        return (" AND EXISTS(SELECT 1 FROM suggestions s JOIN guild_modules g ON g.guild_id=s.guild_id"
+                " WHERE s.id=suggestion_outbox.suggestion_id AND g.module_id=%s AND g.enabled=1)",
+                ('suggestions',))
+
+
 class SuggestionRepository:
     def __init__(self, database_url: str) -> None:
         from guild_settings import GuildSettingsRepository
         self.database_url = database_url
         require_current(self.database_url)
-        self.outbox_jobs = QueueRepository(self.database_url, QUEUE_SPECS['suggestion_outbox'])
+        self.outbox_jobs = SuggestionQueue(self.database_url, QUEUE_SPECS['suggestion_outbox'])
         self.settings = GuildSettingsRepository(database_url)
 
     @staticmethod
@@ -25,13 +32,22 @@ class SuggestionRepository:
         connection.execute('INSERT INTO suggestion_outbox(suggestion_id,action,payload_json,available_at,created_at) VALUES(%s,%s,%s,%s,%s)',
                            (suggestion_id, action, json.dumps(payload or {}), now, now))
 
+    @staticmethod
+    def _delivery_owned(connection, item: dict):
+        # The outbox lock can wait; compare its deadline only after acquisition.
+        owned = connection.execute("SELECT lease_until FROM suggestion_outbox WHERE id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s FOR UPDATE",
+            (item['id'], item['_lease']['owner'], item['_lease']['token'])).fetchone()
+        if not owned or owned['lease_until'] is None or owned['lease_until'] <= int(time.time()):
+            raise LostLease('Suggestion delivery ownership changed')
+
     def delivery_state(self, item: dict, *, started: bool, failed: str | None = None):
         with self._connection() as connection:
-            changed = connection.execute("""UPDATE suggestion_outbox SET delivery_started=%s WHERE id=%s AND status='processing'
-                AND lease_owner=%s AND lease_token=%s AND lease_until>%s""",
-                (int(started), item['id'], item['_lease']['owner'], item['_lease']['token'], int(time.time())))
-            if changed.rowcount != 1:
-                raise LostLease('Suggestion delivery ownership changed')
+            if failed is not None:
+                connection.execute('SELECT id FROM suggestions WHERE id=%s FOR UPDATE',
+                    (item['suggestion_id'],)).fetchone()
+            self._delivery_owned(connection, item)
+            connection.execute('UPDATE suggestion_outbox SET delivery_started=%s WHERE id=%s',
+                (int(started), item['id']))
             if failed is not None:
                 connection.execute("UPDATE suggestions SET status='delivery_failed',updated_at=%s,revision=revision+1 WHERE id=%s AND message_id IS NULL", (int(time.time()), item['suggestion_id']))
                 connection.execute("""INSERT INTO suggestion_events(suggestion_id,guild_id,actor_id,event_type,detail_json,created_at)
@@ -43,26 +59,26 @@ class SuggestionRepository:
             parent=connection.execute('SELECT guild_id FROM suggestions WHERE id=%s',(item['suggestion_id'],)).fetchone()
             if not parent:raise LostLease('Suggestion no longer exists')
             lock_resource(connection,'suggestion-merge',str(parent['guild_id']))
-            owned = connection.execute("SELECT 1 FROM suggestion_outbox WHERE id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s AND lease_until>%s FOR UPDATE",
-                (item['id'], item['_lease']['owner'], item['_lease']['token'], int(time.time()))).fetchone()
-            if not owned:
-                raise LostLease('Suggestion delivery ownership changed')
+            connection.execute('SELECT id FROM suggestions WHERE id=%s AND guild_id=%s FOR UPDATE',
+                (item['suggestion_id'], parent['guild_id'])).fetchone()
+            children = connection.execute('SELECT id FROM suggestions WHERE guild_id=%s AND merged_into=%s ORDER BY id FOR UPDATE',
+                (parent['guild_id'], item['suggestion_id'])).fetchall()
+            self._delivery_owned(connection, item)
             changed = connection.execute("UPDATE suggestions SET message_id=%s,status=CASE WHEN status='delivery_failed' THEN 'pending' ELSE status END,updated_at=%s,revision=revision+1 WHERE id=%s AND (message_id IS NULL OR message_id=%s)",
                 (message_id, int(time.time()), item['suggestion_id'], message_id))
             if changed.rowcount != 1:
                 raise DiscordFailure('Suggestion publication reference changed; reconciliation required', partial=True)
             self._queue(connection, item['suggestion_id'], 'sync')
-            for child in connection.execute('SELECT id FROM suggestions WHERE guild_id=%s AND merged_into=%s',(parent['guild_id'],item['suggestion_id'])).fetchall():
+            for child in children:
                 self._queue(connection,child['id'],'sync')
             if discussion:
                 self._queue(connection, item['suggestion_id'], 'discussion')
 
     def discussion_delivered(self, item: dict, thread_id: int):
         with self._connection() as connection:
-            owned = connection.execute("SELECT 1 FROM suggestion_outbox WHERE id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s AND lease_until>%s FOR UPDATE",
-                (item['id'], item['_lease']['owner'], item['_lease']['token'], int(time.time()))).fetchone()
-            if not owned:
-                raise LostLease('Suggestion delivery ownership changed')
+            connection.execute('SELECT id FROM suggestions WHERE id=%s FOR UPDATE',
+                (item['suggestion_id'],)).fetchone()
+            self._delivery_owned(connection, item)
             changed = connection.execute('UPDATE suggestions SET discussion_thread_id=%s,revision=revision+1,updated_at=%s WHERE id=%s AND (discussion_thread_id IS NULL OR discussion_thread_id=%s)',
                 (thread_id, int(time.time()), item['suggestion_id'], thread_id))
             if changed.rowcount != 1:
@@ -74,8 +90,55 @@ class SuggestionRepository:
             row = connection.execute('SELECT guild_id FROM suggestions WHERE id=%s', (suggestion_id,)).fetchone()
         return self.get(row['guild_id'], suggestion_id) if row else None
 
+    def queue_sync(self, guild_id: int, suggestion_id: int, *, job: dict | None = None) -> None:
+        """Repair a completed stale edit without accepting an expired job lease."""
+        with self._connection() as connection:
+            parent = connection.execute('SELECT expires_at FROM suggestions WHERE guild_id=%s AND id=%s FOR UPDATE',
+                (guild_id, suggestion_id)).fetchone()
+            if job is not None:
+                self._delivery_owned(connection, job)
+            if parent and (parent['expires_at'] is None or parent['expires_at'] > int(time.time())):
+                self._queue(connection, suggestion_id, 'sync')
+
     def _connection(self):
         return transaction(self.database_url)
+
+    def delivery_repair(self, guild_id: int, suggestion_id: int, job: dict, *, cancelled=False) -> None:
+        """Reserve current-state work after a late external effect, without lease authority.
+
+        This never attaches a receipt or completes the old job. Unknown sends
+        retain their original suggestion marker and may only reconcile it.
+        Pending work can be coalesced; processing work may already hold an old
+        snapshot, so it cannot replace a repair reservation.
+        """
+        with self._connection() as c:
+            lock_resource(c, 'suggestion-repair', str(suggestion_id))
+            row = c.execute('SELECT message_id,discussion_thread_id,expires_at FROM suggestions WHERE guild_id=%s AND id=%s FOR UPDATE',
+                            (guild_id, suggestion_id)).fetchone()
+            if (row is None or job['suggestion_id'] != suggestion_id
+                    or row['expires_at'] is not None and row['expires_at'] <= int(time.time())):
+                return
+            action = job['action']
+            if action == 'publish' and not row['message_id']:
+                action = 'publish'
+            elif action == 'discussion' and not row['discussion_thread_id']:
+                action = 'discussion'
+            else:
+                action = 'sync'
+            # A live handler failure is retried by its fenced runner. Once it
+            # loses ownership (or is cancelled), reserve independent work.
+            owned = c.execute("SELECT 1 FROM suggestion_outbox WHERE id=%s AND suggestion_id=%s AND action=%s AND status='processing' AND lease_owner=%s AND lease_token=%s AND lease_until>%s",
+                              (job['id'], suggestion_id, action, job['_lease']['owner'], job['_lease']['token'], int(time.time()))).fetchone()
+            if owned and not cancelled:
+                return
+            pending = c.execute("SELECT id,payload_json FROM suggestion_outbox WHERE suggestion_id=%s AND action=%s AND status IN ('pending','retry') ORDER BY id LIMIT 1 FOR UPDATE",
+                                (suggestion_id, action)).fetchone()
+            if pending:
+                if action in {'publish', 'discussion'}:
+                    payload = {**json.loads(pending['payload_json']), 'recover': True}
+                    c.execute('UPDATE suggestion_outbox SET payload_json=%s WHERE id=%s', (json.dumps(payload), pending['id']))
+                return
+            self._queue(c, suggestion_id, action, {'recover': True} if action in {'publish', 'discussion'} else None)
 
     @staticmethod
     def _item(row: dict[str, Any], *, upvotes: int = 0, downvotes: int = 0) -> dict[str, Any]:
@@ -85,10 +148,20 @@ class SuggestionRepository:
         value["upvotes"], value["downvotes"] = upvotes, downvotes
         return value
 
-    def create(self, guild_id: int, channel_id: int, author_id: int, answers: dict[str, str]) -> dict[str, Any]:
+    def create(self, guild_id: int, channel_id: int, author_id: int, answers: dict[str, str], *,
+               expected_form_fields: list[dict] | None = None) -> dict[str, Any]:
         now = int(time.time())
         with self._connection() as connection:
-            retention=self.settings.get_module(guild_id,'suggestions',_conn=connection)['settings']['retention_days']
+            if expected_form_fields is not None:
+                lock_resource(connection, 'guild-module', f'{guild_id}:suggestions')
+            module = self.settings.get_module(guild_id, 'suggestions', _conn=connection)
+            if expected_form_fields is not None:
+                if not module['enabled']:
+                    raise PermissionError('suggestions_disabled')
+                if (module['settings']['form_fields'] != expected_form_fields
+                        or module['settings']['channel_id'] != channel_id):
+                    raise RuntimeError('suggestion_form_changed')
+            retention = module['settings']['retention_days']
             cursor = connection.execute(
                 "INSERT INTO suggestions(guild_id,channel_id,author_id,answers_json,created_at,updated_at,expires_at) VALUES(%s,%s,%s,%s,%s,%s,%s) RETURNING id",
                 (guild_id, channel_id, author_id, json.dumps(answers, ensure_ascii=False), now, now, now+retention*86400),
@@ -214,10 +287,13 @@ class SuggestionRepository:
             raise ValueError('invalid_reason')
         now = int(time.time())
         with self._connection() as connection:
+            lock_resource(connection, 'guild-module', f'{guild_id}:suggestions')
             previous = connection.execute('SELECT status,revision FROM suggestions WHERE guild_id=%s AND id=%s AND (expires_at IS NULL OR expires_at>%s) FOR UPDATE',
                 (guild_id, suggestion_id,now)).fetchone()
             if previous is None:
                 raise LookupError('suggestion_not_found')
+            if not self.settings.get_module(guild_id, 'suggestions', _conn=connection)['enabled']:
+                raise PermissionError('suggestions_disabled')
             if expected_revision is not None and previous['revision'] != expected_revision:
                 raise RuntimeError('revision_conflict')
             allowed = {'approved'} if status == 'implemented' else {'pending', 'reviewing'}

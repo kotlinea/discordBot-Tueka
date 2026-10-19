@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -10,13 +10,14 @@ import { useUnsavedChanges } from '../../../components/forms/useUnsavedChanges'
 import { Failure, Loading } from '../../../components/Feedback'
 import s from '../../../styles/App.module.css'
 
-export function ReviewItem({guildId,item,enabled}:{guildId:string;item:ApplicationItem;enabled:boolean}){
+export function ReviewItem({guildId,item,enabled,onBusy}:{guildId:string;item:ApplicationItem;enabled:boolean;onBusy?:(id:number,busy:boolean)=>void}){
   const {t,i18n}=useTranslation(['applications','common']);const qc=useQueryClient()
   const [reason,setReason]=useState('');const [revision,setRevision]=useState<number|null>(null)
   const [history,setHistory]=useState(false)
   const events=useQuery({queryKey:['applicationEvents',guildId,item.id],enabled:history,queryFn:()=>request('GET /api/v1/guilds/{guild_id}/applications/items/{item_id}/events',`/guilds/${guildId}/applications/items/${item.id}/events`)})
   const save=useSaveMutation({mutationFn:(status:'reviewing'|'approved'|'rejected')=>request('POST /api/v1/guilds/{guild_id}/applications/items/{item_id}/review',`/guilds/${guildId}/applications/items/${item.id}/review`,{body:encodeBody('POST /api/v1/guilds/{guild_id}/applications/items/{item_id}/review',{status,reason,revision:revision??item.revision})}),onSuccess:async()=>{setReason('');setRevision(null);await Promise.all([qc.invalidateQueries({queryKey:['applicationsItems',guildId]}),qc.invalidateQueries({queryKey:['applicationEvents',guildId,item.id]})])}})
   useUnsavedChanges(Boolean(reason),save.isPending)
+  useEffect(()=>{onBusy?.(item.id,Boolean(reason)||save.isPending);return()=>onBusy?.(item.id,false)},[item.id,reason,save.isPending,onBusy])
   const open=['pending','reviewing'].includes(item.status)
   return <section className={s.applicationSection} aria-label={`#${item.id}`}><h2>#{item.id} {item.snapshot.title}</h2>
     <p>{t('applications.author')}: {item.author_id} · {t(`applications.status.${item.status}`)}</p>
@@ -34,12 +35,15 @@ export default function Review({features}:FeatureScreenProps){
   const {guildId=''}=useParams();const {t}=useTranslation('applications')
   const enabled=Boolean(features.find(f=>f.id==='applications')?.enabled)
   const [before,setBefore]=useState<number|undefined>()
+  const [editors,setEditors]=useState<Record<number,boolean>>({})
+  const onBusy=useCallback((id:number,busy:boolean)=>setEditors(old=>old[id]===busy?old:{...old,[id]:busy}),[])
+  const busy=Object.values(editors).some(Boolean)
   const query=useQuery({queryKey:['applicationsItems',guildId,before],queryFn:()=>request('GET /api/v1/guilds/{guild_id}/applications/items',`/guilds/${guildId}/applications/items${before?`?before=${before}`:''}`)})
   if(query.isLoading)return <Loading/>
-  if(query.error)return <main className={s.page}><Failure error={query.error} retry={()=>void query.refetch()}/></main>
+  if(query.error&&!query.data)return <main className={s.page}><Failure error={query.error} retry={()=>void query.refetch()}/></main>
   const items=query.data?.items??[]
-  return <main className={s.page}><h1>{t('applications.review')}</h1><p>{t('applications.private')}</p>{!enabled&&<p>{t('applications.disabled')}</p>}
-    {!items.length&&<p>{t('applications.emptyItems')}</p>}{items.map(item=><ReviewItem key={item.id} guildId={guildId} item={item} enabled={enabled}/>)}
-    {before&&<button onClick={()=>setBefore(undefined)}>{t('applications.latest')}</button>}
-    {items.length===50&&<button onClick={()=>setBefore(items[items.length-1].id)}>{t('applications.older')}</button>}</main>
+  return <main className={s.page}><h1>{t('applications.review')}</h1>{query.error&&<Failure error={query.error} retry={()=>void query.refetch()}/>}<p>{t('applications.private')}</p>{!enabled&&<p>{t('applications.disabled')}</p>}
+    {!items.length&&<p>{t('applications.emptyItems')}</p>}{items.map(item=><ReviewItem key={item.id} guildId={guildId} item={item} enabled={enabled&&!query.error} onBusy={onBusy}/>)}
+    {before&&<button disabled={busy} onClick={()=>setBefore(undefined)}>{t('applications.latest')}</button>}
+    {items.length===50&&<button disabled={busy} onClick={()=>setBefore(items[items.length-1].id)}>{t('applications.older')}</button>}</main>
 }

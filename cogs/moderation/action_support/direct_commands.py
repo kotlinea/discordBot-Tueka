@@ -34,8 +34,8 @@ class SafetyCog(commands.Cog):
     async def _apply_case(self, guild: discord.Guild, member: discord.Member, action: str, reason: str | None, moderator_id: int | None, minutes: int = 0, notify: bool = True) -> None:
         await self.moderation.apply_case(guild_ref(guild), member_ref(member), action, reason, moderator_id, minutes, notify)
 
-    async def _warn(self, guild: discord.Guild, member: discord.Member, reason: str | None, moderator_id: int | None) -> int:
-        return await self.moderation.warn(guild_ref(guild), member_ref(member), reason, moderator_id)
+    async def _warn(self, guild: discord.Guild, member: discord.Member, reason: str | None, moderator_id: int | None, execution_key: str | None = None) -> int:
+        return await self.moderation.warn(guild_ref(guild), member_ref(member), reason, moderator_id, execution_key=execution_key)
 
     @app_commands.command(description="メンバーに警告を与えます。")
     @app_commands.checks.has_permissions(moderate_members=True)
@@ -48,7 +48,7 @@ class SafetyCog(commands.Cog):
         if error:
             await interaction.response.send_message(error, ephemeral=True)
             return
-        count = await self._warn(interaction.guild, member, reason, interaction.user.id)
+        count = await self._warn(interaction.guild, member, reason, interaction.user.id, str(interaction.id))
         await interaction.response.send_message(f"{member.mention} に警告しました（現在 {count} 回）。", ephemeral=True)
 
     @app_commands.command(description="メンバーを一時的にタイムアウトします。")

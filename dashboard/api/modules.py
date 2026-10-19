@@ -54,6 +54,9 @@ def create_router(context: ApiContext) -> APIRouter:
                 if not permissions & ADMINISTRATOR and any((not permissions & PERMISSION_BITS[name] for name in required)):
                     raise ValueError('missing_permissions')
             access.validate(bool(body.get('enabled')), values)
+            resource_validator = getattr(access, 'validate_resources', None)
+            if resource_validator is not None:
+                resource_validator(bool(body.get('enabled')), values, snapshot)
             saved = access.save(guild_id, enabled=bool(body.get('enabled')), settings=_normalize_resource_ids(values), expected_revision=int(body['revision']) if body.get('revision') is not None else None)
             return {**saved, 'settings': _serialize_resource_ids(saved['settings'])}
         except RuntimeError as exc:

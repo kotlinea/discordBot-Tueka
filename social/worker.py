@@ -49,10 +49,11 @@ class SocialWorker:
         if target["status"] == "orphaned":
             try:
                 await adapter.unsubscribe(target)
-                self.repository.delete_social_target(target["id"], target["lease_owner"])
+                if not self.repository.delete_social_target(target["id"], target["lease_owner"]):
+                    self.repository.resume_social_target_after_cleanup(target["id"])
             except Exception as exc:
                 self.repository.complete_social_target(target["id"], target["lease_owner"], status="orphaned", cursor=target.get("cursor", {}),
-                    next_check_at=int(time.time()) + 3600, error=str(exc)[:500])
+                    next_check_at=int(time.time()) + 3600, error=str(exc)[:500], observed_wake_revision=target.get('wake_revision'))
             return
         initialize = not target.get("cursor")
         try:
@@ -64,6 +65,7 @@ class SocialWorker:
             self.repository.complete_social_target(target["id"], target["lease_owner"], status=result.status, cursor=result.cursor,
                 next_check_at=int(time.time()) + interval + jitter, external_id=result.external_id, handle=result.handle,
                 display_name=result.display_name, avatar_url=result.avatar_url, error=result.error,
+                observed_wake_revision=target.get('wake_revision'),
                 events=[{'external_id': event.external_id, 'account_id': account_id, 'event_type': event.event_type,
                          'payload': event.payload, 'occurred_at': event.occurred_at} for event in result.events])
         except Exception as exc:
@@ -73,7 +75,7 @@ class SocialWorker:
             delay = min(3600, 30 * (2 ** min(failures, 7))) + random.randint(0, 15)
             status = "error" if initialize else "degraded"
             self.repository.complete_social_target(target["id"], target["lease_owner"], status=status, cursor=target.get("cursor", {}),
-                next_check_at=int(time.time()) + delay, error=str(exc)[:500])
+                next_check_at=int(time.time()) + delay, error=str(exc)[:500], observed_wake_revision=target.get('wake_revision'))
             log.warning("social target check failed provider=%s target_id=%s error=%s", provider, target["id"], type(exc).__name__)
 
     async def poll_loop(self, client: httpx.AsyncClient) -> None:
@@ -134,11 +136,15 @@ class SocialWorker:
                                 target = self.repository.social_target(target_id)
                                 if not target or not post.get("id"):
                                     continue
+                                external_id = target.get("external_id")
+                                author_id = post.get("author_id")
+                                if not external_id or not author_id or str(author_id) != str(external_id):
+                                    continue
                                 handle = target.get("handle") or target["account_key"]
                                 payload = {"account": target.get("display_name") or handle, "handle": handle, "title": f"@{handle} の新しい投稿",
                                     "text": post.get("text", ""), "url": f"https://x.com/{handle}/status/{post['id']}", "platform": "X", "event": "post",
                                     "published_at": post.get("created_at", ""), "thumbnail": "", "avatar": target.get("avatar_url") or "", "viewer_count": ""}
-                                self.repository.enqueue_social_event_v2("x", post["id"], str(target.get("external_id") or handle), "post", payload)
+                                self.repository.enqueue_social_event_v2("x", post["id"], str(external_id), "post", payload)
                 backoff = 5
             except Exception as exc:
                 log.warning("X stream disconnected error=%s", type(exc).__name__)

@@ -2,6 +2,33 @@
 from datetime import datetime, timezone
 
 
+def bounded_embed(value):
+    """Fit rendered previews and their receipt footer into one Discord embed."""
+    result = dict(value)
+    remaining = 6000
+    # Reserve the receipt before fitting visible text so recovery can still find it.
+    for kind, field, maximum in (('footer', 'text', 2048), ('author', 'name', 256)):
+        if result.get(kind):
+            part = dict(result[kind])
+            part[field] = str(part.get(field) or '')[:maximum]
+            remaining -= len(part[field])
+            result[kind] = part
+    result['title'] = str(result.get('title') or '')[:256]
+    remaining -= len(result['title'])
+    fields = list(result.get('fields') or [])[:25]
+    fitted = []
+    for index, field in enumerate(fields):
+        # Keep at least a name and value for every remaining preview field.
+        reserve = (len(fields) - index - 1) * 2
+        name = str(field.get('name') or '-')[:min(256, remaining - reserve - 1)]
+        content = str(field.get('value') or '-')[:min(1024, remaining - reserve - len(name))]
+        fitted.append({**field, 'name': name, 'value': content})
+        remaining -= len(name) + len(content)
+    result['fields'] = fitted
+    result['description'] = str(result.get('description') or '')[:min(4096, remaining)]
+    return result
+
+
 def welcome(ticket, panel, member, team, answers):
     replacements = {'ticket_number': ticket['ticket_number'], 'user': f"<@{member['id']}>",
         'username': member['name'], 'user_id': member['id'], 'panel': panel['name'], 'team': (team or {}).get('name', 'Support')}
@@ -25,9 +52,11 @@ def welcome(ticket, panel, member, team, answers):
     for kind in ('image', 'thumbnail'):
         if config.get(kind + '_url'):
             embed[kind] = {'url': config[kind + '_url']}
-    embed['fields'] = [{'name': render(field['name']), 'value': render(field['value']), 'inline': bool(field.get('inline'))}
-                       for field in config.get('fields', [])]
-    embed['fields'].extend({'name': key[:256], 'value': value[:1024] or '-', 'inline': False} for key, value in answers.items())
+    answer_fields = [{'name': key[:256], 'value': value[:1024] or '-', 'inline': False} for key, value in answers.items()][:25]
+    embed['fields'] = answer_fields + [
+        {'name': render(field['name']), 'value': render(field['value']), 'inline': bool(field.get('inline'))}
+        for field in config.get('fields', [])[:25 - len(answer_fields)]]
+    embed = bounded_embed(embed)
     buttons = []
     for enabled, label, action, style in (
         (panel.get('show_claim_button') and panel['mode'] == 'channel', 'Claim', 'claim', 2),

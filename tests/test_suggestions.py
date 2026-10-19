@@ -11,6 +11,7 @@ class SuggestionTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.repository = SuggestionRepository(prepare_database(Path(self.directory.name) / "suggestions.sqlite3", self.addCleanup))
         self.service = SuggestionService(self.repository)
+        self.repository.settings.set_module(1, 'suggestions', enabled=True, settings={'channel_id': 10})
 
     def tearDown(self):
         self.directory.cleanup()

@@ -32,7 +32,7 @@ export function ModuleSettings({ feature, renderField, title, description, actio
     if (feature && !form.formState.isDirty && feature.revision > form.getValues('revision')) {
       form.reset({ enabled: feature.enabled, settings: feature.settings, revision: feature.revision })
     }
-  }, [feature, form])
+  }, [feature, form, form.formState.isDirty])
   const save = useSaveMutation({
     mutationFn: (value: Value) => request('PUT /api/v1/guilds/{guild_id}/modules/{module_id}', `/guilds/${guildId}/modules/${feature!.id}`, { method: 'PUT', body: encodeBody('PUT /api/v1/guilds/{guild_id}/modules/{module_id}', value) }),
     onSuccess: async value => {

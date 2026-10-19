@@ -70,7 +70,7 @@ Find each command’s purpose, arguments, permissions and response visibility. R
 - **Purpose**: Ask Gemini a question.
 - **Arguments (* required)**: message*:string
 - **Permissions**: Members with access to the server/channel.
-- **Response**: Responses and generation errors are public; the unconfigured notice is private.
+- **Response**: Responses and generation errors are public. Replies over 2000 characters are sent as a text file, with mentions disabled. The unconfigured notice is private.
 - **When disabled**: Unavailable unless enabled/configured by the system operator.
 - **Example**: `/gemini message:Hello`
 

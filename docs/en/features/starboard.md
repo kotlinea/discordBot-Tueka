@@ -8,7 +8,11 @@ Highlight posts from explicitly selected channels based on reaction votes. Guild
 
 ## Sources and votes
 
-Choose 1–25 source channels. Selecting a parent includes its threads; up to 25 channels or threads can be excluded. NSFW posts and Bot posts are excluded. Votes from Bots and the source author do not count. Normal and super reactions count together, once per person.
+Choose 1–25 source channels. Selecting a parent includes its public threads. To highlight a private thread, add that thread ID explicitly as a source. Parent selection alone does not fetch private thread bodies or voters. Up to 25 channels or threads can be excluded. NSFW posts and Bot posts are excluded. Votes from Bots and the source author do not count. Normal and super reactions count together, once per person.
+
+Explicitly selecting a private thread publishes its content to the destination. Confirm that everyone who can view the destination may see that content.
+
+Existing private-thread highlights are checked when the source is next fetched or the highlight is updated. They are withdrawn if the thread is not explicitly selected. Existing highlights may remain until that processing occurs.
 
 Thresholds range from 1 to 100 people. Counting is limited to 5,000 users; larger reactions fail rather than publishing a partial count. The Bot needs source viewing/history permissions and destination message/embed permissions.
 
@@ -25,5 +29,7 @@ An uncertain send is reconciled against the latest 200 destination messages. If 
 Turning the whole feature OFF stops fetching and delivery. Records remain readable within retention. Disabling an individual board withdraws its highlights; withdrawal waits while the whole feature is OFF.
 
 New records capture 1–365 retention days, default 30. Settings changes do not extend existing records. Expired content, history and jobs are removed. Retention does not automatically delete Discord source posts or highlight posts. Tracking ends at expiry; manage any remaining Discord highlights directly.
+
+Only the board ID and source message ID remain for the lifetime of the board to prevent highlighting the same source again. Content, scores and author information expire with the record. IDs of sources whose records have already been purged cannot be recovered, so those sources may be highlighted again.
 
 Each board holds up to 1,000 unexpired highlight records. A Guild has up to 1,000 pending source fetches, with a one-day event processing deadline. Repeated pending events for one post are coalesced. Backups include configuration, retained records and receipts.

@@ -77,13 +77,17 @@ class ApplicationRepository:
                 (guild,form_id,author)).fetchone()
             if previous and previous['expires_at'] > now and previous['status'] in ('pending','reviewing'):
                 raise RuntimeError('application_open')
-            if previous and now < previous['created_at'] + form['cooldown_seconds']:
+            cooldown = c.execute('SELECT submitted_at FROM application_cooldowns WHERE guild_id=%s AND form_id=%s AND author_id=%s',
+                (guild,form_id,author)).fetchone()
+            if cooldown and now < cooldown['submitted_at'] + form['cooldown_seconds']:
                 raise RuntimeError('application_cooldown')
             # Expired pending entries cannot block the partial unique index.
             c.execute('DELETE FROM applications WHERE form_id=%s AND author_id=%s AND expires_at<=%s', (form_id,author,now))
             row = c.execute('INSERT INTO applications(guild_id,form_id,author_id,interaction_id,snapshot_json,answers_json,created_at,updated_at,expires_at) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *',
                 (guild,form_id,author,interaction_id,json.dumps(form),json.dumps(normalized),now,now,now+form['retention_days']*86400)).fetchone()
             c.execute("INSERT INTO application_events(application_id,actor_id,event_type,created_at) VALUES(%s,%s,'submitted',%s)", (row['id'],author,now))
+            c.execute('INSERT INTO application_cooldowns(guild_id,form_id,author_id,submitted_at) VALUES(%s,%s,%s,%s) ON CONFLICT(guild_id,form_id,author_id) DO UPDATE SET submitted_at=EXCLUDED.submitted_at',
+                (guild,form_id,author,now))
             return self._item(row)
 
     def items(self, guild, *, author=None, before=None, limit=50):
@@ -117,6 +121,12 @@ class ApplicationRepository:
             return self._item(row)
 
     def purge_expired(self, *, now=None):
+        now = int(time.time()) if now is None else now
         with transaction(self.database_url) as c:
             # Bounded batches; all Guilds, including disabled ones. Cascades answers' audit.
-            return c.execute('DELETE FROM applications WHERE id IN (SELECT id FROM applications WHERE expires_at<=%s ORDER BY expires_at LIMIT 500)', (int(time.time()) if now is None else now,)).rowcount
+            deleted = c.execute('DELETE FROM applications WHERE id IN (SELECT id FROM applications WHERE expires_at<=%s ORDER BY expires_at LIMIT 500)', (now,)).rowcount
+            # Retain the latest timestamp for the maximum permitted cooldown (30 days).
+            # Recheck its age after a concurrent intake updates the selected row.
+            c.execute('DELETE FROM application_cooldowns WHERE submitted_at<=%s AND (guild_id,form_id,author_id) IN (SELECT guild_id,form_id,author_id FROM application_cooldowns WHERE submitted_at<=%s ORDER BY submitted_at LIMIT 500)',
+                (now-2592000,now-2592000))
+            return deleted

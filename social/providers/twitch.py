@@ -22,21 +22,31 @@ class TwitchAdapter(ProviderAdapter):
             raise RuntimeError("Twitch credentials are not configured")
         token = await self._token()
         headers = {"Client-Id": self.settings.twitch_client_id, "Authorization": f"Bearer {token}"}
-        user_response = await self.client.get("https://api.twitch.tv/helix/users", params={"login": target["account_key"]}, headers=headers)
+        identity = {"id": target['external_id']} if target.get('external_id') else {"login": target['account_key']}
+        user_response = await self.client.get("https://api.twitch.tv/helix/users", params=identity, headers=headers)
         user_response.raise_for_status()
         users = user_response.json().get("data", [])
         if not users:
             raise ValueError("Twitch account was not found")
         user = users[0]
+        if target.get('external_id') and str(user['id']) != str(target['external_id']):
+            raise RuntimeError('Twitch account identity did not match the monitored user')
         stream_response = await self.client.get("https://api.twitch.tv/helix/streams", params={"user_id": user["id"]}, headers=headers)
         stream_response.raise_for_status()
         streams = stream_response.json().get("data", [])
         live, was_live = bool(streams), bool(target.get("cursor", {}).get("live"))
+        previous_id = target.get('cursor', {}).get('stream_id')
+        stream_id = streams[0].get('id') if streams else None
+        changed = live and was_live and previous_id and stream_id and str(previous_id) != str(stream_id)
         events: list[SocialEvent] = []
-        if not initialize and live != was_live:
-            event_type = "live_start" if live else "live_end"
-            stream = streams[0] if streams else {}
-            events.append(SocialEvent(str(stream.get("id") or target.get("cursor", {}).get("stream_id") or int(time.time())), event_type, {
+        transitions = []
+        if not initialize:
+            if was_live and (not live or changed):
+                transitions.append(('live_end', {}, previous_id))
+            if live and (not was_live or changed):
+                transitions.append(('live_start', streams[0], stream_id))
+        for event_type, stream, event_id in transitions:
+            events.append(SocialEvent(str(event_id or int(time.time())), event_type, {
                 "account": user["display_name"], "handle": user["login"], "title": stream.get("title") or f"{user['display_name']} の配信",
                 "text": stream.get("game_name", ""), "url": f"https://twitch.tv/{user['login']}", "platform": "Twitch", "event": event_type,
                 "published_at": stream.get("started_at", ""), "thumbnail": str(stream.get("thumbnail_url", "")).replace("{width}", "1280").replace("{height}", "720"),

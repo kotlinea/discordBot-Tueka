@@ -172,11 +172,13 @@ class ModerationRepository:
             rule_id: int | None = None, actor_id: int | None = None, actor_kind: str = "human", target_user_id: int | None = None,
             channel_id: int | None = None, target_id: int | None = None, evidence_text: str | None = None,
             evidence: dict[str, Any] | None = None, mode: str = "enforce", retention_days: int = 30,
-            dedupe_key: str | None = None) -> int | None:
+            dedupe_key: str | None = None, lease=None) -> int | None:
         now = int(time.time())
         has_evidence = bool(evidence_text or evidence)
         expires = now + max(1, min(retention_days, 365)) * 86400 if has_evidence else None
         with self._connection() as connection:
+            if lease:
+                lease.guard(connection)
             cursor = connection.execute('INSERT INTO moderation_events\n                (guild_id,rule_id,family,event_type,source,actor_id,actor_kind,target_user_id,channel_id,target_id,reason,evidence_text,evidence_json,mode,created_at,evidence_expires_at,dedupe_key)\n                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING RETURNING id', (guild_id,rule_id,family,event_type,source,actor_id,actor_kind,target_user_id,
                 channel_id,target_id,reason,evidence_text[:1000] if evidence_text else None,json.dumps(evidence or {},ensure_ascii=False),mode,now,expires,dedupe_key))
             inserted = cursor.fetchone()
@@ -332,6 +334,92 @@ class ModerationRepository:
             cursor = connection.execute("UPDATE moderation_points SET revoked_at=%s WHERE guild_id=%s AND user_id=%s AND revoked_at IS NULL", (int(time.time()),guild_id,user_id))
         return cursor.rowcount
 
+    def add_points_case(self, guild_id, user_id, points, reason, *, execution_key, thresholds,
+            moderator_id=None, dm_sent=False, moderation_rule_id=None, moderation_event_id=None,
+            expires_at=None, source='manual'):
+        """Persist the point transition, Case, and threshold delivery as one operation."""
+        if not 1 <= points <= 1000:
+            raise ValueError('Points must be between 1 and 1000')
+        now, key = int(time.time()), 'points:' + execution_key
+        with self._connection() as c:
+            lock_resource(c, 'moderation-points', f'{guild_id}:{user_id}')
+            existing = c.execute("SELECT evidence_json,case_id FROM moderation_events WHERE guild_id=%s AND dedupe_key=%s AND source='points_execution'", (guild_id, key)).fetchone()
+            if existing:
+                result = json.loads(existing['evidence_json'])
+                if not result or result.get('user_id') != user_id:
+                    raise ValueError('Point operation snapshot unavailable')
+                return {**result, 'case_id': existing['case_id']}
+            before = int(c.execute('''SELECT COALESCE(SUM(points),0) AS total FROM moderation_points
+                WHERE guild_id=%s AND user_id=%s AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>%s)''',
+                (guild_id, user_id, now)).fetchone()['total'])
+            after = before + points
+            crossed = [item for item in thresholds if before < int(item.get('points', 0)) <= after]
+            threshold = max(crossed, key=lambda item: int(item['points'])) if crossed else None
+            if threshold and (threshold.get('action') or {}).get('type') not in {'timeout', 'kick', 'ban', 'tempban'}:
+                threshold = None
+            point_id = c.execute('''INSERT INTO moderation_points(guild_id,user_id,points,reason,moderation_rule_id,moderation_event_id,created_at,expires_at)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id''',
+                (guild_id, user_id, points, reason, moderation_rule_id, moderation_event_id, now, expires_at)).fetchone()['id']
+            case_id = self._insert_case(c, guild_id, user_id, 'warn', reason, moderator_id, expires_at, dm_sent,
+                moderation_event_id, moderation_rule_id, source, points, now)
+            snapshot = {'guild_id': guild_id, 'user_id': user_id, 'point_id': point_id, 'before': before,
+                'after': after, 'threshold': threshold, 'parent_event_id': moderation_event_id,
+                'rule_id': moderation_rule_id, 'reason': reason}
+            event_id = c.execute('''INSERT INTO moderation_events(guild_id,family,event_type,source,actor_id,
+                target_user_id,reason,evidence_json,created_at,evidence_expires_at,dedupe_key,case_id)
+                VALUES(%s,'infraction','infraction_change','points_execution',%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id''',
+                (guild_id, moderator_id, user_id, reason or '', json.dumps(snapshot), now, now + 30 * 86400, key, case_id)).fetchone()['id']
+            snapshot['event_id'] = event_id
+            if threshold:
+                request_id = c.execute('''INSERT INTO moderation_action_requests(guild_id,moderator_id,target_user_id,
+                    action,reason,options_json,created_at,dedupe_key) VALUES(%s,0,%s,'threshold',%s,%s,%s,%s) RETURNING id''',
+                    (guild_id, user_id, reason, json.dumps({'point_event_id': event_id}), now, f'threshold:{event_id}')).fetchone()['id']
+                snapshot['request_id'] = request_id
+            c.execute('UPDATE moderation_events SET evidence_json=%s WHERE id=%s', (json.dumps(snapshot), event_id))
+        return {**snapshot, 'case_id': case_id}
+
+    def threshold_intent(self, request_id):
+        """Internal privilege comes from the atomic DB operation, never an options flag."""
+        with self._connection() as c:
+            request = c.execute("SELECT * FROM moderation_action_requests WHERE id=%s AND action='threshold' AND moderator_id=0", (request_id,)).fetchone()
+            if request is None:
+                return None
+            options = json.loads(request['options_json'])
+            event = c.execute("SELECT * FROM moderation_events WHERE id=%s AND source='points_execution' AND guild_id=%s AND target_user_id=%s",
+                (options.get('point_event_id'), request['guild_id'], request['target_user_id'])).fetchone()
+            if event is None or request['dedupe_key'] != f"threshold:{event['id']}":
+                return None
+            snapshot = json.loads(event['evidence_json'])
+            case = c.execute("SELECT id FROM moderation_cases WHERE id=%s AND guild_id=%s AND user_id=%s AND action='warn' AND points>0",
+                (event['case_id'], request['guild_id'], request['target_user_id'])).fetchone()
+            point = c.execute('SELECT id FROM moderation_points WHERE id=%s AND guild_id=%s AND user_id=%s AND points>0',
+                (snapshot.get('point_id'), request['guild_id'], request['target_user_id'])).fetchone()
+            if (not case or not point or snapshot.get('guild_id') != request['guild_id']
+                    or snapshot.get('user_id') != request['target_user_id'] or snapshot.get('request_id') != request_id
+                    or snapshot.get('event_id') != event['id'] or not snapshot.get('threshold')):
+                return None
+        return snapshot
+
+    def expiring_tempban(self, pending, *, lease):
+        with self._connection() as c:
+            lease.guard(c)
+            claim = pending.get('_lease') or {}
+            owned = c.execute("SELECT lease_until FROM scheduled_moderation_actions WHERE id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s FOR UPDATE",
+                (pending['id'], claim.get('owner'), claim.get('token'))).fetchone()
+            if not owned or owned['lease_until'] is None or owned['lease_until'] <= int(time.time()):
+                from jobs import LostLease
+                raise LostLease('Scheduled sanction claim expired or changed')
+            receipt = c.execute('''SELECT e.*,m.expires_at FROM moderation_events e
+                LEFT JOIN moderation_cases m ON m.id=e.case_id
+                WHERE e.guild_id=%s AND e.target_user_id=%s AND e.source='case_execution'
+                AND COALESCE(m.action,e.evidence_json::jsonb->>'action') IN ('ban','tempban','unban','softban')
+                ORDER BY e.id DESC LIMIT 1''', (pending['guild_id'], pending['user_id'])).fetchone()
+            if receipt is None or receipt['case_id'] != pending.get('case_id'):
+                return None
+            case = c.execute("SELECT id FROM moderation_cases WHERE id=%s AND guild_id=%s AND user_id=%s AND action='tempban'",
+                (pending['case_id'], pending['guild_id'], pending['user_id'])).fetchone()
+            return dict(receipt) if case else None
+
     def clear_warnings(self, guild_id: int, user_id: int) -> int:
         with self._connection() as connection:
             lock_resource(connection, "moderation-points", f"{guild_id}:{user_id}")
@@ -353,32 +441,49 @@ class ModerationRepository:
 
     def purge_moderation_evidence(self, now: int | None = None) -> int:
         with self._connection() as connection:
-            cursor = connection.execute("UPDATE moderation_events SET evidence_text=NULL,evidence_json='{}',evidence_expires_at=NULL WHERE evidence_expires_at IS NOT NULL AND evidence_expires_at<=%s AND NOT(source='case_execution' AND case_id IS NULL)", (int(time.time()) if now is None else now,))
+            cursor = connection.execute("""UPDATE moderation_events e SET evidence_text=NULL,evidence_json='{}',evidence_expires_at=NULL
+                WHERE evidence_expires_at IS NOT NULL AND evidence_expires_at<=%s
+                AND NOT(source='case_execution' AND case_id IS NULL)
+                AND NOT EXISTS(SELECT 1 FROM scheduled_moderation_actions s WHERE s.case_id=e.case_id AND s.status IN ('pending','retry','processing'))
+                AND NOT EXISTS(SELECT 1 FROM moderation_action_requests r WHERE r.dedupe_key='threshold:' || e.id::text
+                    AND r.action='threshold' AND r.status IN ('pending','retry','processing'))""", (int(time.time()) if now is None else now,))
         return cursor.rowcount
 
     def add_case(self, guild_id: int, user_id: int, action: str, reason: str | None, moderator_id: int | None = None,
                  expires_at: int | None = None, dm_sent: bool = False, *, moderation_event_id: int | None = None,
                  moderation_rule_id: int | None = None, source: str = "manual", points: int = 0,
-                 execution_event_id: int | None = None) -> int:
-        weights = {"warn": -10, "timeout": -20, "kick": -30, "ban": -40, "spam": -15, "anti_spam": -15, "chat_filter": -10, "phishing": -20}
+                 execution_event_id: int | None = None, lease=None) -> int:
         now = int(time.time())
         with self._connection() as c:
+            if lease:
+                lease.guard(c)
             if execution_event_id is not None:
                 receipt = c.execute("SELECT case_id FROM moderation_events WHERE id=%s AND guild_id=%s AND source='case_execution' FOR UPDATE", (execution_event_id, guild_id)).fetchone()
                 if receipt is None:
                     raise ValueError('Execution intent not found')
                 if receipt['case_id'] is not None:
                     return int(receipt['case_id'])
-            cursor = c.execute('INSERT INTO moderation_cases\n                (guild_id,user_id,moderator_id,action,reason,expires_at,dm_sent,created_at,moderation_event_id,moderation_rule_id,source,points)\n                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id', (guild_id,user_id,moderator_id,action,reason,expires_at,int(dm_sent),now,moderation_event_id,moderation_rule_id,source,points))
-            inserted = cursor.fetchone()
-            trust_enabled = c.execute("SELECT enabled FROM guild_modules WHERE guild_id=%s AND module_id='trust_score'", (guild_id,)).fetchone()
-            if action in weights and trust_enabled and trust_enabled["enabled"]:
-                c.execute("INSERT INTO trust_events (guild_id,user_id,category,weight,reason,created_at) VALUES (%s,%s,%s,%s,%s,%s)", (guild_id, user_id, action, weights[action], reason, now))
+            case_id = self._insert_case(c, guild_id, user_id, action, reason, moderator_id, expires_at, dm_sent,
+                moderation_event_id, moderation_rule_id, source, points, now)
             if execution_event_id is not None:
-                c.execute('UPDATE moderation_events SET case_id=%s WHERE id=%s', (inserted["id"], execution_event_id))
+                c.execute('UPDATE moderation_events SET case_id=%s WHERE id=%s', (case_id, execution_event_id))
                 if action == 'tempban' and expires_at is not None:
-                    c.execute("INSERT INTO scheduled_moderation_actions(guild_id,user_id,action,due_at,reason,case_id) VALUES(%s,%s,'unban',%s,%s,%s)", (guild_id, user_id, expires_at, reason, inserted["id"]))
-        return int(inserted["id"])
+                    c.execute("INSERT INTO scheduled_moderation_actions(guild_id,user_id,action,due_at,reason,case_id) VALUES(%s,%s,'unban',%s,%s,%s)", (guild_id, user_id, expires_at, reason, case_id))
+        return case_id
+
+    @staticmethod
+    def _insert_case(c, guild_id, user_id, action, reason, moderator_id, expires_at, dm_sent,
+            moderation_event_id, moderation_rule_id, source, points, now):
+        weights = {'warn': -10, 'timeout': -20, 'kick': -30, 'ban': -40, 'spam': -15, 'anti_spam': -15, 'chat_filter': -10, 'phishing': -20}
+        case_id = c.execute('''INSERT INTO moderation_cases
+            (guild_id,user_id,moderator_id,action,reason,expires_at,dm_sent,created_at,moderation_event_id,moderation_rule_id,source,points)
+            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id''',
+            (guild_id, user_id, moderator_id, action, reason, expires_at, int(dm_sent), now, moderation_event_id, moderation_rule_id, source, points)).fetchone()['id']
+        trust = c.execute("SELECT enabled FROM guild_modules WHERE guild_id=%s AND module_id='trust_score'", (guild_id,)).fetchone()
+        if action in weights and trust and trust['enabled']:
+            c.execute('INSERT INTO trust_events(guild_id,user_id,category,weight,reason,created_at) VALUES(%s,%s,%s,%s,%s,%s)',
+                (guild_id, user_id, action, weights[action], reason, now))
+        return int(case_id)
 
     def trust_score(self, guild_id: int, user_id: int, retention_days: int = 90) -> dict[str, Any]:
         cutoff = int(time.time()) - max(1, retention_days) * 86400

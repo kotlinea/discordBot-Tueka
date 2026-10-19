@@ -61,7 +61,7 @@ class StarboardCog(commands.Cog):
                         self.repository.delete_channel(guild,channel);continue
                     parent=target.parent_id if isinstance(target,discord.Thread) else None
                     if not {channel,parent}&set(config['source_channel_ids']) or {channel,parent}&set(config['excluded_channel_ids']):continue
-                    try:source,score=await self.adapter.source(guild,channel,message,config['emoji'])
+                    try:source,score=await self.adapter.source(guild,channel,message,config['emoji'],channel in config['source_channel_ids'])
                     except DiscordFailure as failure:
                         if failure.missing:self.repository.delete_source(guild,channel,[message])
                         else:raise

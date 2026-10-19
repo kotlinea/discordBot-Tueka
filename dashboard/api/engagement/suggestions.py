@@ -132,6 +132,8 @@ def create_router(context: ApiContext) -> APIRouter:
                 reason, expected_revision=body['revision'])
         except LookupError as exc:
             raise api_error(404, 'suggestion_not_found', '提案が見つかりません。') from exc
+        except PermissionError as exc:
+            raise api_error(409, 'suggestions_disabled', 'Suggestionsは無効です。') from exc
         except RuntimeError as exc:
             raise revision_conflict('提案が更新されています。再読み込みしてください。') from exc
         for key in ('author_id', 'channel_id', 'message_id', 'reviewer_id', 'discussion_thread_id'):

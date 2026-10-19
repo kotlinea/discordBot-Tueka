@@ -3,21 +3,29 @@ from jobs import Outcome, LostLease
 from discord_io import DiscordFailure
 
 
+class DeliveryPaused(DiscordFailure):
+    """Transport preparation finished, but no message send was attempted."""
+
+
 class AppealDeliveryService:
     def __init__(self, repository, port):
         self.repository, self.port = repository, port
 
     async def deliver(self, job):
-        item=self.repository.delivery(job)
-        if not item:
-            return Outcome('thread_expired_or_disabled',retry=True)
         if job['discord_message_id']:
             return Outcome()
+        item=self.repository.delivery(job)
+        if not item:
+            self.repository.pause_delivery(job)
+            raise LostLease('Appeal delivery paused before sending')
         recover=bool(job['delivery_started'])
         if not self.repository.delivery_state(job):
             raise LostLease('Appeal delivery lease lost')
         try:
             receipt=await self.port.notify(item,job['id'],recover=recover)
+        except DeliveryPaused:
+            self.repository.pause_delivery(job)
+            raise LostLease('Appeal delivery paused before sending')
         except DiscordFailure as exc:
             if not recover and not exc.partial:
                 if not self.repository.delivery_state(job,started=False):

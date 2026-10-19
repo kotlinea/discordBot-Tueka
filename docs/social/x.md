@@ -10,7 +10,7 @@ keywords: X API Filtered Stream poll since_id 429 credits
 
 ## 登録
 
-アカウントIDまたはハンドルと通知チャンネルを指定します。
+数値のアカウントIDまたはハンドルと通知チャンネルを指定します。
 
 ## 利用と確認
 

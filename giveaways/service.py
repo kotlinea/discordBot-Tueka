@@ -1,6 +1,7 @@
 """Live membership verification and durable draw/publication orchestration."""
+import asyncio
 from typing import Protocol
-from discord_io import DiscordFailure
+from discord_io import DiscordFailure, settle_external
 from jobs import LostLease, Outcome
 from .models import eligible
 
@@ -15,6 +16,8 @@ class GiveawayPort(Protocol):
 class GiveawayService:
     def __init__(self, repository, port: GiveawayPort):
         self.repo, self.port = repository, port
+
+    _external = staticmethod(settle_external)
 
     async def participate(self, guild, item, user, message, interaction, *, join):
         if not self.repo.settings.module_enabled(guild, 'giveaways'):
@@ -53,6 +56,10 @@ class GiveawayService:
             return Outcome(f'Campaign draw failed ({type(exc).__name__})', retry=True)
 
     async def publish(self, job):
+        campaign = None
+        external_started = False
+        settled = False
+        cancelled = False
         try:
             plan = self.repo.publication_plan(job)
             campaign = plan['campaign']
@@ -60,7 +67,8 @@ class GiveawayService:
             action = self.repo.publication_begin(job)
             if action == 'send':
                 try:
-                    message = await self.port.send(plan, marker)
+                    external_started = True
+                    message = await self._external(self.port.send(plan, marker))
                 except DiscordFailure as failure:
                     if not failure.partial:
                         self.repo.publication_not_sent(job)
@@ -71,11 +79,17 @@ class GiveawayService:
                 if message is None:
                     raise DiscordFailure('Campaign publication uncertain; receipt reconciliation required', partial=True)
                 self.repo.publication_receipt(job, message)
-                await self.port.edit(plan, message, marker)
+                external_started = True
+                await self._external(self.port.edit(plan, message, marker))
             else:
-                await self.port.edit(plan, campaign['message_id'], marker)
+                external_started = True
+                await self._external(self.port.edit(plan, campaign['message_id'], marker))
             self.repo.publication_settled(job, campaign['revision'])
+            settled = True
             return Outcome()
+        except asyncio.CancelledError:
+            cancelled = True
+            raise
         except LostLease:
             raise
         except DiscordFailure as failure:
@@ -84,3 +98,6 @@ class GiveawayService:
             return Outcome('Giveaways disabled', retry=True)
         except Exception as exc:
             return Outcome(f'Campaign publication failed ({type(exc).__name__})', retry=True)
+        finally:
+            if external_started and not settled:
+                self.repo.publication_repair(campaign['guild_id'], campaign['id'], job, cancelled=cancelled)

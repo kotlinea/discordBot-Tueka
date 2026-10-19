@@ -37,6 +37,7 @@ class EngagementRepository:
             if not 0 <= option_index < len(json.loads(poll["options_json"])):
                 return None
             c.execute("INSERT INTO poll_votes (message_id,user_id,option_index,created_at) VALUES (%s,%s,%s,%s) ON CONFLICT(message_id,user_id) DO UPDATE SET option_index=excluded.option_index,created_at=excluded.created_at", (message_id, user_id, option_index, int(time.time())))
+            c.execute("UPDATE polls SET display_revision=display_revision+1 WHERE message_id=%s", (message_id,))
             rows = c.execute("SELECT option_index,COUNT(*) AS votes FROM poll_votes WHERE message_id=%s GROUP BY option_index", (message_id,)).fetchall()
         counts = [0] * len(json.loads(poll["options_json"]))
         for row in rows:
@@ -47,5 +48,30 @@ class EngagementRepository:
         now = int(time.time())
         with self._connection() as c:
             rows = c.execute("SELECT * FROM polls WHERE status='open' AND closes_at IS NOT NULL AND closes_at<=%s FOR UPDATE SKIP LOCKED", (now,)).fetchall()
-            c.execute("UPDATE polls SET status='closed' WHERE message_id=ANY(%s)", ([row['message_id'] for row in rows],))
+            c.execute("UPDATE polls SET status='closed',display_revision=display_revision+1 WHERE message_id=ANY(%s)", ([row['message_id'] for row in rows],))
         return [dict(row) for row in rows]
+
+    def pending_poll_displays(self) -> list[int]:
+        with self._connection() as c:
+            rows = c.execute("SELECT message_id FROM polls WHERE display_revision<>synced_revision ORDER BY message_id").fetchall()
+        return [row['message_id'] for row in rows]
+
+    def poll_display(self, message_id: int) -> dict[str, Any] | None:
+        """Read revision, status and counts while votes/close share the row lock."""
+        with self._connection() as c:
+            row = c.execute("SELECT * FROM polls WHERE message_id=%s FOR UPDATE", (message_id,)).fetchone()
+            if not row:
+                return None
+            data = dict(row)
+            data['options'] = json.loads(data.pop('options_json'))
+            counts = [0] * len(data['options'])
+            for vote in c.execute("SELECT option_index,COUNT(*) AS votes FROM poll_votes WHERE message_id=%s GROUP BY option_index", (message_id,)).fetchall():
+                counts[vote['option_index']] = vote['votes']
+            data['counts'] = counts
+        return data
+
+    def mark_poll_display_synced(self, message_id: int, revision: int) -> None:
+        with self._connection() as c:
+            # A slower writer may finish after the latest writer already acked.
+            # Reset that ack too, so its stale external edit is repaired next tick.
+            c.execute("UPDATE polls SET synced_revision=CASE WHEN display_revision=%s THEN display_revision ELSE 0 END WHERE message_id=%s", (revision, message_id))

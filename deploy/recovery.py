@@ -109,7 +109,7 @@ def backup(directory, destination, *, resume_source=False):
             'observations': observations, 'artifacts': {name: digest(destination / name) for name in ARTIFACTS}}
         write_json(destination / 'manifest.json', manifest)
         if resume_source and was_running:
-            compose.execute(directory, 'up', '-d', '--no-deps', *sorted(was_running))
+            compose.execute(directory, 'up', '-d', '--no-deps', '--wait', '--wait-timeout', '120', *sorted(was_running))
     return manifest
 
 

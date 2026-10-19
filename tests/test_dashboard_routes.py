@@ -93,6 +93,7 @@ class DashboardRouteTests(unittest.TestCase):
                 spec = importlib.util.spec_from_file_location('api_docs_test', 'dashboard/app.py')
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
+                module.api.bot_user = AsyncMock(return_value={'id': '1', 'username': 'Offline Tueka', 'avatar': None})
                 client = TestClient(module.app, follow_redirects=False)
                 self.addCleanup(client.close)
                 for path in ('/api/docs', '/api/openapi.json'):

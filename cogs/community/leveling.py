@@ -1,4 +1,5 @@
 """Independent text and voice leveling with cumulative role rewards."""
+import logging
 import random
 import time
 
@@ -11,6 +12,7 @@ from guild_settings import GuildSettingsRepository
 
 
 MAX_REWARDS = 25
+LOGGER = logging.getLogger(__name__)
 
 
 def calculate_level(xp: int) -> tuple[int, int]:
@@ -88,37 +90,54 @@ class LevelingCog(commands.Cog):
         self.last_xp_time[key] = now
         if new_level > old_level:
             await self._on_level_up(message.author, new_level, module["settings"], "text")
+        else:
+            await self._grant_rewards(message.author, new_level, module["settings"].get("text_role_rewards", []))
 
     @tasks.loop(seconds=60)
     async def voice_xp_tick(self) -> None:
         now = time.monotonic()
         self.last_xp_time = {key: last for key, last in self.last_xp_time.items() if now - last < 60}
-        for guild_id in self.guild_settings.enabled_module_guild_ids("leveling"):
-            guild = self.bot.get_guild(guild_id)
-            if guild is None:
+        try:
+            guild_ids = self.guild_settings.enabled_module_guild_ids("leveling")
+        except Exception as error:
+            LOGGER.warning("Voice XP guild lookup failed (%s)", type(error).__name__)
+            return
+        for guild_id in guild_ids:
+            try:
+                guild = self.bot.get_guild(guild_id)
+                if guild is not None:
+                    await self._award_voice_guild(guild)
+            except Exception as error:
+                LOGGER.warning("Voice XP failed in guild %s (%s)", guild_id, type(error).__name__)
+
+    async def _award_voice_guild(self, guild: discord.Guild) -> None:
+        for channel in guild.voice_channels:
+            if guild.afk_channel and channel.id == guild.afk_channel.id:
                 continue
-            module = self.guild_settings.get_module(guild_id, "leveling")
-            settings = module["settings"]
-            if not module["enabled"] or not settings.get("voice_enabled"):
-                continue
-            amount = max(1, min(int(settings.get("voice_xp_per_minute", 5)), 100))
-            allow_solo = bool(settings.get("voice_allow_solo"))
-            allow_muted = bool(settings.get("voice_allow_muted"))
-            for channel in guild.voice_channels:
-                if guild.afk_channel and channel.id == guild.afk_channel.id:
-                    continue
-                humans = [member for member in channel.members if not member.bot]
-                if not allow_solo and len(humans) < 2:
-                    continue
-                for member in humans:
-                    state = member.voice
-                    if state is None or (not allow_muted and (state.self_mute or state.mute or state.self_deaf or state.deaf)):
+            humans = [member for member in channel.members if not member.bot]
+            for member in humans:
+                try:
+                    # Earlier members may have awaited Discord while settings changed.
+                    module = self.guild_settings.get_module(guild.id, "leveling")
+                    settings = module["settings"]
+                    if not module["enabled"] or not settings.get("voice_enabled"):
+                        return
+                    current_humans = [item for item in channel.members if not item.bot]
+                    if member not in current_humans or (not settings.get("voice_allow_solo") and len(current_humans) < 2):
                         continue
+                    state = member.voice
+                    if state is None or (not settings.get("voice_allow_muted") and (state.self_mute or state.mute or state.self_deaf or state.deaf)):
+                        continue
+                    amount = max(1, min(int(settings.get("voice_xp_per_minute", 5)), 100))
                     current = self.repository.add_voice_xp(guild.id, member.id, amount)
                     old_level, _ = calculate_level(current["xp"] - amount)
                     new_level, _ = calculate_level(current["xp"])
                     if new_level > old_level:
                         await self._on_level_up(member, new_level, settings, "voice")
+                    else:
+                        await self._grant_rewards(member, new_level, settings.get("voice_role_rewards", []))
+                except Exception as error:
+                    LOGGER.warning("Voice XP failed for member %s in guild %s (%s)", member.id, guild.id, type(error).__name__)
 
     @voice_xp_tick.before_loop
     async def before_voice_xp_tick(self) -> None:

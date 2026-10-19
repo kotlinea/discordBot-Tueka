@@ -78,6 +78,7 @@ class ObservabilityTests(unittest.TestCase):
 
     def test_delivery_delay_and_failed_attempt_are_visible_without_error_text(self):
         repository = SuggestionRepository(self.url)
+        repository.settings.set_module(1, 'suggestions', enabled=True, settings={})
         repository.create(1, 2, 3, {'idea': 'PRIVATE_BODY'})
         with transaction(self.url) as client:
             client.execute('UPDATE suggestion_outbox SET created_at=%s,available_at=%s', (int(time.time())-900, int(time.time())-900))

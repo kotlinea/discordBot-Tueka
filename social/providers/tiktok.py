@@ -53,12 +53,19 @@ class TikTokAdapter(ProviderAdapter):
         live_data = await self._extract(f"https://www.tiktok.com/@{handle}/live", offline_ok=True)
         live = bool(live_data and (live_data.get("is_live") or live_data.get("live_status") == "is_live"))
         was_live = bool(target.get("cursor", {}).get("live"))
-        live_id = str((live_data or {}).get("id") or target.get("cursor", {}).get("live_id") or handle)
-        if not initialize and live != was_live:
-            event_type = "live_start" if live else "live_end"
-            events.append(SocialEvent(live_id, event_type, {"account": data.get("uploader") or handle, "handle": handle,
-                "title": (live_data or {}).get("title") or f"@{handle} の配信", "text": (live_data or {}).get("description", ""),
+        previous_live_id = target.get("cursor", {}).get("live_id")
+        live_id = str((live_data or {}).get("id") or previous_live_id or handle)
+        replaced = bool(live and was_live and previous_live_id and live_id != str(previous_live_id))
+        transitions = []
+        if not initialize:
+            if was_live and (not live or replaced):
+                transitions.append((str(previous_live_id or handle), "live_end", {}))
+            if live and (not was_live or replaced):
+                transitions.append((live_id, "live_start", live_data or {}))
+        for event_id, event_type, details in transitions:
+            events.append(SocialEvent(event_id, event_type, {"account": data.get("uploader") or handle, "handle": handle,
+                "title": details.get("title") or f"@{handle} の配信", "text": details.get("description", ""),
                 "url": f"https://www.tiktok.com/@{handle}/live", "platform": "TikTok", "event": event_type,
-                "published_at": (live_data or {}).get("timestamp", ""), "thumbnail": (live_data or {}).get("thumbnail", ""),
-                "avatar": target.get("avatar_url") or "", "viewer_count": (live_data or {}).get("concurrent_view_count", "")}))
+                "published_at": details.get("timestamp", ""), "thumbnail": details.get("thumbnail", ""),
+                "avatar": target.get("avatar_url") or "", "viewer_count": details.get("concurrent_view_count", "")}))
         return PollResult({"seen": current, "live": live, "live_id": live_id}, events, handle, handle, data.get("uploader") or handle, target.get("avatar_url"), 60 if live else 120)

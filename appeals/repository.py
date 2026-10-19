@@ -78,7 +78,9 @@ class AppealRepository:
         with transaction(self.database_url) as c:
             self._item(c,guild,item_id,author=author)
             return {'messages':c.execute('SELECT id,actor_id,staff,content,created_at FROM appeal_messages WHERE thread_id=%s ORDER BY id LIMIT 100', (item_id,)).fetchall(),
-                    'events':c.execute('SELECT id,actor_id,event_type,reason,created_at FROM appeal_events WHERE thread_id=%s ORDER BY id DESC LIMIT 100', (item_id,)).fetchall(),
+                    'events':c.execute("SELECT id,actor_id,event_type,reason,created_at FROM appeal_events WHERE thread_id=%s AND "
+                        "(event_type IN ('reviewing','accepted','rejected','closed') OR id IN "
+                        '(SELECT id FROM appeal_events WHERE thread_id=%s ORDER BY id DESC LIMIT 100)) ORDER BY id DESC', (item_id,item_id)).fetchall(),
                     'delivery':c.execute('SELECT id,status,attempts,delivery_started,discord_message_id FROM appeal_outbox WHERE thread_id=%s ORDER BY id DESC LIMIT 100',(item_id,)).fetchall()}
 
     def reply(self, guild, item_id, actor, content, *, revision, staff=False, interaction=None):
@@ -148,6 +150,20 @@ class AppealRepository:
         with transaction(self.database_url) as c:
             return c.execute('UPDATE appeal_outbox SET delivery_started=%s,discord_message_id=%s WHERE id=%s AND lease_owner=%s AND lease_token=%s AND lease_until>%s AND status=\'processing\'',
                 (int(started),receipt,job['id'],job['_lease']['owner'],job['_lease']['token'],int(time.time()))).rowcount == 1
+
+    def delivery_allowed(self, item):
+        """Fresh eligibility after transport preparation, without an external await."""
+        with transaction(self.database_url) as c:
+            return c.execute('SELECT 1 FROM appeal_threads t JOIN guild_modules g ON g.guild_id=t.guild_id '
+                'WHERE t.id=%s AND t.guild_id=%s AND t.expires_at>%s AND g.module_id=%s AND g.enabled=1',
+                (item['id'],item['guild_id'],int(time.time()),'appeals')).fetchone() is not None
+
+    def pause_delivery(self, job):
+        """Restore the pre-claim state only after proving no send was attempted."""
+        with transaction(self.database_url) as c:
+            return c.execute("UPDATE appeal_outbox SET status=%s,attempts=%s,delivery_started=%s,lease_owner=NULL,lease_token=NULL,lease_until=NULL "
+                "WHERE id=%s AND lease_owner=%s AND lease_token=%s AND lease_until>%s AND status='processing' AND discord_message_id IS NULL",
+                (job['status'],job['attempts'],job['delivery_started'],job['id'],job['_lease']['owner'],job['_lease']['token'],int(time.time()))).rowcount == 1
 
     def purge_expired(self, now=None):
         with transaction(self.database_url) as c:

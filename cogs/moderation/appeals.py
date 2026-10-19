@@ -2,6 +2,7 @@
 import logging
 import os
 import socket
+from io import BytesIO
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -50,7 +51,7 @@ class AppealsCog(commands.Cog):
         url=bot.settings.database_url
         self.repository=AppealRepository(url)
         self.service=AppealService(self.repository,ModerationRepository(url),ApplicationRepository(url),None)
-        self.delivery=AppealDeliveryService(self.repository,DiscordAppealAdapter(bot))
+        self.delivery=AppealDeliveryService(self.repository,DiscordAppealAdapter(bot,send_allowed=self.repository.delivery_allowed))
         self.owner=f'appeals:{socket.gethostname()}:{os.getpid()}'
 
     async def cog_load(self):self.maintenance.start()
@@ -100,8 +101,15 @@ class AppealsCog(commands.Cog):
             else:
                 item=self.repository.item(guild,conversation_id,author=interaction.user.id)
                 detail=self.repository.conversation(guild,conversation_id,author=interaction.user.id)
-                body=f"#{item['id']} · {item['status']}\n"+'\n'.join(('管理者: ' if v['staff'] else '自分: ')+v['content'] for v in detail['messages'][-10:])
-            await interaction.followup.send(body[-1900:],ephemeral=True,allowed_mentions=discord.AllowedMentions.none())
+                body=f"#{item['id']} · {item['status']}\n"+'\n'.join(('管理者: ' if v['staff'] else '自分: ')+v['content'] for v in detail['messages'])
+                reviews=[v for v in reversed(detail['events']) if v['event_type'] in ('reviewing','accepted','rejected','closed')]
+                if reviews:
+                    body+='\n'+'\n'.join(f"審査: {v['event_type']}\n{v['reason']}" for v in reviews)
+            options={'ephemeral':True,'allowed_mentions':discord.AllowedMentions.none()}
+            if len(body.encode('utf-16-le'))//2 > 1900:
+                options['file']=discord.File(BytesIO(body.encode('utf-8')),filename=f'conversation-{conversation_id}.txt')
+                body=f"#{item['id']} · {item['status']}\n本文・返信・審査理由の全文を添付しました。"
+            await interaction.followup.send(body,**options)
         except (ValueError,LookupError):await interaction.followup.send('本人の保存期限内のやり取りを指定してください。',ephemeral=True)
 
     @app_commands.command(name='appeal-reply',description='自分の未解決のやり取りに返信します。')

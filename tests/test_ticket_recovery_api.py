@@ -26,6 +26,7 @@ class TicketRecoveryApiTests(unittest.TestCase):
             **{f'ticket_s3_{key}': '' for key in ('endpoint_url', 'region', 'bucket', 'access_key_id', 'secret_access_key', 'prefix')})
         DashboardRepository(database).create_dashboard_session('session', 'token', 3600)
         self.repo = TicketRepository(database)
+        self.repo.save_settings(1, {**self.repo.settings(1), 'enabled': True})
         team = self.repo.save_team(1, {'name': 'Staff', 'role_ids': [500]})
         self.bundle = self.repo.save_panel_bundle(1, {
             'panel': {'name': 'Support', 'mode': 'channel', 'category_id': 100, 'team_id': team['id']},

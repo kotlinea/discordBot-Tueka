@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import * as Dialog from '@radix-ui/react-dialog'
+import * as Dialog from '../components/WorkspaceDialog'
 import { ChevronRight, Search } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'

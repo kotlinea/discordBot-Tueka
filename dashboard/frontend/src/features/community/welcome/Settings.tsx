@@ -10,6 +10,7 @@ export default function WelcomeSettings({ features }: FeatureScreenProps) {
   const feature = features.find(item => item.id === 'welcome')
   return <ModuleSettings feature={feature} title={t('welcome.title')} description={t('welcome.description')} renderField={props => <SettingField {...props}
     label={t(`welcome.fields.${props.name}`)}
+    resource={props.name.endsWith('_channel_id') ? 'text' : undefined}
     options={props.name.endsWith('_format') ? [{ value: 'text', label: t('welcome.text') }, { value: 'embed', label: t('welcome.embed') }] : undefined}
     template={props.name.endsWith('_content') ? { variables, maxLength: 4096, multiline: true } : undefined}
   />}/>

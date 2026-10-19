@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -35,7 +35,7 @@ export function ScheduleEditor({guildId,item,enabled,channels,onBusy}:{guildId:s
   useUnsavedChanges(draft.dirty,save.isPending)
   useEffect(()=>{onBusy?.(draft.dirty||save.isPending);return()=>onBusy?.(false)},[draft.dirty,save.isPending,onBusy])
   const change=<K extends keyof Draft>(field:K,next:Draft[K])=>draft.setDraft({...value,[field]:next})
-  return <form className={s.applicationSection} aria-label={item?`${t('scheduling.edit')} #${item.id}`:t('scheduling.create')} onSubmit={event=>{event.preventDefault();save.mutate()}}>
+  return <form className={s.applicationSection} aria-label={item?`${t('scheduling.edit')} #${item.id}`:t('scheduling.create')} onSubmit={event=>{event.preventDefault();if(enabled)save.mutate()}}>
     <h2>{item?`${t('scheduling.edit')} #${item.id}`:t('scheduling.create')}</h2>
     <fieldset disabled={!enabled||save.isPending}>
       <label className={s.field}>{t('scheduling.kind')}<select value={value.kind} onChange={e=>draft.setDraft({...value,kind:e.target.value as Draft['kind'],interval_seconds:0,occurrences:1})}><option value="message">{t('scheduling.message')}</option><option value="event">{t('scheduling.event')}</option></select></label>
@@ -60,37 +60,43 @@ export function ScheduleEditor({guildId,item,enabled,channels,onBusy}:{guildId:s
   </form>
 }
 
-export function ScheduleCard({guildId,item,enabled,channels}:{guildId:string;item:ScheduleItem;enabled:boolean;channels:Resource[]}){
+export function ScheduleCard({guildId,item,enabled,channels,onBusy}:{guildId:string;item:ScheduleItem;enabled:boolean;channels:Resource[];onBusy?:(id:number,busy:boolean)=>void}){
   const {t,i18n}=useTranslation('scheduling');const qc=useQueryClient();const [expanded,setExpanded]=useState(false)
   const [editorBusy,setEditorBusy]=useState(false)
   const base=`/guilds/${guildId}/schedules/items/${item.id}`
   const detail=useQuery({queryKey:['scheduleHistory',guildId,item.id],enabled:expanded,queryFn:()=>request('GET /api/v1/guilds/{guild_id}/schedules/items/{item_id}/history',base+'/history')})
   const save=useSaveMutation({mutationFn:(job:number|null)=>job===null?request('POST /api/v1/guilds/{guild_id}/schedules/items/{item_id}/cancel',base+'/cancel',{body:encodeBody('POST /api/v1/guilds/{guild_id}/schedules/items/{item_id}/cancel',{revision:item.revision})}):request('POST /api/v1/guilds/{guild_id}/schedules/items/{item_id}/delivery/{job_id}/retry',base+`/delivery/${job}/retry`,{body:encodeBody('POST /api/v1/guilds/{guild_id}/schedules/items/{item_id}/delivery/{job_id}/retry',{revision:item.revision})}),onSuccess:async()=>{await Promise.all([qc.invalidateQueries({queryKey:['scheduleItems',guildId]}),qc.invalidateQueries({queryKey:['scheduleHistory',guildId,item.id]})])}})
+  useEffect(()=>{onBusy?.(item.id,editorBusy||save.isPending);return()=>onBusy?.(item.id,false)},[item.id,editorBusy,save.isPending,onBusy])
   const date=(n:number)=>new Intl.DateTimeFormat(i18n.language,{dateStyle:'medium',timeStyle:'short'}).format(n*1000)
   return <section className={s.applicationSection}><h2>#{item.id} · {item.payload.title||t(`scheduling.${item.payload.kind}`)}</h2><p>{t(`scheduling.status.${item.status}`)} · {date(item.next_due)} · {t('scheduling.remaining')}: {item.remaining}</p>
     <p style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{item.payload.body}</p>
     {item.payload.kind==='event'&&<p>{date(item.payload.event_start!)} — {date(item.payload.event_end!)} · {item.payload.event_location}</p>}
     <button aria-expanded={expanded} disabled={editorBusy} onClick={()=>setExpanded(!expanded)}>{t('scheduling.history')} #{item.id}</button>
-    {expanded&&(detail.isLoading?<Loading/>:detail.error?<Failure error={detail.error} retry={()=>void detail.refetch()}/>:<>
-      <ul>{detail.data?.delivery.map(job=><li key={job.id}>#{job.id} · {date(job.due_at)} · {job.status==='completed'?t('scheduling.delivered'):t(`scheduling.status.${job.status}`,{defaultValue:job.status})} · {job.discord_receipt_id??'—'}{job.status==='failed'&&<button disabled={!enabled||save.isPending||editorBusy||item.status==='cancelled'} onClick={()=>save.mutate(job.id)}>{t('scheduling.retry')} #{job.id}</button>}</li>)}</ul>
+    {expanded&&detail.error&&<Failure error={detail.error} retry={()=>void detail.refetch()}/>}
+    {expanded&&(detail.isLoading&&!detail.data?<Loading/>:!detail.data?null:<>
+      <ul>{detail.data?.delivery.map(job=><li key={job.id}>#{job.id} · {date(job.due_at)} · {job.status==='completed'?t('scheduling.delivered'):t(`scheduling.status.${job.status}`,{defaultValue:job.status})} · {job.discord_receipt_id??'—'}{job.status==='failed'&&<button disabled={!enabled||Boolean(detail.error)||save.isPending||editorBusy||item.status==='cancelled'} onClick={()=>save.mutate(job.id)}>{t('scheduling.retry')} #{job.id}</button>}</li>)}</ul>
       <ol>{detail.data?.events.map(event=><li key={event.id}>{date(event.created_at)} · {event.actor_id} · {t(`scheduling.status.${event.event_type}`,{defaultValue:event.event_type})} {event.detail}</li>)}</ol>
-      {((item.status==='scheduled'&&detail.data?.delivery.length===0)||editorBusy)&&<ScheduleEditor guildId={guildId} item={item} enabled={enabled&&item.status==='scheduled'} channels={channels} onBusy={setEditorBusy}/>}
+      {((item.status==='scheduled'&&detail.data?.delivery.length===0)||editorBusy)&&<ScheduleEditor guildId={guildId} item={item} enabled={enabled&&!detail.error&&item.status==='scheduled'} channels={channels} onBusy={setEditorBusy}/>}
     </>)}
-    {item.status!=='cancelled'&&<button disabled={!enabled||save.isPending||editorBusy} onClick={()=>{if(confirm(t('scheduling.cancelConfirm')))save.mutate(null)}}>{t('scheduling.cancel')} #{item.id}</button>}{save.error&&<Failure error={save.error}/>}</section>
+    {item.status!=='cancelled'&&<button disabled={!enabled||Boolean(detail.error)||save.isPending||editorBusy} onClick={()=>{if(confirm(t('scheduling.cancelConfirm')))save.mutate(null)}}>{t('scheduling.cancel')} #{item.id}</button>}{save.error&&<Failure error={save.error}/>}</section>
 }
 
 export default function Schedules({features}:FeatureScreenProps){
   const {guildId=''}=useParams();const {t}=useTranslation('scheduling');const [before,setBefore]=useState<number|undefined>()
+  const [editors,setEditors]=useState<Record<number,boolean>>({})
+  const onBusy=useCallback((id:number,busy:boolean)=>setEditors(old=>old[id]===busy?old:{...old,[id]:busy}),[])
+  const onCreateBusy=useCallback((busy:boolean)=>onBusy(0,busy),[onBusy])
+  const busy=Object.values(editors).some(Boolean)
   const query=useQuery({queryKey:['scheduleItems',guildId,before],queryFn:async()=>{
     const [items,resources]=await Promise.all([request('GET /api/v1/guilds/{guild_id}/schedules/items',`/guilds/${guildId}/schedules/items${before?`?before=${before}`:''}`),request('GET /api/v1/guilds/{guild_id}/resources',`/guilds/${guildId}/resources`)])
     return {...items,channels:resources.channels.filter(c=>c.type===0)}
   }})
   const enabled=Boolean(features.find(f=>f.id==='scheduled_messages')?.enabled)
   if(query.isLoading)return <Loading/>
-  if(query.error)return <main className={s.page}><Failure error={query.error} retry={()=>void query.refetch()}/></main>
+  if(query.error&&!query.data)return <main className={s.page}><Failure error={query.error} retry={()=>void query.refetch()}/></main>
   const items=query.data?.items??[];const channels=query.data?.channels??[]
-  return <main className={s.page}><h1>{t('scheduling.title')}</h1><p>{t('scheduling.help')}</p><p>{t('scheduling.warning')}</p>{!enabled&&<p>{t('scheduling.disabled')}</p>}
-    <ScheduleEditor guildId={guildId} enabled={enabled} channels={channels}/>{!items.length&&<p>{t('scheduling.empty')}</p>}
-    {items.map(item=><ScheduleCard key={item.id} guildId={guildId} item={item} enabled={enabled} channels={channels}/>)}
-    {before&&<button onClick={()=>setBefore(undefined)}>{t('scheduling.latest')}</button>}{items.length===50&&<button onClick={()=>setBefore(items[items.length-1].id)}>{t('scheduling.older')}</button>}</main>
+  return <main className={s.page}><h1>{t('scheduling.title')}</h1>{query.error&&<Failure error={query.error} retry={()=>void query.refetch()}/>}<p>{t('scheduling.help')}</p><p>{t('scheduling.warning')}</p>{!enabled&&<p>{t('scheduling.disabled')}</p>}
+    <ScheduleEditor guildId={guildId} enabled={enabled&&!query.error} channels={channels} onBusy={onCreateBusy}/>{!items.length&&<p>{t('scheduling.empty')}</p>}
+    {items.map(item=><ScheduleCard key={item.id} guildId={guildId} item={item} enabled={enabled&&!query.error} channels={channels} onBusy={onBusy}/>)}
+    {before&&<button disabled={busy} onClick={()=>setBefore(undefined)}>{t('scheduling.latest')}</button>}{items.length===50&&<button disabled={busy} onClick={()=>setBefore(items[items.length-1].id)}>{t('scheduling.older')}</button>}</main>
 }

@@ -114,10 +114,10 @@ class GiveawayRepository:
             return self._item(c, guild, item)
 
     def launch(self, guild, item, actor, revision):
-        now = int(self.clock())
         with transaction(self.database_url) as c:
             self._enabled(c, guild)
             row = self._item(c, guild, item, locked=True)
+            now = int(self.clock())
             self._revision(row, revision)
             if row['status'] != 'draft' or row['ends_at'] <= now:
                 raise RuntimeError('campaign_not_launchable')
@@ -129,7 +129,6 @@ class GiveawayRepository:
             return self._item(c, guild, item)
 
     def enter(self, guild, item, user, message, interaction, *, join):
-        now = int(self.clock())
         if type(join) is not bool:
             raise ValueError('invalid_participation_action')
         user = snowflake(user, 'user_id')
@@ -138,6 +137,7 @@ class GiveawayRepository:
         with transaction(self.database_url) as c:
             self._enabled(c, guild)
             row = self._item(c, guild, item, locked=True)
+            now = int(self.clock())
             old = c.execute('SELECT * FROM giveaway_interactions WHERE interaction_id=%s', (interaction,)).fetchone()
             if old:
                 if (old['campaign_id'], old['user_id'], old['action']) != (item, user, action):
@@ -241,9 +241,10 @@ class GiveawayRepository:
         self._enabled(c, parent['guild_id'])
         row = self._item(c, parent['guild_id'], job['campaign_id'], locked=True)
         lease = job['_lease']
-        owned = c.execute(f"SELECT 1 FROM {table} WHERE id=%s AND campaign_id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s AND lease_until>%s FOR UPDATE",
-                          (job['id'], row['id'], lease['owner'], lease['token'], int(self.clock()))).fetchone()
-        if not owned:
+        # Check expiry after the queue row lock, which may have waited.
+        owned = c.execute(f"SELECT lease_until FROM {table} WHERE id=%s AND campaign_id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s FOR UPDATE",
+                          (job['id'], row['id'], lease['owner'], lease['token'])).fetchone()
+        if not owned or owned['lease_until'] is None or owned['lease_until'] <= int(self.clock()):
             raise LostLease('Campaign job ownership changed')
         return row
 
@@ -325,6 +326,18 @@ class GiveawayRepository:
             row = self._owned(c, job, 'giveaway_outbox')
             if row['revision'] != revision:
                 self._queue(c, row['id'], int(self.clock()), except_job=job['id'])
+
+    def publication_repair(self, guild, item, job, *, cancelled=False):
+        """Request current-state delivery without acknowledging an obsolete lease."""
+        with transaction(self.database_url) as c:
+            row = c.execute('SELECT id FROM giveaways WHERE guild_id=%s AND id=%s AND expires_at>%s FOR UPDATE',
+                            (guild, item, int(self.clock()))).fetchone()
+            if row:
+                lease = job['_lease']
+                if not cancelled and c.execute("SELECT 1 FROM giveaway_outbox WHERE id=%s AND campaign_id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s AND lease_until>%s",
+                             (job['id'], item, lease['owner'], lease['token'], int(self.clock()))).fetchone():
+                    return  # Only a running handler can leave recovery to its retry.
+                self._queue(c, row['id'], int(self.clock()))
 
     def history(self, guild, item):
         with transaction(self.database_url) as c:

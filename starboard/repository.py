@@ -111,6 +111,9 @@ class StarboardRepository:
             config=current['config']
             if not config['enabled']:return None
             row=c.execute('SELECT * FROM starboard_entries WHERE board_id=%s AND source_message_id=%s FOR UPDATE',(board,source['message_id'])).fetchone()
+            # Read after the entry lock: a concurrent purge can finish while
+            # that SELECT waits, and its committed marker must then be visible.
+            if not row and c.execute('SELECT 1 FROM starboard_expired_sources WHERE board_id=%s AND source_message_id=%s',(board,source['message_id'])).fetchone():return None
             desired=eligible(config,source) and score>=config['threshold']
             if not row and not desired:return None
             snapshot=json.dumps(source,sort_keys=True,ensure_ascii=False)
@@ -156,14 +159,32 @@ class StarboardRepository:
     def purge_expired(self):
         now=int(self.clock())
         with transaction(self.database_url) as c:
-            # Source/history/jobs expire together, including disabled Guilds.
-            return c.execute('DELETE FROM starboard_entries WHERE id IN (SELECT e.id FROM starboard_entries e WHERE e.expires_at<=%s AND NOT EXISTS(SELECT 1 FROM starboard_outbox j WHERE j.entry_id=e.id AND j.lease_until>%s) ORDER BY e.expires_at LIMIT 500 FOR UPDATE SKIP LOCKED)',(now,now)).rowcount
+            # Retain only source IDs to prevent publishing the same source again;
+            # content/history/receipts/jobs still expire in this transaction.
+            # Board first matches observe/save lock ordering. Inserting the
+            # marker also takes a foreign-key lock on its Board.
+            return c.execute('''WITH board_scope AS (
+                SELECT b.id FROM starboards b WHERE EXISTS(
+                    SELECT 1 FROM starboard_entries e WHERE e.board_id=b.id
+                    AND e.expires_at<=%s AND NOT EXISTS(
+                        SELECT 1 FROM starboard_outbox j WHERE j.entry_id=e.id AND j.lease_until>%s))
+                ORDER BY b.id LIMIT 500 FOR UPDATE SKIP LOCKED
+            ), expired AS (
+                SELECT e.id,e.board_id,e.source_message_id FROM starboard_entries e
+                WHERE e.board_id IN (SELECT id FROM board_scope) AND e.expires_at<=%s AND NOT EXISTS(
+                    SELECT 1 FROM starboard_outbox j WHERE j.entry_id=e.id AND j.lease_until>%s)
+                ORDER BY e.expires_at LIMIT 500 FOR UPDATE SKIP LOCKED
+            ), marked AS (
+                INSERT INTO starboard_expired_sources(board_id,source_message_id)
+                SELECT board_id,source_message_id FROM expired ON CONFLICT DO NOTHING
+            ) DELETE FROM starboard_entries WHERE id IN (SELECT id FROM expired)''',(now,now,now,now)).rowcount
 
     def _owned(self,c,job):
         entry=c.execute('SELECT * FROM starboard_entries WHERE id=%s FOR UPDATE',(job['entry_id'],)).fetchone()
         lease=job['_lease']
-        owned=c.execute("SELECT 1 FROM starboard_outbox WHERE id=%s AND entry_id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s AND lease_until>%s FOR UPDATE",(job['id'],job['entry_id'],lease['owner'],lease['token'],int(self.clock()))).fetchone()
-        if not entry or not owned:raise LostLease('Highlight delivery ownership changed')
+        # Row-lock waits must not preserve a lease checked against an old time.
+        owned=c.execute("SELECT lease_until FROM starboard_outbox WHERE id=%s AND entry_id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s FOR UPDATE",(job['id'],job['entry_id'],lease['owner'],lease['token'])).fetchone()
+        if not entry or not owned or owned['lease_until'] is None or owned['lease_until']<=int(self.clock()):raise LostLease('Highlight delivery ownership changed')
         return entry
 
     def delivery_plan(self,job):
@@ -211,6 +232,19 @@ class StarboardRepository:
         with transaction(self.database_url) as c:
             entry=self._owned(c,job)
             if entry['revision']!=revision:self._queue(c,entry['id'],int(self.clock()),except_job=job['id'])
+
+    def delivery_repair(self,guild,entry,job,*,cancelled=False):
+        """Reserve current-state synchronization without acknowledging an old lease."""
+        with transaction(self.database_url) as c:
+            row=c.execute('SELECT id,expires_at FROM starboard_entries WHERE guild_id=%s AND id=%s FOR UPDATE',
+                          (guild,entry)).fetchone()
+            # Evaluate time after the entry lock, which may have waited.
+            if not row or row['expires_at']<=int(self.clock()):return
+            lease=job['_lease']
+            if not cancelled and c.execute("SELECT 1 FROM starboard_outbox WHERE id=%s AND entry_id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s AND lease_until>%s",
+                         (job['id'],entry,lease['owner'],lease['token'],int(self.clock()))).fetchone():
+                return  # Only a running handler can leave recovery to its retry.
+            self._queue(c,row['id'],int(self.clock()))
 
     def retry(self,guild,board,job_id,actor,revision):
         now=int(self.clock())

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import * as Dialog from '@radix-ui/react-dialog'
+import * as Dialog from '../components/WorkspaceDialog'
 import { BookOpen, LogOut, X } from 'lucide-react'
 import type { Session } from "../types"
 import s from "../styles/App.module.css"

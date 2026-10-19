@@ -4,21 +4,65 @@ from __future__ import annotations
 import json
 from contextlib import nullcontext
 import time
-from jobs import QueueRepository, QueueSpec
+from jobs import QueueRepository, QueueSpec, LostLease
 from jobs.catalog import QUEUE_SPECS
 from database import Connection, lock_resource, require_current, transaction
 from typing import Any
+from .models import ReactionRoleValidationError
+
+
+class ReactionRoleOutbox(QueueRepository):
+    def _claim_scope(self):
+        return (" AND (action NOT IN ('reconcile_remove','reconcile_add','reconcile_selection') OR EXISTS (SELECT 1 FROM reaction_role_settings s WHERE s.guild_id=reaction_role_outbox.guild_id AND s.enabled=1))", ())
+
+    def finish(self, claim, outcome):
+        if claim.payload.get('action') not in {'reconcile_remove', 'reconcile_add', 'reconcile_selection'} or outcome.error != 'reaction_roles_disabled':
+            return super().finish(claim, outcome)
+        with transaction(self.database_url) as c:
+            if self._owned_at(c, claim) is None:
+                return False
+            state = claim.payload['state']
+            if state == 'processing':
+                state = 'pending'
+            return c.execute("""UPDATE reaction_role_outbox SET state=%s,attempts=%s,
+                lease_owner=NULL,lease_token=NULL,lease_until=NULL WHERE id=%s""",
+                (state, claim.attempt - 1, claim.id)).rowcount == 1
 
 
 class ReactionRoleRepository:
     def __init__(self, database_url: str) -> None:
         self.database_url = database_url
         require_current(self.database_url)
-        self.outbox_jobs = QueueRepository(self.database_url, QUEUE_SPECS['reaction_role_outbox'])
+        self.outbox_jobs = ReactionRoleOutbox(self.database_url, QUEUE_SPECS['reaction_role_outbox'])
         self.schedule_jobs = QueueRepository(self.database_url, QUEUE_SPECS['reaction_role_schedules'])
 
     def connection(self):
         return transaction(self.database_url)
+
+    def _guard_job(self, c, item, *, schedule=False):
+        if not item or not item.get('_lease'):
+            return
+        queue = self.schedule_jobs if schedule else self.outbox_jobs
+        row = c.execute(f'SELECT state,lease_owner,lease_token,lease_until FROM {queue.spec.table} WHERE id=%s FOR UPDATE', (item['id'],)).fetchone()
+        identity = item['_lease']
+        if (row is None or row['state'] != 'processing' or row['lease_owner'] != identity['owner']
+                or row['lease_token'] != identity['token'] or row['lease_until'] is None
+                or row['lease_until'] <= int(queue.clock())):
+            raise LostLease('Reaction Role queue ownership expired')
+
+    def guard_delivery(self, item, *, schedule=False):
+        with self.connection() as c:
+            self._guard_job(c, item, schedule=schedule)
+
+    @staticmethod
+    def _detach_expiries(c, config_id, mapping_ids=None):
+        suffix = '' if mapping_ids is None else f" AND a.mapping_id IN ({','.join('%s' for _ in mapping_ids)})"
+        values = (config_id,) if mapping_ids is None else (config_id, *mapping_ids)
+        c.execute(f"""UPDATE reaction_role_schedules s SET role_id=a.role_id,mapping_id=NULL
+            FROM reaction_role_assignments a WHERE a.message_config_id=%s AND s.message_config_id=a.message_config_id
+            AND s.mapping_id=a.mapping_id AND s.user_id=a.user_id AND s.scheduled_for=a.expires_at
+            AND s.selection_generation=a.generation AND s.kind='temp_role' AND a.state='active'
+            AND s.state IN ('pending','retry','processing'){suffix}""", values)
 
     def settings(self, guild_id: int) -> dict[str, Any]:
         with self.connection() as c:
@@ -93,6 +137,9 @@ class ReactionRoleRepository:
         incoming = {(item["key"], int(item["role_id"])) for item in value["mappings"]}
         removed = [mapping_id for pair, mapping_id in existing.items() if pair not in incoming]
         if removed:
+            # Mapping deletion cascades assignments. Preserve only the current
+            # temporary expiry as a detached job before that evidence disappears.
+            self._detach_expiries(c, config_id, removed)
             c.execute(f"DELETE FROM reaction_role_mappings_v2 WHERE id IN ({','.join('%s' for _ in removed)})", removed)
         for item in value["mappings"]:
             pair = (item["key"], int(item["role_id"]))
@@ -106,10 +153,19 @@ class ReactionRoleRepository:
         for policy, key in (("whitelist", "whitelist_role_ids"), ("blacklist", "blacklist_role_ids")):
             c.cursor().executemany("INSERT INTO reaction_role_access_roles(message_config_id,role_id,policy) VALUES(%s,%s,%s)", [(config_id, role_id, policy) for role_id in value[key]])
 
+    @staticmethod
+    def _check_link_group(c: Connection, guild_id: int, group_id: int | None) -> None:
+        if group_id is not None and not c.execute(
+            'SELECT id FROM reaction_role_link_groups WHERE guild_id=%s AND id=%s FOR SHARE',
+            (guild_id, group_id),
+        ).fetchone():
+            raise ReactionRoleValidationError('link_group_invalid', 'このサーバーのLink Groupを選択してください。', 'link_group_id')
+
     def create_message(self, guild_id: int, value: dict[str, Any], actor_id: int | None = None, *, _conn=None) -> dict[str, Any]:
         now = int(time.time())
         with (nullcontext(_conn) if _conn is not None else self.connection()) as c:
             lock_resource(c, "reaction-role-settings", guild_id)
+            self._check_link_group(c, guild_id, value.get('link_group_id'))
             # The first V2 configuration makes the feature usable immediately.
             # ON CONFLICT DO NOTHING means a deliberate administrator disable is
             # never overwritten by creating another configuration.
@@ -130,6 +186,7 @@ class ReactionRoleRepository:
             row = c.execute("SELECT revision,source FROM reaction_role_messages_v2 WHERE guild_id=%s AND id=%s FOR UPDATE", (guild_id,config_id)).fetchone()
             if not row: raise KeyError(config_id)
             if int(row["revision"]) != expected_revision: raise RuntimeError("revision_conflict")
+            self._check_link_group(c, guild_id, value.get('link_group_id'))
             if row["source"] == "external" and value["source"] != "external": raise ValueError("source_immutable")
             c.execute("""UPDATE reaction_role_messages_v2 SET channel_id=%s,message_id=%s,name=%s,behavior_type=%s,locked=%s,access_policy=%s,selection_limit=%s,temp_duration_seconds=%s,self_destruct_at=%s,embed_json=%s,link_group_id=%s,enabled=%s,status='pending',last_error=NULL,revision=revision+1,updated_at=%s WHERE id=%s""",
                 (value["channel_id"],value["message_id"],value["name"],value["behavior_type"],int(value["locked"]),value["access_policy"],value["selection_limit"],value["temp_duration_seconds"],value["self_destruct_at"],json.dumps(value["embed"],ensure_ascii=False),value["link_group_id"],int(value["enabled"]),now,config_id))
@@ -153,6 +210,7 @@ class ReactionRoleRepository:
             if recoverable and item.get("message_id"):
                 snapshot = {key:value for key,value in item.items() if key not in {"last_error"}}
                 c.execute('INSERT INTO reaction_role_recovery VALUES(%s,%s,%s,%s,%s) ON CONFLICT(guild_id,deleted_message_id) DO UPDATE SET snapshot_json=excluded.snapshot_json,created_at=excluded.created_at,expires_at=excluded.expires_at', (guild_id,item["message_id"],json.dumps(snapshot,ensure_ascii=False),now,now+604800))
+            self._detach_expiries(c, config_id)
             c.execute("DELETE FROM reaction_role_messages_v2 WHERE guild_id=%s AND id=%s", (guild_id,config_id))
         self.audit(guild_id,None,"message_deleted","success",actor_id=actor_id,details={"message_id":item.get("message_id"),"recoverable":recoverable})
 
@@ -210,10 +268,12 @@ class ReactionRoleRepository:
         with self.connection() as c:
             c.execute("UPDATE reaction_role_messages_v2 SET link_group_id=NULL,revision=revision+1 WHERE guild_id=%s AND link_group_id=%s",(guild_id,group_id)); c.execute("DELETE FROM reaction_role_link_groups WHERE guild_id=%s AND id=%s",(guild_id,group_id))
 
-    def assignments(self, user_id: int, *, config_id: int | None = None, link_group_id: int | None = None) -> list[dict[str,Any]]:
+    def assignments(self, user_id: int, *, config_id: int | None = None, link_group_id: int | None = None, guild_id: int | None = None) -> list[dict[str,Any]]:
         with self.connection() as c:
             if link_group_id is not None:
-                rows=c.execute("""SELECT a.* FROM reaction_role_assignments a JOIN reaction_role_messages_v2 m ON m.id=a.message_config_id WHERE a.user_id=%s AND a.state='active' AND m.link_group_id=%s""",(user_id,link_group_id)).fetchall()
+                rows=c.execute("""SELECT a.* FROM reaction_role_assignments a JOIN reaction_role_messages_v2 m ON m.id=a.message_config_id
+                    JOIN reaction_role_link_groups g ON g.id=m.link_group_id AND g.guild_id=m.guild_id
+                    WHERE a.user_id=%s AND a.state='active' AND m.link_group_id=%s AND (%s::bigint IS NULL OR m.guild_id=%s)""",(user_id,link_group_id,guild_id,guild_id)).fetchall()
             else: rows=c.execute("SELECT * FROM reaction_role_assignments WHERE user_id=%s AND message_config_id=%s AND state='active'",(user_id,config_id)).fetchall()
         return [dict(row) for row in rows]
 
@@ -221,11 +281,134 @@ class ReactionRoleRepository:
         with self.connection() as c: row=c.execute("SELECT * FROM reaction_role_binding_receipts WHERE message_config_id=%s AND user_id=%s",(config_id,user_id)).fetchone()
         return dict(row) if row else None
 
-    def reset_binding(self,config_id:int,user_id:int)->bool:
-        with self.connection() as c: cursor=c.execute("DELETE FROM reaction_role_binding_receipts WHERE message_config_id=%s AND user_id=%s",(config_id,user_id))
+    def reset_binding(self,config_id:int,user_id:int, *, guild_id:int|None=None)->bool:
+        with self.connection() as c: cursor=c.execute("""DELETE FROM reaction_role_binding_receipts r USING reaction_role_messages_v2 m
+            WHERE r.message_config_id=m.id AND r.message_config_id=%s AND r.user_id=%s AND (%s::bigint IS NULL OR m.guild_id=%s)""",(config_id,user_id,guild_id,guild_id))
         return cursor.rowcount>0
 
+    def consume_self_destruct(self, guild_id: int, config_id: int, due_at: int, job=None) -> None:
+        with self.connection() as c:
+            self._guard_job(c, job, schedule=True)
+            current = c.execute('SELECT * FROM reaction_role_messages_v2 WHERE guild_id=%s AND id=%s FOR UPDATE', (guild_id, config_id)).fetchone()
+            if current is None or current['source'] != 'bot' or current['self_destruct_at'] != due_at:
+                return
+            self._queue(c, guild_id, None, 'delete', {'channel_id': current['channel_id'], 'message_id': current['message_id'], 'source': 'bot'})
+            self._detach_expiries(c, config_id)
+            c.execute('DELETE FROM reaction_role_messages_v2 WHERE guild_id=%s AND id=%s', (guild_id, config_id))
+            self.audit(guild_id, None, 'message_deleted', 'success', details={'message_id': current['message_id'], 'recoverable': False}, _conn=c)
+
+    def temporary_expiry(self, item: dict, *, lease=None) -> dict | None:
+        with self.connection() as c:
+            if lease:
+                lease.guard(c)
+            self._guard_job(c, item, schedule=True)
+            schedule = c.execute("SELECT * FROM reaction_role_schedules WHERE id=%s AND guild_id=%s AND kind='temp_role'", (item['id'], item['guild_id'])).fetchone()
+            if (schedule is None or schedule['state'] not in {'pending', 'retry', 'processing'}
+                    or schedule['scheduled_for'] != item.get('scheduled_for') or schedule['scheduled_for'] is None
+                    or schedule['selection_generation'] != item.get('selection_generation')):
+                return None
+            if schedule['selection_generation'] is None:
+                raise ValueError('Selection generation unavailable; reconciliation required')
+            if schedule['mapping_id'] is not None:
+                active = c.execute("""SELECT 1 FROM reaction_role_assignments WHERE message_config_id=%s AND mapping_id=%s
+                    AND user_id=%s AND state='active' AND expires_at=%s AND generation=%s""",
+                    (schedule['message_config_id'],schedule['mapping_id'],item['user_id'],schedule['scheduled_for'],schedule['selection_generation'])).fetchone()
+                if not active:
+                    return None
+            selected = c.execute("""SELECT 1 FROM reaction_role_assignments a JOIN reaction_role_messages_v2 m ON m.id=a.message_config_id
+                WHERE m.guild_id=%s AND a.user_id=%s AND a.role_id=%s AND a.state='active' AND a.generation<>%s
+                AND (a.expires_at IS NULL OR EXISTS (SELECT 1 FROM reaction_role_schedules owned
+                    WHERE owned.guild_id=m.guild_id AND owned.user_id=a.user_id AND owned.selection_generation=a.generation
+                    AND owned.kind='temp_role' AND NOT owned.cleanup_only AND owned.state IN ('pending','retry','processing'))) LIMIT 1""",
+                (item['guild_id'],item['user_id'],schedule['role_id'],schedule['selection_generation'])).fetchone()
+            return {**dict(schedule), 'remove_role': not schedule['cleanup_only'] and not selected}
+
+    def finish_temporary_expiry(self, item, expiry, *, lease):
+        with self.connection() as c:
+            lease.guard(c)
+            self._guard_job(c, item, schedule=True)
+            if expiry['mapping_id'] is not None:
+                c.execute("""UPDATE reaction_role_assignments SET state='removed',updated_at=%s WHERE message_config_id=%s
+                    AND mapping_id=%s AND user_id=%s AND generation=%s AND expires_at=%s""",
+                    (int(time.time()),expiry['message_config_id'],expiry['mapping_id'],item['user_id'],expiry['selection_generation'],expiry['scheduled_for']))
+
+    def cleanup_current(self, item):
+        payload = item['payload']
+        if payload.get('selection_generation') is None:
+            raise ValueError('Cleanup selection generation unavailable; reconciliation required')
+        with self.connection() as c:
+            self._guard_job(c, item)
+            current = c.execute("""SELECT a.generation FROM reaction_role_assignments a JOIN reaction_role_messages_v2 m ON m.id=a.message_config_id
+                WHERE m.guild_id=%s AND a.message_config_id=%s AND a.mapping_id=%s AND a.user_id=%s""",
+                (item['guild_id'],payload['config_id'],payload['mapping_id'],payload['user_id'])).fetchone()
+            return current is not None and current['generation'] == payload['selection_generation']
+
+    def queue_reaction_removal(self, config, mapping, user_id, *, lease, event='remove'):
+        if event not in {'add', 'remove'}:
+            raise ValueError('Invalid reaction event')
+        action = f'reconcile_{event}'
+        with self.connection() as c:
+            lease.guard(c)
+            row = c.execute('SELECT generation FROM reaction_role_assignments WHERE message_config_id=%s AND mapping_id=%s AND user_id=%s',
+                (config['id'], mapping['id'], user_id)).fetchone()
+            payload = {
+                'revision': config['revision'], 'mapping_id': mapping['id'], 'user_id': user_id,
+                'selection_generation': row['generation'] if row else None}
+            duplicate = c.execute("""SELECT 1 FROM reaction_role_outbox WHERE guild_id=%s AND message_config_id=%s
+                AND action=%s AND state IN ('pending','retry','processing') AND payload_json::jsonb=%s::jsonb""",
+                (config['guild_id'], config['id'], action, json.dumps(payload))).fetchone()
+            if not duplicate:
+                self._queue(c, config['guild_id'], config['id'], action, payload)
+
+    def selection_generation(self, config_id, mapping_id, user_id):
+        with self.connection() as c:
+            row = c.execute('SELECT generation FROM reaction_role_assignments WHERE message_config_id=%s AND mapping_id=%s AND user_id=%s',
+                (config_id, mapping_id, user_id)).fetchone()
+        return row['generation'] if row else None
+
+    def queue_member_reconciliation(self, config, mapping, user_id, event, *, selection_generation, competing_owner_token):
+        with self.connection() as c:
+            lock_resource(c, 'reaction-role-reconcile', f'{config["guild_id"]}:{user_id}')
+            payload = {'revision': config['revision'], 'mapping_id': mapping['id'], 'user_id': user_id,
+                'event': event, 'selection_generation': selection_generation, 'predecessor_lease_token': competing_owner_token}
+            duplicate = c.execute("""SELECT 1 FROM reaction_role_outbox WHERE guild_id=%s AND message_config_id=%s
+                AND action='reconcile_selection' AND state IN ('pending','retry','processing') AND payload_json::jsonb=%s::jsonb""",
+                (config['guild_id'], config['id'], json.dumps(payload))).fetchone()
+            if not duplicate:
+                self._queue(c, config['guild_id'], config['id'], 'reconcile_selection', payload)
+
+    def _reaction_generation_current(self, c, item):
+        payload = item['payload']
+        row = c.execute('SELECT generation FROM reaction_role_assignments WHERE message_config_id=%s AND mapping_id=%s AND user_id=%s',
+            (item['message_config_id'], payload['mapping_id'], payload['user_id'])).fetchone()
+        generation = row['generation'] if row else None
+        if generation == payload['selection_generation']:
+            return True
+        if item['action'] != 'reconcile_selection' or payload.get('predecessor_lease_token') is None:
+            return False
+        predecessor = c.execute("""SELECT details_json FROM reaction_role_events WHERE guild_id=%s AND user_id=%s
+            AND message_config_id=%s AND event_type='role_change' AND result='committed'
+            AND details_json::jsonb->>'member_lease_token'=%s ORDER BY id DESC LIMIT 1""",
+            (item['guild_id'], payload['user_id'], item['message_config_id'], payload['predecessor_lease_token'])).fetchone()
+        if predecessor is None:
+            return False
+        detail = json.loads(predecessor['details_json'])
+        return detail['mapping_id'] == payload['mapping_id'] and generation is not None and detail.get('committed_generation') == generation
+
+    def reaction_removal_current(self, item, *, lease):
+        payload = item['payload']
+        with self.connection() as c:
+            lease.guard(c)
+            self._guard_job(c, item)
+            config = c.execute('SELECT revision FROM reaction_role_messages_v2 WHERE guild_id=%s AND id=%s',
+                (item['guild_id'], item['message_config_id'])).fetchone()
+            if config is None or config['revision'] != payload['revision']:
+                return False
+            return self._reaction_generation_current(c, item)
+
     def begin_role_change(self, guild_id: int, user_id: int, detail: dict, *, lease=None) -> dict:
+        if lease is not None:
+            detail = {**detail, 'member_lease_token': lease.token}
         now = int(time.time())
         with self.connection() as c:
             if lease:
@@ -246,6 +429,13 @@ class ReactionRoleRepository:
             rows = c.execute("SELECT * FROM reaction_role_events WHERE guild_id=%s AND event_type='role_change' AND result IN ('pending','compensation_failed') ORDER BY id", (guild_id,)).fetchall()
         return [{**dict(row), 'detail': json.loads(row['details_json'])} for row in rows]
 
+    def role_capacity(self, guild_id: int, role_id: int) -> int | None:
+        with self.connection() as c:
+            row = c.execute("""SELECT min(r.max_members) AS capacity FROM reaction_role_mappings_v2 r
+                JOIN reaction_role_messages_v2 m ON m.id=r.message_config_id WHERE m.guild_id=%s AND r.role_id=%s""",
+                (guild_id, role_id)).fetchone()
+        return row['capacity']
+
     def role_change_finished(self, operation_id: int) -> bool:
         with self.connection() as c:
             row = c.execute('SELECT result FROM reaction_role_events WHERE id=%s', (operation_id,)).fetchone()
@@ -263,11 +453,15 @@ class ReactionRoleRepository:
                 lease.guard(c)
             c.execute("UPDATE reaction_role_events SET result='rolled_back' WHERE id=%s AND result IN ('pending','compensation_failed')", (operation_id,))
 
-    def commit_role_change(self, operation: dict, *, lease=None) -> None:
+    def commit_role_change(self, operation: dict, *, lease=None, removal_job=None) -> None:
         detail, now = operation['detail'], int(time.time())
         with self.connection() as c:
             if lease:
                 lease.guard(c)
+            if removal_job is not None:
+                self._guard_job(c, removal_job)
+                if not self._reaction_generation_current(c, removal_job):
+                    raise RuntimeError('Removal selection changed')
             receipt = c.execute('SELECT result FROM reaction_role_events WHERE id=%s FOR UPDATE', (operation['id'],)).fetchone()
             if receipt is None or receipt['result'] != 'pending':
                 raise RuntimeError('role_operation_conflict')
@@ -281,30 +475,37 @@ class ReactionRoleRepository:
                 for previous in detail['conflicts']:
                     c.execute("UPDATE reaction_role_assignments SET state='removed',updated_at=%s WHERE message_config_id=%s AND mapping_id=%s AND user_id=%s",
                         (now, previous['message_config_id'], previous['mapping_id'], operation['user_id']))
-                c.execute("""INSERT INTO reaction_role_assignments VALUES(%s,%s,%s,%s, 'active',%s,%s,%s)
-                    ON CONFLICT(message_config_id,mapping_id,user_id) DO UPDATE SET state='active',expires_at=excluded.expires_at,updated_at=excluded.updated_at""",
-                    (detail['config_id'], detail['mapping_id'], operation['user_id'], detail['role_id'], detail['expires_at'], now, now))
+                assigned = c.execute("""INSERT INTO reaction_role_assignments(message_config_id,mapping_id,user_id,role_id,state,expires_at,created_at,updated_at)
+                    VALUES(%s,%s,%s,%s,'active',%s,%s,%s) ON CONFLICT(message_config_id,mapping_id,user_id) DO UPDATE SET
+                    state='active',expires_at=excluded.expires_at,updated_at=excluded.updated_at,generation=nextval('reaction_role_selection_generation') RETURNING generation""",
+                    (detail['config_id'],detail['mapping_id'],operation['user_id'],detail['role_id'],detail['expires_at'],now,now)).fetchone()
+                c.execute("UPDATE reaction_role_events SET details_json=jsonb_set(details_json::jsonb,'{committed_generation}',to_jsonb(%s::bigint))::text WHERE id=%s",
+                    (assigned['generation'], operation['id']))
                 if detail['binding']:
                     c.execute('INSERT INTO reaction_role_binding_receipts VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING', (detail['config_id'], operation['user_id'], detail['mapping_id'], now))
                 if detail['expires_at']:
-                    self._schedule(c, operation['guild_id'], detail['config_id'], detail['mapping_id'], operation['user_id'], 'temp_role', detail['expires_at'])
+                    self._schedule(c, operation['guild_id'], detail['config_id'], detail['mapping_id'], operation['user_id'], 'temp_role', detail['expires_at'], role_id=detail['role_id'])
             if detail['operation'] == 'add':
                 for previous in detail['conflicts']:
                     target = c.execute("""SELECT m.channel_id,m.message_id,r.emoji_display AS emoji FROM reaction_role_messages_v2 m
                         JOIN reaction_role_mappings_v2 r ON r.message_config_id=m.id WHERE m.id=%s AND r.id=%s""",
                         (previous['message_config_id'], previous['mapping_id'])).fetchone()
                     if target and target['message_id']:
-                        self._queue(c, operation['guild_id'], None, 'clear_selection', {**dict(target), 'user_id': operation['user_id']})
+                        self._queue(c, operation['guild_id'], None, 'clear_selection', {**dict(target), 'user_id': operation['user_id'],
+                            'config_id': previous['message_config_id'], 'mapping_id': previous['mapping_id'], 'selection_generation': previous.get('generation')})
                 if detail['verify'] and detail['message_id']:
-                    self._queue(c, operation['guild_id'], None, 'clear_selection', {key: detail[key] for key in ('channel_id', 'message_id', 'emoji')} | {'user_id': operation['user_id']})
+                    self._queue(c, operation['guild_id'], None, 'clear_selection', {key: detail[key] for key in ('channel_id', 'message_id', 'emoji')} |
+                        {'user_id': operation['user_id'], 'config_id': detail['config_id'], 'mapping_id': detail['mapping_id'], 'selection_generation': assigned['generation']})
             c.execute("UPDATE reaction_role_events SET result='committed' WHERE id=%s", (operation['id'],))
 
     def activate_assignment(self,guild_id:int,config_id:int,mapping_id:int,user_id:int,role_id:int,expires_at:int|None,binding:bool=False)->None:
         now=int(time.time())
         with self.connection() as c:
-            c.execute("""INSERT INTO reaction_role_assignments VALUES(%s,%s,%s,%s, 'active',%s,%s,%s) ON CONFLICT(message_config_id,mapping_id,user_id) DO UPDATE SET state='active',expires_at=excluded.expires_at,updated_at=excluded.updated_at""",(config_id,mapping_id,user_id,role_id,expires_at,now,now))
+            c.execute("""INSERT INTO reaction_role_assignments(message_config_id,mapping_id,user_id,role_id,state,expires_at,created_at,updated_at)
+                VALUES(%s,%s,%s,%s,'active',%s,%s,%s) ON CONFLICT(message_config_id,mapping_id,user_id) DO UPDATE SET
+                state='active',expires_at=excluded.expires_at,updated_at=excluded.updated_at,generation=nextval('reaction_role_selection_generation')""",(config_id,mapping_id,user_id,role_id,expires_at,now,now))
             if binding: c.execute('INSERT INTO reaction_role_binding_receipts VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING',(config_id,user_id,mapping_id,now))
-            if expires_at: self._schedule(c,guild_id,config_id,mapping_id,user_id,"temp_role",expires_at)
+            if expires_at: self._schedule(c,guild_id,config_id,mapping_id,user_id,"temp_role",expires_at,role_id=role_id)
 
     def deactivate_assignment(self,config_id:int,mapping_id:int,user_id:int, *, lease=None)->None:
         with self.connection() as c:
@@ -313,8 +514,23 @@ class ReactionRoleRepository:
             c.execute("UPDATE reaction_role_assignments SET state='removed',updated_at=%s WHERE message_config_id=%s AND mapping_id=%s AND user_id=%s",(int(time.time()),config_id,mapping_id,user_id))
 
     @staticmethod
-    def _schedule(c:Connection,guild_id:int,config_id:int|None,mapping_id:int|None,user_id:int|None,kind:str,due_at:int)->None:
-        c.execute('INSERT INTO reaction_role_schedules(guild_id,message_config_id,mapping_id,user_id,kind,due_at,created_at) VALUES(%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(guild_id,config_id,mapping_id,user_id,kind,due_at,int(time.time())))
+    def _schedule(c:Connection,guild_id:int,config_id:int|None,mapping_id:int|None,user_id:int|None,kind:str,due_at:int,*,role_id:int|None=None)->None:
+        now = int(time.time())
+        generation = c.execute('SELECT generation FROM reaction_role_assignments WHERE message_config_id=%s AND mapping_id=%s AND user_id=%s', (config_id,mapping_id,user_id)).fetchone() if kind == 'temp_role' else None
+        scheduled = c.execute("""INSERT INTO reaction_role_schedules(guild_id,message_config_id,mapping_id,user_id,kind,due_at,scheduled_for,role_id,created_at,selection_generation)
+            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT(kind,message_config_id,mapping_id,user_id,scheduled_for) DO UPDATE SET
+                due_at=excluded.due_at,role_id=excluded.role_id,selection_generation=excluded.selection_generation,cleanup_only=false,state='pending',attempts=0,
+                last_error=NULL,completed_at=NULL,lease_owner=NULL,lease_token=NULL,lease_until=NULL
+            RETURNING id""",(guild_id,config_id,mapping_id,user_id,kind,due_at,due_at,role_id,now,generation['generation'] if generation else None)).fetchone()
+        if kind == 'temp_role':
+            c.execute("""UPDATE reaction_role_schedules SET cleanup_only=true,
+                state=CASE WHEN mapping_id IS NOT NULL THEN 'pending' ELSE 'done' END,
+                due_at=CASE WHEN mapping_id IS NOT NULL THEN scheduled_for ELSE due_at END,
+                completed_at=CASE WHEN mapping_id IS NOT NULL THEN NULL ELSE %s END,
+                last_error='Superseded by a newer Reaction Role selection',lease_owner=NULL,lease_token=NULL,lease_until=NULL
+                WHERE guild_id=%s AND user_id=%s AND role_id=%s AND kind='temp_role'
+                AND id<>%s AND state IN ('pending','retry','processing')""", (now,guild_id,user_id,role_id,scheduled['id']))
 
     @staticmethod
     def _queue(c:Connection,guild_id:int,config_id:int|None,action:str,payload:dict[str,Any])->None:
@@ -325,15 +541,19 @@ class ReactionRoleRepository:
 
 
 
-    def set_discord_message(self,config_id:int,message_id:int,status:str="active",error:str|None=None)->None:
-        with self.connection() as c: c.execute("UPDATE reaction_role_messages_v2 SET message_id=%s,status=%s,last_error=%s,updated_at=%s WHERE id=%s",(message_id,status,error,int(time.time()),config_id))
-
-    def set_delivery_status(self,config_id:int,status:str,error:str|None=None)->None:
+    def set_discord_message(self,config_id:int,message_id:int,status:str="active",error:str|None=None,*,job=None)->None:
         with self.connection() as c:
+            self._guard_job(c, job)
+            c.execute("UPDATE reaction_role_messages_v2 SET message_id=%s,status=%s,last_error=%s,updated_at=%s WHERE id=%s",(message_id,status,error,int(time.time()),config_id))
+
+    def set_delivery_status(self,config_id:int,status:str,error:str|None=None,*,job=None)->None:
+        with self.connection() as c:
+            self._guard_job(c, job)
             c.execute("UPDATE reaction_role_messages_v2 SET status=%s,last_error=%s,updated_at=%s WHERE id=%s",(status,error[:500] if error else None,int(time.time()),config_id))
 
-    def move_message(self,guild_id:int,config_id:int,channel_id:int,message_id:int,source:str,expected_revision:int,actor_id:int|None=None)->dict[str,Any]:
+    def move_message(self,guild_id:int,config_id:int,channel_id:int,message_id:int,source:str,expected_revision:int,actor_id:int|None=None,*,job=None)->dict[str,Any]:
         with self.connection() as c:
+            self._guard_job(c, job)
             row=c.execute("SELECT revision,channel_id,message_id,source FROM reaction_role_messages_v2 WHERE guild_id=%s AND id=%s FOR UPDATE",(guild_id,config_id)).fetchone()
             if not row:raise KeyError(config_id)
             if int(row["revision"])!=expected_revision:raise RuntimeError("revision_conflict")

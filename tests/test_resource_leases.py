@@ -21,12 +21,15 @@ class ResourceLeaseTests(unittest.IsolatedAsyncioTestCase):
         first = ResourceLease(self.database, 'lockdown', 1, seconds=3, clock=lambda: now)
         second = ResourceLease(self.database, 'lockdown', 1, seconds=3, clock=lambda: now)
         first.acquire()
-        with self.assertRaises(LostLease):
+        with self.assertRaises(LostLease) as collision:
             second.acquire()
+        self.assertEqual(str(collision.exception), 'Resource operation already owned')
+        self.assertEqual(collision.exception.competing_owner_token, first.token)
         now = 103
         with self.assertRaises(LostLease):
             first.renew()
         second.acquire()
+        self.assertEqual(collision.exception.competing_owner_token, first.token)
         with transaction(self.database) as connection:
             with self.assertRaises(LostLease):
                 first.guard(connection)
@@ -34,6 +37,12 @@ class ResourceLeaseTests(unittest.IsolatedAsyncioTestCase):
         first.release()
         second.renew()
         second.release()
+
+    async def test_lost_lease_legacy_construction_keeps_runtime_error_contract(self):
+        failure = LostLease('ownership lost', 'detail')
+        self.assertIsInstance(failure, RuntimeError)
+        self.assertEqual(failure.args, ('ownership lost', 'detail'))
+        self.assertIsNone(failure.competing_owner_token)
 
     async def test_cancellation_releases_ownership_and_cancels_external_operation(self):
         lease = ResourceLease(self.database, 'lockdown', 1)

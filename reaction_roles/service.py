@@ -16,6 +16,15 @@ class ReactionDecision:
     conflicting_assignments: list[dict[str, Any]] = field(default_factory=list)
 
 
+def preserves_linked_selection(repository, config: dict, mapping: dict, user_id: int) -> bool:
+    if not config.get('link_group_id'):
+        return False
+    active = repository.assignments(user_id, link_group_id=config['link_group_id'], guild_id=config['guild_id'])
+    if any(item['message_config_id'] == config['id'] and item['mapping_id'] == mapping['id'] for item in active):
+        return False
+    return any(item['role_id'] == mapping['role_id'] for item in active)
+
+
 class ReactionRoleService:
     def __init__(self, repository: ReactionRoleRepository, *, max_mappings: int = 20) -> None:
         self.repository, self.max_mappings = repository, max_mappings
@@ -39,13 +48,17 @@ class ReactionRoleService:
             ("temp", "add"): "add", ("temp", "remove"): "remove",
         }.get((behavior, event), "none")
         if operation == "none": return ReactionDecision(True, operation="none")
-        if operation == "remove": return ReactionDecision(True, operation="remove")
+        if operation == "remove":
+            if event == 'remove' and behavior in {'normal', 'unique', 'temp'}:
+                if preserves_linked_selection(self.repository, config, mapping, user_id):
+                    return ReactionDecision(True, operation='none')
+            return ReactionDecision(True, operation="remove")
         blacklist=set(config.get("blacklist_role_ids",[])); whitelist=set(config.get("whitelist_role_ids",[]))
         if blacklist & member_role_ids: return ReactionDecision(False, reason="このReaction Roleは利用できません。")
         if whitelist and not whitelist & member_role_ids: return ReactionDecision(False, reason="必要なRoleを持っていません。")
         if behavior == "binding" and self.repository.binding_receipt(config["id"],user_id):
             return ReactionDecision(False,reason="この選択はすでに確定しています。")
-        conflicts=self.repository.assignments(user_id,link_group_id=config.get("link_group_id")) if config.get("link_group_id") else self.repository.assignments(user_id,config_id=config["id"])
+        conflicts=self.repository.assignments(user_id,link_group_id=config.get("link_group_id"),guild_id=config['guild_id']) if config.get("link_group_id") else self.repository.assignments(user_id,config_id=config["id"])
         conflicts=[item for item in conflicts if int(item["mapping_id"])!=int(mapping["id"])]
         limit=config.get("selection_limit")
         if config.get("link_group_id") or behavior in {"unique","binding"}: limit=1

@@ -3,6 +3,7 @@ import discord
 
 from discord_io import DiscordFailure
 from .contracts import ContainerRef
+from .messages import bounded_embed
 
 
 class DiscordTicketAdapter:
@@ -52,7 +53,7 @@ class DiscordTicketAdapter:
         except discord.HTTPException as exc:
             raise DiscordFailure(str(exc), retry=exc.status == 429 or exc.status >= 500, resource_id=resource_id) from exc
 
-    async def create_container(self, ticket, panel, name, team_roles, on_call):
+    async def create_container(self, ticket, panel, name, team_roles, on_call, team_users=None):
         guild = self.bot.get_guild(ticket['guild_id'])
         member = guild.get_member(ticket['opener_id']) if guild else None
         if guild is None or member is None or guild.me is None:
@@ -85,7 +86,7 @@ class DiscordTicketAdapter:
                 await container.add_user(member)
                 for user_id in on_call:
                     staff = guild.get_member(user_id)
-                    if staff:
+                    if staff and (user_id in (team_users or []) or any(role.id in team_roles for role in staff.roles)):
                         try:
                             await container.add_user(staff)
                         except discord.HTTPException:
@@ -350,6 +351,14 @@ class DiscordTicketAdapter:
                 raise DiscordFailure('Ticket message receipt needs reconciliation', partial=True)
             embed = discord.Embed()
             embed.set_footer(text=marker)
+            if len(content) > 2000:
+                heading, separator, body = content.partition('\n')
+                if separator and heading.startswith('**') and heading.endswith('**') and len(body) <= 2000:
+                    embed.set_author(name=heading[2:-2])
+                    content = body
+                else:
+                    embed.description = content
+                    content = None
             message = await channel.send(content=content, embed=embed, allowed_mentions=discord.AllowedMentions.none())
             return {'id': message.id, 'created_at': int(message.created_at.timestamp())}
         except discord.HTTPException as exc:
@@ -409,9 +418,12 @@ class DiscordTicketAdapter:
                     if message.author.id == self.bot.user.id and any((e.footer.text or '').endswith(marker) for e in message.embeds):
                         return {'id': message.id, 'created_at': int(message.created_at.timestamp())}
                 raise DiscordFailure('Ticket notice receipt needs reconciliation', partial=True)
-            embed = discord.Embed.from_dict(packet.get('embed') or {})
+            embed_data = dict(packet.get('embed') or {})
             footer = (packet.get('embed') or {}).get('footer') or {}
-            embed.set_footer(text=(str(footer.get('text') or '')[:1900] + ' · ' + marker).lstrip(' ·'), icon_url=footer.get('icon_url'))
+            embed_data['footer'] = {'text': (str(footer.get('text') or '')[:1900] + ' · ' + marker).lstrip(' ·')}
+            if footer.get('icon_url'):
+                embed_data['footer']['icon_url'] = footer['icon_url']
+            embed = discord.Embed.from_dict(bounded_embed(embed_data))
             view = discord.ui.View(timeout=None)
             for button in packet.get('buttons', []):
                 view.add_item(discord.ui.Button(**{**button, 'style': discord.ButtonStyle(button.get('style', 2))}))

@@ -183,12 +183,14 @@ class AuditLogCog(commands.Cog):
         if all(self._channel(member.guild, "member", event) is None for event in ("ban", "kick", "leave")):
             return
         ban = await self._recent_audit(member.guild, discord.AuditLogAction.ban, member.id)
-        if ban and self._claim_action(member.guild.id, "ban", member.id):
-            await self._send(member.guild, "member", "⛔ メンバーBAN", discord.Color.red(), fields=[("対象", str(member)), ("実行者", getattr(ban.user, "mention", "不明")), ("理由", ban.reason or "(なし)")])
+        if ban:
+            if self._claim_action(member.guild.id, "ban", member.id):
+                await self._send(member.guild, "member", "⛔ メンバーBAN", discord.Color.red(), fields=[("対象", str(member)), ("実行者", getattr(ban.user, "mention", "不明")), ("理由", ban.reason or "(なし)")])
             return
         kick = await self._recent_audit(member.guild, discord.AuditLogAction.kick, member.id)
-        if kick and self._claim_action(member.guild.id, "kick", member.id):
-            await self._send(member.guild, "member", "👢 メンバーKick", discord.Color.orange(), fields=[("対象", str(member)), ("実行者", getattr(kick.user, "mention", "不明")), ("理由", kick.reason or "(なし)")])
+        if kick:
+            if self._claim_action(member.guild.id, "kick", member.id):
+                await self._send(member.guild, "member", "👢 メンバーKick", discord.Color.orange(), fields=[("対象", str(member)), ("実行者", getattr(kick.user, "mention", "不明")), ("理由", kick.reason or "(なし)")])
             return
         await self._send(member.guild, "member", "🚪 メンバー退会", discord.Color.light_grey(), f"{member} が退会しました。")
 

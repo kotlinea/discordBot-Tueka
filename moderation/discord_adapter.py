@@ -41,14 +41,26 @@ class DiscordModerationAdapter:
 
     def manageable(self, actor: MemberRef | None, target: MemberRef, action: str) -> str | None:
         guild = self._guild(target.guild_id)
-        if action == 'unban':
-            return None if guild.me and guild.me.guild_permissions.ban_members else 'BotにBan解除権限がありません。'
-        member = guild.get_member(target.id)
+        if actor and actor.guild_id != target.guild_id:
+            return '実行者のサーバーが一致しません。'
         moderator = guild.get_member(actor.id) if actor else None
-        if member is None:
-            return '対象メンバーが見つかりません。'
         if actor and moderator is None:
             return '実行者を確認できません。'
+        permission = {'timeout': 'moderate_members', 'untimeout': 'moderate_members', 'kick': 'kick_members',
+                      'ban': 'ban_members', 'tempban': 'ban_members', 'softban': 'ban_members',
+                      'unban': 'ban_members'}.get(action)
+        if (moderator and moderator.id != guild.owner_id and permission
+                and not (getattr(moderator.guild_permissions, 'administrator', False)
+                         or getattr(moderator.guild_permissions, permission, False))):
+            return '実行者に必要なDiscord権限がありません。'
+        if guild.me is None or permission and not (getattr(guild.me.guild_permissions, 'administrator', False)
+                or getattr(guild.me.guild_permissions, permission, False)):
+            return 'Botに必要なDiscord権限がありません。'
+        if action == 'unban':
+            return None
+        member = guild.get_member(target.id)
+        if member is None:
+            return '対象メンバーが見つかりません。'
         if actor and target.id == actor.id:
             return '自分自身にはこの処置を実行できません。'
         if target.id == guild.owner_id:
@@ -59,10 +71,6 @@ class DiscordModerationAdapter:
             return 'Botより同等以上のロールを持つメンバーには実行できません。'
         if moderator and member.top_role >= moderator.top_role and moderator.id != guild.owner_id:
             return '自分より同等以上のロールを持つメンバーには実行できません。'
-        permission = {'timeout': 'moderate_members', 'untimeout': 'moderate_members', 'kick': 'kick_members',
-                      'ban': 'ban_members', 'tempban': 'ban_members', 'softban': 'ban_members'}.get(action)
-        if permission and not getattr(guild.me.guild_permissions, permission):
-            return 'Botに必要なDiscord権限がありません。'
         return None
 
     async def dm(self, member: MemberRef, text: str) -> bool:
@@ -121,6 +129,13 @@ class DiscordModerationAdapter:
             matched = False
             async for entry in guild.audit_logs(limit=100, action=audit_action,
                     after=datetime.fromtimestamp(created_at - 1, timezone.utc)):
+                if action in {'ban', 'tempban'} and getattr(entry.target, 'id', None) == user_id:
+                    # Only the latest ban for this user can establish current ownership.
+                    matched = (getattr(entry.user, 'id', None) == getattr(self.bot.user, 'id', None)
+                               and f'[Tueka execution:{execution_id}]' in (entry.reason or ''))
+                    if not matched:
+                        return False
+                    break
                 if (getattr(entry.target, 'id', None) == user_id and getattr(entry.user, 'id', None) == getattr(self.bot.user, 'id', None)
                         and f'[Tueka execution:{execution_id}]' in (entry.reason or '')):
                     matched = True
@@ -129,8 +144,8 @@ class DiscordModerationAdapter:
                 return None
             if action in {'ban', 'tempban', 'unban'}:
                 try:
-                    await guild.fetch_ban(discord.Object(id=user_id))
-                    return action != 'unban'
+                    ban = await guild.fetch_ban(discord.Object(id=user_id))
+                    return action != 'unban' and f'[Tueka execution:{execution_id}]' in (ban.reason or '')
                 except discord.NotFound:
                     return action == 'unban'
             member = await guild.fetch_member(user_id)
@@ -214,15 +229,29 @@ class DiscordModerationAdapter:
         current = channel.overwrites_for(role)
         return {'send_messages': current.send_messages, 'send_messages_in_threads': current.send_messages_in_threads}
 
-    async def set_overwrite(self, guild_id, channel_id, role_id, values, reason):
+    async def fresh_overwrite(self, guild_id, channel_id, role_id):
         guild = self._guild(guild_id)
-        channel, role = guild.get_channel(channel_id), guild.get_role(role_id)
-        if channel is None or role is None:
+        role = guild.get_role(role_id)
+        try:
+            channel = await guild.fetch_channel(channel_id)
+        except discord.HTTPException as exc:
+            raise failure(exc) from exc
+        if (role is None or getattr(getattr(channel, 'guild', None), 'id', None) != guild_id
+                or not isinstance(channel, (discord.TextChannel, discord.ForumChannel))):
             raise ActionFailure('Permission target unavailable')
         current = channel.overwrites_for(role)
-        for key, value in values.items():
-            setattr(current, key, value)
+        return {'send_messages': current.send_messages, 'send_messages_in_threads': current.send_messages_in_threads}
+
+    async def set_overwrite(self, guild_id, channel_id, role_id, values, reason):
+        guild = self._guild(guild_id)
         try:
+            channel, role = await guild.fetch_channel(channel_id), guild.get_role(role_id)
+            if (role is None or getattr(getattr(channel, 'guild', None), 'id', None) != guild_id
+                    or not isinstance(channel, (discord.TextChannel, discord.ForumChannel))):
+                raise ActionFailure('Permission target unavailable')
+            current = channel.overwrites_for(role)
+            for key, value in values.items():
+                setattr(current, key, value)
             await channel.set_permissions(role, overwrite=current, reason=reason)
         except discord.HTTPException as exc:
             raise failure(exc) from exc

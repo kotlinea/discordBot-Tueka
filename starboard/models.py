@@ -53,9 +53,10 @@ def normalize(values):
 
 
 def eligible(config, source):
-    """Explicit parent channels include threads; either level can be excluded."""
+    """Parents include public threads; private threads require their own ID."""
     if source.get('author_bot') or source.get('deleted') or source.get('nsfw'):return False
     channel=source['channel_id'];parent=source.get('parent_channel_id')
+    if source.get('private_thread') and channel not in config['source_channel_ids']:return False
     excluded=set(config['excluded_channel_ids'])
     return (channel!=config['target_channel_id'] and channel not in excluded and parent not in excluded
             and bool({channel,parent}&set(config['source_channel_ids'])))

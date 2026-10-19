@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import * as Dialog from '@radix-ui/react-dialog'
+import * as Dialog from '../../components/WorkspaceDialog'
 import { Check, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Resource } from "../../types"

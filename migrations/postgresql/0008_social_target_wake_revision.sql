@@ -1,0 +1,1 @@
+ALTER TABLE social_targets ADD COLUMN wake_revision BIGINT NOT NULL DEFAULT 0;

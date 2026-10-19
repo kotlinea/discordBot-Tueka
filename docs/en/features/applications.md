@@ -27,6 +27,8 @@ Open Review applications to read the questions as they were at submission time a
 
 Retention is fixed on submission: 30 days by default, configurable from 1 to 365 days. Expired applications disappear from lists. The Bot deletes up to 500 expired applications, answers and histories per minute, including while intake is disabled. Deletion resumes after a Bot outage. Form definitions and configuration audit remain. Backups have their own retention. Operators who can read the DB or backups can access answers; do not collect passwords or credentials.
 
+To enforce resubmission limits even when the cooldown setting changes, server, form and applicant IDs and the latest submission time are retained for up to 30 days. This record contains no answers or review reasons. Answers and application history are deleted on their configured retention deadline.
+
 Disabling a form stops new submissions. Disabling intake also pauses reviews and withdrawals; managers can still read stored answers until expiry. Retention cleanup continues while disabled.
 
 Forms, applications and histories are included in Tueka's database snapshots. Restore the matching Image and database snapshot together. If a submission response was interrupted, check `/application-status` before submitting again.

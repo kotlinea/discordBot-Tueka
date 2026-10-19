@@ -44,9 +44,7 @@ class SocialUpdatesCog(commands.Cog):
         await run_batch(self.social_repository.event_jobs, self.owner, self._deliver_event, limit=10, lease_seconds=120)
 
     async def _deliver_event(self, event: dict) -> Outcome:
-        if await self._deliver(event):
-            return Outcome()
-        return Outcome('One or more Discord deliveries need retry', retry=True)
+        return await self.delivery.deliver_outcome(event)
 
     @deliver_events.before_loop
     async def before_deliver_events(self) -> None:

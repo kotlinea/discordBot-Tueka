@@ -3,6 +3,7 @@ import type { ErrorField, Operations } from './generated/api'
 
 let csrfToken = ''
 export class ApiError extends Error { constructor(public status: number, public code: string, message: string, public fields: ErrorField[] = []) { super(message) } }
+export const isTransientQueryError = (error: unknown) => error instanceof TypeError || error instanceof ApiError && error.status === 503
 export function setCsrf(value: string) { csrfToken = value }
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)

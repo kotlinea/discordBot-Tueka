@@ -1,6 +1,6 @@
 import { Suspense, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import { I18nextProvider } from 'react-i18next'
@@ -37,6 +37,21 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe('registered welcome settings', () => {
+  it('offers only text destinations for welcome and leave', async () => {
+    request.mockResolvedValue({ channels: [
+      { id: '10', name: 'Text', type: 0 },
+      { id: '11', name: 'Voice', type: 2 },
+      { id: '12', name: 'Stage', type: 13 },
+      { id: '100', name: 'Category', type: 4 },
+    ], roles: [] })
+    const feature = initial()
+    await mount('en', { ...feature, fields: [...feature.fields, 'leave_channel_id'], settings: { ...feature.settings, leave_channel_id: null } })
+    for (const label of [/Welcome channel/, /Leave channel/]) {
+      const picker = await screen.findByRole('combobox', { name: label })
+      expect(within(picker).getByRole('option', { name: 'Text' })).toBeInTheDocument()
+      for (const name of ['Voice', 'Stage', 'Category']) expect(within(picker).queryByRole('option', { name })).not.toBeInTheDocument()
+    }
+  })
   it('refreshes clean data but preserves edits, and isolates drafts when changing servers', async () => {
     const mounted = await mount()
     const content = await screen.findByRole('textbox', { name: /Welcome content/ })
@@ -119,3 +134,4 @@ describe('shared controls', () => {
     expect(request).not.toHaveBeenCalled()
   })
 })
+

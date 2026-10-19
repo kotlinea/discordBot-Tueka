@@ -1,4 +1,5 @@
 import discord
+from io import BytesIO
 from google import genai
 from discord import app_commands
 from discord.ext import commands
@@ -28,9 +29,17 @@ class AICog(commands.Cog):
                 model=self.bot.settings.gemini_model,
                 contents=message,
             )
-            await interaction.followup.send(response.text or "適切な応答を生成できませんでした。")
+            answer = response.text or "適切な応答を生成できませんでした。"
+            if len(answer) > 2000:
+                await interaction.followup.send(
+                    "回答が長いため、テキストファイルで送信します。",
+                    file=discord.File(BytesIO(answer.encode('utf-8')), filename='gemini-response.txt'),
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+            else:
+                await interaction.followup.send(answer, allowed_mentions=discord.AllowedMentions.none())
         except Exception:
-            await interaction.followup.send("Gemini の応答生成に失敗しました。")
+            await interaction.followup.send("Gemini の応答生成に失敗しました。", allowed_mentions=discord.AllowedMentions.none())
 
 
 async def setup(bot: commands.Bot) -> None:

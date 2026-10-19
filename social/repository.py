@@ -5,16 +5,122 @@ import time
 import uuid
 from typing import Any
 
-from jobs import QueueRepository, QueueSpec
+from jobs import LostLease, QueueRepository, QueueSpec
 from jobs.catalog import QUEUE_SPECS
 from database import IntegrityError, lock_resource, require_current, transaction
+
+
+class SocialEventQueue(QueueRepository):
+    def _remaining_budget(self, connection, event_key):
+        # Only the enabled recipient that spent its own budget is terminated.
+        # A guild pause must never spend another recipient's attempts.
+        connection.execute("""UPDATE social_deliveries d SET state='failed',
+            last_error='Delivery retry limit reached',updated_at=%s
+            FROM social_subscriptions s JOIN guild_modules g ON g.guild_id=s.guild_id
+                AND g.module_id=s.provider || '_updates' AND g.enabled=1
+            WHERE d.subscription_id=s.id AND d.event_key=%s AND d.attempts>=%s
+                AND d.state IN ('pending','retry','uncertain')""",
+            (int(self.clock()), event_key, self.spec.max_attempts))
+        row = connection.execute("""SELECT MAX(attempts) AS remaining
+            FROM social_deliveries WHERE event_key=%s
+            AND state IN ('pending','retry','uncertain') AND attempts<%s""",
+            (event_key, self.spec.max_attempts)).fetchone()
+        if row['remaining'] is None:
+            return None
+        # Spend each new recipient attempt as dispatch progress only once.
+        # Old terminal receipts cannot replenish retries for a dispatcher that
+        # repeatedly fails before reserving any new I/O attempt.
+        progress = connection.execute("""UPDATE social_deliveries d
+            SET dispatch_accounted_attempts=d.attempts
+            WHERE d.event_key=%s
+            AND (d.state IN ('sent','failed') OR
+                (d.state IN ('pending','retry','uncertain') AND EXISTS(
+                    SELECT 1 FROM social_subscriptions s JOIN guild_modules g ON g.guild_id=s.guild_id
+                        AND g.module_id=s.provider || '_updates' AND g.enabled=1
+                    WHERE s.id=d.subscription_id)))
+            AND d.attempts>d.dispatch_accounted_attempts RETURNING d.id""", (event_key,)).fetchall()
+        return row['remaining'] if progress else None
+
+    def _exhaust(self, connection, now, scope, scope_values):
+        # Lock eligible final attempts in the same transaction as the next
+        # claim. Rows skipped or outside this batch must not be exhausted by a
+        # second, generic query that never reconciled their recipient budgets.
+        rows = connection.execute(f"""SELECT id,event_key FROM social_events
+            WHERE attempts>=%s AND status IN ('pending','retry','processing')
+            AND (lease_until IS NULL OR lease_until<=%s){scope}
+            ORDER BY id LIMIT 100 FOR UPDATE SKIP LOCKED""",
+            (self.spec.max_attempts, now, *scope_values)).fetchall()
+        for row in rows:
+            remaining = self._remaining_budget(connection, row['event_key'])
+            if remaining is not None:
+                connection.execute("""UPDATE social_events SET attempts=%s,status='retry',processed_at=NULL,
+                    lease_owner=NULL,lease_token=NULL,lease_until=NULL WHERE id=%s""", (remaining, row['id']))
+            else:
+                connection.execute("""UPDATE social_events SET status='failed',processed_at=%s,
+                    last_error='Lease expired at retry limit',lease_owner=NULL,lease_token=NULL,lease_until=NULL
+                    WHERE id=%s""", (int(self.clock()), row['id']))
+
+    def _claim_scope(self):
+        # Events are shared across guilds. An enabled unfinished recipient may
+        # proceed while another guild's existing intent waits for re-enabling.
+        recipients = """FROM social_subscriptions s JOIN social_targets t ON t.id=s.target_id
+            LEFT JOIN guild_modules g ON g.guild_id=s.guild_id AND g.module_id=s.provider || '_updates'
+            LEFT JOIN social_deliveries d ON d.subscription_id=s.id AND d.event_key=social_events.event_key
+            WHERE s.provider=social_events.provider AND s.enabled=1
+            AND (s.account_id=social_events.account_id OR t.external_id=social_events.account_id
+                 OR t.account_key=ltrim(lower(social_events.account_id),'@'))
+            AND s.events_json::jsonb ? social_events.event_type"""
+        return (f" AND (NOT EXISTS(SELECT 1 {recipients} AND COALESCE(g.enabled,0)=0"
+                " AND d.state IN ('pending','retry','uncertain'))"
+                f" OR EXISTS(SELECT 1 {recipients} AND g.enabled=1"
+                " AND (d.id IS NULL OR d.state IN ('pending','retry','uncertain')))"
+                f" OR EXISTS(SELECT 1 {recipients} AND d.id IS NULL))", ())
+
+    def finish(self, claim, outcome):
+        if outcome.error is not None and outcome.retry and claim.attempt >= self.spec.max_attempts:
+            try:
+                with transaction(self.database_url) as connection:
+                    if self._owned_at(connection, claim) is None:
+                        return False
+                    remaining = self._remaining_budget(connection, claim.payload['event_key'])
+                    now = self._owned_at(connection, claim)
+                    if now is None:
+                        raise LostLease('Social event lease expired while reconciling recipient budgets')
+                    changed = connection.execute("""UPDATE social_events SET status=%s,attempts=%s,
+                        processed_at=%s,available_at=%s,last_error=%s,
+                        lease_owner=NULL,lease_token=NULL,lease_until=NULL
+                        WHERE id=%s AND lease_owner=%s AND lease_token=%s
+                        AND lease_until>%s AND status='processing'""",
+                        ('retry' if remaining is not None else 'failed',
+                         remaining if remaining is not None else claim.attempt,
+                         None if remaining is not None else now, claim.payload['available_at'], outcome.error[:500],
+                         claim.id, claim.owner, claim.token, now)).rowcount == 1
+                    if not changed:
+                        raise LostLease('Social event lease lost before budget completion')
+                return True
+            except LostLease:
+                return False
+        if outcome.error is not None or not (outcome.result or {}).get('paused'):
+            return super().finish(claim, outcome)
+        # A pause is not a failed delivery attempt. Restore the claim's prior
+        # retry budget and deadline; the scope will wake it when any guild can run.
+        with transaction(self.database_url) as connection:
+            if self._owned_at(connection, claim) is None:
+                return False
+            return connection.execute("""UPDATE social_events SET status=%s,attempts=attempts-1,
+                available_at=%s,last_error=%s,processed_at=NULL,
+                lease_owner=NULL,lease_token=NULL,lease_until=NULL
+                WHERE id=%s AND lease_owner=%s AND lease_token=%s AND status='processing'""",
+                ('pending' if claim.payload['status'] == 'pending' else 'retry',
+                 claim.payload['available_at'], claim.payload.get('last_error'),
+                 claim.id, claim.owner, claim.token)).rowcount == 1
 
 
 class SocialRepository:
     def __init__(self, database_url: str) -> None:
         self.database_url = database_url
         require_current(self.database_url)
-        self.event_jobs = QueueRepository(self.database_url, QUEUE_SPECS['social_events'])
+        self.event_jobs = SocialEventQueue(self.database_url, QUEUE_SPECS['social_events'])
 
     def _connection(self):
         return transaction(self.database_url)
@@ -59,7 +165,31 @@ class SocialRepository:
                 VALUES(%s,%s,%s,'pending',0,%s,%s) ON CONFLICT(provider,account_key) DO UPDATE SET updated_at=excluded.updated_at""",
                 (provider, account_key, account_key, now, now))
             row = connection.execute("SELECT * FROM social_targets WHERE provider=%s AND account_key=%s", (provider, account_key)).fetchone()
+            if row['status'] == 'orphaned':
+                row = self._resume_social_target(connection, row)
         return self._social_target_row(row)
+
+    @staticmethod
+    def _resume_social_target(connection, row):
+        cursor = json.loads(row['cursor_json'])
+        cursor.pop('websub_renew_at', None)
+        cursor.pop('eventsub_synced_at', None)
+        return connection.execute("""UPDATE social_targets SET status='pending',next_check_at=0,
+            lease_owner=NULL,lease_until=NULL,cursor_json=%s,last_error=NULL,
+            revision=revision+1,updated_at=%s WHERE id=%s RETURNING *""",
+            (json.dumps(cursor), int(time.time()), row['id'])).fetchone()
+
+    def resume_social_target_after_cleanup(self, target_id: int) -> None:
+        """Reconcile an old unsubscribe that finished after references returned."""
+        with self._connection() as connection:
+            row = connection.execute('SELECT provider FROM social_targets WHERE id=%s', (target_id,)).fetchone()
+            if row is None:
+                return
+            lock_resource(connection, 'social-provider-targets', row['provider'])
+            row = connection.execute('SELECT * FROM social_targets WHERE id=%s FOR UPDATE', (target_id,)).fetchone()
+            if row and connection.execute('SELECT 1 FROM social_subscriptions WHERE target_id=%s LIMIT 1', (target_id,)).fetchone():
+                self._resume_social_target(connection, row)
+                connection.execute("UPDATE social_subscriptions SET status='pending',last_error=NULL,updated_at=%s WHERE target_id=%s", (int(time.time()), target_id))
 
     @staticmethod
     def _social_target_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -119,7 +249,7 @@ class SocialRepository:
 
     def wake_social_target(self, provider: str, account_id: str) -> int:
         with self._connection() as connection:
-            result = connection.execute("""UPDATE social_targets SET next_check_at=0,updated_at=%s
+            result = connection.execute("""UPDATE social_targets SET next_check_at=0,wake_revision=wake_revision+1,updated_at=%s
                 WHERE provider=%s AND (external_id=%s OR account_key=%s)""", (int(time.time()), provider, account_id, account_id))
         return int(result.rowcount)
 
@@ -132,19 +262,22 @@ class SocialRepository:
                 cursor = json.loads(row["cursor_json"])
                 cursor.pop("eventsub_synced_at", None)
                 cursor.pop("websub_renew_at", None)
-                connection.execute("UPDATE social_targets SET status='degraded',cursor_json=%s,last_error=%s,next_check_at=0,updated_at=%s WHERE id=%s",
+                # In-flight polling owns the old subscription snapshot. Revoke
+                # its claim so completion cannot restore the removed markers.
+                connection.execute("UPDATE social_targets SET status='degraded',cursor_json=%s,last_error=%s,next_check_at=0,lease_owner=NULL,lease_until=NULL,updated_at=%s WHERE id=%s",
                                    (json.dumps(cursor), error[:500], now, row["id"]))
                 connection.execute("UPDATE social_subscriptions SET status='degraded',last_error=%s,updated_at=%s WHERE target_id=%s", (error[:500], now, row["id"]))
         return len(rows)
 
     def claim_social_targets(self, owner: str, *, limit: int = 20, lease_seconds: int = 60) -> list[dict[str, Any]]:
-        now = int(time.time())
         with self._connection() as connection:
-            rows = connection.execute("""SELECT * FROM social_targets WHERE next_check_at<=%s AND (lease_until IS NULL OR lease_until<%s)
+            now = int(time.time())
+            rows = connection.execute("""SELECT * FROM social_targets WHERE next_check_at<=%s AND (lease_until IS NULL OR lease_until<=%s)
                 AND (status='orphaned' OR EXISTS(SELECT 1 FROM social_subscriptions s WHERE s.target_id=social_targets.id AND s.enabled=1))
                 ORDER BY next_check_at,id LIMIT %s FOR UPDATE SKIP LOCKED""", (now, now, max(1, min(limit, 100)))).fetchall()
             claimed = []
             for row in rows:
+                now = int(time.time())
                 claim_owner = f"{owner}:{uuid.uuid4().hex}"
                 connection.execute("UPDATE social_targets SET lease_owner=%s,lease_until=%s WHERE id=%s",
                                    (claim_owner, now + lease_seconds, row['id']))
@@ -155,16 +288,19 @@ class SocialRepository:
     def complete_social_target(self, target_id: int, owner: str, *, status: str, cursor: dict[str, Any], next_check_at: int,
                                external_id: str | None = None, handle: str | None = None, display_name: str | None = None,
                                avatar_url: str | None = None, error: str | None = None,
-                               events: list[dict[str, Any]] | None = None) -> bool:
-        now = int(time.time())
+                               events: list[dict[str, Any]] | None = None,
+                               observed_wake_revision: int | None = None) -> bool:
         with self._connection() as connection:
             provider_row = connection.execute('SELECT provider FROM social_targets WHERE id=%s', (target_id,)).fetchone()
             if provider_row is None:
                 return False
             lock_resource(connection, "social-provider-targets", provider_row['provider'])
-            current = connection.execute("SELECT provider FROM social_targets WHERE id=%s AND lease_owner=%s AND lease_until>%s FOR UPDATE", (target_id, owner, now)).fetchone()
-            if not current:
+            current = connection.execute("SELECT provider,wake_revision,lease_until FROM social_targets WHERE id=%s AND lease_owner=%s FOR UPDATE", (target_id, owner)).fetchone()
+            now = int(time.time())
+            if not current or current['lease_until'] is None or current['lease_until'] <= now:
                 return False
+            if observed_wake_revision is not None and current['wake_revision'] > observed_wake_revision:
+                next_check_at = 0
             for event in events or []:
                 self._enqueue_event(connection, current['provider'], event['external_id'], event['account_id'],
                                     event['event_type'], event['payload'], occurred_at=event.get('occurred_at'))
@@ -217,7 +353,11 @@ class SocialRepository:
             if provider_row is None:
                 return False
             lock_resource(connection, "social-provider-targets", provider_row['provider'])
-            result = connection.execute("DELETE FROM social_targets WHERE id=%s AND lease_owner=%s AND lease_until>%s AND NOT EXISTS(SELECT 1 FROM social_subscriptions WHERE target_id=%s)", (target_id, owner, int(time.time()), target_id))
+            current = connection.execute("SELECT lease_until FROM social_targets WHERE id=%s AND lease_owner=%s FOR UPDATE", (target_id, owner)).fetchone()
+            now = int(time.time())
+            if not current or current['lease_until'] is None or current['lease_until'] <= now:
+                return False
+            result = connection.execute("DELETE FROM social_targets WHERE id=%s AND lease_owner=%s AND lease_until>%s AND NOT EXISTS(SELECT 1 FROM social_subscriptions WHERE target_id=%s)", (target_id, owner, now, target_id))
         return result.rowcount == 1
 
     def social_connection(self, guild_id: int, provider: str, account_id: str) -> dict[str, Any] | None:
@@ -234,9 +374,9 @@ class SocialRepository:
             rows = connection.execute(query + " ORDER BY provider, account_name", params).fetchall()
         return [dict(row) for row in rows]
 
-    def save_social_connection(self, guild_id: int, provider: str, account_id: str, account_name: str, access_token_encrypted: str, refresh_token_encrypted: str | None, expires_at: int | None) -> None:
+    def save_social_connection(self, guild_id: int, provider: str, account_id: str, account_name: str, access_token_encrypted: str, refresh_token_encrypted: str | None, expires_at: int | None, *, _conn=None) -> None:
         now = int(time.time())
-        with self._connection() as connection:
+        with (nullcontext(_conn) if _conn is not None else self._connection()) as connection:
             connection.execute("INSERT INTO social_connections(guild_id,provider,account_id,account_name,access_token_encrypted,refresh_token_encrypted,expires_at,created_at,updated_at) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(guild_id,provider,account_id) DO UPDATE SET account_name=excluded.account_name,access_token_encrypted=excluded.access_token_encrypted,refresh_token_encrypted=excluded.refresh_token_encrypted,expires_at=excluded.expires_at,updated_at=excluded.updated_at", (guild_id, provider, account_id, account_name, access_token_encrypted, refresh_token_encrypted, expires_at, now, now))
 
     def create_social_oauth_state(self, state: str, guild_id: int, provider: str, *, ttl_seconds: int = 600) -> None:
@@ -290,28 +430,65 @@ class SocialRepository:
                 return bool(row and row["state"] in {"pending", "retry", "uncertain"} and int(row["next_attempt_at"] or 0) <= now)
         return True
 
-    def update_social_delivery(self, subscription_id: int, event_key: str, message_id: int, state: str = "sent") -> None:
+    def update_social_delivery(self, subscription_id: int, event_key: str, message_id: int | None, state: str = "sent") -> None:
         with self._connection() as connection:
             connection.execute("UPDATE social_deliveries SET discord_message_id=%s,state=%s,updated_at=%s WHERE subscription_id=%s AND event_key=%s", (message_id, state, int(time.time()), subscription_id, event_key))
 
-    def fail_social_delivery(self, subscription_id: int, event_key: str, error: str, *, retry: bool, uncertain: bool = False) -> None:
+    def begin_social_delivery_attempt(self, subscription_id: int, event_key: str) -> bool:
+        with self._connection() as connection:
+            row = connection.execute('SELECT state,attempts FROM social_deliveries WHERE subscription_id=%s AND event_key=%s FOR UPDATE',
+                (subscription_id, event_key)).fetchone()
+            if row is None or row['state'] in {'sent', 'failed', 'skipped'}:
+                return False
+            if row['attempts'] >= QUEUE_SPECS['social_events'].max_attempts:
+                connection.execute("UPDATE social_deliveries SET state='failed',last_error='Delivery retry limit reached',updated_at=%s WHERE subscription_id=%s AND event_key=%s",
+                    (int(time.time()), subscription_id, event_key))
+                return False
+            connection.execute('UPDATE social_deliveries SET attempts=attempts+1 WHERE subscription_id=%s AND event_key=%s',
+                (subscription_id, event_key))
+            return True
+
+    def fail_social_delivery(self, subscription_id: int, event_key: str, error: str, *, retry: bool, uncertain: bool = False, attempted: bool = False) -> None:
         now = int(time.time())
         with self._connection() as connection:
             row = connection.execute("SELECT attempts FROM social_deliveries WHERE subscription_id=%s AND event_key=%s FOR UPDATE", (subscription_id, event_key)).fetchone()
-            attempts = int(row["attempts"] if row else 0) + 1
+            attempts = int(row["attempts"] if row else 0) + (0 if attempted else 1)
+            exhausted = attempts >= QUEUE_SPECS['social_events'].max_attempts
             delay = min(3600, 15 * (2 ** min(attempts, 8))) if retry else 0
             connection.execute("""UPDATE social_deliveries SET state=%s,attempts=%s,next_attempt_at=%s,last_error=%s,updated_at=%s
-                WHERE subscription_id=%s AND event_key=%s""", ("uncertain" if uncertain else "retry" if retry else "failed", attempts, now + delay, error[:500], now, subscription_id, event_key))
+                WHERE subscription_id=%s AND event_key=%s""", ("failed" if exhausted else "uncertain" if uncertain else "retry" if retry else "failed", attempts, now + delay, error[:500], now, subscription_id, event_key))
 
     def purge_social_history(self, *, retention_days: int = 30) -> int:
         cutoff = int(time.time()) - max(1, retention_days) * 86400
         with self._connection() as connection:
-            delivery_count = connection.execute("DELETE FROM social_deliveries WHERE updated_at<%s AND state IN ('sent','failed')", (cutoff,)).rowcount
             event_count = connection.execute("DELETE FROM social_events WHERE processed_at IS NOT NULL AND processed_at<%s", (cutoff,)).rowcount
+            # A retained event can resume after a long guild pause. Its terminal
+            # receipts remain the deduplication and suppression record until the
+            # event itself is gone, including when the queue's purge removed it.
+            delivery_count = connection.execute("""DELETE FROM social_deliveries d
+                WHERE updated_at<%s AND state IN ('sent','failed','skipped')
+                AND NOT EXISTS(SELECT 1 FROM social_events e WHERE e.event_key=d.event_key)""", (cutoff,)).rowcount
         return int(delivery_count + event_count)
 
-    def set_social_live_message(self, subscription_id: int, provider: str, account_id: str, channel_id: int, message_id: int) -> None:
+    def set_social_live_message(self, subscription_id: int, provider: str, account_id: str, channel_id: int, message_id: int,
+                                *, event_key: str | None = None) -> None:
         with self._connection() as connection:
+            lock_resource(connection, 'social-live-message', subscription_id)
+            if event_key is not None:
+                delivery = connection.execute('SELECT id FROM social_deliveries WHERE subscription_id=%s AND event_key=%s',
+                                              (subscription_id, event_key)).fetchone()
+                if delivery is None:
+                    return
+                newer = connection.execute("""SELECT 1 FROM social_deliveries WHERE subscription_id=%s
+                    AND event_key LIKE %s AND state='sent' AND id>%s LIMIT 1""",
+                    (subscription_id, provider + ':live_start:%', delivery['id'])).fetchone()
+                ended = connection.execute("""SELECT 1 FROM social_deliveries WHERE subscription_id=%s
+                    AND event_key LIKE %s AND state='sent' AND
+                    (event_key=%s OR (discord_channel_id=%s AND discord_message_id=%s)) LIMIT 1""",
+                    (subscription_id, provider + ':live_end:%', event_key.replace(':live_start:', ':live_end:', 1),
+                     channel_id, message_id)).fetchone()
+                if newer or ended:
+                    return
             connection.execute("INSERT INTO social_live_messages(subscription_id,provider,account_id,discord_channel_id,discord_message_id) VALUES(%s,%s,%s,%s,%s) ON CONFLICT(subscription_id,provider,account_id) DO UPDATE SET discord_channel_id=excluded.discord_channel_id,discord_message_id=excluded.discord_message_id", (subscription_id, provider, account_id, channel_id, message_id))
 
     def social_live_message(self, subscription_id: int, provider: str, account_id: str) -> dict[str, int] | None:
@@ -319,6 +496,10 @@ class SocialRepository:
             row = connection.execute("SELECT discord_channel_id,discord_message_id FROM social_live_messages WHERE subscription_id=%s AND provider=%s AND account_id=%s", (subscription_id, provider, account_id)).fetchone()
         return dict(row) if row else None
 
-    def clear_social_live_message(self, subscription_id: int, provider: str, account_id: str) -> None:
+    def clear_social_live_message(self, subscription_id: int, provider: str, account_id: str,
+                                  *, channel_id: int | None = None, message_id: int | None = None) -> None:
         with self._connection() as connection:
-            connection.execute("DELETE FROM social_live_messages WHERE subscription_id=%s AND provider=%s AND account_id=%s", (subscription_id, provider, account_id))
+            lock_resource(connection, 'social-live-message', subscription_id)
+            connection.execute("""DELETE FROM social_live_messages WHERE subscription_id=%s AND provider=%s AND account_id=%s
+                AND (%s::bigint IS NULL OR discord_channel_id=%s) AND (%s::bigint IS NULL OR discord_message_id=%s)""",
+                (subscription_id, provider, account_id, channel_id, channel_id, message_id, message_id))

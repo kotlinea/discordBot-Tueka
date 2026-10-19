@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from pathlib import Path
 import re
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import urlencode
 
 import httpx
 
@@ -233,26 +233,52 @@ def session_token_or_none(request: Request) -> str | None:
     return access_dependencies.token_or_none(request)
 
 
+def discard_pending_oauth(request: Request) -> None:
+    state = request.session.pop('oauth_state', None)
+    if state:
+        dashboard_repository.cancel_oauth_state(state)
+    pending = request.session.pop('social_oauth', None)
+    if pending:
+        social_repository.consume_social_oauth_state(pending['state'], pending['provider'])
+
+
 @app.get("/login")
 async def login(request: Request):
     state = secrets.token_urlsafe(32)
+    discard_pending_oauth(request)
     request.session.clear()
     dashboard_repository.create_oauth_state(state)
+    request.session['oauth_state'] = state
     params = urlencode({"client_id": client_id, "redirect_uri": redirect_uri, "response_type": "code", "scope": "identify guilds", "state": state})
     return RedirectResponse(f"https://discord.com/oauth2/authorize?{params}", status_code=303)
 
 
 @app.get("/oauth/callback")
 async def oauth_callback(request: Request, code: str | None = None, state: str | None = None):
-    if not code or not state or not dashboard_repository.consume_oauth_state(state):
+    expected = request.session.get('oauth_state')
+    if (not code or not state or not expected or not secrets.compare_digest(state.encode('utf-8'), expected.encode('utf-8'))
+            or not dashboard_repository.begin_oauth_exchange(state)):
         raise HTTPException(status_code=400, detail="OAuth state が無効です")
+    request.session.pop('oauth_state', None)
     try:
         token_data = await api.exchange_code(code)
     except Exception as exc:
+        dashboard_repository.cancel_oauth_state(state)
         raise HTTPException(status_code=401, detail="Discordログインに失敗しました") from exc
-    request.session.clear()
+    except BaseException:
+        dashboard_repository.cancel_oauth_state(state)
+        raise
     session_id = secrets.token_urlsafe(32)
-    dashboard_repository.create_dashboard_session(session_id, token_data["access_token"], int(token_data.get("expires_in", 604800)))
+    try:
+        completed = dashboard_repository.complete_oauth_exchange(state, session_id,
+            token_data['access_token'], int(token_data.get('expires_in', 604800)))
+    except BaseException:
+        dashboard_repository.cancel_oauth_state(state)
+        raise
+    if not completed:
+        raise HTTPException(status_code=400, detail="OAuth state が無効です")
+    discard_pending_oauth(request)
+    request.session.clear()
     request.session["session_id"] = session_id
     request.session["csrf_token"] = secrets.token_urlsafe(32)
     return RedirectResponse("/servers", status_code=303)
@@ -263,6 +289,7 @@ async def logout(request: Request):
     session_id = request.session.get("session_id")
     if session_id:
         dashboard_repository.delete_dashboard_session(session_id)
+    discard_pending_oauth(request)
     request.session.clear()
     return RedirectResponse("/", status_code=303)
 
@@ -288,23 +315,37 @@ async def begin_social_connection(request: Request, guild_id: int, provider: str
         return RedirectResponse(f"{target}?error=social-token-key", status_code=303)
     state = secrets.token_urlsafe(32)
     if provider == "tiktok" and settings.tiktok_client_key and settings.tiktok_redirect_uri:
+        discard_pending_oauth(request)
         social_repository.create_social_oauth_state(state, guild_id, provider)
+        request.session['social_oauth'] = {'state': state, 'provider': provider, 'guild_id': guild_id,
+                                            'session_id': request.session['session_id']}
         params = urlencode({"client_key": settings.tiktok_client_key, "response_type": "code", "scope": "user.info.basic,video.list", "redirect_uri": settings.tiktok_redirect_uri, "state": state})
         return RedirectResponse(f"https://www.tiktok.com/v2/auth/authorize/?{params}", status_code=303)
     if provider == "instagram" and settings.instagram_app_id and settings.instagram_redirect_uri:
+        discard_pending_oauth(request)
         social_repository.create_social_oauth_state(state, guild_id, provider)
+        request.session['social_oauth'] = {'state': state, 'provider': provider, 'guild_id': guild_id,
+                                            'session_id': request.session['session_id']}
         params = urlencode({"client_id": settings.instagram_app_id, "redirect_uri": settings.instagram_redirect_uri, "response_type": "code", "scope": "instagram_business_basic", "state": state})
         return RedirectResponse(f"https://www.instagram.com/oauth/authorize?{params}", status_code=303)
     return RedirectResponse(f"{target}?error=social-provider-unavailable", status_code=303)
 
 
 @app.get("/social/oauth/{provider}/callback")
-async def social_oauth_callback(provider: str, code: str | None = None, state: str | None = None, error: str | None = None):
+async def social_oauth_callback(request: Request, provider: str, code: str | None = None, state: str | None = None, error: str | None = None):
+    session_token(request)
     if not state or error:
         raise HTTPException(status_code=400, detail="ソーシャルOAuth認証が拒否されました")
-    guild_id = social_repository.consume_social_oauth_state(state, provider)
-    if guild_id is None or not code:
+    pending = request.session.get('social_oauth')
+    if (not pending or pending['provider'] != provider
+            or pending['session_id'] != request.session.get('session_id')
+            or not secrets.compare_digest(state.encode('utf-8'), pending['state'].encode('utf-8'))):
         raise HTTPException(status_code=400, detail="ソーシャルOAuth state が無効です")
+    request.session.pop('social_oauth', None)
+    guild_id = social_repository.consume_social_oauth_state(state, provider)
+    if guild_id is None or guild_id != pending['guild_id'] or not code:
+        raise HTTPException(status_code=400, detail="ソーシャルOAuth state が無効です")
+    await authorized(request, guild_id, live=True)
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             if provider == "tiktok" and settings.tiktok_client_key and settings.tiktok_client_secret and settings.tiktok_redirect_uri:
@@ -325,7 +366,16 @@ async def social_oauth_callback(provider: str, code: str | None = None, state: s
         raise HTTPException(status_code=502, detail="ソーシャルOAuthトークンの取得に失敗しました") from exc
     if not token or not account_id:
         raise HTTPException(status_code=502, detail="ソーシャルOAuthの応答が不完全です")
-    social_repository.save_social_connection(guild_id, provider, str(account_id), str(account_name), social_cipher.encrypt(str(token)), social_cipher.encrypt(str(payload["refresh_token"])) if payload.get("refresh_token") else None, int(time.time()) + int(payload.get("expires_in", 0)) if payload.get("expires_in") else None)
+    access = await authorized(request, guild_id, live=True)
+    encrypted_token = social_cipher.encrypt(str(token))
+    encrypted_refresh = social_cipher.encrypt(str(payload['refresh_token'])) if payload.get('refresh_token') else None
+    expires_at = int(time.time()) + int(payload['expires_in']) if payload.get('expires_in') else None
+    try:
+        with dashboard_repository.guard_dashboard_session(request.session['session_id'], access) as connection:
+            social_repository.save_social_connection(guild_id, provider, str(account_id), str(account_name),
+                encrypted_token, encrypted_refresh, expires_at, _conn=connection)
+    except PermissionError as exc:
+        raise HTTPException(status_code=401, detail='ログインが必要です') from exc
     return RedirectResponse(f"/servers/{guild_id}/social/{provider}?saved=connected", status_code=303)
 
 
@@ -337,11 +387,7 @@ async def favicon():
 @app.get("/webhooks/youtube")
 async def youtube_webhook_verify(request: Request):
     """WebSub lease validation; the public callback URL is configured at YouTube."""
-    if request.query_params.get("hub.mode") == "denied":
-        topic = request.query_params.get("hub.topic", "")
-        channel_id = parse_qs(urlparse(topic).query).get("channel_id", [""])[0]
-        if channel_id:
-            social_repository.invalidate_social_target("youtube", channel_id, request.query_params.get("hub.reason", "WebSub subscription denied"))
+    # GET callbacks have no authenticated body; a denial cannot invalidate a target.
     return PlainTextResponse(request.query_params.get("hub.challenge", ""))
 
 
@@ -394,11 +440,7 @@ async def twitch_webhook(request: Request):
     account_id = str(event.get("broadcaster_user_id", ""))
     if not event_type or not account_id:
         raise HTTPException(status_code=400, detail="Unsupported Twitch event")
-    external_id = str(event.get("id") or message_id)
-    handle = str(event.get("broadcaster_user_login", ""))
-    social_repository.enqueue_social_event_v2("twitch", external_id, account_id, event_type, {
-        "account": event.get("broadcaster_user_name") or handle, "handle": handle, "title": event.get("title") or "配信を開始しました",
-        "text": "", "url": f"https://twitch.tv/{handle}", "platform": "Twitch", "event": event_type, "type": event_type,
-        "published_at": event.get("started_at", ""), "thumbnail": "", "avatar": "", "viewer_count": "",
-    })
+    # Both transports reconcile through polling, which owns the stream identity.
+    # A delayed notification must not end or reopen a newer stream's message.
+    social_repository.wake_social_target("twitch", account_id)
     return PlainTextResponse("ok")

@@ -57,10 +57,12 @@ def main():
         source, target, invalid = urls
         apply(source)
         repo = SuggestionRepository(source)
+        GuildSettingsRepository(source).set_module(1234567890123456789, 'suggestions', enabled=True)
         item = repo.create(1234567890123456789, 1234567890123456790, 1234567890123456791, {'idea': 'restore-proof'})
         repo.vote(1234567890123456789, item['id'], 1234567890123456792, 1)
         GuildSettingsRepository(source).set_module(1, 'welcome', enabled=True, settings={'welcome_channel_id': 100})
         tickets = TicketRepository(source)
+        tickets.save_settings(1, {**tickets.settings(1), 'enabled': True})
         team = tickets.save_team(1, {'name': 'Staff', 'role_ids': [500]})
         panel = tickets.save_panel(1, {'name': 'Support', 'mode': 'channel', 'category_id': 100, 'team_id': team['id']})
         ticket = tickets.reserve_ticket(1, panel['id'], 10, 'restore', {})

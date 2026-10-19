@@ -33,6 +33,19 @@ class SchedulingApiTests(unittest.TestCase):
         self.base='/api/v1/guilds/1/schedules/items'
         self.body={'request_key':'generated','payload':{'kind':'message','title':'Generated','body':'Test','channel_id':'10','run_at':int(time.time())+600}}
 
+    def test_missing_message_channel_returns_validation_error_without_mutation(self):
+        item = self.create()
+        for present in (False, True):
+            payload = {key: value for key, value in self.body['payload'].items() if key != 'channel_id'}
+            if present:
+                payload['channel_id'] = None
+            with self.subTest(explicit_null=present):
+                response = self.client.post(self.base, json={**self.body, 'request_key': 'missing-channel', 'payload': payload}, headers=self.headers)
+                self.assertEqual(response.status_code, 422, response.text)
+                response = self.client.put(f"{self.base}/{item['id']}", json={'revision': item['revision'], 'payload': payload}, headers=self.headers)
+                self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(self.client.get(self.base).json()['items'], [item])
+
     def create(self):
         response=self.client.post(self.base,json=self.body,headers=self.headers)
         self.assertEqual(response.status_code,200,response.text)

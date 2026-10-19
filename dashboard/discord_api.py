@@ -26,7 +26,6 @@ def retry_after(response: httpx.Response) -> float | None:
 
 
 ADMINISTRATOR = 0x8
-MANAGEMENT_PERMISSIONS = 0x0000000000000008 | 0x0000000000000010 | 0x0000000000000020 | 0x0000000000000040 | 0x0000000000000080 | 0x0000000000000100 | 0x0000000000000400 | 0x0000000000001000 | 0x0000000000002000 | 0x0000000000004000 | 0x0000000000008000 | 0x0000000001000000 | 0x0000000020000000
 PERMISSION_BITS = {
     "send_messages": 1 << 11, "view_audit_log": 1 << 7, "manage_messages": 1 << 13,
     "manage_channels": 1 << 4, "manage_roles": 1 << 28, "move_members": 1 << 24,
@@ -35,6 +34,11 @@ PERMISSION_BITS = {
     "read_message_history": 1 << 16, "embed_links": 1 << 14, "attach_files": 1 << 15,
     "manage_threads": 1 << 34, "create_public_threads": 1 << 35, "create_private_threads": 1 << 36, "send_messages_in_threads": 1 << 38,
 }
+# Restrict assignable roles without excluding ordinary channel/media permissions.
+MANAGEMENT_PERMISSIONS = ADMINISTRATOR | sum(PERMISSION_BITS[name] for name in (
+    'kick_members', 'ban_members', 'manage_channels', 'view_audit_log', 'manage_messages',
+    'move_members', 'manage_roles', 'moderate_members', 'manage_threads',
+)) | (1 << 5) | (1 << 29)  # Manage Guild, Manage Webhooks
 
 
 def effective_channel_permissions(
@@ -176,7 +180,7 @@ class DiscordAPI:
         selectable_roles = [item for item in all_roles if item.get("name") != "@everyone" and not item.get("managed") and int(item.get("position", 0)) < bot_top_position and not (int(item.get("permissions", "0")) & MANAGEMENT_PERMISSIONS)]
         visible_channels = []
         for raw_channel in channels.json():
-            if raw_channel.get("type") not in {0, 2, 4}:
+            if raw_channel.get("type") not in {0, 2, 4, 5, 13, 15, 16}:
                 continue
             channel = dict(raw_channel)
             channel["bot_permissions"] = str(effective_channel_permissions(

@@ -276,7 +276,7 @@ class YouTubeAdapter(ProviderAdapter):
                     recovery_cursor.setdefault("seen", [])
                     recovery_cursor.setdefault("live_ids", [])
                     recovery_cursor.setdefault("websub_renew_at", 0)
-                    recovery_cursor["feed_ready"] = bool(cursor_before.get("seen"))
+                    recovery_cursor["feed_ready"] = cursor_before.get("feed_ready", bool(cursor_before.get("seen")))
                     recovery_cursor["rss_retry_at"] = rss_retry_at
                     recovery_cursor["rss_last_status"] = rss_status_code
                     recovery_cursor["source"] = "unavailable"
@@ -292,19 +292,40 @@ class YouTubeAdapter(ProviderAdapter):
                         status="pending" if initialize else "degraded",
                         error=" ".join(part for part in (rss_error, websub_error) if part),
                     )
-        previous = set(cursor_before.get("seen", []))
-        current = [item["id"] for item in entries[:15]]
-        video_state: dict[str, dict[str, Any]] = {}
-        if self.settings.youtube_api_key and current:
-            details = await self.client.get("https://www.googleapis.com/youtube/v3/videos", params={"part": "snippet,liveStreamingDetails", "id": ",".join(current), "key": self.settings.youtube_api_key})
-            details.raise_for_status()
-            video_state = {str(item["id"]): item for item in details.json().get("items", [])}
-        previous_live = set(cursor_before.get("live_ids", []))
-        live_ids = {video_id for video_id,item in video_state.items() if item.get("liveStreamingDetails", {}).get("actualStartTime") and not item.get("liveStreamingDetails", {}).get("actualEndTime")}
-        events: list[SocialEvent] = []
+        entries = entries[:15]
+        current = [item["id"] for item in entries]
         effective_initialize = initialize or cursor_before.get("feed_ready") is False
+        baseline_seen = current if effective_initialize else cursor_before.get('baseline_seen', cursor_before.get('seen', []))
+        previous = set(cursor_before.get("seen", [])) | set(baseline_seen)
+        previous_live = set(cursor_before.get("live_ids", []))
+        video_state: dict[str, dict[str, Any]] = {}
+        detail_ids = list(dict.fromkeys(current + sorted(previous_live)))
+        if self.settings.youtube_api_key:
+            for offset in range(0, len(detail_ids), 50):
+                details = await self.client.get("https://www.googleapis.com/youtube/v3/videos", params={"part": "snippet,liveStreamingDetails", "id": ",".join(detail_ids[offset:offset + 50]), "key": self.settings.youtube_api_key})
+                details.raise_for_status()
+                video_state.update({str(item["id"]): item for item in details.json().get("items", [])})
+        # Missing/private/deleted videos are not evidence that a stream ended.
+        # Keep the identity until an explicit actualEndTime can be observed.
+        live_ids = set(previous_live)
+        for video_id, state in video_state.items():
+            live_details = state.get('liveStreamingDetails') or {}
+            if live_details.get('actualEndTime'):
+                live_ids.discard(video_id)
+            elif live_details.get('actualStartTime'):
+                live_ids.add(video_id)
+        events: list[SocialEvent] = []
         if not effective_initialize:
-            for item in reversed(entries):
+            event_entries = list(reversed(entries))
+            for video_id in sorted(previous_live - set(current)):
+                state = video_state.get(video_id, {})
+                if not (state.get('liveStreamingDetails') or {}).get('actualEndTime'):
+                    continue
+                snippet = state.get('snippet') or {}
+                event_entries.append({'id': video_id, 'account': snippet.get('channelTitle') or target.get('display_name') or channel_id,
+                    'title': snippet.get('title') or '', 'url': f'https://www.youtube.com/watch?v={video_id}',
+                    'published_at': snippet.get('publishedAt') or ''})
+            for item in event_entries:
                 state = video_state.get(item["id"], {})
                 live_details = state.get("liveStreamingDetails") or {}
                 if item["id"] in live_ids and item["id"] not in previous_live:
@@ -317,12 +338,13 @@ class YouTubeAdapter(ProviderAdapter):
                     continue
                 events.append(SocialEvent(item["id"], event_type, {"account": item["account"], "handle": target.get("handle") or channel_id,
                     "title": item["title"], "text": "", "url": item["url"], "platform": "YouTube", "event": event_type,
-                    "published_at": live_details.get("actualStartTime") or item["published_at"],
+                    "published_at": (live_details.get("actualEndTime") if event_type == 'live_end' else live_details.get("actualStartTime")) or item["published_at"],
                     "thumbnail": f"https://i.ytimg.com/vi/{item['id']}/maxresdefault.jpg", "avatar": target.get("avatar_url") or "",
                     "viewer_count": live_details.get("concurrentViewers", "")}))
         name = api_name or (entries[0]["account"] if entries else target.get("display_name") or channel_id)
         cursor = {
-            "seen": current,
+            "seen": current or cursor_before.get('seen', []),
+            "baseline_seen": baseline_seen,
             "live_ids": sorted(live_ids),
             "websub_renew_at": cursor_before.get("websub_renew_at", 0),
             "feed_ready": True,

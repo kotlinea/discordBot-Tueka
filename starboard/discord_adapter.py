@@ -28,21 +28,24 @@ class DiscordHighlightAdapter:
     async def channel(self,guild_id,channel_id):
         guild=self.bot.get_guild(guild_id)
         if guild is None:raise DiscordFailure('Highlight Guild unavailable',retry=True)
-        channel=guild.get_channel_or_thread(channel_id) or await guild.fetch_channel(channel_id)
+        try:channel=guild.get_channel_or_thread(channel_id) or await guild.fetch_channel(channel_id)
+        except (discord.HTTPException,OSError,TimeoutError) as exc:raise failure(exc) from exc
         if not isinstance(channel,(discord.TextChannel,discord.Thread)) or channel.guild.id!=guild_id:
             raise DiscordFailure('Highlight channel unavailable')
         return channel
 
-    async def source(self,guild,channel,message,emoji):
+    async def source(self,guild,channel,message,emoji,allow_private=False):
         try:
             target=await self.channel(guild,channel)
             parent=target.parent if isinstance(target,discord.Thread) else None
             if isinstance(target,discord.Thread) and parent is None:parent=await target.guild.fetch_channel(target.parent_id)
             nsfw=parent.is_nsfw() if parent else target.is_nsfw()
-            if nsfw:
-                return {'guild_id':guild,'channel_id':channel,'message_id':message,'parent_channel_id':parent.id if parent else None,'author_id':0,'author_bot':False,'author_name':'','content':'','nsfw':True,'deleted':False,'image_url':''},0
+            private=isinstance(target,discord.Thread) and target.type==discord.ChannelType.private_thread
+            if nsfw or (private and not allow_private):
+                return {'guild_id':guild,'channel_id':channel,'message_id':message,'parent_channel_id':parent.id if parent else None,'author_id':0,'author_bot':False,'author_name':'','content':'','nsfw':nsfw,'private_thread':private,'deleted':False,'image_url':''},0
             source=await target.fetch_message(message)
             snapshot={'guild_id':guild,'channel_id':channel,'message_id':message,'parent_channel_id':parent.id if parent else None,'author_id':source.author.id,'author_bot':source.author.bot,'author_name':source.author.display_name[:80],'content':source.content[:2000],'nsfw':nsfw,'deleted':False,'image_url':''}
+            if private:snapshot['private_thread']=True
             for attachment in source.attachments:
                 url=urlparse(attachment.url)
                 if (attachment.content_type or '').startswith('image/') and url.scheme=='https' and url.hostname in {'cdn.discordapp.com','media.discordapp.net'}:
@@ -51,7 +54,11 @@ class DiscordHighlightAdapter:
             if not source.author.bot and not nsfw:
                 for reaction in source.reactions:
                     raw=f'custom:{reaction.emoji.id}' if isinstance(reaction.emoji,discord.PartialEmoji) and reaction.emoji.id else str(reaction.emoji)
-                    if normalize_emoji(raw)!=emoji:continue
+                    # External reactions can use emoji outside our configuration
+                    # validator. They must not prevent counting the chosen emoji.
+                    try:reaction_emoji=normalize_emoji(raw)
+                    except ValueError:continue
+                    if reaction_emoji!=emoji:continue
                     for kind in (discord.ReactionType.normal,discord.ReactionType.burst):
                         async for user in reaction.users(limit=5001,type=kind):
                             voters[user.id]={'id':user.id,'bot':user.bot}

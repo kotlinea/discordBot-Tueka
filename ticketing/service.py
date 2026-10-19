@@ -221,7 +221,8 @@ class TicketService:
         resource = None
         try:
             resource = await port.create_container(ticket, panel, name, (team or {}).get('role_ids', []),
-                self.repository.on_call_members(ticket['guild_id'], int(panel.get('team_id') or 0)))
+                self.repository.on_call_members(ticket['guild_id'], int(panel.get('team_id') or 0)),
+                (team or {}).get('user_ids', []) + (team or {}).get('admin_user_ids', []))
             saved = self.repository.activate_ticket(ticket['id'], resource.id, resource.parent_id)
             self.schedule_ticket(saved)
             return saved, resource
@@ -295,6 +296,10 @@ class TicketService:
         encrypted_answers = {key: self.transcripts.encrypt_text(value) for key, value in normalized.items()}
         try:
             ticket = self.repository.reserve_ticket(guild_id, panel_id, opener_id, interaction_id, encrypted_answers, staff_exempt=staff_exempt)
+        except ValueError as exc:
+            if str(exc) == 'disabled':
+                raise TicketValidationError('disabled', 'チケット受付は現在利用できません。') from exc
+            raise
         except OverflowError as exc:
             code = str(exc)
             if code.startswith("ticket_cooldown:"):
@@ -352,10 +357,14 @@ class TicketService:
         return self.repository.queue_outbox(ticket_id, "note" if note else "reply", actor_id, payload)
 
     async def close(self, ticket_id: int, actor_id: int, reason: str) -> tuple[dict[str, Any], dict[str, Any]]:
+        lease = ResourceLease(self.repository.database_url, 'ticket_close', ticket_id)
+        return await lease.run(lambda owned: self._close_owned(ticket_id, actor_id, reason, owned))
+
+    async def _close_owned(self, ticket_id: int, actor_id: int, reason: str, lease) -> tuple[dict[str, Any], dict[str, Any]]:
         ticket = self.repository.ticket(ticket_id)
         if not ticket or ticket["status"] not in {"open", "awaiting_user"}:
             raise TicketValidationError("ticket_closed", "開いているチケットではありません。")
-        ticket = self.repository.begin_close(ticket_id, actor_id, reason)
+        ticket = self.repository.begin_close(ticket_id, actor_id, reason, lease=lease)
         try:
             messages, cursor = [], 0
             while True:
@@ -369,15 +378,17 @@ class TicketService:
                 cursor = int(page[-1]["id"])
             answers = {key: self.transcripts.decrypt_text(value) for key, value in dict(ticket.get("form_answers") or {}).items()}
             attachments = [{"id": item["id"], "filename": item["filename"], "content_type": item.get("content_type"), "size": item["byte_size"]} for item in self.repository.attachments(ticket_id) if item.get("status") == "ready"]
-            payload = {"version": 1, "ticket": {key: ticket.get(key) for key in ("id", "guild_id", "ticket_number", "panel_id", "opener_id", "mode", "created_at", "opened_at")},
+            payload = {"version": 1, "close_revision": ticket['revision'], "ticket": {key: ticket.get(key) for key in ("id", "guild_id", "ticket_number", "panel_id", "opener_id", "mode", "created_at", "opened_at")},
                        "form_answers": answers, "closed_by": actor_id, "close_reason": reason[:1000], "closed_at": int(time.time()), "messages": messages}
             payload["attachments"] = attachments
             stored = await self.transcripts.save(ticket["guild_id"], ticket_id, payload)
             retention = self.repository.settings(ticket["guild_id"])["transcript_retention_days"]
-            transcript = self.repository.save_transcript(ticket_id, stored.backend, stored.object_key, stored.content_hash, stored.byte_size, int(time.time()) + retention * 86400)
-            closed = self.repository.close_ticket(ticket_id, actor_id, reason)
+            transcript = self.repository.save_transcript(ticket_id, stored.backend, stored.object_key, stored.content_hash, stored.byte_size, int(time.time()) + retention * 86400, lease=lease)
+            closed = self.repository.close_ticket(ticket_id, actor_id, reason, lease=lease)
+        except LostLease:
+            raise
         except Exception:
-            self.repository.cancel_close(ticket_id)
+            self.repository.cancel_close(ticket_id, lease=lease)
             raise
         self.repository.audit(ticket["guild_id"], "ticket_closed", actor_id, ticket_id, {"transcript_id": transcript["id"]})
         return closed, transcript
