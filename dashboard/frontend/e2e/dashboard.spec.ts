@@ -9,6 +9,39 @@ const welcome = { ...feature('welcome','community'), title: '入退室', fields:
 const reactionRoles = { ...feature('reaction_roles','community'), title: 'リアクションロール', fields: [], settings: { enabled: false, revision: 0 } }
 const rule = (id: number, name: string) => ({ id, guild_id: 1, family: 'automod', event_type: 'message_create', name, enabled: true, mode: 'enforce', priority: id * 10, stop_on_match: false, trigger_type: 'keyword', trigger_config: { keywords: ['bad'], allow_list: [], match: 'wildcard' }, conditions: { channel_policy: 'all_except', role_policy: 'all_except', channel_ids: [], required_role_ids: [] }, exemptions: { channel_ids: [], role_ids: [] }, actions: [{ type: 'delete' }, { type: 'log', message: '{rule}: {reason}' }], revision: 1 })
 
+for (const locale of ['ja','en'] as const) {
+  test(`suggestions review keeps a reason on conflict and supports keyboard history (${locale})`, async ({page}) => {
+    const copy=(locale==='ja'?ja:en).suggestions.suggestions
+    let writes=0
+    let item={id:1,author_id:'20',message_id:'100',status:'approved',answers:{idea:'Generated proposal'},upvotes:1,downvotes:0,reviewer_id:'30',created_at:1000,revision:2,review_reason:'Accepted',discussion_thread_id:'100'}
+    await page.route('**/api/v1/session',route=>route.fulfill({json:{...session,preferences:{...session.preferences,locale}}}))
+    await page.route('**/api/v1/guilds/1/suggestions/settings',route=>route.fulfill({json:{...feature('suggestions','engagement'),settings:{channel_id:'123456789012345678',log_channel_id:null,review_role_ids:[],allow_voting:true,show_author:true,discussion_enabled:false,form_title:'Ideas',form_fields:[{key:'idea',label:'Idea',placeholder:'',style:'paragraph',required:true,min_length:1,max_length:100}]}}}))
+    await page.route('**/api/v1/guilds/1/suggestions/items*',route=>route.fulfill({json:{items:[item]}}))
+    await page.route('**/api/v1/guilds/1/suggestions/items/1/events',route=>route.fulfill({json:{items:[{id:1,actor_id:'30',event_type:'status_changed',detail:{status:item.status,reason:item.review_reason},created_at:1000}]}}))
+    await page.route('**/api/v1/guilds/1/suggestions/items/1/review',async route=>{
+      writes++;const body=route.request().postDataJSON()
+      expect(body).toMatchObject({reason:'Released by keyboard',revision:2,status:'implemented'})
+      if(writes===1)return route.fulfill({status:409,json:{detail:{code:'revision_conflict',message:'Concurrent review',errors:[]}}})
+      item={...item,status:'implemented',review_reason:body.reason,revision:3}
+      return route.fulfill({json:item})
+    })
+    await page.goto('/servers/1/suggestions')
+    const input=page.getByRole('textbox',{name:copy.reason})
+    await input.fill('Released by keyboard');await input.focus();await page.keyboard.press('Tab')
+    await expect(page.getByRole('button',{name:copy.status.implemented,exact:true})).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('alert')).toContainText('Concurrent review')
+    await expect(input).toHaveValue('Released by keyboard')
+    await page.getByRole('button',{name:copy.status.implemented,exact:true}).focus();await page.keyboard.press('Enter')
+    await expect(input).toHaveCount(0)
+    await page.getByRole('button',{name:copy.history}).click()
+    await expect(page.getByRole('listitem').filter({hasText:'Released by keyboard'})).toBeVisible()
+    expect(writes).toBe(2)
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false)
+    expect((await new AxeBuilder({page}).analyze()).violations).toEqual([])
+  })
+}
+
 test('suggestions save bar validates and persists edits', async ({ page }) => {
   let writes = 0
   let settings = { ...feature('suggestions', 'engagement'), settings: {

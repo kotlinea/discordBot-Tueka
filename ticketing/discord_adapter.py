@@ -258,6 +258,11 @@ class DiscordTicketAdapter:
         try:
             return await attachment.read(use_cached=True)
         except discord.HTTPException as exc:
+            if exc.status in {404, 415}:
+                try:
+                    return await attachment.read(use_cached=False)
+                except discord.HTTPException as source_error:
+                    exc = source_error
             raise DiscordFailure(str(exc), retry=exc.status == 429 or exc.status >= 500) from exc
 
     async def participant(self, ticket, user_id, *, add):

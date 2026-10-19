@@ -1,6 +1,5 @@
 [Unit]
 Description=Tueka consistent offline backup
-Requires=docker.service
 After=docker.service
 
 [Service]
@@ -8,6 +7,7 @@ Type=oneshot
 User=tueka-operator
 SupplementaryGroups=docker
 WorkingDirectory=/srv/tueka
-ExecStart=/usr/bin/docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm -T recovery backup --config-dir data/environments/prod --backup-root data/backups --resume-source
+ExecCondition=/usr/bin/test -S /var/run/docker.sock
+ExecStart=/usr/bin/docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build --no-deps -T recovery scheduled-backup --backup-config data/backup.json
 UMask=0077
 TimeoutStartSec=1h

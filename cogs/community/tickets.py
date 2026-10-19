@@ -159,7 +159,8 @@ class TicketsCog(commands.Cog):
         panel = self.repository.panel(interaction.guild.id, panel_id)
         try:
             exempt = await self._staff(member, panel)
-            ticket, panel = self.service.reserve(interaction.guild.id, panel_id, member.id, str(interaction.id), answers, role_ids={role.id for role in member.roles}, staff_exempt=exempt)
+            ticket, panel = self.service.reserve(interaction.guild.id, panel_id, member.id, str(interaction.id),
+                role_ids={role.id for role in member.roles}, answers=answers, staff_exempt=exempt)
         except TicketValidationError as exc:
             await interaction.followup.send(str(exc), ephemeral=True)
             return

@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from unittest.mock import AsyncMock
 
 from db_support import prepare_database
 from discord_io import DiscordFailure
@@ -38,6 +39,29 @@ class SuggestionDeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.service = SuggestionDeliveryService(self.repo, settings, self.port)
         self.item = self.repo.create(1, 10, 20, {'idea': 'A proposal'})
 
+    async def test_discussion_recovers_receipt_without_creating_twice(self):
+        self.service.guild_settings.set_module(1,'suggestions',enabled=True,settings={'channel_id':10,'discussion_enabled':True})
+        self.port.sync=AsyncMock()
+        self.port.discussion=AsyncMock(return_value=900)
+        claim=self.repo.outbox_jobs.claim('worker')
+        self.assertIsNone((await self.service.deliver(claim.payload)).error)
+        self.repo.outbox_jobs.finish(claim,Outcome())
+        sync=self.repo.outbox_jobs.claim('worker')
+        await self.service.deliver(sync.payload)
+        self.repo.outbox_jobs.finish(sync,Outcome())
+        discussion=self.repo.outbox_jobs.claim('worker')
+        self.assertEqual(discussion.payload['action'],'discussion')
+        with patch.object(self.repo,'discussion_delivered',side_effect=RuntimeError('DB failed')):
+            with self.assertRaises(RuntimeError):await self.service.deliver(discussion.payload)
+        self.repo.outbox_jobs.finish(discussion,Outcome('DB failed',retry=True))
+        self.repo.outbox_jobs.clock=lambda:discussion.payload['created_at']+100
+        retry=self.repo.outbox_jobs.claim('worker')
+        self.assertTrue(retry.payload['delivery_started'])
+        self.assertIsNone((await self.service.deliver(retry.payload)).error)
+        self.assertTrue(self.port.discussion.call_args.kwargs['recover'])
+        self.assertEqual(self.repo.get(1,self.item['id'])['discussion_thread_id'],900)
+        with self.assertRaises(LostLease):self.repo.discussion_delivered(discussion.payload,901)
+
     async def test_database_failure_after_send_recovers_without_duplicate_post(self):
         now = 1000
         self.repo.outbox_jobs.clock = lambda: now
@@ -54,8 +78,8 @@ class SuggestionDeliveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(retry.id, claim.id)
             self.assertIsNone((await self.service.deliver(retry.payload)).error)
             self.assertTrue(self.repo.outbox_jobs.finish(retry, Outcome()))
+            self.assertEqual(self.repo.get(1, self.item['id'])['message_id'], 900)
         self.assertEqual(self.port.sent, 1)
-        self.assertEqual(self.repo.get(1, self.item['id'])['message_id'], 900)
 
     async def test_stale_lease_cannot_attach_message_or_change_delivery_state(self):
         self.repo.outbox_jobs.clock = lambda: self.item['created_at']

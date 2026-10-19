@@ -11,6 +11,15 @@ DOCS = ROOT / "docs"
 
 
 class DocumentationTests(unittest.TestCase):
+    def test_documented_maturity_is_generated_from_the_registry(self):
+        values=json.loads((DOCS/'reference/feature-maturity.json').read_text(encoding='utf-8'))
+        self.assertEqual(values,{feature.id:feature.maturity for feature in FEATURES})
+        for feature in FEATURES:
+            relative=feature.docs_path.removeprefix('/docs/')
+            for prefix in ('','en/'):
+                page=DOCS/f'{prefix}{relative}.md'
+                self.assertIn(f'feature_id: {feature.id}',page.read_text(encoding='utf-8'))
+
     def test_every_feature_has_a_canonical_japanese_page(self):
         for feature in FEATURES:
             relative = feature.docs_path.removeprefix("/docs/")

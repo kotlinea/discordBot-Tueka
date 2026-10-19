@@ -39,6 +39,9 @@ class TikTokAdapter(ProviderAdapter):
         handle = target["account_key"]
         data = await self._extract(f"https://www.tiktok.com/@{handle}", flat=True) or {}
         entries = data.get("entries") or []
+        if not isinstance(entries, list):
+            raise RuntimeError("TikTok returned an invalid entries response")
+        entries = [item for item in entries if isinstance(item, dict) and item.get("id")]
         previous = set(target.get("cursor", {}).get("seen", []))
         current = [str(item.get("id")) for item in entries if item.get("id")][:20]
         events = [] if initialize else [SocialEvent(str(item["id"]), "post", {

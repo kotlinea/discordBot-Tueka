@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from database import connect
 from database.testing import temporary_database
 from database.migrations import load
+from features.registry import FEATURES
 
 
 def docker(*args, check=True):
@@ -71,7 +72,7 @@ for path in ('feature_registry.py', 'guild_settings/models.py', 'social/provider
     assert not pathlib.Path('/app', path).exists(), path
 from features.registry import REGISTRY
 from features.loading import resolve_bindings
-assert len([feature for feature in REGISTRY.features if feature.dashboard]) == 24
+assert sorted(feature.id for feature in REGISTRY.features if feature.dashboard) == __EXPECTED_FEATURE_IDS__
 for process in ('bot', 'api', 'worker'):
     assert resolve_bindings(REGISTRY.for_process(process)), process
 print('category bindings resolve; retired source paths absent: OK')
@@ -97,7 +98,7 @@ for path in ('/ui/index.html', '/docs/', '/docs/en/getting-started.html', '/serv
         if asset.startswith('/'):
             assert urllib.request.urlopen('http://127.0.0.1:8000' + asset).status == 200
 print('nonroot, read-only, no-new-privileges, SPA/Docs/assets: OK')
-'''
+'''.replace('__EXPECTED_FEATURE_IDS__', repr(sorted(feature.id for feature in FEATURES)))
             deadline = time.monotonic() + 60
             while True:
                 result = docker('exec', dashboard, 'python', '-c', probe, check=False)

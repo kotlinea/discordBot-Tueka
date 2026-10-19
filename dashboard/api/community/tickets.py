@@ -101,6 +101,12 @@ def create_router(context: ApiContext) -> APIRouter:
         action = str(body.get('action', ''))
         if action not in {'claim', 'unclaim', 'close', 'reopen', 'delete', 'exclude_auto_close', 'awaiting_user'}:
             raise api_error(422, 'ticket_action_invalid', '操作を確認してください。')
+        if action == 'awaiting_user':
+            panel = ticket_repository.panel(guild_id, int(ticket['panel_id'])) or {}
+            if ticket['mode'] != 'channel' or not panel.get('awaiting_category_id'):
+                raise api_error(422, 'awaiting_category_unavailable', '回答待ちに移動するカテゴリーを受付設定で指定してください。')
+            if ticket['status'] != 'open':
+                raise api_error(409, 'ticket_not_open', '開いているチケットではありません。')
         item = ticket_repository.queue_outbox(ticket_id, action, actor, {'reason': str(body.get('reason', ''))[:1000], 'revision': body.get('revision'), 'excluded': body.get('excluded', True)})
         return {'id': item['id'], 'status': item['status']}
 

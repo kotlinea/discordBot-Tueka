@@ -7,7 +7,7 @@ from pathlib import Path
 from psycopg import IntegrityError
 
 from database import SchemaNotReady, connect, require_current, transaction
-from database.migrations import MIGRATIONS, apply
+from database.migrations import MIGRATIONS, apply, load
 from database.testing import temporary_database
 
 
@@ -20,11 +20,11 @@ class PostgresTests(unittest.TestCase):
     def test_empty_schema_gate_initialization_and_idempotency(self):
         with self.assertRaises(SchemaNotReady):
             require_current(self.url)
-        self.assertEqual(apply(self.url)['applied'], ['0001_initial.sql', '0002_observability.sql'])
+        self.assertEqual(apply(self.url)['applied'], [row[1] for row in load()])
         require_current(self.url)
         self.assertEqual(apply(self.url)['applied'], [])
         with transaction(self.url) as c:
-            self.assertEqual(c.execute('SELECT count(*) count FROM information_schema.tables WHERE table_schema=current_schema()').fetchone()['count'], 68)
+            self.assertEqual(c.execute('SELECT count(*) count FROM information_schema.tables WHERE table_schema=current_schema()').fetchone()['count'], 96)
 
     def test_transaction_and_migration_failures_roll_back(self):
         apply(self.url)
@@ -38,7 +38,7 @@ class PostgresTests(unittest.TestCase):
             root = Path(directory)
             for migration in MIGRATIONS.glob('*.sql'):
                 (root / migration.name).write_bytes(migration.read_bytes())
-            (root / '0003_failure.sql').write_text("INSERT INTO app_metadata VALUES('partial','discard'); INSERT INTO app_metadata VALUES('partial','fail');")
+            (root / f'{len(load()) + 1:04d}_failure.sql').write_text("INSERT INTO app_metadata VALUES('partial','discard'); INSERT INTO app_metadata VALUES('partial','fail');")
             with self.assertRaises(IntegrityError):
                 apply(self.url, root)
         require_current(self.url)
@@ -221,7 +221,7 @@ class PostgresTests(unittest.TestCase):
         self.assertEqual(suggestions.list(1)[0]['upvotes'], 4)
         suggestions.vote(1, item['id'], 10, 1)
         self.assertEqual(suggestions.get(1, item['id'])['upvotes'], 3)
-        suggestions.review(1, item['id'], 20, 'approved')
+        suggestions.review(1, item['id'], 20, 'approved', 'Accepted')
         with self.assertRaisesRegex(RuntimeError, 'suggestion_closed'):
             suggestions.vote(1, item['id'], 11, -1)
         claim = suggestions.outbox_jobs.claim('publisher')

@@ -23,6 +23,7 @@ class SuggestionsApiTests(unittest.TestCase):
         self.dashboard_repository.create_dashboard_session('test-session', 'test-token', 3600)
         self.session = {'session_id': 'test-session', 'csrf_token': 'test-csrf'}
         self.discord = SimpleNamespace(
+            current_user=AsyncMock(return_value={'id':'30'}),
             can_manage=AsyncMock(return_value=True),
             guild_resources=AsyncMock(return_value=([{'id': '10', 'type': 0}], [{'id': '20'}], ADMINISTRATOR)),
         )
@@ -35,6 +36,37 @@ class SuggestionsApiTests(unittest.TestCase):
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
         self.url = '/api/v1/guilds/1/suggestions/settings'
+
+    def test_review_history_revision_and_guild_boundaries(self):
+        from suggestions import SuggestionRepository
+        repo=SuggestionRepository(self.storage.database_url)
+        item=repo.create(1,10,20,{'idea':'Proposal'})
+        url=f"/api/v1/guilds/1/suggestions/items/{item['id']}/review"
+        history=url.removesuffix('review')+'events'
+        body={'status':'approved','reason':'Useful','revision':item['revision']}
+        self.assertEqual(self.client.post(url,json=body).status_code,403)
+        headers={'x-csrf-token':'test-csrf'}
+        self.assertEqual(self.client.post(url,json=body,headers=headers).status_code,409)
+        self.storage.set_module(1,'suggestions',enabled=True)
+        for reason in ('', '   ', 'x'*1001):
+            self.assertEqual(self.client.post(url,json={**body,'reason':reason},headers=headers).status_code,422)
+        self.assertEqual(self.client.post(url.replace('/guilds/1/','/guilds/2/'),json=body,headers=headers).status_code,409)
+        self.storage.set_module(2,'suggestions',enabled=True)
+        self.assertEqual(self.client.post(url.replace('/guilds/1/','/guilds/2/'),json=body,headers=headers).status_code,404)
+        self.assertEqual(self.client.get(history.replace('/guilds/1/','/guilds/2/')).status_code,404)
+        response=self.client.post(url,json=body,headers=headers)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()['review_reason'],'Useful')
+        self.assertEqual(self.client.post(url,json=body,headers=headers).status_code,409)
+        body={'status':'implemented','reason':'Released','revision':response.json()['revision']}
+        response=self.client.post(url,json=body,headers=headers)
+        self.assertEqual(response.status_code,200,response.text)
+        events=self.client.get(history).json()['items']
+        self.assertEqual(events[0]['detail']['reason'],'Released')
+        self.assertEqual(events[0]['actor_id'],'30')
+        self.discord.can_manage.return_value=False
+        self.assertEqual(self.client.get(history).status_code,403)
+        self.assertEqual(self.client.post(url,json=body,headers=headers).status_code,403)
 
     def payload(self):
         return {'revision': 0, 'enabled': True, 'settings': {'channel_id': '10', 'review_role_ids': ['20']}}

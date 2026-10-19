@@ -36,14 +36,19 @@ class QueueRepository:
         require_current(self.database_url)
         self.spec, self.clock = spec, clock
 
+    def _claim_scope(self):
+        """Domain stores may fence eligible rows without consuming paused attempts."""
+        return '',()
+
     def claim(self, owner: str, *, lease_seconds: int = 60) -> Claim | None:
         if not owner or lease_seconds < 3:
             raise ValueError('Owner and a lease of at least three seconds are required')
         now, s = int(self.clock()), self.spec
+        scope,scope_values=self._claim_scope()
         with transaction(self.database_url) as c:
             # A crashed final attempt must terminate rather than remain stranded.
-            c.execute(f"UPDATE {s.table} SET {s.state}='failed',{s.completed}=%s,last_error='Lease expired at retry limit',lease_owner=NULL,lease_token=NULL,lease_until=NULL WHERE id IN (SELECT id FROM {s.table} WHERE {s.state} IN ('pending','retry','processing') AND attempts>=%s AND (lease_until IS NULL OR lease_until<=%s) FOR UPDATE SKIP LOCKED)", (now, s.max_attempts, now))
-            row = c.execute(f"SELECT * FROM {s.table} WHERE {s.state} IN ('pending','retry','processing') AND {s.due}<=%s AND attempts<%s AND (lease_until IS NULL OR lease_until<=%s) ORDER BY {s.due},id LIMIT 1 FOR UPDATE SKIP LOCKED", (now, s.max_attempts, now)).fetchone()
+            c.execute(f"UPDATE {s.table} SET {s.state}='failed',{s.completed}=%s,last_error='Lease expired at retry limit',lease_owner=NULL,lease_token=NULL,lease_until=NULL WHERE id IN (SELECT id FROM {s.table} WHERE {s.state} IN ('pending','retry','processing') AND attempts>=%s AND (lease_until IS NULL OR lease_until<=%s){scope} FOR UPDATE SKIP LOCKED)", (now, s.max_attempts, now,*scope_values))
+            row = c.execute(f"SELECT * FROM {s.table} WHERE {s.state} IN ('pending','retry','processing') AND {s.due}<=%s AND attempts<%s AND (lease_until IS NULL OR lease_until<=%s){scope} ORDER BY {s.due},id LIMIT 1 FOR UPDATE SKIP LOCKED", (now, s.max_attempts, now,*scope_values)).fetchone()
             if row is None:
                 return None
             token = uuid.uuid4().hex

@@ -29,6 +29,9 @@ WORKDIR /app
 RUN groupadd --gid 10001 tueka && useradd --uid 10001 --gid 10001 --no-create-home tueka && mkdir /data && chown 10001:10001 /data
 COPY --from=python-builder /opt/venv /opt/venv
 COPY cogs cogs
+COPY applications applications
+COPY appeals appeals
+COPY scheduling scheduling
 COPY community community
 COPY dashboard dashboard
 COPY database database
@@ -38,6 +41,8 @@ COPY docs docs
 COPY engagement engagement
 COPY features features
 COPY guild_settings guild_settings
+COPY giveaways giveaways
+COPY insights insights
 COPY jobs jobs
 COPY migrations migrations
 COPY moderation moderation
@@ -47,6 +52,7 @@ COPY recovery recovery
 COPY runtime runtime
 COPY scripts scripts
 COPY social social
+COPY starboard starboard
 COPY suggestions suggestions
 COPY tests tests
 COPY ticketing ticketing

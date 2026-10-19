@@ -9,6 +9,68 @@ from scripts.generate_api import artifacts
 
 
 class ApiSchemaTests(unittest.TestCase):
+    def test_feature_maturity_is_independent_of_environment_enablement(self):
+        from guild_settings import GuildSettingsRepository
+        repository=GuildSettingsRepository(self.api.database)
+        for enabled in (False,True):
+            repository.set_module(1,'suggestions',enabled=enabled)
+            response=self.api.client.get('/api/v1/guilds/1/features')
+            self.assertEqual(response.status_code,200,response.text)
+            items=response.json()['items']
+            self.assertEqual(len(items),30)
+            self.assertTrue(all(item['maturity']=='improving' for item in items))
+            self.assertEqual(next(item for item in items if item['id']=='suggestions')['enabled'],enabled)
+
+    def test_manual_action_feature_state_tracks_the_executor_module_without_exposing_settings(self):
+        from guild_settings import GuildSettingsRepository
+        repository = GuildSettingsRepository(self.api.database)
+        for enabled in (True, False):
+            repository.set_module(1, 'moderation', enabled=enabled, settings={'default_log_channel_id':10})
+            repository.set_module(1, 'moderation_actions', enabled=not enabled)
+            response = self.api.client.get('/api/v1/guilds/1/features')
+            self.assertEqual(response.status_code,200,response.text)
+            feature = next(item for item in response.json()['items'] if item['id']=='moderation_actions')
+            self.assertEqual(feature['enabled'],enabled)
+            self.assertEqual(feature['settings'],{})
+
+    def test_purge_rejects_forum_but_lock_accepts_it_before_queueing(self):
+        from guild_settings import GuildSettingsRepository
+        from moderation import ModerationRepository
+        GuildSettingsRepository(self.api.database).set_module(1, 'moderation', enabled=True)
+        channels, roles, permissions = self.api.discord.guild_resources.return_value
+        self.api.discord.guild_resources.return_value = ([*channels, {'id':'15','type':15}], roles, permissions)
+        root = '/api/v1/guilds/1/moderation/actions'
+        repository = ModerationRepository(self.api.database)
+        body = {'action':'purge','channel_id':'15','reason':'channel support test','confirmed':True}
+        rejected = self.api.client.post(root,json=body,headers=self.api.headers)
+        self.assertEqual(rejected.status_code,422,rejected.text)
+        with repository._connection() as connection:
+            self.assertEqual(connection.execute('SELECT COUNT(*) AS count FROM moderation_action_requests').fetchone()['count'],0)
+        accepted = self.api.client.post(root,json={**body,'action':'lock'},headers=self.api.headers)
+        self.assertEqual(accepted.status_code,202,accepted.text)
+
+    def test_manual_action_duration_limits_reject_before_queueing_and_preserve_boundaries(self):
+        from guild_settings import GuildSettingsRepository
+        from moderation import ModerationRepository
+        GuildSettingsRepository(self.api.database).set_module(1, 'moderation', enabled=True)
+        root = '/api/v1/guilds/1/moderation/actions'
+        repository = ModerationRepository(self.api.database)
+        for action, maximum in (('timeout', 40320), ('lockdown', 1440)):
+            body = {'action': action, 'target_user_id': '30', 'reason': 'boundary test',
+                    'confirmed': True, 'confirmation': '1', 'duration_minutes': maximum + 1}
+            with repository._connection() as connection:
+                before = connection.execute('SELECT COUNT(*) AS count FROM moderation_action_requests').fetchone()['count']
+            rejected = self.api.client.post(root, json=body, headers=self.api.headers)
+            self.assertEqual(rejected.status_code, 422, rejected.text)
+            with repository._connection() as connection:
+                self.assertEqual(connection.execute('SELECT COUNT(*) AS count FROM moderation_action_requests').fetchone()['count'], before)
+            accepted = self.api.client.post(root, json={**body, 'duration_minutes': maximum}, headers=self.api.headers)
+            self.assertEqual(accepted.status_code, 202, accepted.text)
+            with repository._connection() as connection:
+                import json
+                row = connection.execute('SELECT options_json FROM moderation_action_requests WHERE id=%s', (accepted.json()['request_id'],)).fetchone()
+                self.assertEqual(json.loads(row['options_json'])['duration_minutes'], maximum)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -95,6 +157,43 @@ class ApiSchemaTests(unittest.TestCase):
         stats = self.api.client.get(root + '/stats')
         self.assertEqual(stats.status_code, 200, stats.text)
         self.assertEqual(stats.json()['panels'][0]['id'], panel['id'])
+
+    def test_ticket_bundle_create_read_update_preserves_shared_message_identity(self):
+        root = '/api/v1/guilds/1/tickets'
+        team_response = self.api.client.post(root + '/teams', headers=self.api.headers, json={
+            'name': 'Recovery test', 'role_ids': [], 'user_ids': [], 'admin_user_ids': [],
+            'notification_channel_id': None, 'enabled': True})
+        self.assertEqual(team_response.status_code, 201, team_response.text)
+        team = team_response.json()
+        response = self.api.client.post(root + '/panels/bundles', headers=self.api.headers, json={
+            'panel': {'name': 'First', 'mode': 'channel', 'category_id': '100', 'team_id': team['id']},
+            'deployment': {'name': 'Entry', 'channel_id': '10', 'title': 'Recovery test'}})
+        self.assertEqual(response.status_code, 201, response.text)
+        first = response.json()
+        message_id = first['deployments'][0]['id']
+        self.assertEqual(first['deployment']['panel_message_id'], message_id)
+        self.assertEqual(first['deployment']['position'], 0)
+        editor = root + '/panels/' + str(first['panel']['id']) + '/editor'
+        loaded = self.api.client.get(editor)
+        self.assertEqual(loaded.status_code, 200, loaded.text)
+        self.assertEqual(loaded.json(), first)
+        first['deployment']['title'] = 'Updated entry'
+        updated = self.api.client.put(root + '/panels/' + str(first['panel']['id']) + '/bundle',
+                                      headers=self.api.headers, json=first)
+        self.assertEqual(updated.status_code, 200, updated.text)
+        self.assertEqual(updated.json()['deployment']['panel_message_id'], message_id)
+        self.assertEqual(len(updated.json()['deployments']), 1)
+        self.assertEqual(self.api.client.get(editor).json()['deployment']['title'], 'Updated entry')
+        second = self.api.client.post(root + '/panels/bundles', headers=self.api.headers, json={
+            'panel': {'name': 'Second', 'mode': 'channel', 'category_id': '100', 'team_id': team['id']},
+            'deployment': {**updated.json()['deployment'], 'position': 0}})
+        self.assertEqual(second.status_code, 201, second.text)
+        self.assertEqual(second.json()['deployment']['panel_message_id'], message_id)
+        self.assertEqual(second.json()['deployment']['position'], 0)
+        reread = self.api.client.get(editor)
+        self.assertEqual(reread.status_code, 200, reread.text)
+        self.assertEqual(reread.json()['deployment']['position'], 1)
+        self.assertEqual(reread.json()['deployment']['panel_message_id'], message_id)
 
     def test_framework_domain_and_json_validation_share_one_error_shape(self):
         cases = [self.api.client.get('/api/v1/guilds/invalid/modules/welcome'),

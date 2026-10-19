@@ -3,17 +3,66 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from api_support import ApiFixture
 from moderation import default_rule
 from ticketing import TicketRepository
+from social import SocialRepository
+from reaction_roles.repository import ReactionRoleRepository
 
 
 CONTRACT = Path(__file__).parent / 'fixtures' / 'api_v1_contract.json'
 U4_PATHS = {
     '/api/v1/guilds/{guild_id}/moderation/{family}/rules/state': 'put',
     '/api/v1/guilds/{guild_id}/moderation/{family}/templates/{trigger_type}': 'get',
+    '/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/events': 'get',
+    '/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/review': 'post',
 }
+APPLICATION_PATHS = {
+    '/api/v1/guilds/{guild_id}/applications/forms': {'get','post'},
+    '/api/v1/guilds/{guild_id}/applications/forms/{form_id}': {'put'},
+    '/api/v1/guilds/{guild_id}/applications/items': {'get'},
+    '/api/v1/guilds/{guild_id}/applications/items/{item_id}/events': {'get'},
+    '/api/v1/guilds/{guild_id}/applications/items/{item_id}/review': {'post'},
+}
+APPEAL_PATHS = {
+    '/api/v1/guilds/{guild_id}/appeals/items': {'get'},
+    '/api/v1/guilds/{guild_id}/appeals/items/{item_id}': {'get'},
+    '/api/v1/guilds/{guild_id}/appeals/items/{item_id}/reply': {'post'},
+    '/api/v1/guilds/{guild_id}/appeals/items/{item_id}/review': {'post'},
+    '/api/v1/guilds/{guild_id}/appeals/items/{item_id}/ticket': {'post'},
+    '/api/v1/guilds/{guild_id}/appeals/items/{item_id}/delivery/{job_id}/retry': {'post'},
+}
+SCHEDULE_PATHS = {
+    '/api/v1/guilds/{guild_id}/schedules/items': {'get','post'},
+    '/api/v1/guilds/{guild_id}/schedules/items/{item_id}': {'put'},
+    '/api/v1/guilds/{guild_id}/schedules/items/{item_id}/history': {'get'},
+    '/api/v1/guilds/{guild_id}/schedules/items/{item_id}/cancel': {'post'},
+    '/api/v1/guilds/{guild_id}/schedules/items/{item_id}/delivery/{job_id}/retry': {'post'},
+}
+ADDED_PATHS = {**{path:{method} for path,method in U4_PATHS.items()},**APPLICATION_PATHS,**APPEAL_PATHS,**SCHEDULE_PATHS}
+ADDED_PATHS.update({
+    '/api/v1/guilds/{guild_id}/insights':{'get'},
+    '/api/v1/guilds/{guild_id}/insights/settings':{'get','put'},
+    '/api/v1/guilds/{guild_id}/giveaways':{'get','post'},
+    '/api/v1/guilds/{guild_id}/giveaways/{item_id}':{'get','put'},
+    '/api/v1/guilds/{guild_id}/giveaways/{item_id}/launch':{'post'},
+    '/api/v1/guilds/{guild_id}/giveaways/{item_id}/cancel':{'post'},
+    '/api/v1/guilds/{guild_id}/giveaways/{item_id}/close':{'post'},
+    '/api/v1/guilds/{guild_id}/giveaways/{item_id}/reroll':{'post'},
+    '/api/v1/guilds/{guild_id}/giveaways/{item_id}/history':{'get'},
+    '/api/v1/guilds/{guild_id}/giveaways/{item_id}/jobs/{job_id}/retry':{'post'},
+    '/api/v1/guilds/{guild_id}/starboard/boards':{'get','post'},
+    '/api/v1/guilds/{guild_id}/starboard/boards/{board_id}':{'put'},
+    '/api/v1/guilds/{guild_id}/starboard/boards/{board_id}/entries':{'get'},
+    '/api/v1/guilds/{guild_id}/starboard/boards/{board_id}/history':{'get'},
+    '/api/v1/guilds/{guild_id}/starboard/boards/{board_id}/delivery/{job_id}/retry':{'post'},
+    '/api/v1/guilds/{guild_id}/starboard/boards/{board_id}/source-jobs/{job_id}/retry':{'post'},
+    '/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}':{'get'},
+    '/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/labels':{'post'},
+    '/api/v1/guilds/{guild_id}/suggestions/items/{suggestion_id}/merge':{'post'},
+})
 
 
 def request_path(template):
@@ -51,15 +100,19 @@ class ApiContractTests(unittest.TestCase):
         expected = json.loads(CONTRACT.read_text(encoding='utf-8'))
         actual = self.api.app.openapi()['paths']
         baseline = expected['openapi']['paths']
-        self.assertEqual(set(actual), set(baseline) | set(U4_PATHS))
-        for path, method in U4_PATHS.items():
-            self.assertEqual(set(actual[path]), {method})
+        self.assertEqual(set(actual), set(baseline) | set(ADDED_PATHS))
+        for path, methods in ADDED_PATHS.items():
+            self.assertEqual(set(actual[path]), methods)
         for path, methods in baseline.items():
             self.assertEqual(set(actual[path]), set(methods))
             for method, operation in methods.items():
                 current = actual[path][method]
                 for key in ('operationId', 'parameters'):
-                    self.assertEqual(current.get(key), operation.get(key), (path, method, key))
+                    value=current.get(key)
+                    if path=='/api/v1/guilds/{guild_id}/suggestions/items' and method=='get' and key=='parameters':
+                        self.assertTrue({'category','tag','status'} <= {p['name'] for p in value})
+                        value=[p for p in value if p['name'] not in {'category','tag','status'}]
+                    self.assertEqual(value, operation.get(key), (path, method, key))
                 self.assertTrue(set(operation['responses']).issubset(current['responses']))
 
     def test_all_route_authentication_authorization_and_csrf_boundaries_are_preserved(self):
@@ -72,12 +125,12 @@ class ApiContractTests(unittest.TestCase):
             elif isinstance(row['body'], dict) and 'items' in row['body']:
                 row['body'] = {'next': None, **row['body']}
         actual = boundary_responses(self.api)
-        self.assertEqual([row for row in actual if row['path'] not in U4_PATHS], baseline)
-        added = [row for row in actual if row['path'] in U4_PATHS]
-        self.assertEqual(len(added), 5)
+        self.assertEqual([row for row in actual if row['path'] not in ADDED_PATHS], baseline)
+        added = [row for row in actual if row['path'] in ADDED_PATHS]
+        self.assertEqual(len(added), 117)
         for row in added:
             # CSRF runs before authentication on writes, as for existing routes.
-            expected_code = ('csrf_invalid' if row['method'] == 'PUT' and row['mode'] != 'forbidden'
+            expected_code = ('csrf_invalid' if row['method'] in {'PUT', 'POST'} and row['mode'] != 'forbidden'
                              else 'authentication_required' if row['mode'] == 'anonymous' else 'guild_forbidden')
             self.assertEqual(row['body']['detail']['code'], expected_code, row)
             self.assertEqual(row['status'], 401 if expected_code == 'authentication_required' else 403)
@@ -96,6 +149,75 @@ class ApiContractTests(unittest.TestCase):
         response = self.api.client.delete(url, headers={**self.api.headers, 'if-match': str(item['revision'])})
         self.assertEqual((response.status_code, response.content), (204, b''))
         self.assertEqual(self.api.client.get(root).json()['items'], [])
+
+    def test_social_preview_is_side_effect_free_and_retry_preserves_cursor(self):
+        root = '/api/v1/guilds/1/social/youtube'
+        value = {'account': 'UC' + 'a' * 22, 'channel_id': '10', 'events': ['video']}
+        saved = self.api.client.post(root + '/subscriptions', json=value, headers=self.api.headers).json()
+        repository = SocialRepository(self.api.database)
+        target = repository.claim_social_targets('fixture')[0]
+        repository.complete_social_target(target['id'], target['lease_owner'], status='degraded',
+            cursor={'seen': ['old']}, next_check_at=10 ** 12, error='fixture failure')
+        before = repository.social_target(target['id'])
+        preview = self.api.client.post(root + '/preview', json={'event': 'video', 'template': {'title': '{account}: {title}'}}, headers=self.api.headers)
+        self.assertEqual(preview.status_code, 200, preview.text)
+        self.assertIn('Sample Creator', preview.json()['title'])
+        self.assertEqual(repository.social_target(target['id']), before)
+        self.assertEqual(repository.pending_social_events(), [])
+        retry = root + '/subscriptions/' + str(saved['id']) + '/retry'
+        self.assertEqual(self.api.client.post(retry).status_code, 403)
+        self.assertEqual(self.api.client.post(retry.replace('/guilds/1/', '/guilds/2/'), headers=self.api.headers).status_code, 404)
+        self.assertEqual(repository.social_target(target['id']), before)
+        self.assertEqual(self.api.client.post(retry, headers=self.api.headers).status_code, 200)
+        after = repository.social_target(target['id'])
+        self.assertEqual((after['status'], after['next_check_at'], after['cursor']), ('pending', 0, {'seen': ['old']}))
+        self.assertEqual(repository.pending_social_events(), [])
+
+    def _deleted_reaction_role(self):
+        from test_reaction_roles import message
+        root = '/api/v1/guilds/1/reaction-roles'
+        created = self.api.client.post(root, json=message(role_id=500), headers=self.api.headers)
+        self.assertEqual(created.status_code, 201, created.text)
+        repository = ReactionRoleRepository(self.api.database)
+        repository.set_discord_message(created.json()['id'], 900)
+        repository.delete_message(1, created.json()['id'], recoverable=True)
+        return repository, root + '/recoveries/900/restore'
+
+    def test_reaction_role_restore_consumes_one_snapshot_and_is_guild_scoped(self):
+        repository, url = self._deleted_reaction_role()
+        body = {'channel_id': '10', 'message_id': '900'}
+        self.assertEqual(self.api.client.post(url.replace('/guilds/1/', '/guilds/2/'), json=body, headers=self.api.headers).status_code, 404)
+        with patch.object(ReactionRoleRepository, 'restore_message', side_effect=RuntimeError('recovery_conflict')):
+            self.assertEqual(self.api.client.post(url, json=body, headers=self.api.headers).status_code, 409)
+        self.assertIsNotNone(repository.recovery(1, 900))
+        restored = self.api.client.post(url, json=body, headers=self.api.headers)
+        self.assertEqual(restored.status_code, 201, restored.text)
+        self.assertEqual(restored.json()['source'], 'external')
+        self.assertEqual(restored.json()['message_id'], '900')
+        self.assertIsNone(repository.recovery(1, 900))
+        self.assertEqual(self.api.client.post(url, json=body, headers=self.api.headers).status_code, 404)
+        self.assertEqual(len(repository.messages(1)), 1)
+
+    def test_reaction_role_restore_snapshot_failure_rolls_back_configuration_and_audit(self):
+        repository, url = self._deleted_reaction_role()
+        before = repository.events(1)
+        with patch.object(ReactionRoleRepository, 'consume_recovery', side_effect=RuntimeError('fixture consume failure')):
+            with self.assertRaisesRegex(RuntimeError, 'fixture consume failure'):
+                self.api.client.post(url, json={'channel_id': '10', 'message_id': '900'}, headers=self.api.headers)
+        self.assertEqual(repository.messages(1), [])
+        self.assertIsNotNone(repository.recovery(1, 900))
+        self.assertEqual(repository.events(1), before)
+
+    def test_reaction_role_restore_to_occupied_message_keeps_snapshot(self):
+        from reaction_roles.service import ReactionRoleService
+        from test_reaction_roles import message
+        repository, url = self._deleted_reaction_role()
+        ReactionRoleService(repository).create(1, {**message(role_id=500), 'source': 'external', 'message_id': 900})
+        response = self.api.client.post(url, json={'channel_id': '10', 'message_id': '900'}, headers=self.api.headers)
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(response.json()['detail']['code'], 'message_exists')
+        self.assertIsNotNone(repository.recovery(1, 900))
+        self.assertEqual(len(repository.messages(1)), 1)
 
     def test_moderation_rule_revision_and_guild_isolation(self):
         root = '/api/v1/guilds/1/moderation/automod/rules'

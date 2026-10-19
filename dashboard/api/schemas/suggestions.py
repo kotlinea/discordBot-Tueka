@@ -16,10 +16,14 @@ class SuggestionFormField(ApiModel):
 
 
 class SuggestionSettings(ApiModel):
+    categories: list[str] = Field(default_factory=list,max_length=20)
+    tags: list[str] = Field(default_factory=list,max_length=50)
+    retention_days: int = Field(default=30,ge=1,le=365)
     channel_id: str | None
     log_channel_id: str | None
     review_role_ids: list[str] = Field(max_length=25)
     allow_voting: bool
+    discussion_enabled: bool = False
     show_author: bool
     form_title: str = Field(min_length=1, max_length=45)
     form_fields: list[SuggestionFormField] = Field(min_length=1, max_length=5)
@@ -29,7 +33,14 @@ class SuggestionItem(ApiModel):
     id: int
     author_id: str
     message_id: str | None
-    status: Literal["pending"] | Literal["reviewing"] | Literal["approved"] | Literal["rejected"] | Literal["delivery_failed"]
+    status: Literal["pending", "reviewing", "approved", "rejected", "delivery_failed", "implemented",'merged']
+    category: str = ''
+    tags: list[str] = Field(default_factory=list)
+    merged_into: int | None = None
+    expires_at: int | None = None
+    review_reason: str = ''
+    discussion_thread_id: str | None = None
+    implemented_at: int | None = None
     answers: dict[str, str]
     upvotes: int
     downvotes: int
@@ -43,3 +54,24 @@ from .common import Feature
 
 class SuggestionFeature(Feature):
     settings: SuggestionSettings
+
+
+class SuggestionEvent(ApiModel):
+    id: int
+    actor_id: str | None
+    event_type: str
+    detail: dict[str, Any]
+    created_at: int
+
+
+class SuggestionLabelsInput(ApiModel):
+    category: str = Field(default='',max_length=40)
+    tags: list[str] = Field(default_factory=list,max_length=10)
+    revision: int = Field(ge=1)
+
+
+class SuggestionMergeInput(ApiModel):
+    target_id: int = Field(ge=1)
+    target_revision: int = Field(ge=1)
+    revision: int = Field(ge=1)
+    reason: str = Field(min_length=1,max_length=1000)

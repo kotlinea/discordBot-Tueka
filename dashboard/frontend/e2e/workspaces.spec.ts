@@ -13,7 +13,7 @@ for (const locale of ['ja', 'en'] as const) {
     let rrSettings = { enabled: false, revision: 0, log_channel_id: null, denial_dm: true, denial_dm_cooldown_seconds: 300 }
     const writes: string[] = []
     const forbidden: string[] = []
-    const features = baseline.features.map(feature => ({ ...feature, title: feature.id, description: '', enabled: false, settings: {}, revision: 1, missing_permissions: [] }))
+    const features = [...baseline.features,{id:'applications',category:'community',docs_path:'/docs/features/applications',fields:[],required_fields:[],required_bot_permissions:[]},{id:'appeals',category:'moderation',docs_path:'/docs/features/appeals',fields:['retention_days'],required_fields:[],required_bot_permissions:[]},{id:'scheduled_messages',category:'engagement',docs_path:'/docs/features/scheduled-messages',fields:['retention_days'],required_fields:[],required_bot_permissions:[]},{id:'starboard',category:'engagement',docs_path:'/docs/features/starboard',fields:[],required_fields:[],required_bot_permissions:[]},{id:'giveaways',category:'engagement',docs_path:'/docs/features/giveaways',fields:[],required_fields:[],required_bot_permissions:[]},{id:'insights',category:'community',docs_path:'/docs/features/insights',fields:[],required_fields:[],required_bot_permissions:[]}].map(feature => ({ ...feature, title: feature.id, description: '', enabled: false, settings: {}, revision: 1, missing_permissions: [] }))
     await page.route('**/api/v1/session', route => route.fulfill({ json: { user: { id: '1', name: 'Reviewer', avatar_url: '' }, csrf_token: 'offline', preferences: { locale, appearance: 'precision', color_scheme: 'light', navigation_collapsed: false, revision: 1 } } }))
     await page.route('**/api/v1/guilds', route => route.fulfill({ json: { items: [{ id: '1', name: 'Workspace fixture', icon: null, access: staff ? 'ticket_staff' : 'manager' }] } }))
     await page.route('**/api/v1/guilds/1/**', route => {
@@ -57,15 +57,15 @@ for (const locale of ['ja', 'en'] as const) {
     const menu = page.getByRole('button', { name: 'Navigation', exact: true })
     if (await menu.isVisible()) await menu.click()
     const nav = page.getByRole('navigation', { name: 'Dashboard' }).filter({ visible: true })
-    // Independent acceptance table: one main entry for each of the 24 public features.
+    // Independent acceptance table: one main entry for every public feature.
     const groups = [
-      [copy.common.nav.serverOperations, ['tickets', 'reaction-roles']],
-      [copy.common.nav.community, ['modules/welcome', 'modules/autorole', 'modules/leveling', 'modules/live_stats', 'modules/temporary_voice']],
-      [copy.common.nav.engagement, ['modules/advanced_polls', 'suggestions', 'modules/minigames']],
-      [copy.common.nav.moderation, ['modules/moderation', 'moderation/automod', 'moderation/anti_spam', 'moderation/anti_raid', 'moderation/infractions', 'moderation/moderation_actions', 'moderation/moderation_logs', 'moderation/audit_log', 'moderation/trust_score']],
+      [copy.common.nav.serverOperations, ['tickets', 'reaction-roles', 'applications']],
+      [copy.common.nav.community, ['modules/welcome', 'modules/autorole', 'modules/leveling', 'modules/live_stats', 'modules/temporary_voice','insights']],
+      [copy.common.nav.engagement, ['modules/advanced_polls', 'suggestions', 'modules/minigames', 'schedules', 'starboard', 'giveaways']],
+      [copy.common.nav.moderation, ['modules/moderation', 'moderation/automod', 'moderation/anti_spam', 'moderation/anti_raid', 'moderation/infractions', 'moderation/moderation_actions', 'moderation/moderation_logs', 'moderation/audit_log', 'moderation/trust_score','appeals']],
       [copy.common.nav.social, ['social/youtube', 'social/twitch', 'social/tiktok', 'social/x', 'social/instagram']],
     ] as const
-    await expect(nav.getByRole('link')).toHaveCount(26)
+    await expect(nav.getByRole('link')).toHaveCount(32)
     for (const [name, paths] of groups) {
       const links = nav.getByRole('group', { name, exact: true }).getByRole('link')
       expect(await links.evaluateAll(nodes => nodes.map(node => node.getAttribute('href')))).toEqual(paths.map(path => `/servers/1/${path}`))
@@ -109,7 +109,7 @@ for (const locale of ['ja', 'en'] as const) {
     await page.getByRole('button', { name: copy.common.nav.search, exact: true }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('textbox').fill(copy.common.nav.serverOperations)
-    await expect(dialog.getByRole('button')).toHaveCount(2)
+    await expect(dialog.getByRole('button')).toHaveCount(3)
     await dialog.getByRole('button', { name: new RegExp(copy.reactionRoles.reactionRoles.title) }).click()
     const rrHeading = page.getByRole('heading', { name: copy.reactionRoles.reactionRoles.title, exact: true })
     await expect(rrHeading).toBeFocused()

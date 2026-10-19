@@ -34,6 +34,36 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe('Suggestions settings', () => {
+  it.each(['en','ja'])('reviews with a reason, preserves edits on conflict, and reads history in %s', async locale => {
+    const text=(locale==='en'?en:ja).suggestions.suggestions
+    const item={id:1,author_id:'20',message_id:'100',status:'approved',answers:{idea:'Guide'},upvotes:1,downvotes:0,reviewer_id:'30',created_at:1000,revision:2,review_reason:'Useful',discussion_thread_id:'100'}
+    request.mockImplementation(async(path,init)=>{
+      if(init?.method==='POST')throw new Error('revision_conflict')
+      if(path.endsWith('/events'))return {items:[{id:1,actor_id:'30',event_type:'status_changed',detail:{status:'approved',reason:'History reason'},created_at:1000}]}
+      if(path.includes('/items'))return {items:[item]}
+      if(path.endsWith('/resources'))return {channels:[],roles:[]}
+      return initial()
+    })
+    const client=await mount(locale)
+    const input=await screen.findByRole('textbox',{name:text.reason})
+    const button=screen.getByRole('button',{name:text.status.implemented})
+    expect(button).toBeDisabled()
+    fireEvent.change(input,{target:{value:'Released'}})
+    await act(async()=>{client.setQueryData(['suggestionsItems','1'],{items:[{...item,revision:3}]})})
+    fireEvent.click(button)
+    expect(await screen.findByRole('alert')).toHaveTextContent('revision_conflict')
+    expect(input).toHaveValue('Released')
+    const call=request.mock.calls.find(([,init])=>init?.method==='POST')
+    expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({revision:2,status:'implemented',reason:'Released'})
+    fireEvent.click(screen.getByRole('button',{name:text.history}))
+    expect(await screen.findByText(/History reason/)).toBeInTheDocument()
+    expect(screen.getByRole('link',{name:text.discussionOpen})).toHaveAttribute('href','https://discord.com/channels/1/100')
+    await act(async()=>{client.setQueryData(['suggestionsItems','1'],{items:[{...item,status:'implemented',revision:4}]})})
+    expect(input).toHaveValue('Released')
+    await waitFor(()=>expect(input).toBeDisabled())
+    fireEvent.click(screen.getByRole('button',{name:(locale==='en'?en:ja).common.common.discard}))
+    expect(screen.queryByRole('textbox',{name:text.reason})).not.toBeInTheDocument()
+  })
   it('shows an initial settings failure instead of loading forever', async () => {
     request.mockRejectedValue(new Error('Settings unavailable'))
     await mount()
