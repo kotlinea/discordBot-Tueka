@@ -2,6 +2,8 @@
 
 ## Composeの復旧セット
 
+復旧には、バックアップ時のMigration履歴に対応するImageを使用します。11段階のMigrationで作成したバックアップを、初期Migrationを1本に統合した版へ直接復元することはできません。対応する旧Imageと復旧セットを一緒に保管してください。
+
 Stage/本番の運用Composeでは次のコマンドで、対応Image・Migration・Queue集計・鍵世代の指紋・PostgreSQL dump・暗号化Transcript/添付を一つのディレクトリへ保存します。保存先には新しいディレクトリを指定します。対象環境は、構築済みImageで稼働するStage／Prodです。
 
 ```sh

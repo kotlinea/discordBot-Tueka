@@ -48,7 +48,7 @@ class ObservabilityTests(unittest.TestCase):
         self.assertEqual(self.client.get('/health/ready').status_code, 503)
         (self.root / 'index.html').write_text('assets')
         with transaction(self.url) as client:
-            client.execute("UPDATE schema_migrations SET checksum='wrong' WHERE version=2")
+            client.execute("UPDATE schema_migrations SET checksum='wrong' WHERE version=1")
         self.assertEqual(self.client.get('/health/ready').status_code, 503)
         self.assertEqual(self.client.get('/health/live').status_code, 200)
 
