@@ -13,14 +13,14 @@ jobs:
       matrix:
         group: [python, web, runtime, secrets]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Run shared Compose tasks
         run: docker compose --env-file deploy/compose.env -f compose.tools.yaml run --rm --build -T ci --group ${{ matrix.group }}
       - name: Upload task logs and browser traces
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: compose-${{ matrix.group }}
           path: artifacts/
