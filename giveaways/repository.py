@@ -51,7 +51,9 @@ class GiveawayRepository:
 
     @staticmethod
     def _queue(c, item, now, *, except_job=None):
-        if not c.execute("SELECT 1 FROM giveaway_outbox WHERE campaign_id=%s AND status IN ('pending','retry','processing') AND (%s::bigint IS NULL OR id<>%s)",
+        # Revision reconciliation precedes queue completion, so processing work
+        # cannot replace a durable successor for a newly committed change.
+        if not c.execute("SELECT 1 FROM giveaway_outbox WHERE campaign_id=%s AND status IN ('pending','retry') AND (%s::bigint IS NULL OR id<>%s)",
                          (item, except_job, except_job)).fetchone():
             c.execute('INSERT INTO giveaway_outbox(campaign_id,available_at,created_at) VALUES(%s,%s,%s)', (item, now, now))
 

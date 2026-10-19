@@ -63,7 +63,9 @@ class StarboardRepository:
 
     @staticmethod
     def _queue(c,entry,now,*,except_job=None):
-        if not c.execute("SELECT 1 FROM starboard_outbox WHERE entry_id=%s AND status IN ('pending','retry','processing') AND (%s::bigint IS NULL OR id<>%s)",(entry,except_job,except_job)).fetchone():
+        # A processing job may have already checked its revision. Keep a durable
+        # successor while coalescing changes into work that has not started.
+        if not c.execute("SELECT 1 FROM starboard_outbox WHERE entry_id=%s AND status IN ('pending','retry') AND (%s::bigint IS NULL OR id<>%s)",(entry,except_job,except_job)).fetchone():
             c.execute('INSERT INTO starboard_outbox(entry_id,available_at,created_at) VALUES(%s,%s,%s)',(entry,now,now))
 
     def boards(self,guild):

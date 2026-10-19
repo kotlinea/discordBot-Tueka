@@ -97,6 +97,26 @@ class HighlightDeliveryTests(unittest.IsolatedAsyncioTestCase):
         await self.process();await self.process()
         self.assertEqual(self.adapter.sent,[1000]);self.assertEqual(self.adapter.edited,[1000])
 
+    async def test_board_off_after_settled_before_finish_keeps_one_durable_followup(self):
+        claim = self.repo.jobs.claim('first-worker')
+        outcome = await self.delivery.handle(claim.payload)
+        self.assertIsNone(outcome.error)  # Revision check ran; queue finish has not.
+        board = self.repo.save_board(1, 30, {**self.config, 'enabled': False},
+            board=self.board['id'], revision=1)
+        self.repo.save_board(1, 30, {**self.config, 'enabled': False, 'name': 'Latest'},
+            board=board['id'], revision=board['revision'])
+        with transaction(self.url) as c:
+            self.assertEqual([r['status'] for r in c.execute('SELECT status FROM starboard_outbox ORDER BY id')],
+                ['processing', 'pending'])
+        self.assertTrue(self.repo.jobs.finish(claim, outcome))
+        self.repo = StarboardRepository(self.url, clock=lambda: self.now)
+        self.delivery = HighlightDelivery(self.repo, self.adapter)
+        self.assertIsNone((await self.process()).error)
+        self.assertEqual(self.adapter.sent, [1000])
+        self.assertEqual(self.adapter.deleted, [1000])
+        self.assertEqual(self.adapter.messages, {})
+        self.assertIsNone(self.repo.jobs.claim('empty'))
+
     async def test_unexpected_errors_do_not_store_private_exception_text(self):
         async def unexpected(*_):raise RuntimeError('private generated credential text')
         self.adapter.source=unexpected

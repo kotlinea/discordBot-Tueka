@@ -2,7 +2,9 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import AsyncMock
 from db_support import prepare_database
+from database import transaction
 from giveaways.repository import GiveawayRepository
 from giveaways.service import GiveawayService
 from discord_io import DiscordFailure
@@ -120,3 +122,48 @@ class GiveawayServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.retry)
         self.assertNotIn('private', result.error)
         self.assertIn('RuntimeError', result.error)
+
+    async def test_cancel_after_settled_before_finish_keeps_one_durable_followup(self):
+        claim = self.repo.jobs.claim('first-publisher')
+        outcome = await self.service.publish(claim.payload)
+        self.assertIsNone(outcome.error)
+        await self.enter(30)
+        await self.enter(31)
+        current = self.repo.item(1, self.item['id'])
+        self.repo.cancel(1, current['id'], 10, current['revision'], 'Generated cancellation')
+        with transaction(self.url) as c:
+            self.assertEqual([r['status'] for r in c.execute('SELECT status FROM giveaway_outbox ORDER BY id')],
+                ['processing', 'pending'])
+        self.assertTrue(self.repo.jobs.finish(claim, outcome))
+        self.repo = GiveawayRepository(self.url, clock=lambda: self.now)
+        self.service = GiveawayService(self.repo, self.port)
+        self.port.edit = AsyncMock(wraps=self.port.edit)
+        await self.publish()
+        self.assertEqual(self.port.edit.call_args.args[0]['campaign']['status'], 'cancelled')
+        self.assertEqual(self.port.sent, [100])
+        self.assertEqual(self.port.edited, [100])
+        self.assertIsNone(self.repo.jobs.claim('empty'))
+
+    async def test_draw_after_settled_before_finish_publishes_persisted_result(self):
+        await self.publish()
+        await self.enter(30)
+        claim = self.repo.jobs.claim('first-publisher', lease_seconds=120)
+        outcome = await self.service.publish(claim.payload)
+        self.assertIsNone(outcome.error)
+        self.now += 60
+        await run_batch(self.repo.draw_jobs, 'drawer', self.service.draw, limit=1)
+        self.assertEqual(self.repo.item(1, self.item['id'])['status'], 'closed')
+        with transaction(self.url) as c:
+            self.assertEqual([r['status'] for r in c.execute('SELECT status FROM giveaway_outbox ORDER BY id')],
+                ['completed', 'processing', 'pending'])
+        self.assertTrue(self.repo.jobs.finish(claim, outcome))
+        self.repo = GiveawayRepository(self.url, clock=lambda: self.now)
+        self.service = GiveawayService(self.repo, self.port)
+        self.port.edit = AsyncMock(wraps=self.port.edit)
+        await self.publish()
+        plan = self.port.edit.call_args.args[0]
+        self.assertEqual(plan['campaign']['status'], 'closed')
+        self.assertEqual(json.loads(plan['draw']['winners_json']), [30])
+        self.assertEqual(len(self.repo.history(1, self.item['id'])['draws']), 1)
+        self.assertEqual(self.port.sent, [100])
+        self.assertIsNone(self.repo.jobs.claim('empty'))
