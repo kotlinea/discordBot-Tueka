@@ -93,6 +93,76 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(self.repo.enqueue_due(limit=1),1)
         self.assertEqual(len(self.repo.history(2,other['id'])['delivery']),1)
 
+    def test_disabled_reserved_delivery_resumes_at_500_seconds_without_backoff(self):
+        item = self.create()
+        self.now += 60
+        self.repo.enqueue_due()
+        due = self.now
+        with transaction(self.url) as c:
+            before = dict(c.execute('SELECT * FROM scheduled_post_outbox WHERE post_id=%s', (item['id'],)).fetchone())
+        self.settings.set_module(1, 'scheduled_messages', enabled=False)
+        restarted = ScheduleRepository(self.url, clock=lambda: self.now)
+        for elapsed in (0, 30, 90, 210, 450):
+            self.now = due + elapsed
+            self.assertIsNone(restarted.jobs.claim('paused-worker'))
+        with transaction(self.url) as c:
+            self.assertEqual(dict(c.execute('SELECT * FROM scheduled_post_outbox WHERE post_id=%s', (item['id'],)).fetchone()), before)
+        self.now = due + 500
+        self.settings.set_module(1, 'scheduled_messages', enabled=True)
+        claim = restarted.jobs.claim('resumed-worker')
+        self.assertIsNotNone(claim)
+        port = SimpleNamespace(deliver=AsyncMock(return_value=1234))
+        outcome = asyncio.run(ScheduleDeliveryService(restarted, port).deliver(claim.payload))
+        self.assertIsNone(outcome.error)
+        self.assertFalse(port.deliver.call_args.kwargs['recover'])
+        self.assertTrue(restarted.jobs.finish(claim, outcome))
+        self.assertEqual(restarted.enqueue_due(), 0)
+        delivery = restarted.history(1, item['id'])['delivery']
+        self.assertEqual(len(delivery), 1)
+        self.assertEqual(delivery[0]['attempts'], 1)
+        self.assertEqual(delivery[0]['discord_receipt_id'], 1234)
+
+    def test_disabled_queue_keeps_retries_expired_leases_and_final_attempt_unchanged(self):
+        item = self.create()
+        self.now += 60
+        self.repo.enqueue_due()
+        for state, attempts, started in (('retry', 7, 0), ('processing', 7, 1), ('processing', 8, 1)):
+            with self.subTest(state=state, attempts=attempts):
+                with transaction(self.url) as c:
+                    c.execute("UPDATE scheduled_post_outbox SET status=%s,attempts=%s,delivery_started=%s,discord_receipt_id=NULL,completed_at=NULL,available_at=%s,lease_owner=%s,lease_token=%s,lease_until=%s WHERE post_id=%s",
+                        (state, attempts, started, self.now, 'old-worker' if started else None,
+                         'old-token' if started else None, self.now - 1 if started else None, item['id']))
+                    before = dict(c.execute('SELECT * FROM scheduled_post_outbox WHERE post_id=%s', (item['id'],)).fetchone())
+                self.settings.set_module(1, 'scheduled_messages', enabled=False)
+                restarted = ScheduleRepository(self.url, clock=lambda: self.now)
+                for _ in range(3):
+                    self.assertIsNone(restarted.jobs.claim('paused-worker'))
+                with transaction(self.url) as c:
+                    self.assertEqual(dict(c.execute('SELECT * FROM scheduled_post_outbox WHERE post_id=%s', (item['id'],)).fetchone()), before)
+                self.settings.set_module(1, 'scheduled_messages', enabled=True)
+                claim = restarted.jobs.claim('resumed-worker')
+                if attempts < 8:
+                    self.assertIsNotNone(claim)
+                    port = SimpleNamespace(deliver=AsyncMock(return_value=1234))
+                    outcome = asyncio.run(ScheduleDeliveryService(restarted, port).deliver(claim.payload))
+                    self.assertIsNone(outcome.error)
+                    self.assertEqual(port.deliver.call_args.kwargs['recover'], bool(started))
+                    self.assertTrue(restarted.jobs.finish(claim, outcome))
+                else:
+                    self.assertIsNone(claim)
+                    self.assertEqual(restarted.history(1, item['id'])['delivery'][0]['status'], 'failed')
+
+    def test_disabled_outbox_does_not_starve_enabled_guild_delivery(self):
+        first = self.create()
+        self.settings.set_module(2, 'scheduled_messages', enabled=True)
+        other = self.repo.create(2, 20, self.values(), 'other')
+        self.now += 60
+        self.repo.enqueue_due()
+        self.settings.set_module(1, 'scheduled_messages', enabled=False)
+        claim = self.repo.jobs.claim('worker')
+        self.assertEqual(claim.payload['post_id'], other['id'])
+        self.assertEqual(self.repo.history(1, first['id'])['delivery'][0]['attempts'], 0)
+
     def test_edit_revision_and_cancel_fence_claim_before_send(self):
         item=self.create()
         with self.assertRaises(RuntimeError):self.repo.reschedule(1,item['id'],20,self.values(),2)

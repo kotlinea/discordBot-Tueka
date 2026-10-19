@@ -9,6 +9,10 @@ from .service import normalize, short
 
 
 class ScheduleQueue(QueueRepository):
+    def _claim_scope(self):
+        return (' AND EXISTS(SELECT 1 FROM guild_modules g WHERE g.guild_id=scheduled_post_outbox.guild_id'
+                ' AND g.module_id=%s AND g.enabled=1)', ('scheduled_messages',))
+
     def purge(self, **_):
         # Parent schedules own the configured retention and cascading cleanup.
         return 0
