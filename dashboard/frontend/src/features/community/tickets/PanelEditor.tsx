@@ -11,7 +11,7 @@ import { SaveBar } from '../../../components/SaveBar'
 import { ResourceSelect } from '../../../components/ResourcePicker'
 /* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4 */
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import * as Dialog from '@radix-ui/react-dialog'
+import * as Dialog from '../../../components/WorkspaceDialog'
 import * as Switch from '@radix-ui/react-switch'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Copy, Download, Eye, Plus, RotateCcw, Save, Trash2, Upload, X } from 'lucide-react'

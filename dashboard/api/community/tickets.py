@@ -6,6 +6,7 @@ from database import IntegrityError
 import time
 from typing import Any
 from urllib.parse import quote
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from ticketing import TicketValidationError
@@ -53,14 +54,15 @@ def create_router(context: ApiContext) -> APIRouter:
     async def ticket_items(request: Request, guild_id: int, status: str | None=None, before: int | None=None, _ticket_actor: tuple[int, bool]=Depends(ticket_access.staff)) -> dict[str, Any]:
         actor, administrator = _ticket_actor
         visible = []
-        for item in ticket_repository.tickets(guild_id, status=status, before=before):
+        page = ticket_repository.tickets(guild_id, status=status, before=before)
+        for item in page:
             try:
                 await ticket_subject_access(request, guild_id, item, actor, administrator)
                 visible.append(ticket_ids(item))
             except HTTPException as exc:
                 if exc.status_code != 403:
                     raise
-        return {'items': visible, 'next': int(visible[-1]['id']) if visible else None}
+        return {'items': visible, 'next': int(page[-1]['id']) if page else None}
 
     @router.get('/guilds/{guild_id}/tickets/items/{ticket_id}', response_model=schemas.TicketDetail, response_model_exclude_unset=True)
     async def ticket_detail(request: Request, guild_id: int, ticket_id: int, after: int=0, _ticket_actor: tuple[int, bool]=Depends(ticket_access.staff)) -> dict[str, Any]:
@@ -120,13 +122,34 @@ def create_router(context: ApiContext) -> APIRouter:
         access = token(request)
         user = await discord.current_user(access)
         user_id = int(user['id'])
-        if user_id != int(transcript['opener_id']):
+        staff_view = False
+        if user_id == int(transcript['opener_id']):
+            # The opener keeps their personal transcript access after leaving
+            # the guild, but private notes require current assigned-team access.
+            try:
+                actor, administrator = await ticket_actor(request, int(transcript['guild_id']))
+                ticket = ticket_repository.ticket(int(transcript['ticket_id']))
+                if ticket:
+                    await ticket_subject_access(request, int(transcript['guild_id']), ticket, actor, administrator)
+                    staff_view = True
+            except HTTPException as exc:
+                if exc.status_code != 403:
+                    raise
+            except httpx.HTTPStatusError as exc:
+                # Guild access is optional for the opener's public copy.
+                # Failed checks never grant private staff visibility.
+                if exc.response.status_code not in {403, 404}:
+                    raise
+        else:
             actor, administrator = await ticket_actor(request, int(transcript['guild_id']))
             ticket = ticket_repository.ticket(int(transcript['ticket_id']))
             if ticket:
                 await ticket_subject_access(request, int(transcript['guild_id']), ticket, actor, administrator)
+                staff_view = True
         ticket_repository.audit(int(transcript['guild_id']), 'transcript_viewed', user_id, int(transcript['ticket_id']), {'transcript_id': transcript_id})
         payload = await ticket_transcripts.load(transcript['backend'], transcript['object_key'], transcript['content_hash'])
+        if not staff_view:
+            payload['messages'] = [message for message in payload.get('messages', []) if message.get('kind') != 'note']
         panel = ticket_repository.panel(int(transcript['guild_id']), int(transcript['panel_id']))
         payload['feedback_enabled'] = bool(panel and panel.get('feedback_enabled'))
         payload['feedback_form'] = ticket_repository.form(int(transcript['guild_id']), int(panel['exit_form_id'])) if panel and panel.get('exit_form_id') else None

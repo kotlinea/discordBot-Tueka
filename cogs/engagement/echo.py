@@ -40,7 +40,8 @@ class EchoCog(commands.Cog):
 def _valid_url(value: str | None, field: str) -> str | None:
     if value is None:
         return None
-    if urlparse(value).scheme not in {"http", "https"}:
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname or any(char.isspace() for char in value):
         raise ValueError(f"{field} は http:// または https:// URLにしてください")
     return value
 
@@ -57,7 +58,10 @@ def _build_embed(title, description, color, url, author_name, author_url, author
     colour = discord.Color.default()
     if color:
         try:
-            colour = discord.Color(int(color.removeprefix("#"), 16))
+            number = int(color.removeprefix("#"), 16)
+            if not 0 <= number <= 0xFFFFFF:
+                raise ValueError("Color out of range")
+            colour = discord.Color(number)
         except ValueError as exc:
             raise ValueError("color は #5865F2 のような6桁の16進数です") from exc
     embed = discord.Embed(title=title, description=description, color=colour, url=_valid_url(url, "url"), timestamp=datetime.now(timezone.utc) if timestamp else None)

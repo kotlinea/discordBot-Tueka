@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import time
+import unicodedata
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -150,7 +151,8 @@ class AutoModEngine:
 
     @staticmethod
     def _keyword_hit(content: str, keyword: str, mode: str) -> bool:
-        lowered, target = content.casefold(), keyword.casefold()
+        lowered = unicodedata.normalize("NFKC", content).casefold()
+        target = unicodedata.normalize("NFKC", keyword).casefold()
         if mode == "contains":
             return target in lowered
         if "*" in target:
@@ -257,7 +259,12 @@ class AutoModEngine:
                 if percentage >= int(config.get("percentage", 70)):
                     return RuleMatch(rule, f"大文字率が上限を超過: {percentage}%", {"percentage": percentage})
         elif trigger == "media_only":
-            paths = [urlparse(url if "://" in url else f"https://{url}").path for url in context.urls]
+            paths = []
+            for url in context.urls:
+                try:
+                    paths.append(urlparse(url if "://" in url else f"https://{url}").path)
+                except (ValueError, UnicodeError):
+                    continue
             media_link = any(path.rsplit(".", 1)[-1].lower() in MEDIA_EXTENSIONS for path in paths if "." in path)
             if context.attachment_count == 0 and not (config.get("allow_links", True) and media_link):
                 return RuleMatch(rule, "メディア限定チャンネルへのテキスト投稿")

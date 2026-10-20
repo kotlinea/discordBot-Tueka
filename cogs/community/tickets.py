@@ -7,7 +7,8 @@ import socket
 from database import IntegrityError
 from typing import Any
 
-from jobs import Outcome, run_batch
+from jobs import LostLease, Outcome, run_batch
+from jobs.leases import ResourceLease
 
 import discord
 from discord_io import DiscordFailure
@@ -254,8 +255,16 @@ class TicketsCog(commands.Cog):
                 return
             await self.show_open(interaction, entity_id); return
         ticket = self.repository.ticket(entity_id)
-        if not ticket or ticket['guild_id'] != interaction.guild.id or ticket.get('discord_container_id') != interaction.channel_id:
+        if not ticket or ticket['guild_id'] != interaction.guild.id:
             await interaction.response.send_message("Ticketが見つかりません。", ephemeral=True); return
+        if ticket.get('discord_container_id') != interaction.channel_id:
+            panel = self.repository.panel(interaction.guild.id, int(ticket['panel_id'])) or {}
+            message_id = interaction.message.id if interaction.message else 0
+            notification_join = (action == 'join' and ticket['mode'] == 'private_thread'
+                and panel.get('staff_notification_channel_id') == interaction.channel_id
+                and self.repository.notice_message_recorded(ticket['id'], message_id))
+            if not notification_join:
+                await interaction.response.send_message("Ticketが見つかりません。", ephemeral=True); return
         if action == "close-reason":
             await interaction.response.send_modal(TicketCloseReasonModal(self, entity_id)); return
         await interaction.response.defer(ephemeral=True)
@@ -380,6 +389,9 @@ class TicketsCog(commands.Cog):
         ticket = self.repository.ticket_for_container(interaction.channel_id or 0)
         if not ticket or not isinstance(interaction.channel, (discord.TextChannel, discord.Thread)):
             await interaction.response.send_message("Ticket内で実行してください。", ephemeral=True); return
+        panel = self.repository.panel(interaction.guild_id or 0, int(ticket['panel_id']))
+        if not isinstance(interaction.user, discord.Member) or not await self._staff(interaction.user, panel):
+            await interaction.response.send_message("Staffだけが実行できます。", ephemeral=True); return
         await self.discord.rename(ticket, name)
         await interaction.response.send_message("Ticket名を変更しました。", ephemeral=True)
 
@@ -526,12 +538,18 @@ class TicketsCog(commands.Cog):
                     int(item['actor_id']), add=action == 'participant_add', access=item['payload'].get('access', 'member'))
                 return Outcome()
             if action == 'close_resource':
-                if ticket is None or ticket['status'] != 'closed' or ticket['revision'] != item['payload']['revision']:
-                    return Outcome('revision_conflict')
-                if self.repository.transcript_for_ticket(ticket['id']) is None:
-                    return Outcome('Transcript unavailable; resource retained')
-                await self.discord.set_closed(ticket, closed=True)
-                return Outcome()
+                if ticket is None:
+                    return Outcome('Ticket unavailable')
+                async def close_resource(owned):
+                    current = self.repository.ticket(ticket['id'])
+                    if current is None or current['status'] != 'closed' or current['revision'] != item['payload']['revision']:
+                        return Outcome('revision_conflict')
+                    if self.repository.transcript_for_ticket(current['id']) is None:
+                        return Outcome('Transcript unavailable; resource retained')
+                    owned.check()
+                    await self.discord.set_closed(current, closed=True)
+                    return Outcome()
+                return await ResourceLease(self.repository.database_url, 'ticket_close', ticket['id']).run(close_resource)
             if action in {"close", "auto_close"}:
                 if ticket is None:
                     return Outcome('Ticket unavailable')
@@ -550,13 +568,19 @@ class TicketsCog(commands.Cog):
                 await self._set_claim(ticket, panel, claimant, item["payload"].get("revision"))
                 return Outcome()
             if action == "reopen":
-                if ticket is None or ticket['mode'] != 'private_thread' or ticket['status'] not in {'open', 'closed'} or ticket.get('deleted_at'):
-                    return Outcome('reopen_unavailable')
-                await self.discord.set_closed(ticket, closed=False)
-                reopened = ticket if ticket['status'] == 'open' else self.repository.reopen_ticket(ticket['id'])
-                self.service.schedule_ticket(reopened)
-                self.repository.audit(reopened['guild_id'], 'ticket_reopened', int(item['actor_id']), reopened['id'])
-                return Outcome()
+                if ticket is None:
+                    return Outcome('Ticket unavailable')
+                async def reopen_resource(owned):
+                    current = self.repository.ticket(ticket['id'])
+                    if current is None or current['mode'] != 'private_thread' or current['status'] not in {'open', 'closed'} or current.get('deleted_at'):
+                        return Outcome('reopen_unavailable')
+                    owned.check()
+                    await self.discord.set_closed(current, closed=False)
+                    reopened = current if current['status'] == 'open' else self.repository.reopen_ticket(current['id'], lease=owned)
+                    self.service.schedule_ticket(reopened)
+                    self.repository.audit(reopened['guild_id'], 'ticket_reopened', int(item['actor_id']), reopened['id'])
+                    return Outcome()
+                return await ResourceLease(self.repository.database_url, 'ticket_close', ticket['id']).run(reopen_resource)
             if action == "exclude_auto_close":
                 self.repository.set_auto_close_excluded(ticket["id"], bool(item["payload"].get("excluded", True)))
                 self.service.schedule_ticket(self.repository.ticket(ticket["id"]) or ticket)
@@ -575,6 +599,8 @@ class TicketsCog(commands.Cog):
                 raise RuntimeError("Ticket channel unavailable")
             await self.service.deliver_message(self.discord, ticket, item)
             return Outcome()
+        except LostLease as exc:
+            return Outcome(str(exc), retry=True)
         except DiscordFailure as exc:
             return Outcome(str(exc), retry=exc.retry or exc.partial)
         except (discord.Forbidden, discord.NotFound) as exc:
@@ -587,6 +613,7 @@ class TicketsCog(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def auto_close(self) -> None:
+        self.repository.recover_incomplete_closes()
         self.repository.expire_close_requests()
         await run_batch(self.repository.schedule_jobs, self.owner, self._expire_ticket_schedule, limit=100)
 
@@ -621,10 +648,14 @@ class TicketsCog(commands.Cog):
                     LOGGER.warning("Could not promote ticket attachment id=%s", item["id"], exc_info=True)
         for item in self.repository.expired_transcripts():
             try:
-                for attachment in self.repository.attachments(int(item["ticket_id"])):
-                    if attachment.get("status") == "ready":
-                        await self.transcripts.delete(str(attachment["backend"]), str(attachment["object_key"]))
-                await self.transcripts.delete(str(item["backend"]), str(item["object_key"]))
+                expiration = self.repository.begin_transcript_expiration(int(item['id']), int(item['ticket_id']))
+                if expiration is None:
+                    continue
+                for attachment in expiration['attachments']:
+                    await self.transcripts.delete(str(attachment["backend"]), str(attachment["object_key"]))
+                    self.repository.mark_attachment_deleted(int(attachment['id']))
+                if not expiration['shared_blob']:
+                    await self.transcripts.delete(str(item["backend"]), str(item["object_key"]))
                 self.repository.mark_transcript_deleted(int(item["id"]), int(item["ticket_id"]))
             except Exception:
                 LOGGER.warning("Could not expire ticket transcript id=%s", item["id"], exc_info=True)

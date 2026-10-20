@@ -29,9 +29,11 @@ class InsightsCog(commands.Cog):
 
     def _release_all(self):
         for guild in tuple(self._claimed):
+            # A known observation gap invalidates local ownership even if the
+            # best-effort DB release fails. Collection must claim a new boundary.
+            self._claimed.discard(guild)
             try:
                 self.service.release(guild)
-                self._claimed.discard(guild)
             except Exception as error:
                 LOGGER.warning('Insights release failed: %s', type(error).__name__)
 
@@ -81,8 +83,8 @@ class InsightsCog(commands.Cog):
             enabled = set(self.repository.settings.enabled_module_guild_ids('insights'))
             available = {g.id: g for g in self.bot.guilds if not g.unavailable}
             for guild in tuple(self._claimed - (enabled & available.keys())):
-                self.service.release(guild)
                 self._claimed.discard(guild)
+                self.service.release(guild)
             for guild_id in sorted(enabled & available.keys()):
                 try:
                     if guild_id not in self._claimed:
@@ -151,9 +153,9 @@ class InsightsCog(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
         if guild.id in self._claimed:
+            self._claimed.discard(guild.id)
             try:
                 self.service.release(guild.id)
-                self._claimed.discard(guild.id)
             except Exception as error:
                 LOGGER.warning('Insights guild release failed: %s', type(error).__name__)
 

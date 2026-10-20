@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link,useParams } from 'react-router-dom'
 import { useQuery,useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -10,7 +10,7 @@ import { useUnsavedChanges } from '../../../components/forms/useUnsavedChanges'
 import { Failure,Loading } from '../../../components/Feedback'
 import s from '../../../styles/App.module.css'
 
-export function Conversation({guildId,item,enabled}:{guildId:string;item:AppealItem;enabled:boolean}){
+export function Conversation({guildId,item,enabled,onBusy}:{guildId:string;item:AppealItem;enabled:boolean;onBusy?:(id:number,busy:boolean)=>void}){
   const {t,i18n}=useTranslation(['appeals','common']);const qc=useQueryClient()
   const [expanded,setExpanded]=useState(false)
   const [content,setContent]=useState(''),[reason,setReason]=useState(''),[ticket,setTicket]=useState('')
@@ -25,6 +25,7 @@ export function Conversation({guildId,item,enabled}:{guildId:string;item:AppealI
     return request('POST /api/v1/guilds/{guild_id}/appeals/items/{item_id}/review',base+'/review',{body:encodeBody('POST /api/v1/guilds/{guild_id}/appeals/items/{item_id}/review',{status:action as 'reviewing'|'accepted'|'rejected'|'closed',reason,revision:currentRevision})})
   },onSuccess:async()=>{setContent('');setReason('');setTicket('');setRevision(null);await Promise.all([qc.invalidateQueries({queryKey:['appealItems',guildId]}),qc.invalidateQueries({queryKey:['appealDetail',guildId,item.id]})])}})
   const dirty=Boolean(content||reason||ticket);useUnsavedChanges(dirty,save.isPending)
+  useEffect(()=>{onBusy?.(item.id,dirty||save.isPending);return()=>onBusy?.(item.id,false)},[item.id,dirty,save.isPending,onBusy])
   const capture=()=>{if(revision===null)setRevision(item.revision)}
   const clear=()=>{setContent('');setReason('');setTicket('');setRevision(null);save.reset()}
   const open=['open','reviewing'].includes(item.status)
@@ -51,12 +52,15 @@ export function Conversation({guildId,item,enabled}:{guildId:string;item:AppealI
 
 export default function Inbox({features}:FeatureScreenProps){
   const {guildId=''}=useParams();const {t}=useTranslation('appeals');const [before,setBefore]=useState<number|undefined>()
+  const [editors,setEditors]=useState<Record<number,boolean>>({})
+  const onBusy=useCallback((id:number,busy:boolean)=>setEditors(old=>old[id]===busy?old:{...old,[id]:busy}),[])
+  const busy=Object.values(editors).some(Boolean)
   const query=useQuery({queryKey:['appealItems',guildId,before],queryFn:()=>request('GET /api/v1/guilds/{guild_id}/appeals/items',`/guilds/${guildId}/appeals/items${before?`?before=${before}`:''}`)})
   const enabled=Boolean(features.find(f=>f.id==='appeals')?.enabled)
   if(query.isLoading)return <Loading/>
-  if(query.error)return <main className={s.page}><Failure error={query.error} retry={()=>void query.refetch()}/></main>
+  if(query.error&&!query.data)return <main className={s.page}><Failure error={query.error} retry={()=>void query.refetch()}/></main>
   const items=query.data?.items??[]
-  return <main className={s.page}><h1>{t('appeals.title')}</h1><p>{t('appeals.private')}</p>{!enabled&&<p>{t('appeals.disabled')}</p>}{!items.length&&<p>{t('appeals.empty')}</p>}
-    {items.map(item=><Conversation key={item.id} guildId={guildId} item={item} enabled={enabled}/>)}
-    {before&&<button onClick={()=>setBefore(undefined)}>{t('appeals.latest')}</button>}{items.length===50&&<button onClick={()=>setBefore(items[items.length-1].id)}>{t('appeals.older')}</button>}</main>
+  return <main className={s.page}><h1>{t('appeals.title')}</h1>{query.error&&<Failure error={query.error} retry={()=>void query.refetch()}/>}<p>{t('appeals.private')}</p>{!enabled&&<p>{t('appeals.disabled')}</p>}{!items.length&&<p>{t('appeals.empty')}</p>}
+    {items.map(item=><Conversation key={item.id} guildId={guildId} item={item} enabled={enabled&&!query.error} onBusy={onBusy}/>)}
+    {before&&<button disabled={busy} onClick={()=>setBefore(undefined)}>{t('appeals.latest')}</button>}{items.length===50&&<button disabled={busy} onClick={()=>setBefore(items[items.length-1].id)}>{t('appeals.older')}</button>}</main>
 }

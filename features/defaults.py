@@ -15,6 +15,16 @@ def additional_permissions(settings: Settings) -> tuple[str, ...]:
     return ()
 
 
+class SettingsResources(Protocol):
+    """Resource details available to API-owned settings validation."""
+    def channel_ids(self, *types: int) -> set[int]: ...
+    def channel_permissions(self, channel_id: int) -> int: ...
+
+
+def validate_resources(enabled: bool, settings: Settings, resources: SettingsResources) -> None:
+    """Default settings need only the router's resource membership checks."""
+
+
 class ModuleStore(Protocol):
     def get_module(self, guild_id: int, module_id: str) -> Settings: ...
     def set_module(self, guild_id: int, module_id: str, *, enabled: bool,
@@ -22,7 +32,7 @@ class ModuleStore(Protocol):
 
 
 class SettingsAccess(Protocol):
-    """A feature may supply a dedicated store with this same contract."""
+    """A dedicated store may also provide an optional validate_resources hook."""
     def read(self, guild_id: int) -> Settings: ...
     def validate(self, enabled: bool, settings: Settings) -> None: ...
     def additional_permissions(self, settings: Settings) -> tuple[str, ...]: ...
@@ -37,6 +47,7 @@ class ModuleSettingsAccess:
     normalize: Normalizer = deepcopy
     validate: Callable[[bool, Settings], None] = validate_settings
     additional_permissions: Callable[[Settings], tuple[str, ...]] = additional_permissions
+    validate_resources: Callable[[bool, Settings, SettingsResources], None] = validate_resources
 
     def read(self, guild_id: int) -> Settings:
         return self.from_module(self.store.get_module(guild_id, self.feature_id))
@@ -63,6 +74,7 @@ class RepositorySettingsAccess:
     store: DedicatedStore | None
     validate: Callable[[bool, Settings], None] = validate_settings
     additional_permissions: Callable[[Settings], tuple[str, ...]] = additional_permissions
+    validate_resources: Callable[[bool, Settings, SettingsResources], None] = validate_resources
 
     @staticmethod
     def _module(value: Settings) -> Settings:

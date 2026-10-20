@@ -11,6 +11,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from guild_settings import GuildSettingsRepository
+from discord_io import settle_external
 from jobs import run_batch
 from suggestions.delivery import SuggestionDeliveryService
 from suggestions.discord_adapter import DiscordSuggestionAdapter
@@ -69,6 +70,9 @@ class SuggestionReviewModal(discord.ui.Modal):
         try:
             self.cog.service.review(interaction.guild.id, self.item['id'], interaction.user.id, self.status,
                 reason, expected_revision=self.item['revision'])
+        except PermissionError:
+            await interaction.response.send_message('現在この提案を審査する権限がありません。', ephemeral=True)
+            return
         except (LookupError, RuntimeError, ValueError):
             await interaction.response.send_message('提案が更新されています。再度開いて状態を確認してください。', ephemeral=True)
             return
@@ -127,13 +131,24 @@ class SuggestionsCog(commands.Cog):
         if not current["enabled"]:
             await interaction.response.send_message("Suggestionsは現在無効です。", ephemeral=True)
             return
+        presented_fields = normalize_settings(settings)['form_fields']
         settings = normalize_settings(current["settings"])
+        if presented_fields != settings['form_fields']:
+            await interaction.response.send_message('投稿フォームが変更されました。/suggestを実行し直して回答してください。', ephemeral=True)
+            return
         channel = interaction.guild.get_channel(settings["channel_id"]) if settings["channel_id"] else None
         if not isinstance(channel, discord.TextChannel):
             await interaction.response.send_message("提案の投稿先を利用できません。", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
-        item = self.service.submit(interaction.guild.id, channel.id, interaction.user.id, settings, answers)
+        try:
+            item = self.service.submit(interaction.guild.id, channel.id, interaction.user.id, settings, answers)
+        except PermissionError:
+            await interaction.followup.send('Suggestionsは現在無効です。', ephemeral=True)
+            return
+        except (RuntimeError, ValueError):
+            await interaction.followup.send('投稿フォームが変更されました。/suggestを実行し直して回答してください。', ephemeral=True)
+            return
         await run_batch(self.repository.outbox_jobs, self.owner, self.delivery.deliver)
         item = self.repository.get(interaction.guild.id, item['id'])
         if item['status'] == 'delivery_failed':
@@ -194,7 +209,12 @@ class SuggestionsCog(commands.Cog):
             message = "この提案の審査はすでに完了しています。" if action == "review" else "審査が完了した提案には投票できません。"
             await interaction.response.send_message(message, ephemeral=True)
             return
-        await interaction.response.edit_message(embed=suggestion_embed(item, settings), view=suggestion_view(item, settings))
+        try:
+            await settle_external(interaction.response.edit_message(embed=suggestion_embed(item, settings), view=suggestion_view(item, settings)))
+        finally:
+            # Discord may apply the edit before its response fails. Preserve
+            # reconciliation if a newer revision settled while this was in flight.
+            self.delivery.refresh_after_edit(item, module['revision'])
 
 
 async def setup(bot: commands.Bot) -> None:

@@ -259,7 +259,7 @@ class SetupTests(unittest.TestCase):
         self.prepared()
         with patch('deploy.setup.subprocess.run'), patch('deploy.setup.image_id', return_value='sha256:' + 'a' * 64):
             setup.build(self.directory)
-        with patch('deploy.setup.compose.execute') as execute, patch('deploy.setup.compose.up', side_effect=subprocess.CalledProcessError(1, 'migrate')):
+        with patch('deploy.setup.compose.execute') as execute, patch('deploy.setup.compose._up', side_effect=subprocess.CalledProcessError(1, 'migrate')):
             execute.return_value.stdout = 'existing-container'
             with self.assertRaises(subprocess.CalledProcessError):
                 setup.start(self.directory)

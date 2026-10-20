@@ -30,6 +30,7 @@ async def seed():
     settings = Settings.from_env()
     store = storage(settings)
     repo = TicketRepository(settings.database_url)
+    repo.save_settings(1, {'enabled': True})
     team = repo.save_team(1, {'name': 'Staff', 'role_ids': [50]})
     panel = repo.save_panel(1, {'name': 'Recovery', 'mode': 'channel', 'category_id': 10, 'team_id': team['id']})
     ticket = repo.reserve_ticket(1, panel['id'], 2, 'recovery-test', {'answer': store.encrypt_text('private answer')})
@@ -159,6 +160,9 @@ async def resume():
     assert application['answers'] == {'answer':'Snapshot answer'} and application['status'] == 'approved'
     assert applications.events(1,application['id'])[0]['reason'] == 'Snapshot decision'
     assert applications.form(1,application['form_id'])['retention_days'] == 30
+    with transaction(settings.database_url) as c:
+        cooldown = c.execute('SELECT submitted_at FROM application_cooldowns WHERE guild_id=1 AND form_id=%s AND author_id=3', (application['form_id'],)).fetchone()
+        assert cooldown and cooldown['submitted_at'] == application['created_at']
     appeals = AppealRepository(settings.database_url)
     mail = appeals.items(1)[0]
     detail = appeals.conversation(1,mail['id'])

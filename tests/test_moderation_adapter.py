@@ -45,6 +45,9 @@ class FakePort:
     def overwrite(self, *args):
         return dict(self.permissions)
 
+    async def fresh_overwrite(self, *args):
+        return dict(self.permissions)
+
 
 class ModerationAdapterTests(unittest.IsolatedAsyncioTestCase):
     def test_timeout_administrator_is_rejected_even_below_bot_role(self):

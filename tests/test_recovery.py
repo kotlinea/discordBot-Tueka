@@ -38,6 +38,7 @@ class RecoveryStorageTests(unittest.IsolatedAsyncioTestCase):
         self.settings = settings(self.url, self.root / 'source', self.key)
         self.store = TranscriptStorage(self.settings.data_dir / 'ticket-transcripts', self.key)
         self.repo = TicketRepository(self.url)
+        self.repo.save_settings(1, {'enabled': True})
         team = self.repo.save_team(1, {'name': 'Staff', 'role_ids': [50]})
         panel = self.repo.save_panel(1, {'name': 'Recovery', 'mode': 'channel', 'category_id': 10, 'team_id': team['id']})
         self.ticket = self.repo.reserve_ticket(1, panel['id'], 2, 'recover-test', {'answer': self.store.encrypt_text('private answer')})

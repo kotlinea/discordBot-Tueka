@@ -25,7 +25,9 @@ class SuggestionService:
         return clean
 
     def submit(self, guild_id: int, channel_id: int, author_id: int, settings: dict[str, Any], answers: dict[str, str]) -> dict[str, Any]:
-        return self.repository.create(guild_id, channel_id, author_id, self.validate_answers(settings, answers))
+        normalized = normalize_settings(settings)
+        return self.repository.create(guild_id, channel_id, author_id, self.validate_answers(normalized, answers),
+                                      expected_form_fields=normalized['form_fields'])
 
     def vote(self, guild_id: int, suggestion_id: int, user_id: int, value: int, settings: dict[str, Any]) -> dict[str, Any]:
         if not normalize_settings(settings)["allow_voting"]:

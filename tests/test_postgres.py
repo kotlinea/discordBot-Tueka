@@ -24,7 +24,7 @@ class PostgresTests(unittest.TestCase):
         require_current(self.url)
         self.assertEqual(apply(self.url)['applied'], [])
         with transaction(self.url) as c:
-            self.assertEqual(c.execute('SELECT count(*) count FROM information_schema.tables WHERE table_schema=current_schema()').fetchone()['count'], 96)
+            self.assertEqual(c.execute('SELECT count(*) count FROM information_schema.tables WHERE table_schema=current_schema()').fetchone()['count'], 98)
 
     def test_transaction_and_migration_failures_roll_back(self):
         apply(self.url)
@@ -212,7 +212,9 @@ class PostgresTests(unittest.TestCase):
 
     def test_suggestion_votes_review_and_outbox(self):
         from suggestions.repository import SuggestionRepository
+        from guild_settings import GuildSettingsRepository
         apply(self.url)
+        GuildSettingsRepository(self.url).set_module(1, 'suggestions', enabled=True)
         suggestions = SuggestionRepository(self.url)
         item = suggestions.create(1, 2, 3, {'title': 'Idea'})
         with ThreadPoolExecutor(max_workers=4) as executor:

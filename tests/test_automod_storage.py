@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock
 
 from moderation.models import default_rule, validate_rule
 from moderation.service import ActionContext, ModerationService
+from moderation.contracts import GuildRef
 from moderation import ModerationRepository
 
 
@@ -127,14 +128,21 @@ class ModerationThresholdTests(unittest.IsolatedAsyncioTestCase):
         self.temp_dir.cleanup()
 
     async def test_only_highest_newly_crossed_threshold_runs(self):
+        GuildSettingsRepository(self.storage.database_url).set_module(1, 'moderation', enabled=True)
+        self.storage.add_points(1, 2, 2, 'previous points')
+        result = self.storage.add_points_case(1, 2, 4, 'points', execution_key='highest-threshold',
+            thresholds=self.service._point_thresholds(1), moderator_id=10)
+        intent = self.storage.threshold_intent(result['request_id'])
+        self.assertEqual(intent['threshold']['action']['type'], 'ban')
+        self.assertEqual(intent['threshold']['points'], 5)
         self.service.apply_case = AsyncMock(return_value=99)
-        result = await self.service._apply_threshold(SimpleNamespace(id=1), object(), 2, 6, "points", 10, 20)
-        self.assertEqual(result["action"], "ban")
-        self.assertEqual(result["points"], 5)
+        await self.service.execute_threshold(GuildRef(1, 'Synthetic'), {'id': result['request_id']})
         self.service.apply_case.assert_awaited_once()
-        self.service.apply_case.reset_mock()
-        self.assertIsNone(await self.service._apply_threshold(SimpleNamespace(id=1), object(), 5, 6, "points", 10, 20))
-        self.service.apply_case.assert_not_awaited()
+        self.storage.add_points(1, 3, 5, 'previous points')
+        unchanged = self.storage.add_points_case(1, 3, 1, 'points', execution_key='no-crossing',
+            thresholds=self.service._point_thresholds(1), moderator_id=10)
+        self.assertIsNone(unchanged['threshold'])
+        self.assertNotIn('request_id', unchanged)
 
     async def test_disabled_infractions_never_falls_back_to_old_thresholds(self):
         GuildSettingsRepository(self.storage.database_url).set_module(1, 'infractions', enabled=False)
@@ -145,7 +153,10 @@ class ModerationThresholdTests(unittest.IsolatedAsyncioTestCase):
             'escalation_enabled': True, 'escalation_threshold': 1, 'escalation_action': 'ban',
         })
         self.service.apply_case = AsyncMock()
-        self.assertIsNone(await self.service._apply_threshold(SimpleNamespace(id=1), object(), 0, 5, 'points', None, None))
+        result = self.storage.add_points_case(1, 2, 5, 'points', execution_key='disabled-threshold',
+            thresholds=self.service._point_thresholds(1))
+        self.assertIsNone(result['threshold'])
+        self.assertNotIn('request_id', result)
         self.service.apply_case.assert_not_awaited()
 
     async def test_points_action_records_only_current_rule_and_event_links(self):

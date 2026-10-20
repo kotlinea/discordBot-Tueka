@@ -5,7 +5,8 @@ import json
 import re
 import time
 import uuid
-from jobs import QueueRepository, QueueSpec
+from jobs import LostLease, QueueRepository, QueueSpec
+from jobs.repository import ResourceLeaseRepository
 from jobs.catalog import QUEUE_SPECS
 from database import lock_resource, require_current, transaction
 from typing import Any, Iterable
@@ -304,7 +305,7 @@ class TicketRepository:
     def mark_panel_published(self, config: dict[str, Any], message_id: int, error: str | None = None,
                              *, deleted: bool = False, finish: bool = True, retry: bool = False) -> bool:
         now = int(time.time())
-        status = (config['status'] if config['status'].startswith('delete') else 'publishing') if retry or not finish else (
+        status = (config['status'] if config['status'].startswith('delete') or (retry and config['status'] == 'draft') else 'publishing') if retry or not finish else (
             'error' if error else 'detached' if deleted else 'published')
         with self._connection() as connection:
             cursor = connection.execute("""UPDATE ticket_panel_messages SET message_id=%s,status=%s,last_error=%s,
@@ -333,12 +334,15 @@ class TicketRepository:
         return claimed
 
     def reserve_ticket(self, guild_id: int, panel_id: int, opener_id: int, interaction_id: str, form_answers: dict[str, str], *, staff_exempt: bool = False) -> dict[str, Any]:
-        now, settings = int(time.time()), self.settings(guild_id)
+        now = int(time.time())
         with self._connection() as connection:
             lock_resource(connection, "ticket-guild", guild_id)
             existing = connection.execute("SELECT * FROM tickets_v2 WHERE interaction_id=%s", (interaction_id,)).fetchone()
             if existing:
                 return self._item(existing) or {}
+            settings = connection.execute('SELECT enabled,open_limit FROM ticket_guild_settings WHERE guild_id=%s', (guild_id,)).fetchone()
+            if not settings or not settings['enabled']:
+                raise ValueError('disabled')
             panel = connection.execute("SELECT * FROM ticket_panels WHERE guild_id=%s AND id=%s AND enabled=1 AND archived_at IS NULL", (guild_id, panel_id)).fetchone()
             if not panel:
                 raise KeyError("panel")
@@ -493,49 +497,84 @@ class TicketRepository:
         with self._connection() as connection:
             connection.execute("UPDATE tickets_v2 SET notes_thread_id=%s,revision=revision+1 WHERE id=%s AND mode='channel'", (thread_id, ticket_id))
 
-    def begin_close(self, ticket_id: int, actor_id: int, reason: str) -> dict[str, Any]:
+    def begin_close(self, ticket_id: int, actor_id: int, reason: str, *, lease=None) -> dict[str, Any]:
         with self._connection() as connection:
+            if lease is not None:
+                lease.guard(connection)
             lock_resource(connection, "ticket", ticket_id)
             result = connection.execute("UPDATE tickets_v2 SET status='closing',closing_at=%s,closed_by=%s,close_reason=%s,revision=revision+1 WHERE id=%s AND status IN ('open','awaiting_user')", (int(time.time()), actor_id, reason[:1000], ticket_id))
             if result.rowcount != 1:
                 raise RuntimeError("ticket_not_open")
+            connection.execute("""INSERT INTO ticket_audit_events(guild_id,ticket_id,actor_id,event_type,detail_json,created_at)
+                SELECT guild_id,id,%s,'close_started',json_build_object('previous_transcript_id',
+                    (SELECT COALESCE(MAX(id),0) FROM ticket_transcripts WHERE ticket_id=%s))::text,%s
+                FROM tickets_v2 WHERE id=%s""", (actor_id, ticket_id, int(time.time()), ticket_id))
         return self.ticket(ticket_id) or {}
 
     def recover_incomplete_closes(self) -> None:
-        with self._connection() as connection:
-            connection.execute("""UPDATE tickets_v2 SET status=CASE WHEN EXISTS(
-                SELECT 1 FROM ticket_transcripts tr WHERE tr.ticket_id=tickets_v2.id AND tr.status='ready'
-            ) THEN 'closed' ELSE 'open' END,
-            closed_at=CASE WHEN EXISTS(SELECT 1 FROM ticket_transcripts tr WHERE tr.ticket_id=tickets_v2.id AND tr.status='ready')
-                THEN COALESCE(closed_at,(SELECT MAX(created_at) FROM ticket_transcripts tr WHERE tr.ticket_id=tickets_v2.id)) ELSE NULL END,
-            closed_by=CASE WHEN EXISTS(SELECT 1 FROM ticket_transcripts tr WHERE tr.ticket_id=tickets_v2.id AND tr.status='ready') THEN closed_by ELSE NULL END,
-            close_reason=CASE WHEN EXISTS(SELECT 1 FROM ticket_transcripts tr WHERE tr.ticket_id=tickets_v2.id AND tr.status='ready') THEN close_reason ELSE NULL END,
-            closing_at=NULL,revision=revision+1 WHERE status='closing' AND (closing_at IS NULL OR closing_at<%s)""", (int(time.time()) - 300,))
-
-    def cancel_close(self, ticket_id: int) -> None:
-        with self._connection() as connection:
-            connection.execute("UPDATE tickets_v2 SET status='open',closing_at=NULL,closed_by=NULL,close_reason=NULL,revision=revision+1 WHERE id=%s AND status='closing'", (ticket_id,))
-
-    def close_ticket(self, ticket_id: int, actor_id: int, reason: str) -> dict[str, Any]:
         now = int(time.time())
         with self._connection() as connection:
+            pending = connection.execute("SELECT id FROM tickets_v2 WHERE status='closing' AND (closing_at IS NULL OR closing_at<%s) ORDER BY id", (now - 300,)).fetchall()
+        for row in pending:
+            lease = ResourceLeaseRepository(self.database_url, 'ticket_close', row['id'], clock=time.time)
+            try:
+                lease.acquire()
+            except LostLease:
+                continue
+            try:
+                with self._connection() as connection:
+                    lease.guard(connection)
+                    lock_resource(connection, 'ticket', row['id'])
+                    ticket = connection.execute("SELECT * FROM tickets_v2 WHERE id=%s AND status='closing' AND (closing_at IS NULL OR closing_at<%s)", (row['id'], now - 300)).fetchone()
+                    if ticket is None:
+                        continue
+                    started = connection.execute("SELECT detail_json FROM ticket_audit_events WHERE ticket_id=%s AND event_type='close_started' ORDER BY id DESC LIMIT 1", (ticket['id'],)).fetchone()
+                    previous_id = json.loads(started['detail_json'])['previous_transcript_id'] if started else None
+                    transcript = connection.execute("""SELECT id FROM ticket_transcripts WHERE ticket_id=%s AND status='ready'
+                        AND ((%s::bigint IS NOT NULL AND id>%s) OR (%s::bigint IS NULL AND created_at>=%s))
+                        ORDER BY id DESC LIMIT 1""", (ticket['id'], previous_id, previous_id, previous_id, ticket['closing_at'] or 0)).fetchone()
+                    if transcript:
+                        self._finish_close(connection, ticket['id'], ticket['closed_by'], ticket['close_reason'] or '', now, transcript['id'])
+                    else:
+                        connection.execute("UPDATE tickets_v2 SET status='open',closing_at=NULL,closed_by=NULL,close_reason=NULL,closed_at=NULL,revision=revision+1 WHERE id=%s", (ticket['id'],))
+            finally:
+                lease.release()
+
+    def cancel_close(self, ticket_id: int, *, lease=None) -> None:
+        with self._connection() as connection:
+            if lease is not None:
+                lease.guard(connection)
+            lock_resource(connection, 'ticket', ticket_id)
+            connection.execute("UPDATE tickets_v2 SET status='open',closing_at=NULL,closed_by=NULL,close_reason=NULL,revision=revision+1 WHERE id=%s AND status='closing'", (ticket_id,))
+
+    def close_ticket(self, ticket_id: int, actor_id: int, reason: str, *, lease=None) -> dict[str, Any]:
+        now = int(time.time())
+        with self._connection() as connection:
+            if lease is not None:
+                lease.guard(connection)
             lock_resource(connection, "ticket", ticket_id)
-            result = connection.execute("UPDATE tickets_v2 SET status='closed',closing_at=NULL,closed_by=%s,close_reason=%s,closed_at=%s,revision=revision+1 WHERE id=%s AND status='closing'", (actor_id, reason[:1000], now, ticket_id))
-            if result.rowcount != 1:
-                raise RuntimeError("ticket_not_open")
-            connection.execute("DELETE FROM ticket_schedules WHERE ticket_id=%s", (ticket_id,))
-            revision = connection.execute('SELECT revision FROM tickets_v2 WHERE id=%s', (ticket_id,)).fetchone()['revision']
-            connection.execute("INSERT INTO ticket_outbox(ticket_id,action,actor_id,payload_json,available_at,created_at) VALUES(%s,'close_resource',%s,%s,%s,%s)",
-                               (ticket_id, actor_id, json.dumps({'revision': revision}), now, now))
             transcript = connection.execute("SELECT id FROM ticket_transcripts WHERE ticket_id=%s AND status='ready' ORDER BY id DESC LIMIT 1", (ticket_id,)).fetchone()
-            if transcript:
-                for action in ('close_dm', 'close_log'):
-                    connection.execute("INSERT INTO ticket_outbox(ticket_id,action,actor_id,payload_json,available_at,created_at) VALUES(%s,%s,%s,%s,%s,%s)",
-                        (ticket_id, action, actor_id, json.dumps({'transcript_id': transcript['id'], 'reason': reason}), now, now))
+            self._finish_close(connection, ticket_id, actor_id, reason, now, transcript['id'] if transcript else None)
         return self.ticket(ticket_id) or {}
 
-    def reopen_ticket(self, ticket_id: int) -> dict[str, Any]:
+    @staticmethod
+    def _finish_close(connection, ticket_id, actor_id, reason, now, transcript_id):
+        result = connection.execute("UPDATE tickets_v2 SET status='closed',closing_at=NULL,closed_by=%s,close_reason=%s,closed_at=%s,revision=revision+1 WHERE id=%s AND status='closing' RETURNING revision", (actor_id, reason[:1000], now, ticket_id)).fetchone()
+        if result is None:
+            raise RuntimeError('ticket_not_open')
+        connection.execute('DELETE FROM ticket_schedules WHERE ticket_id=%s', (ticket_id,))
+        connection.execute("INSERT INTO ticket_outbox(ticket_id,action,actor_id,payload_json,available_at,created_at) VALUES(%s,'close_resource',%s,%s,%s,%s)",
+            (ticket_id, actor_id, json.dumps({'revision': result['revision']}), now, now))
+        if transcript_id is not None:
+            for action in ('close_dm', 'close_log'):
+                connection.execute("INSERT INTO ticket_outbox(ticket_id,action,actor_id,payload_json,available_at,created_at) VALUES(%s,%s,%s,%s,%s,%s)",
+                    (ticket_id, action, actor_id, json.dumps({'transcript_id': transcript_id, 'reason': reason}), now, now))
+
+    def reopen_ticket(self, ticket_id: int, *, lease=None) -> dict[str, Any]:
         with self._connection() as connection:
+            if lease is not None:
+                lease.guard(connection)
+            lock_resource(connection, 'ticket', ticket_id)
             result = connection.execute("UPDATE tickets_v2 SET status='open',closed_by=NULL,close_reason=NULL,closed_at=NULL,revision=revision+1 WHERE id=%s AND status='closed' AND mode='private_thread' AND deleted_at IS NULL", (ticket_id,))
             if result.rowcount != 1:
                 raise ValueError("reopen_unavailable")
@@ -753,9 +792,32 @@ class TicketRepository:
         with self._connection() as connection:
             lock_resource(connection, "ticket", ticket_id)
             connection.execute("UPDATE ticket_transcripts SET status='deleted',last_error=NULL WHERE id=%s", (transcript_id,))
-            connection.execute("UPDATE ticket_messages SET encrypted_content=NULL WHERE ticket_id=%s", (ticket_id,))
-            connection.execute("UPDATE tickets_v2 SET form_answers_json='{}' WHERE id=%s", (ticket_id,))
-            connection.execute("UPDATE ticket_attachments SET status='deleted' WHERE ticket_id=%s", (ticket_id,))
+
+    def begin_transcript_expiration(self, transcript_id: int, ticket_id: int) -> dict | None:
+        """Retire shared content under the same lock as reopen and new snapshots.
+
+        Purging attachments are no longer readable or included in new snapshots.
+        Their rows stay resumable until each external deletion succeeds.
+        """
+        now = int(time.time())
+        with self._connection() as connection:
+            lock_resource(connection, 'ticket', ticket_id)
+            transcript = connection.execute("SELECT * FROM ticket_transcripts WHERE id=%s AND ticket_id=%s AND status='ready' AND expires_at<=%s", (transcript_id, ticket_id, now)).fetchone()
+            if transcript is None:
+                return None
+            ticket = connection.execute('SELECT status FROM tickets_v2 WHERE id=%s', (ticket_id,)).fetchone()
+            retained = connection.execute("SELECT 1 FROM ticket_transcripts WHERE ticket_id=%s AND status='ready' AND expires_at>%s LIMIT 1", (ticket_id, now)).fetchone()
+            if ticket and ticket['status'] == 'closed' and not retained:
+                connection.execute("UPDATE ticket_messages SET encrypted_content=NULL WHERE ticket_id=%s", (ticket_id,))
+                connection.execute("UPDATE tickets_v2 SET form_answers_json='{}' WHERE id=%s", (ticket_id,))
+                connection.execute("UPDATE ticket_attachments SET status='purging' WHERE ticket_id=%s AND status='ready'", (ticket_id,))
+            attachments = connection.execute("SELECT * FROM ticket_attachments WHERE ticket_id=%s AND status='purging' ORDER BY id", (ticket_id,)).fetchall()
+            shared = connection.execute("SELECT 1 FROM ticket_transcripts WHERE id<>%s AND status='ready' AND backend=%s AND object_key=%s LIMIT 1", (transcript_id, transcript['backend'], transcript['object_key'])).fetchone()
+        return {'attachments': [self._item(row) for row in attachments], 'shared_blob': bool(shared)}
+
+    def mark_attachment_deleted(self, attachment_id: int) -> None:
+        with self._connection() as connection:
+            connection.execute("UPDATE ticket_attachments SET status='deleted' WHERE id=%s AND status='purging'", (attachment_id,))
 
 
     @staticmethod
@@ -813,9 +875,11 @@ class TicketRepository:
 
 
 
-    def save_transcript(self, ticket_id: int, backend: str, object_key: str, content_hash: str, byte_size: int, expires_at: int) -> dict[str, Any]:
+    def save_transcript(self, ticket_id: int, backend: str, object_key: str, content_hash: str, byte_size: int, expires_at: int, *, lease=None) -> dict[str, Any]:
         now = int(time.time())
         with self._connection() as connection:
+            if lease is not None:
+                lease.guard(connection)
             lock_resource(connection, "ticket", ticket_id)
             version = int(connection.execute('SELECT COALESCE(MAX(version),0)+1 AS value FROM ticket_transcripts WHERE ticket_id=%s', (ticket_id,)).fetchone()["value"])
             transcript_id = int(connection.execute('INSERT INTO ticket_transcripts(ticket_id,version,backend,object_key,content_hash,byte_size,expires_at,created_at) VALUES(%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id',

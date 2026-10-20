@@ -158,12 +158,14 @@ def build(directory, *, stage_directory=None):
 
 
 def start(directory, *, stage_directory=None):
-    metadata, _ = read(directory)
-    # Bind-check only a first start; an existing project may already own its ports.
-    existing = compose.execute(directory, 'ps', '-a', '-q', capture=True).stdout.strip()
-    if not existing:
-        check_ports(metadata)
-    compose.up(directory, stage_directory)
-    compose.execute(directory, 'up', '-d', '--no-deps', '--wait', '--wait-timeout', '120', *compose.APPLICATIONS)
-    compose.execute(directory, 'run', '--rm', '--no-deps', '--entrypoint', 'python',
-                    'dashboard', '-m', 'observability', 'snapshot')
+    with locked(directory):
+        metadata, _ = read(directory)
+        # Bind-check only a first start; an existing project may already own its ports.
+        existing = compose.execute(directory, 'ps', '-a', '-q', capture=True).stdout.strip()
+        if not existing:
+            check_ports(metadata)
+        # Keep the writer-starting readiness call inside the same recovery lock.
+        compose._up(directory, stage_directory)
+        compose.execute(directory, 'up', '-d', '--no-deps', '--wait', '--wait-timeout', '120', *compose.APPLICATIONS)
+        compose.execute(directory, 'run', '--rm', '--no-deps', '--entrypoint', 'python',
+                        'dashboard', '-m', 'observability', 'snapshot')

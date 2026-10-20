@@ -50,7 +50,8 @@ class ModerationCommandsCog(commands.Cog):
             return
         assert interaction.guild is not None and isinstance(interaction.user, discord.Member)
         try:
-            count = await self.service.warn(guild_ref(interaction.guild), member_ref(member), reason, interaction.user.id, actor=member_ref(interaction.user))
+            count = await self.service.warn(guild_ref(interaction.guild), member_ref(member), reason, interaction.user.id,
+                actor=member_ref(interaction.user), execution_key=str(interaction.id))
         except PermissionError as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
@@ -90,7 +91,8 @@ class ModerationCommandsCog(commands.Cog):
         try:
             target_id = int(user_id)
             case_id = await self.service.apply_case(guild_ref(interaction.guild), MemberRef(target_id, interaction.guild.id, str(target_id)),
-                'unban', reason, interaction.user.id, notify=False, execution_key=str(interaction.id))
+                'unban', reason, interaction.user.id, notify=False, execution_key=str(interaction.id),
+                actor=member_ref(interaction.user))
         except (ValueError, PermissionError, ActionFailure) as exc:
             await interaction.response.send_message(f"Banを解除できません: {exc}",ephemeral=True)
             return

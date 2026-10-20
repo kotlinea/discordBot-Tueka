@@ -43,5 +43,9 @@ class PanelDeliveryService:
             if not self.repository.mark_panel_published(config, message_id):
                 raise LostLease('Panel ownership changed after cleanup')
         except DiscordFailure as exc:
+            # Only a definitely unsent initial publication may start a fresh send.
+            # Unknown receipts and failures after saving a message ID keep recovery.
+            if config['status'] == 'draft' and (exc.partial or message_id):
+                config = {**config, 'status': 'publishing'}
             if not self.repository.mark_panel_published(config, message_id, str(exc), retry=exc.retry or exc.partial):
                 raise LostLease('Panel ownership changed during failure handling') from exc

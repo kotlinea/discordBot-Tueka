@@ -175,3 +175,33 @@ class DiscordReactionRoleAdapter:
             return
         except discord.HTTPException as exc:
             raise self._failure(exc) from exc
+
+    async def selection_present(self, guild_id, channel_id, message_id, emoji, user_id):
+        try:
+            message = await self._channel(guild_id, channel_id).fetch_message(message_id)
+            from .models import normalize_emoji
+            key = normalize_emoji(emoji)['key']
+            for reaction in message.reactions:
+                if normalize_emoji(str(reaction.emoji))['key'] == key:
+                    async for user in reaction.users(limit=None):
+                        if user.id == user_id:
+                            return True
+                    return False
+            return False
+        except discord.NotFound:
+            return False  # Deleted message cannot contain a current selection.
+        except discord.HTTPException as exc:
+            raise self._failure(exc) from exc
+
+    async def role_member_count(self, guild_id, role_id):
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            raise DiscordFailure('Guild unavailable', retry=True)
+        try:
+            count = 0
+            async for member in guild.fetch_members(limit=None):
+                if any(role.id == role_id for role in member.roles):
+                    count += 1
+            return count
+        except discord.HTTPException as exc:
+            raise self._failure(exc) from exc

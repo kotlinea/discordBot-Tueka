@@ -61,6 +61,17 @@ class ModerationService:
                          moderator_id: int | None = None, duration_minutes: int = 0, notify: bool = True,
                          *, moderation_event_id: int | None = None, moderation_rule_id: int | None = None,
                          source: str = "manual", actor: MemberRef | None = None, execution_key: str | None = None) -> int:
+        lease = ResourceLease(self.repository.database_url, 'moderation_member', f'{guild.id}:{member.id}')
+        try:
+            return await lease.run(lambda owned: self._apply_case_owned(guild, member, action, reason,
+                moderator_id, duration_minutes, notify, moderation_event_id=moderation_event_id,
+                moderation_rule_id=moderation_rule_id, source=source, actor=actor,
+                execution_key=execution_key, lease=owned))
+        except LostLease as exc:
+            raise ActionFailure(str(exc), retry=True, partial=True) from exc
+
+    async def _apply_case_owned(self, guild, member, action, reason, moderator_id, duration_minutes, notify,
+            *, moderation_event_id, moderation_rule_id, source, actor, execution_key, lease):
         key = 'case:' + (execution_key or (f'{moderation_event_id}:{moderation_rule_id}:{member.id}:{action}' if moderation_event_id is not None else uuid.uuid4().hex))
         previous = self.repository.case_execution(guild.id, key)
         if previous is not None:
@@ -84,7 +95,7 @@ class ModerationService:
         execution = self.repository.create_moderation_event(guild.id, family='infraction', event_type='infraction_change',
             source='case_execution', reason=reason or '', actor_id=moderator_id, target_user_id=member.id,
             dedupe_key=key, evidence={'action': action, 'expires_at': expires_at, 'parent_event_id': moderation_event_id,
-                                    'rule_id': moderation_rule_id, 'source': source})
+                                    'rule_id': moderation_rule_id, 'source': source}, lease=lease)
         if execution is None:
             raise ActionFailure('同じ処置が既に実行中です。', partial=True)
         try:
@@ -96,7 +107,7 @@ class ModerationService:
         dm_sent = await self.dm(member, f"{guild.name}で {action} が実行されました。理由: {reason or 'なし'}") if notify else False
         case_id = self.repository.add_case(guild.id, member.id, action, reason, moderator_id, expires_at, dm_sent,
             moderation_event_id=moderation_event_id,
-            moderation_rule_id=moderation_rule_id, source=source, execution_event_id=execution)
+            moderation_rule_id=moderation_rule_id, source=source, execution_event_id=execution, lease=lease)
         if source == "manual":
             await self.log_manual(guild, f"Moderation Case #{case_id}", f"`{action}`: {member} ({member.id})\n理由: {reason or 'なし'}",
                 category="timeout" if action in {"timeout", "untimeout"} else action if action in {"kick", "ban", "unban"} else "admin")
@@ -106,6 +117,13 @@ class ModerationService:
         receipt = self.repository.case_execution(guild.id, 'case:' + execution_key)
         if receipt is None:
             raise ValueError('実行記録が見つかりません。')
+        lease = ResourceLease(self.repository.database_url, 'moderation_member', f"{guild.id}:{receipt['target_user_id']}")
+        try:
+            return await lease.run(lambda owned: self._reconcile_case_owned(guild, receipt, owned))
+        except LostLease as exc:
+            raise ActionFailure(str(exc), retry=True, partial=True) from exc
+
+    async def _reconcile_case_owned(self, guild, receipt, lease):
         if receipt['case_id'] is not None:
             return int(receipt['case_id'])
         intent = json.loads(receipt['evidence_json'])
@@ -114,10 +132,33 @@ class ModerationService:
             raise ActionFailure('Discord側の実行結果を確定できません。手動照合が必要です。', partial=True)
         return self.repository.add_case(guild.id, receipt['target_user_id'], intent['action'], receipt['reason'],
             receipt['actor_id'], intent.get('expires_at'), False, moderation_event_id=intent.get('parent_event_id'),
-            moderation_rule_id=intent.get('rule_id'), source=intent['source'], execution_event_id=receipt['id'])
+            moderation_rule_id=intent.get('rule_id'), source=intent['source'], execution_event_id=receipt['id'], lease=lease)
+
+    async def expire_tempban(self, guild: GuildRef, pending: dict[str, Any]) -> None:
+        lease = ResourceLease(self.repository.database_url, 'moderation_member', f"{guild.id}:{pending['user_id']}")
+        async def expire(owned):
+            receipt = self.repository.expiring_tempban(pending, lease=owned)
+            if receipt is None:
+                return  # A newer ban/unban intent superseded this temporary sanction.
+            applied = await self.port.applied(guild.id, pending['user_id'], 'tempban',
+                receipt['expires_at'], receipt['id'], receipt['created_at'])
+            if applied is False:
+                return  # Absent or replaced, including human bans: never undo it.
+            if applied is not True:
+                raise ActionFailure('一時Banの所有権を確認できません。手動照合が必要です。', partial=True)
+            owned.renew()
+            # Recheck the queue claim after the asynchronous audit/state lookup.
+            if self.repository.expiring_tempban(pending, lease=owned) is None:
+                return
+            await self.port.unban(guild.id, pending['user_id'], '一時Banの期限切れ')
+            owned.check()
+        try:
+            await lease.run(expire)
+        except LostLease as exc:
+            raise ActionFailure(str(exc), retry=True, partial=True) from exc
 
     async def warn(self, guild: GuildRef, member: MemberRef, reason: str | None, moderator_id: int | None,
-                   *, notify: bool | None = None, actor: MemberRef | None = None) -> int:
+                   *, notify: bool | None = None, actor: MemberRef | None = None, execution_key: str | None = None) -> int:
         if actor is not None:
             error = self.manageable(actor, member, "timeout")
             if error:
@@ -125,31 +166,29 @@ class ModerationService:
         module = self.guild_settings.get_module(guild.id, "moderation")["settings"]
         should_notify = bool(module.get("dm_notify")) if notify is None else notify
         dm_sent = await self.dm(member, f"{guild.name}で警告を受けました。理由: {reason or 'なし'}") if should_notify else False
-        _, before, after = self.repository.add_points(guild.id, member.id, 1, reason, expires_at=None)
-        case_id = self.repository.add_case(guild.id, member.id, "warn", reason, moderator_id, None, dm_sent, source="manual", points=1)
+        result = self.repository.add_points_case(guild.id, member.id, 1, reason, moderator_id=moderator_id,
+            dm_sent=dm_sent, source='manual', execution_key=execution_key or uuid.uuid4().hex,
+            thresholds=self._point_thresholds(guild.id))
+        case_id, after = result['case_id'], result['after']
         await self.log_manual(guild, f"Moderation Case #{case_id}", f"`warn` ({after}pt): {member} ({member.id})\n理由: {reason or 'なし'}", category="warning")
-        await self._apply_threshold(guild, member, before, after, reason or "警告ポイント", None, None)
         return after
 
-    async def _apply_threshold(self, guild: GuildRef, member: MemberRef, before: int, after: int, reason: str,
-                               event_id: int | None, rule_id: int | None) -> dict[str, Any] | None:
-        infraction_module = self.guild_settings.get_module(guild.id, "infractions")
-        thresholds = infraction_module["settings"].get("point_thresholds", []) if infraction_module["enabled"] else []
-        crossed = [item for item in thresholds if before < int(item.get("points", 0)) <= after]
-        if not crossed:
-            return None
-        selected = max(crossed, key=lambda item: int(item["points"]))
-        action = dict(selected.get("action") or {})
-        action_type = action.get("type")
-        if action_type not in {"timeout", "kick", "ban", "tempban"}:
-            return None
-        try:
-            case_id = await self.apply_case(guild, member, action_type, f"{reason}: {after}ポイントに到達", None,
-                int(action.get("duration_minutes", 0)), False, moderation_event_id=event_id,
-                moderation_rule_id=rule_id, source="infraction")
-            return {"type": "threshold", "status": "success", "action": action_type, "case_id": case_id, "points": selected["points"]}
-        except (ValueError, PermissionError, ActionFailure) as exc:
-            return {"type": "threshold", "status": "failed", "action": action_type, "error": str(exc)[:300]}
+    def _point_thresholds(self, guild_id):
+        module = self.guild_settings.get_module(guild_id, 'infractions')
+        return module['settings'].get('point_thresholds', []) if module['enabled'] else []
+
+    async def execute_threshold(self, guild: GuildRef, request: dict[str, Any]) -> dict[str, Any]:
+        intent = self.repository.threshold_intent(request['id'])
+        if intent is None or intent['guild_id'] != guild.id:
+            raise PermissionError('閾値処置の保存済みIntentを確認できません。')
+        if not self.guild_settings.module_enabled(guild.id, 'moderation') or not self.guild_settings.module_enabled(guild.id, 'infractions'):
+            raise PermissionError('ModerationまたはInfractionsが無効です。')
+        action = intent['threshold']['action']
+        case_id = await self.apply_case(guild, MemberRef(intent['user_id'], guild.id), action['type'],
+            f"{intent['reason'] or '警告ポイント'}: {intent['after']}ポイントに到達", duration_minutes=int(action.get('duration_minutes', 0)),
+            notify=False, moderation_event_id=intent.get('parent_event_id'), moderation_rule_id=intent.get('rule_id'),
+            source='infraction', execution_key=f"threshold:{intent['event_id']}")
+        return {'type': 'threshold', 'status': 'success', 'case_id': case_id}
 
     @staticmethod
     def _message_template(text: str, member: MemberRef | None, reason: str, *, guild: GuildRef | None = None,
@@ -184,6 +223,8 @@ class ModerationService:
         if self.repository.active_lockdown(guild.id):
             raise ActionFailure('An active lockdown must be restored before starting another', partial=True)
         snapshots = self.port.lockdown_snapshots(guild.id, channel_ids or [], category_ids or [])
+        for snapshot in snapshots:
+            snapshot['before'] = await self.port.fresh_overwrite(guild.id, snapshot['channel_id'], snapshot['role_id'])
         unlock_at = int(time.time()) + max(1, min(duration_minutes, 1440)) * 60
         lockdown_id = self.repository.start_lockdown(guild.id, reason=reason, started_by=started_by, unlock_at=unlock_at, source_event_id=source_event_id, lease=lease)
         for snapshot in snapshots:
@@ -213,7 +254,11 @@ class ModerationService:
         restored = conflicts = 0
         for snapshot in self.repository.lockdown_snapshots(int(active['id'])):
             lease.renew()
-            current = self.port.overwrite(guild.id, snapshot['channel_id'], snapshot['role_id'])
+            try:
+                current = await self.port.fresh_overwrite(guild.id, snapshot['channel_id'], snapshot['role_id'])
+            except Exception as exc:
+                self.repository.finish_lockdown(int(active['id']), error=str(exc), lease=lease)
+                raise
             if current == snapshot['before']:
                 restored += 1
                 continue
@@ -236,13 +281,13 @@ class ModerationService:
             settings: dict[str, Any]) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
         member, message, guild = context.member, context.message, context.guild
-        for action in rule.get("actions", []):
+        for sequence, action in enumerate(rule.get("actions", [])):
             action_type = action["type"]
             if rule.get("mode") == "monitor":
                 results.append({"type": action_type, "status": "simulated"})
                 continue
             try:
-                if action_type in {"delete", "purge", "remove_reaction", "lock", "unlock", "unban"}:
+                if action_type in {"delete", "purge", "remove_reaction", "lock", "unlock"}:
                     detail = await self.port.perform(context, action, reason)
                     results.append({"type": action_type, "status": "success", **detail})
                 elif action_type == "points":
@@ -250,14 +295,14 @@ class ModerationService:
                         raise ValueError("対象メンバーが見つかりません")
                     expiry_days = int(action.get("expires_days", 30))
                     expires_at = int(time.time()) + expiry_days * 86400 if expiry_days else None
-                    _, before, after = self.repository.add_points(guild.id, member.id, int(action.get("points", 1)), reason,
-                        moderation_rule_id=rule.get("id"), moderation_event_id=event_id, expires_at=expires_at)
-                    case_id = self.repository.add_case(guild.id, member.id, "warn", reason, None, expires_at, False,
-                        moderation_event_id=event_id, moderation_rule_id=rule.get("id"), source=rule.get("family", "automod"), points=int(action.get("points", 1)))
-                    results.append({"type": action_type, "status": "success", "case_id": case_id, "before": before, "after": after})
-                    threshold = await self._apply_threshold(guild, member, before, after, reason, event_id, rule.get("id"))
-                    if threshold:
-                        results.append(threshold)
+                    result = self.repository.add_points_case(guild.id, member.id, int(action.get('points', 1)), reason,
+                        moderation_rule_id=rule.get('id'), moderation_event_id=event_id, expires_at=expires_at,
+                        source=rule.get('family', 'automod'), execution_key=f'event:{event_id}:{sequence}',
+                        thresholds=self._point_thresholds(guild.id))
+                    results.append({'type': action_type, 'status': 'success', 'case_id': result['case_id'],
+                        'before': result['before'], 'after': result['after']})
+                    if result.get('request_id'):
+                        results.append({'type': 'threshold', 'status': 'queued', 'request_id': result['request_id']})
                 elif action_type == "notify":
                     channel_id = int(action['channel_id']) if action.get('channel_id') else context.channel.id if context.channel else None
                     if channel_id is None:
@@ -272,11 +317,12 @@ class ModerationService:
                         raise ValueError("対象メンバーが見つかりません")
                     sent = await self.dm(member, self._message_template(action.get("message", "ルール違反を検知しました: {reason}"), member, reason, guild=guild, channel=context.channel, rule=rule))
                     results.append({"type": action_type, "status": "success" if sent else "failed"})
-                elif action_type in {"timeout", "untimeout", "kick", "ban", "tempban", "softban"}:
+                elif action_type in {"timeout", "untimeout", "kick", "ban", "unban", "tempban", "softban"}:
                     if member is None:
                         raise ValueError("対象メンバーが見つかりません")
                     case_id = await self.apply_case(guild, member, action_type, reason, None, int(action.get("duration_minutes", 0)), False,
-                        moderation_event_id=event_id, moderation_rule_id=rule.get("id"), source=rule.get("family", "automod"))
+                        moderation_event_id=event_id, moderation_rule_id=rule.get("id"), source=rule.get("family", "automod"),
+                        actor=context.actor if rule.get("family") == "infraction" else None)
                     results.append({"type": action_type, "status": "success", "case_id": case_id})
                 elif action_type == "lockdown":
                     lockdown_id = await self.lockdown(guild, reason, int(action.get("duration_minutes", 30)), source_event_id=event_id,

@@ -20,7 +20,9 @@ class Outcome:
 
 
 class LostLease(RuntimeError):
-    pass
+    def __init__(self, *args, competing_owner_token=None):
+        super().__init__(*args)
+        self.competing_owner_token = competing_owner_token
 
 
 class RetryJob(Exception):

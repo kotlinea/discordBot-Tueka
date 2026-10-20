@@ -38,7 +38,10 @@ class TrustCog(commands.Cog):
         embed.set_footer(text=f"保持期間: {retention_days}日。これは管理者向けの表示のみで、自動制裁は行いません。")
         if result["events"]:
             lines = [f"• {event['category']}: {event['weight']} ({event['reason'] or '理由なし'})" for event in result["events"][:10]]
-            embed.add_field(name="算出理由", value="\n".join(lines), inline=False)
+            reasons = "\n".join(lines)
+            if len(reasons) > 1024:
+                reasons = reasons[:1023] + "…"
+            embed.add_field(name="算出理由", value=reasons, inline=False)
         else:
             embed.add_field(name="算出理由", value="保持期間内に記録された違反はありません。", inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)

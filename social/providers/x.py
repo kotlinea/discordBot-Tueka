@@ -20,7 +20,8 @@ class XAdapter(ProviderAdapter):
         handle = target.get("handle") or target["account_key"]
         display_name, avatar = target.get("display_name"), target.get("avatar_url")
         if not external_id:
-            response = await self.client.get(f"https://api.x.com/2/users/by/username/{quote(handle)}", params={"user.fields": "name,profile_image_url,username"}, headers=headers)
+            user_path = f"users/{quote(handle)}" if handle.isdecimal() else f"users/by/username/{quote(handle)}"
+            response = await self.client.get(f"https://api.x.com/2/{user_path}", params={"user.fields": "name,profile_image_url,username"}, headers=headers)
             response.raise_for_status()
             user = response.json().get("data") or {}
             if not user.get("id"):

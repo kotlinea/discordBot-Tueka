@@ -1,4 +1,6 @@
 x-source: &source
+  - ./applications:/app/applications:ro
+  - ./appeals:/app/appeals:ro
   - ./cogs:/app/cogs:ro
   - ./community:/app/community:ro
   - ./dashboard:/app/dashboard:ro
@@ -7,13 +9,17 @@ x-source: &source
   - ./engagement:/app/engagement:ro
   - ./features:/app/features:ro
   - ./guild_settings:/app/guild_settings:ro
+  - ./giveaways:/app/giveaways:ro
+  - ./insights:/app/insights:ro
   - ./jobs:/app/jobs:ro
   - ./migrations:/app/migrations:ro
   - ./moderation:/app/moderation:ro
   - ./observability:/app/observability:ro
   - ./reaction_roles:/app/reaction_roles:ro
   - ./runtime:/app/runtime:ro
+  - ./scheduling:/app/scheduling:ro
   - ./social:/app/social:ro
+  - ./starboard:/app/starboard:ro
   - ./suggestions:/app/suggestions:ro
   - ./ticketing:/app/ticketing:ro
   - ./bot.py:/app/bot.py:ro

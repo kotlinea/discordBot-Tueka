@@ -383,14 +383,14 @@
     "ja": {
       "usage": "Gemini APIから質問します。",
       "permissions": "一般メンバー（サーバーとChannelの利用権限が必要）。",
-      "response": "応答と生成エラーは公開。未設定時の案内は本人向け。",
+      "response": "応答と生成エラーは公開。2000文字を超える応答はテキストファイルで送信し、メンション通知は行いません。未設定時の案内は本人向け。",
       "disabled": "システム運用者が利用可能にしていない場合は質問できません。",
       "example": "gemini message:Hello"
     },
     "en": {
       "usage": "Ask Gemini a question.",
       "permissions": "Members with access to the server/channel.",
-      "response": "Responses and generation errors are public; the unconfigured notice is private.",
+      "response": "Responses and generation errors are public. Replies over 2000 characters are sent as a text file, with mentions disabled. The unconfigured notice is private.",
       "disabled": "Unavailable unless enabled/configured by the system operator.",
       "example": "gemini message:Hello"
     }

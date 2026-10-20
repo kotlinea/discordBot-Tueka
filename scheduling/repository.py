@@ -147,14 +147,14 @@ class ScheduleRepository:
 
     def start_delivery(self, job):
         """Fence cancellation and module OFF against the irreversible start boundary."""
-        now = int(self.clock())
         with transaction(self.database_url) as c:
             self._enabled(c,job['guild_id'])
             row = self._item(c,job['guild_id'],job['post_id'],locked=True)
             if row['status'] == 'cancelled':
                 raise PermissionError('schedule_cancelled')
-            owned = c.execute("SELECT * FROM scheduled_post_outbox WHERE id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s AND lease_until>%s FOR UPDATE",(job['id'],job['_lease']['owner'],job['_lease']['token'],now)).fetchone()
-            if not owned:
+            owned = c.execute("SELECT * FROM scheduled_post_outbox WHERE id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s FOR UPDATE",(job['id'],job['_lease']['owner'],job['_lease']['token'])).fetchone()
+            now = int(self.clock())
+            if not owned or owned['lease_until'] is None or owned['lease_until'] <= now:
                 raise LostLease('Scheduled delivery lease lost')
             if owned['discord_receipt_id']:
                 return 'done'
@@ -165,7 +165,12 @@ class ScheduleRepository:
 
     def delivery_state(self, job, *, started=True, receipt=None):
         with transaction(self.database_url) as c:
-            return c.execute("UPDATE scheduled_post_outbox SET delivery_started=%s,discord_receipt_id=%s WHERE id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s AND lease_until>%s",(int(started),receipt,job['id'],job['_lease']['owner'],job['_lease']['token'],int(self.clock()))).rowcount == 1
+            owned = c.execute("SELECT lease_until FROM scheduled_post_outbox WHERE id=%s AND status='processing' AND lease_owner=%s AND lease_token=%s FOR UPDATE",
+                (job['id'],job['_lease']['owner'],job['_lease']['token'])).fetchone()
+            if not owned or owned['lease_until'] is None or owned['lease_until'] <= int(self.clock()):
+                return False
+            return c.execute('UPDATE scheduled_post_outbox SET delivery_started=%s,discord_receipt_id=%s WHERE id=%s',
+                (int(started),receipt,job['id'])).rowcount == 1
 
     def retry(self, guild, item, job_id, actor, revision):
         now = int(self.clock())

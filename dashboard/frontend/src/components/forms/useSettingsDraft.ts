@@ -7,19 +7,24 @@ export function useSettingsDraft<T>(source: T | undefined, initial: T, identity:
   const [baseline, setBaseline] = useState(source ?? initial)
   const [draft, setDraft] = useState(source ?? initial)
   const previous = useRef({ identity, source })
+  const deferredRefresh = useRef(false)
   const dirty = externalDirty || !equal(draft, baseline)
   useEffect(() => {
     const old = previous.current
     previous.current = { identity, source }
     if (old.identity !== identity) {
+      deferredRefresh.current = false
       setBaseline(source ?? initial)
       setDraft(source ?? initial)
-    } else if (source !== undefined && old.source !== source && !dirty && !equal(source, baseline)) {
-      setBaseline(source)
-      setDraft(source)
+    } else if (source !== undefined && (old.source !== source || deferredRefresh.current)) {
+      deferredRefresh.current = dirty
+      if (!dirty && !equal(source, baseline)) {
+        setBaseline(source)
+        setDraft(source)
+      }
     }
   }, [source, initial, identity, dirty, baseline])
-  const accept = (value: T) => { setBaseline(value); setDraft(value) }
+  const accept = (value: T) => { deferredRefresh.current = false; setBaseline(value); setDraft(value) }
   return { draft, setDraft, baseline, dirty, accept,
     discard: () => accept(source ?? baseline),
     changedRemotely: dirty && source !== undefined && !equal(source, baseline) }

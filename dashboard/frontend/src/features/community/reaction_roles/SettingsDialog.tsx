@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import * as Dialog from '@radix-ui/react-dialog'
+import * as Dialog from '../../../components/WorkspaceDialog'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'

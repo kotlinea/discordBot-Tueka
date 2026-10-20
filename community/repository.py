@@ -11,17 +11,35 @@ class CommunityRepository:
     def _connection(self):
         return transaction(self.database_url)
 
-    def add_temporary_voice_channel(self, channel_id: int, guild_id: int, owner_id: int) -> None:
+    def add_temporary_voice_channel(self, channel_id: int, guild_id: int, owner_id: int, *, lease=None) -> None:
         with self._connection() as c:
+            if lease is not None:
+                lease.guard(c)
             c.execute("INSERT INTO temporary_voice_channels (channel_id,guild_id,owner_id,created_at) VALUES (%s,%s,%s,%s) ON CONFLICT(channel_id) DO UPDATE SET guild_id=excluded.guild_id,owner_id=excluded.owner_id,created_at=excluded.created_at", (channel_id, guild_id, owner_id, int(time.time())))
+
+    def temporary_voice_channels(self, guild_id: int) -> list[dict[str, int]]:
+        with self._connection() as c:
+            rows = c.execute("SELECT channel_id,guild_id,owner_id,created_at FROM temporary_voice_channels WHERE guild_id=%s ORDER BY channel_id", (guild_id,)).fetchall()
+        return [dict(row) for row in rows]
+
+    def remember_temporary_voice_cleanup(self, channel_id: int, guild_id: int, owner_id: int) -> None:
+        """Remember a confirmed REST creation without claiming lifecycle ownership.
+
+        This append-only recovery path never changes an existing tracked owner.
+        Deletion and removal still require a fresh owner lease in the caller.
+        """
+        with self._connection() as c:
+            c.execute("INSERT INTO temporary_voice_channels (channel_id,guild_id,owner_id,created_at) VALUES (%s,%s,%s,%s) ON CONFLICT(channel_id) DO NOTHING", (channel_id, guild_id, owner_id, int(time.time())))
 
     def temporary_voice_channel(self, channel_id: int) -> dict[str, int] | None:
         with self._connection() as c:
             row = c.execute("SELECT guild_id,owner_id FROM temporary_voice_channels WHERE channel_id=%s", (channel_id,)).fetchone()
         return {"guild_id": row["guild_id"], "owner_id": row["owner_id"]} if row else None
 
-    def remove_temporary_voice_channel(self, channel_id: int) -> None:
+    def remove_temporary_voice_channel(self, channel_id: int, *, lease=None) -> None:
         with self._connection() as c:
+            if lease is not None:
+                lease.guard(c)
             c.execute("DELETE FROM temporary_voice_channels WHERE channel_id=%s", (channel_id,))
 
     def get_user(self, guild_id: int, user_id: int) -> dict[str, int]:

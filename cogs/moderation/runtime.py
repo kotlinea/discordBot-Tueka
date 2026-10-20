@@ -16,7 +16,7 @@ from discord.ext import commands, tasks
 
 from moderation import AutoModEngine, MessageContext, validate_rule
 from moderation.discord_adapter import DiscordModerationAdapter, action_context, guild_ref, member_ref
-from moderation.contracts import ActionFailure
+from moderation.contracts import ActionFailure, MemberRef
 from moderation.service import ActionContext, ModerationService
 from moderation import ModerationRepository
 from guild_settings import GuildSettingsRepository
@@ -66,6 +66,20 @@ class AutoModCog(commands.Cog):
                 LOGGER.warning("Skipping invalid AutoMod rule %s in guild %s", stored.get("id"), guild_id, exc_info=True)
         self._cache[guild_id] = (revision, rules)
         return rules
+
+    def _eligible_family_rules(self, guild_id: int, context: MessageContext,
+            rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        eligible = set()
+        for family in {rule["family"] for rule in rules}:
+            module = self.guild_settings.get_module(guild_id, family)
+            if module["enabled"] and not self.engine.globally_exempt(context, module["settings"]):
+                eligible.add(family)
+        return [rule for rule in rules if rule["family"] in eligible]
+
+    def _record_raid_detection(self, guild_id: int, rule: dict[str, Any], results: list[dict[str, Any]]) -> None:
+        if rule["family"] == "anti_raid":
+            lockdown_id = next((item.get("lockdown_id") for item in results if item.get("lockdown_id")), None)
+            self.moderation_repository.set_raid_state(guild_id, True, source_rule_id=rule.get("id"), lockdown_id=lockdown_id)
 
     async def _unsafe_url(self, urls: list[str]) -> str | None:
         api_key = self.bot.settings.google_safe_browsing_api_key
@@ -145,6 +159,7 @@ class AutoModCog(commands.Cog):
         key = (message.guild.id, message.author.id)
         lock = self._locks.setdefault(key, asyncio.Lock())
         async with lock:
+            rules = self._eligible_family_rules(message.guild.id, context, rules)
             matches = await self.engine.evaluate(context, rules, edited=edited, unsafe_url_checker=self._unsafe_url)
             for match in matches:
                 family_module = self.guild_settings.get_module(message.guild.id, match.rule["family"])
@@ -167,6 +182,7 @@ class AutoModCog(commands.Cog):
                 results = await self.service.execute_actions(action_value, match.rule, match.reason, event_id, family_module["settings"])
                 self.moderation_repository.finish_moderation_event(event_id, results)
                 await self.service.log_event(action_value, match.rule, event_id, match.reason, results, family_module["settings"])
+                self._record_raid_detection(message.guild.id, match.rule, results)
         if len(self._locks) > 5000:
             self._locks = {item_key: item for item_key, item in self._locks.items() if item.locked()}
 
@@ -178,6 +194,7 @@ class AutoModCog(commands.Cog):
         rules = self._rules(guild.id, core)
         key = (guild.id, context.user_id)
         async with self._locks.setdefault(key, asyncio.Lock()):
+            rules = self._eligible_family_rules(guild.id, context, rules)
             matches = await self.engine.evaluate(context, rules)
             for match in matches:
                 family_module = self.guild_settings.get_module(guild.id, match.rule["family"])
@@ -194,9 +211,7 @@ class AutoModCog(commands.Cog):
                 results = await self.service.execute_actions(action_context, match.rule, match.reason, event_id, family_module["settings"])
                 self.moderation_repository.finish_moderation_event(event_id, results)
                 await self.service.log_event(action_context, match.rule, event_id, match.reason, results, family_module["settings"])
-                if match.rule["family"] == "anti_raid":
-                    lockdown_id = next((item.get("lockdown_id") for item in results if item.get("lockdown_id")), None)
-                    self.moderation_repository.set_raid_state(guild.id, True, source_rule_id=match.rule.get("id"), lockdown_id=lockdown_id)
+                self._record_raid_detection(guild.id, match.rule, results)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -278,7 +293,7 @@ class AutoModCog(commands.Cog):
             raise RetryJob('Guild unavailable')
         try:
             if pending['action'] == 'unban':
-                await self.service.port.unban(guild.id, int(pending['user_id']), '一時Banの期限切れ')
+                await self.service.expire_tempban(guild_ref(guild), pending)
             return Outcome()
         except ActionFailure as exc:
             return Outcome(str(exc), retry=exc.retry)
@@ -288,6 +303,12 @@ class AutoModCog(commands.Cog):
         if guild is None:
             raise RetryJob("Guild unavailable")
         action = str(request["action"])
+        if action == 'threshold':
+            try:
+                result = await self.service.execute_threshold(guild_ref(guild), request)
+                return Outcome(result={'actions': [result]})
+            except (ValueError, PermissionError, ActionFailure) as exc:
+                return Outcome(str(exc), retry=bool(getattr(exc, 'retry', False)))
         moderator = guild.get_member(int(request["moderator_id"]))
         member = guild.get_member(int(request["target_user_id"])) if request.get("target_user_id") else None
         channel = guild.get_channel(int(request["channel_id"])) if request.get("channel_id") else None
@@ -305,13 +326,16 @@ class AutoModCog(commands.Cog):
             if action == "warn":
                 if member is None:
                     raise ValueError("対象メンバーが見つかりません")
-                await self.service.warn(guild_ref(guild), member_ref(member), reason, int(request["moderator_id"]), actor=member_ref(moderator))
+                await self.service.warn(guild_ref(guild), member_ref(member), reason, int(request["moderator_id"]),
+                    actor=member_ref(moderator), execution_key=f"action-request:{request['id']}")
                 results = [{"type": action, "status": "success"}]
             elif action == "unban":
                 if not request.get("target_user_id"):
                     raise ValueError("対象ユーザーIDが必要です")
-                await self.service.port.unban(guild.id, int(request['target_user_id']), reason)
-                results = [{"type": action, "status": "success"}]
+                case_id = await self.service.apply_case(guild_ref(guild), MemberRef(int(request['target_user_id']), guild.id),
+                    'unban', reason, int(request['moderator_id']), notify=False, execution_key=f"action-request:{request['id']}",
+                    actor=member_ref(moderator))
+                results = [{"type": action, "status": "success", 'case_id': case_id}]
             else:
                 if action in {"timeout", "untimeout", "kick", "ban", "softban", "points"}:
                     if member is None:

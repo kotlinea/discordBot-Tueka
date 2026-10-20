@@ -189,7 +189,9 @@ class ReactionRolesCog(commands.Cog):
         if operation=="add" and role and role.id not in values:values.append(role.id)
         elif operation=="remove" and role:values=[item for item in values if item!=role.id]
         elif operation=="clear":values=[]
-        value[key]=values;await self._save_edit(interaction,config,value)
+        value[key]=values
+        if operation == 'add':value['access_policy']=policy
+        await self._save_edit(interaction,config,value)
 
     @whitelist.command(name="add")
     async def wl_add(self,interaction:discord.Interaction,config_id:int,role:discord.Role)->None:await self._access(interaction,config_id,"whitelist","add",role)
@@ -248,7 +250,8 @@ class ReactionRolesCog(commands.Cog):
         value=self._editable(config);value["self_destruct_at"]=int(time.time())+minutes*60;await self._save_edit(interaction,config,value)
     @manage.command(name="reset-binding")
     async def reset_binding_command(self,interaction:discord.Interaction,config_id:int,user:discord.Member)->None:
-        changed=self.repository.reset_binding(config_id,user.id);await interaction.response.send_message("選択履歴を解除しました。" if changed else "選択履歴はありません。",ephemeral=True)
+        self._config(interaction.guild_id,config_id)
+        changed=self.repository.reset_binding(config_id,user.id,guild_id=interaction.guild_id);await interaction.response.send_message("選択履歴を解除しました。" if changed else "選択履歴はありません。",ephemeral=True)
 
     @reactionrole.command(name="channel",description="Reaction Roles専用チャンネルを作成します")
     async def channel_command(self,interaction:discord.Interaction,name:str="roles")->None:
@@ -368,7 +371,7 @@ class ReactionRolesCog(commands.Cog):
                     if decision.operation == 'add' and mapping.get('max_members') and role not in member.roles and len(role.members) >= mapping['max_members']:
                         await self._deny(member, message, payload.emoji, config, mapping, 'このRoleは人数上限に達しています。')
                         return
-                    await self.role_changes.apply(config, mapping, member.id, decision)
+                    await self.role_changes.apply(config, mapping, member.id, decision, event=event)
                 self.repository.audit(guild.id,config["id"],f"reaction_{event}","success",user_id=member.id,emoji_key=mapping["emoji_key"],role_id=role.id)
                 await self._send_log(guild,config,"success",member.id,mapping)
             except (discord.HTTPException, DiscordFailure, RuntimeError, ValueError) as exc:
