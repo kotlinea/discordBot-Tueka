@@ -162,7 +162,7 @@ class PollRepository(PublicationRepository):
                 if period is not None and (type(period) is not int or not 1<=period<=30*86400):raise PollError('invalid')
                 if period is not None and closes_at is not None:raise PollError('invalid')
             base=(schedule or now) if row['status'] in ('draft','scheduled') else now
-            if closes_at is not None and closes_at!=row['closes_at'] and (type(closes_at) is not int or not base < closes_at <= base + 30 * 86400):
+            if closes_at is not None and (closes_at!=row['closes_at'] or schedule!=row['scheduled_at']) and (type(closes_at) is not int or not base < closes_at <= base + 30 * 86400):
                 raise PollError('invalid')
             if row['ever_voted']:
                 mutable = {'color', 'image_url', 'max_participants', 'visibility', 'mode','button_style'}

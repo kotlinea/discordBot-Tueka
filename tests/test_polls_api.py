@@ -40,6 +40,26 @@ class PollApiTests(unittest.TestCase):
         self.assertEqual(response.status_code,200,response.text)
         self.assertEqual(self.client.put(f"{self.base}/{poll['id']}",json={'revision':1,'config':self.body['config']},headers=self.headers).status_code,409)
 
+    def test_rescheduling_rejects_a_start_after_the_saved_deadline(self):
+        import time
+        now=int(time.time());day=86400
+        for explicit_deadline in (False,True):
+            with self.subTest(explicit_deadline=explicit_deadline):
+                self.body.update(request_key=f'reschedule-{explicit_deadline}',scheduled_at=now+day,closes_at=now+2*day)
+                poll=self.create()
+                path=f"{self.base}/{poll['id']}"
+                body={'revision':poll['revision'],'config':poll['config'],'scheduled_at':now+3*day}
+                if explicit_deadline:body['closes_at']=poll['closes_at']
+                response=self.client.put(path,json=body,headers=self.headers)
+                self.assertEqual(response.status_code,422,response.text)
+                saved=self.client.get(path).json()
+                for field in ('scheduled_at','closes_at','revision','status'):
+                    self.assertEqual(saved[field],poll[field])
+                body['scheduled_at']=now+day+3600
+                response=self.client.put(path,json=body,headers=self.headers)
+                self.assertEqual(response.status_code,200,response.text)
+                self.assertEqual(response.json()['closes_at'],poll['closes_at'])
+
     def test_auth_csrf_and_cross_guild(self):
         self.assertEqual(self.client.post(self.base,json=self.body).status_code,403)
         poll=self.create()

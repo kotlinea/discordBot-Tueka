@@ -104,6 +104,36 @@ class PollStorageTests(unittest.TestCase):
         self.assertEqual(edited['closes_at'],self.now)
         self.assertEqual(edited['config']['color'],0xffffff)
 
+    def test_rescheduling_revalidates_a_retained_deadline(self):
+        day=86400
+        cases=((day,2*day,3*day,False),(day,2*day,2*day,False),
+               (day,2*day,day+3600,True),(40*day,41*day,11*day,True),
+               (40*day,41*day,11*day-1,False),(40*day,41*day,41*day-1,True),
+               (40*day,41*day,None,False),(day,2*day,None,True),
+               (None,2*day,3*day,False),(None,2*day,2*day,False),
+               (None,2*day,day,True),(day,None,3*day,True))
+        for index,(start,deadline,new_start,valid) in enumerate(cases):
+            for explicit_deadline in (False,True):
+                with self.subTest(start=start,deadline=deadline,new_start=new_start,explicit_deadline=explicit_deadline):
+                    item=self.repo.create(1,10,20,dict(question='Scheduled',options=['A','B']),
+                        f'reschedule-{index}-{explicit_deadline}',scheduled_at=self.now+start if start is not None else None,
+                        closes_at=self.now+deadline if deadline is not None else None)
+                    timing={'scheduled_at':self.now+new_start if new_start is not None else None}
+                    if explicit_deadline:timing['closes_at']=item['closes_at']
+                    if valid:
+                        edited=self.repo.edit(1,item['id'],20,item['config'],item['revision'],**timing)
+                        self.assertEqual(edited['scheduled_at'],timing['scheduled_at'])
+                        self.assertEqual(edited['closes_at'],item['closes_at'])
+                    else:
+                        history=self.repo.history(1,item['id'])
+                        with self.assertRaises(PollError) as error:
+                            self.repo.edit(1,item['id'],20,item['config'],item['revision'],**timing)
+                        self.assertEqual(error.exception.code,'invalid')
+                        saved=self.repo.get(1,item['id'])
+                        for field in ('scheduled_at','closes_at','revision','status'):
+                            self.assertEqual(saved[field],item[field])
+                        self.assertEqual(self.repo.history(1,item['id']),history)
+
     def test_participant_cap_closes_atomically(self):
         self.repo.edit(1,self.item['id'],20,{**self.item['config'],'max_participants':1},1)
         self.assertEqual(self.cast()['status'],'closed')
