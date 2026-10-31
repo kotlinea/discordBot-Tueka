@@ -38,7 +38,10 @@ for(const locale of ['ja','en'] as const){
     await expect(page.getByText('Private generated appeal',{exact:true})).toBeVisible()
     await page.getByLabel(copy.message,{exact:true}).fill('Generated staff reply')
     await page.getByRole('button',{name:copy.send,exact:true}).click()
-    await expect(page.getByText('Generated staff reply',{exact:true})).toBeVisible()
+    // The same text is still present in the draft textarea before save completes.
+    await expect(page.getByRole('listitem').getByText('Generated staff reply',{exact:true})).toBeVisible()
+    await expect(page.getByLabel(copy.message,{exact:true})).toHaveValue('')
+    await expect(page.getByLabel(copy.reason,{exact:true})).toBeEnabled()
     await page.getByLabel(copy.reason,{exact:true}).fill('Independent review proof')
     await page.getByRole('button',{name:copy.status.accepted,exact:true}).click()
     await expect(page.getByText(/Independent review proof/)).toBeVisible()
