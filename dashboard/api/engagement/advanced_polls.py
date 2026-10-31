@@ -8,6 +8,7 @@ from dashboard.api.resources import GuildResources
 from dashboard.api import schemas
 from engagement.polls.models import PollError, disclose, ids
 from engagement.polls.service import Actor, PollService
+from guild_settings.engagement.advanced_polls import normalize as normalize_settings
 import re
 
 
@@ -177,11 +178,16 @@ def create_router(context):
         body=await read_body(request,schemas.PollSettingsInput)
         try:
             old=repo.settings.get_module(guild_id,'advanced_polls')
-            new={**old['settings'],**body['settings']}
+            if old['revision']!=body['revision']:raise PollError('conflict')
+            new=normalize_settings({**old['settings'],**body['settings']})
             for key,permission in (('retention_days','settings'),('role_weights','weights'),('role_permissions','permissions')):
                 if new[key]!=old['settings'][key]:service.require(a,permission)
             resources=await GuildResources.fetch(context.discord,guild_id,live=True,assignable_roles=False)
-            if any(int(role) not in resources.role_ids for role in list(new['role_weights'])+list(new['role_permissions'])):raise PollError('invalid')
+            for field in ('role_weights','role_permissions'):
+                for role,value in new[field].items():
+                    # Retained references to deleted roles must not block unrelated edits.
+                    if int(role) not in resources.role_ids and old['settings'][field].get(role)!=value:
+                        raise PollError('invalid')
             result=repo.save_settings(a,new,body['revision'],enabled=body.get('enabled'))
             return {'revision':result['revision'],'settings':result['settings'],'enabled':result['enabled']}
         except PollError as exc:raise failure(exc) from exc

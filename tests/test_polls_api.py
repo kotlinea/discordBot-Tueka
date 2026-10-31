@@ -60,6 +60,26 @@ class PollApiTests(unittest.TestCase):
                 self.assertEqual(response.status_code,200,response.text)
                 self.assertEqual(response.json()['closes_at'],poll['closes_at'])
 
+    def test_published_relative_deadline_can_be_extended_and_cleared(self):
+        import time
+        from jobs import Outcome
+        for status in ('open','closed'):
+            with self.subTest(status=status):
+                poll=self.repo.create(1,10,20,self.body['config'],'timed-'+status,duration_seconds=600)
+                self.repo.launch(1,poll['id'],20,poll['revision'])
+                claim=self.repo.jobs.claim('publish-timed')
+                self.repo.start_delivery(claim.payload);self.repo.receipt(claim.payload,500+poll['id'])
+                self.repo.jobs.finish(claim,Outcome())
+                poll=self.repo.get(1,poll['id'])
+                if status=='closed':poll=self.repo.transition(1,poll['id'],20,'close',poll['revision'])
+                for deadline in (int(time.time())+1200,None):
+                    response=self.client.put(f"{self.base}/{poll['id']}",json={'revision':poll['revision'],'config':poll['config'],
+                        'closes_at':deadline,'duration_seconds':600,'scheduled_at':None},headers=self.headers)
+                    self.assertEqual(response.status_code,200,response.text)
+                    poll=response.json()
+                    self.assertEqual(poll.get('closes_at'),deadline)
+                    self.assertEqual(poll['duration_seconds'],600)
+
     def test_auth_csrf_and_cross_guild(self):
         self.assertEqual(self.client.post(self.base,json=self.body).status_code,403)
         poll=self.create()
@@ -98,6 +118,63 @@ class PollApiTests(unittest.TestCase):
         row=self.client.get(path).json()
         self.assertEqual(self.client.put(path,json=row,headers=self.headers).status_code,403)
         self.assertEqual(self.client.get(path).json()['revision'],row['revision'])
+
+    def deleted_role_settings(self,rights=None):
+        self.discord.can_manage.return_value=rights is None
+        return self.repo.settings.set_module(1,'advanced_polls',enabled=True,settings={
+            'role_weights':{'3':2,'999':9},'role_permissions':{'3':rights or [],'999':['manage','view']}})
+
+    def test_deleted_role_references_do_not_block_unrelated_authorized_updates(self):
+        from copy import deepcopy
+        path='/api/v1/guilds/1/polls/settings'
+        for rights in (None,['settings'],['weights']):
+            for action,permission in (('retention','settings'),('enabled','settings'),('weights','weights'),('grants','permissions')):
+                with self.subTest(rights=rights,action=action):
+                    self.deleted_role_settings(rights)
+                    original=self.client.get(path).json();row=deepcopy(original)
+                    # Reordering an unchanged grant list is not a permission edit.
+                    row['settings']['role_permissions']['999'].reverse()
+                    if action=='retention':row['settings']['retention_days']=91
+                    elif action=='enabled':row['enabled']=False
+                    elif action=='weights':row['settings']['role_weights']['3']=4
+                    else:row['settings']['role_permissions']['3'].append('manage')
+                    allowed=rights is None or permission in rights
+                    response=self.client.put(path,json=row,headers=self.headers)
+                    self.assertEqual(response.status_code,200 if allowed else 403,response.text)
+                    saved=self.client.get(path).json()
+                    self.assertEqual(saved['settings']['role_weights']['999'],9)
+                    self.assertEqual(saved['settings']['role_permissions']['999'],['manage','view'])
+                    if allowed:self.assertEqual(saved['revision'],original['revision']+1)
+                    else:self.assertEqual(saved,original)
+
+    def test_deleted_role_references_cannot_be_changed_added_or_resurrected(self):
+        from copy import deepcopy
+        path='/api/v1/guilds/1/polls/settings'
+        for field,changed in (('role_weights',10),('role_permissions',['manage','view','settings'])):
+            with self.subTest(field=field):
+                self.deleted_role_settings()
+                original=self.client.get(path).json()
+                for role in ('999','888'):
+                    row=deepcopy(original);row['settings'][field][role]=changed
+                    response=self.client.put(path,json=row,headers=self.headers)
+                    self.assertEqual(response.status_code,422,response.text)
+                    self.assertEqual(self.client.get(path).json(),original)
+                row=deepcopy(original);retained=row['settings'][field].pop('999')
+                response=self.client.put(path,json=row,headers=self.headers)
+                self.assertEqual(response.status_code,200,response.text)
+                row=response.json();row['settings'][field]['999']=retained
+                self.assertEqual(self.client.put(path,json=row,headers=self.headers).status_code,422)
+
+    def test_settings_reference_validation_uses_matching_revision(self):
+        path='/api/v1/guilds/1/polls/settings'
+        self.deleted_role_settings()
+        for delta in (-1,1):
+            with self.subTest(delta=delta):
+                row=self.client.get(path).json();row['revision']+=delta
+                self.discord.guild_resources.reset_mock()
+                response=self.client.put(path,json=row,headers=self.headers)
+                self.assertEqual(response.status_code,409,response.text)
+                self.discord.guild_resources.assert_not_awaited()
 
     def test_resources_and_nulls(self):
         self.body['channel_id']='999'

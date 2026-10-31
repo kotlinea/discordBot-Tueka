@@ -76,6 +76,36 @@ class PollDeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cleanup.payload['action'],'stop_old')
         self.assertEqual(cleanup.payload['old_message_id'],500)
 
+    async def test_move_survives_cosmetic_edits_before_delivery(self):
+        self.launch();job=self.claim();self.repo.jobs.finish(job,await self.service.deliver(job.payload))
+        item=self.repo.get(1,self.item['id'])
+        moving=self.repo.launch(1,item['id'],20,item['revision'],channel=11)
+        self.repo.edit(1,item['id'],20,{**moving['config'],'color':0xffffff},moving['revision'])
+        self.port.deliver.reset_mock();self.port.deliver.return_value=501
+        job=self.claim();self.repo.jobs.finish(job,await self.service.deliver(job.payload))
+        self.port.deliver.assert_awaited_once()
+        moved=self.repo.get(1,item['id'])
+        self.assertEqual((moved['channel_id'],moved['message_id']),(11,501))
+        self.assertEqual(self.port.deliver.await_args.args[1]['config']['color'],0xffffff)
+
+    async def test_closing_actions_wait_for_the_move_and_use_its_destination(self):
+        self.launch();job=self.claim();self.repo.jobs.finish(job,await self.service.deliver(job.payload))
+        item=self.repo.get(1,self.item['id'])
+        item=self.repo.edit(1,item['id'],20,{**item['config'],'announce_winner':True,'pin_on_close':True},item['revision'])
+        with transaction(self.url) as c:c.execute('UPDATE polls SET thread_id=700 WHERE id=%s',(item['id'],))
+        moving=self.repo.launch(1,item['id'],20,item['revision'],channel=11)
+        move=self.claim()
+        self.repo.transition(1,item['id'],20,'close',moving['revision'])
+        self.assertIsNone(self.claim())
+        self.port.deliver.return_value=501
+        self.repo.jobs.finish(move,await self.service.deliver(move.payload))
+        actions=await self.drain_actions()
+        self.assertCountEqual(actions,('announce','pin','archive','stop_old'))
+        for call in self.port.deliver.await_args_list:
+            if call.args[0]['action']!='stop_old':
+                self.assertEqual(call.args[0]['channel_id'],11)
+                self.assertEqual(call.args[1]['message_id'],501)
+
     async def test_expired_schedule_does_not_send(self):
         item=self.repo.create(1,10,20,dict(question='S',options=['A','B']),'scheduled',scheduled_at=self.now+5,closes_at=self.now+10)
         self.now+=20;self.repo.enqueue_due();job=self.claim()

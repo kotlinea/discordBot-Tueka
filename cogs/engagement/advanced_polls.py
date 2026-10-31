@@ -135,7 +135,7 @@ class AdvancedPollsCog(commands.Cog):
 
     @staticmethod
     def _view(message_id, options, disabled=False):
-        return public_view(message_id,normalize(dict(question='投票',options=options)),disabled=disabled)
+        return public_view(message_id,normalize(dict(question='投票',options=options)),revision=1,disabled=disabled)
 
     async def _create(self, interaction, question, options, *, description='', mode='anonymous', max_choices=1, allowed_role=None, image_url=None, duration_seconds=None, scheduled_at=None):
         actor = await self.actor(interaction)
@@ -292,7 +292,7 @@ class AdvancedPollsCog(commands.Cog):
                     if not isinstance(channel,discord.abc.Messageable):return
                     message=await channel.fetch_message(message_id)
                 closed=not enabled or poll['status']!='open' or (poll['closes_at'] is not None and poll['closes_at']<=int(time.time()))
-                await message.edit(embed=embed_for(disclose(poll),marker='受付停止中（機能が無効）' if not enabled else None),view=public_view(message_id,poll['config'],disabled=closed),allowed_mentions=discord.AllowedMentions.none())
+                await message.edit(embed=embed_for(disclose(poll),marker='受付停止中（機能が無効）' if not enabled else None),view=public_view(message_id,poll['config'],revision=poll['revision'],disabled=closed),allowed_mentions=discord.AllowedMentions.none())
             except discord.NotFound:
                 self.engagement_repository.ack_display(message_id,poll['display_revision'],enabled);return
             except discord.HTTPException:return
@@ -313,19 +313,24 @@ class AdvancedPollsCog(commands.Cog):
                 page=int(parts[2]);result=await self.read_poll(interaction,actor,poll['id'])
                 view=ResultView(self,actor,poll['id']);view.page=page
                 await self.respond(interaction,embed=view.render(result),view=view,ephemeral=True);return
-            if parts[0] in ('tueka-poll-vote','tueka-poll-select') or poll['config']['max_choices']>1:
+            size=4 if parts[0]=='tueka-poll' else 3
+            if len(parts) not in (size-1,size):raise PollError('invalid')
+            legacy=len(parts)==size-1
+            revision=None if legacy else int(parts[-1])
+            if not legacy and revision!=poll['revision']:raise PollError('conflict')
+            if legacy or parts[0] in ('tueka-poll-vote','tueka-poll-select') or poll['config']['max_choices']>1:
                 selected=next((row['choices'] for row in poll['ballots'] if row['user_id']==actor.user_id),[])
                 selected=list(selected)
-                if parts[0]=='tueka-poll-select':
+                if not legacy and parts[0]=='tueka-poll-select':
                     selected=selection([int(value) for value in (interaction.data or {}).get('values',[])],len(poll['options']),poll['config']['max_choices'])
-                elif parts[0]=='tueka-poll':
+                elif not legacy and parts[0]=='tueka-poll':
                     index=int(parts[2])
                     if not 0<=index<len(poll['options']):raise PollError('invalid')
                     if index in selected:selected.remove(index)
                     elif len(selected)<poll['config']['max_choices']:selected.append(index)
                     else:raise PollError('invalid')
                 await self.respond(interaction,'選択して確定してください。空の選択で取り消せます。\n匿名方式でも重複防止のため内部に利用者IDを保存します。',view=BallotView(self,actor,poll,selected),ephemeral=True);return
-            self.service.vote(actor,poll['id'],[int(parts[2])],message_id,revision=poll['revision'])
+            self.service.vote(actor,poll['id'],[int(parts[2])],message_id,revision=revision)
             await interaction.followup.send('投票を保存しました。',ephemeral=True)
             await self._sync_poll(message_id,interaction.message)
         except (ValueError,IndexError) as exc:

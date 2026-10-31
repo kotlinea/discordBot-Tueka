@@ -224,7 +224,7 @@ class PollPayloadTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(all(len(field.value)<=1024 for field in embed.fields))
             recovered+='\n'.join(field.value for field in embed.fields)
         for option in config['options']:self.assertIn(option,recovered)
-        view=public_view(100,config)
+        view=public_view(100,config,revision=1)
         self.assertLessEqual(len(view.children),25)
 
     async def test_builder_and_ballot_controls_fit_supported_components(self):

@@ -7,7 +7,8 @@ from ..models import PollError
 
 class PollQueue(QueueRepository):
     def _claim_scope(self):
-        return (" AND (action='stop_old' OR EXISTS(SELECT 1 FROM guild_modules g WHERE g.guild_id=poll_outbox.guild_id AND g.module_id='advanced_polls' AND g.enabled=1))", ())
+        return (" AND (action='stop_old' OR EXISTS(SELECT 1 FROM guild_modules g WHERE g.guild_id=poll_outbox.guild_id AND g.module_id='advanced_polls' AND g.enabled=1))"
+                " AND (action NOT IN ('announce','pin','archive') OR NOT EXISTS(SELECT 1 FROM poll_outbox moving WHERE moving.poll_id=poll_outbox.poll_id AND moving.action='move' AND moving.status NOT IN ('completed','cancelled')))", ())
 
     def purge(self, **_):
         return 0
@@ -77,7 +78,9 @@ class PublicationRepository:
                 return 'recover', snapshot
             if not enabled:
                 return 'paused', snapshot
-            if job['action'] in ('publish', 'move') and (row['revision'] != job['generation'] or row['status'] in ('deleted', 'cancelled')):
+            if job['action']=='publish' and (row['revision'] != job['generation'] or row['status'] in ('deleted', 'cancelled')):
+                return 'done', snapshot
+            if job['action']=='move' and (row['status'] not in ('open','closed') or row['message_id']!=job['old_message_id'] or row['channel_id']!=job['old_channel_id']):
                 return 'done', snapshot
             if job['action'] in ('announce','pin','archive'):
                 config=row['config_json']
@@ -97,7 +100,9 @@ class PublicationRepository:
                 c.execute("UPDATE polls SET status='closed',closed_at=%s,revision=revision+1 WHERE id=%s", (int(self.clock()), row['id']))
                 self._event(c,row['id'],None,'expired_before_publication',int(self.clock()))
                 return 'done', snapshot
-            c.execute('UPDATE poll_outbox SET delivery_started=1 WHERE id=%s', (job['id'],))
+            if job['action'] in ('announce','pin','archive'):
+                job['channel_id']=row['channel_id']
+            c.execute('UPDATE poll_outbox SET delivery_started=1,channel_id=%s WHERE id=%s', (job['channel_id'],job['id']))
             return 'send', snapshot
 
     def reset_delivery(self, job):

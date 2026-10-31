@@ -37,16 +37,16 @@ def embed_for(result, *, page=0, marker=None):
     return embed
 
 
-def public_view(message, config, *, disabled=False):
+def public_view(message, config, *, revision, disabled=False):
     view = discord.ui.View(timeout=None)
     if config['ui'] == 'buttons':
         for index, option in enumerate(config['options']):
-            view.add_item(discord.ui.Button(label=f'{index+1}. {option}'[:80], custom_id=f'tueka-poll:{message}:{index}',
+            view.add_item(discord.ui.Button(label=f'{index+1}. {option}'[:80], custom_id=f'tueka-poll:{message}:{index}:{revision}',
                                            style=getattr(discord.ButtonStyle,config['button_style']), disabled=disabled,emoji=config['emojis'][index] or None))
     else:
-        view.add_item(discord.ui.Select(custom_id=f'tueka-poll-select:{message}',placeholder='投票する選択肢',min_values=0,max_values=config['max_choices'],disabled=disabled,
+        view.add_item(discord.ui.Select(custom_id=f'tueka-poll-select:{message}:{revision}',placeholder='投票する選択肢',min_values=0,max_values=config['max_choices'],disabled=disabled,
             options=[discord.SelectOption(label=f'{i+1}. {option}'[:100],value=str(i),emoji=config['emojis'][i] or None) for i,option in enumerate(config['options'])]))
-    view.add_item(discord.ui.Button(label='投票の変更・取消', custom_id=f'tueka-poll-vote:{message}', disabled=disabled))
+    view.add_item(discord.ui.Button(label='投票の変更・取消', custom_id=f'tueka-poll-vote:{message}:{revision}', disabled=disabled))
     view.add_item(discord.ui.Button(label='選択肢・結果を確認', custom_id=f'tueka-poll-details:{message}:0'))
     return view
 

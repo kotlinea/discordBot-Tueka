@@ -1,10 +1,11 @@
 """Poll display ordering, durable retry and Thread delivery boundaries."""
 import asyncio
 from pathlib import Path
+from itertools import product
 import tempfile
 from types import SimpleNamespace as NS
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import discord
 
@@ -14,6 +15,7 @@ from database.migrations import MIGRATIONS, apply
 from database.testing import temporary_database
 from poll_support import PublishedPollRepository as EngagementRepository
 from engagement.polls.service import PollService
+from engagement.polls.discord_adapter import public_view
 
 
 class PollDisplayTests(unittest.IsolatedAsyncioTestCase):
@@ -47,9 +49,45 @@ class PollDisplayTests(unittest.IsolatedAsyncioTestCase):
     def interaction(self, user, option):
         return NS(type=discord.InteractionType.component, message=self.message,
                   guild=self.guild, user=NS(id=user),
-                  data={'custom_id': f'tueka-poll:100:{option}'},
+                  data={'custom_id': f"tueka-poll:100:{option}:{self.repo.by_message(100)['revision']}"},
                   followup=NS(send=AsyncMock()),
-                  response=NS(edit_message=self.message.edit, defer=AsyncMock(), send_message=AsyncMock()))
+                  response=NS(is_done=Mock(return_value=False),edit_message=self.message.edit, defer=AsyncMock(), send_message=AsyncMock()))
+
+    async def test_public_choice_revision_matrix(self):
+        for control,maximum in product(('buttons','select'),(1,2)):
+            for fresh in (False,True):
+                with self.subTest(control=control,maximum=maximum,fresh=fresh):
+                    original=self.repo.by_message(100)
+                    values={**original['config'],'ui':control,'max_choices':maximum}
+                    # Each case starts with no votes, so the option meaning is editable.
+                    with transaction(self.url) as c:
+                        c.execute('DELETE FROM poll_ballots WHERE poll_id=%s',(original['id'],))
+                        c.execute('UPDATE polls SET ever_voted=FALSE WHERE id=%s',(original['id'],))
+                    original=self.repo.edit(1,original['id'],20,{**values,'options':['A','B']},original['revision'])
+                    old=public_view(100,original['config'],revision=original['revision'])
+                    edited=self.repo.edit(1,original['id'],20,{**original['config'],'options':['B','A']},original['revision'])
+                    view=public_view(100,edited['config'],revision=edited['revision']) if fresh else old
+                    interaction=self.interaction(30,0)
+                    interaction.data={'custom_id':view.children[0].custom_id,'values':['0']}
+                    await self.cog.on_interaction(interaction)
+                    if (control=='select' or maximum>1) and fresh:
+                        ballot=interaction.response.send_message.await_args.kwargs['view']
+                        confirm=NS(type=discord.InteractionType.component,response=NS(defer=AsyncMock()),edit_original_response=AsyncMock(),guild=self.guild,user=NS(id=30))
+                        await ballot.children[-1].callback(confirm)
+                    self.assertEqual(self.repo.by_message(100)['counts'],[1,0] if fresh else [0,0])
+
+    async def test_legacy_controls_require_confirmation_of_current_options(self):
+        poll=self.repo.by_message(100)
+        self.repo.edit(1,poll['id'],20,{**poll['config'],'options':['B','A']},poll['revision'])
+        for custom_id in ('tueka-poll:100:0','tueka-poll-select:100'):
+            with self.subTest(custom_id=custom_id):
+                interaction=self.interaction(30,0)
+                interaction.data={'custom_id':custom_id,'values':['0']}
+                await self.cog.on_interaction(interaction)
+                self.assertEqual(self.repo.by_message(100)['counts'],[0,0])
+                ballot=interaction.response.send_message.await_args.kwargs['view']
+                self.assertEqual(ballot.choices,[])
+                self.assertEqual([option.label for option in ballot.children[0].options],['1. B','2. A'])
 
     def expire(self):
         with transaction(self.url) as c:
