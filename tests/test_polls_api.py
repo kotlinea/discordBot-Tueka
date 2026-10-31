@@ -40,6 +40,60 @@ class PollApiTests(unittest.TestCase):
         self.assertEqual(response.status_code,200,response.text)
         self.assertEqual(self.client.put(f"{self.base}/{poll['id']}",json={'revision':1,'config':self.body['config']},headers=self.headers).status_code,409)
 
+    def test_saved_threads_are_checked_live_but_not_offered_as_new_destinations(self):
+        for index,channel_type in enumerate((10,11,12,None,0,2)):
+            with self.subTest(channel_type=channel_type):
+                message=1000+index
+                self.repo.legacy_create(message,1,99,20,'Q',['A','B'],None,None)
+                poll=self.repo.by_message(message)
+                self.discord.guild_channel=AsyncMock(return_value=None if channel_type is None else {'id':'99','type':channel_type})
+                response=self.client.put(f"{self.base}/{poll['id']}",json={'revision':poll['revision'],'config':{**poll['config'],'color':123}},headers=self.headers)
+                self.assertEqual(response.status_code,200 if channel_type in (10,11,12) else 422,response.text)
+                self.discord.guild_channel.assert_awaited_once_with(1,99)
+                self.assertEqual(self.repo.get(1,poll['id'])['revision'],poll['revision']+(response.status_code==200))
+        self.body.update(channel_id='99',request_key='new-thread')
+        self.assertEqual(self.client.post(self.base,json=self.body,headers=self.headers).status_code,422)
+
+    def test_deleted_condition_roles_allow_only_retained_references(self):
+        for field in ('allowed_roles','denied_roles'):
+            for voted in (False,True):
+                with self.subTest(field=field,voted=voted):
+                    self.repo.legacy_create(900+int(voted)+(10 if field=='denied_roles' else 0),1,10,20,'Q',['A','B'],None,None)
+                    poll=self.repo.by_message(900+int(voted)+(10 if field=='denied_roles' else 0))
+                    poll=self.repo.edit(1,poll['id'],20,{**poll['config'],field:['999']},poll['revision'])
+                    if voted:self.repo.vote(1,poll['id'],30,[0],revision=poll['revision'],roles=['999'] if field=='allowed_roles' else [])
+                    path=f"{self.base}/{poll['id']}"
+                    config={**poll['config'],'color':123}
+                    response=self.client.put(path,json={'revision':poll['revision'],'config':config},headers=self.headers)
+                    self.assertEqual(response.status_code,200,response.text)
+                    saved=response.json();self.assertEqual(saved['config'][field],['999'])
+                    for changed in ([*saved['config'][field],'888'],['888']):
+                        response=self.client.put(path,json={'revision':saved['revision'],'config':{**saved['config'],field:changed}},headers=self.headers)
+                        self.assertEqual(response.status_code,422,response.text)
+                        self.assertEqual(self.repo.get(1,poll['id'])['revision'],saved['revision'])
+                    response=self.client.put(path,json={'revision':saved['revision'],'config':{**saved['config'],field:[]}},headers=self.headers)
+                    self.assertEqual(response.status_code,409 if voted else 200,response.text)
+                    if voted:self.assertEqual(response.json()['detail']['code'],'poll_ballot_locked')
+
+    def test_publication_actions_retain_saved_role_references_and_thread_origin(self):
+        for field in ('allowed_roles','denied_roles'):
+            for action in ('launch','move'):
+                with self.subTest(field=field,action=action):
+                    config={**self.body['config'],field:['999']}
+                    if action=='launch':
+                        poll=self.repo.create(1,99,20,config,f'launch-{field}')
+                    else:
+                        message=2000+(field=='denied_roles')
+                        self.repo.legacy_create(message,1,99,20,'Q',['A','B'],None,None)
+                        poll=self.repo.by_message(message)
+                        poll=self.repo.edit(1,poll['id'],20,config,poll['revision'])
+                        self.repo.vote(1,poll['id'],30,[0],revision=poll['revision'],roles=['999'] if field=='allowed_roles' else [])
+                    self.discord.guild_channel=AsyncMock(return_value={'id':'99','type':11})
+                    response=self.client.post(f"{self.base}/{poll['id']}/actions",json={'action':action,'revision':poll['revision'],'channel_id':'10'},headers=self.headers)
+                    self.assertEqual(response.status_code,200,response.text)
+                    if action=='launch':self.discord.guild_channel.assert_awaited_once_with(1,99)
+                    else:self.discord.guild_channel.assert_not_awaited()
+
     def test_rescheduling_rejects_a_start_after_the_saved_deadline(self):
         import time
         now=int(time.time());day=86400
@@ -243,9 +297,6 @@ class PollApiTests(unittest.TestCase):
                 body={**self.body,'request_key':'foreign-'+field,'config':config}
                 self.assertEqual(self.client.post(self.base,json=body,headers=self.headers).status_code,422)
                 response=self.client.put(f"{self.base}/{poll['id']}",json={'revision':poll['revision'],'config':config},headers=self.headers)
-                self.assertEqual(response.status_code,422,response.text)
-                foreign=self.repo.create(1,10,20,config,'foreign-launch-'+field)
-                response=self.client.post(f"{self.base}/{foreign['id']}/actions",json={'revision':foreign['revision'],'action':'launch'},headers=self.headers)
                 self.assertEqual(response.status_code,422,response.text)
         path='/api/v1/guilds/1/polls/settings'
         for field,value in (('role_weights',10),('role_permissions',['view'])):

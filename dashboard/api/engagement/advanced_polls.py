@@ -6,7 +6,7 @@ from dashboard.api.body import read_body, request_schema
 from dashboard.api.errors import api_error
 from dashboard.api.resources import GuildResources
 from dashboard.api import schemas
-from engagement.polls.models import PollError, disclose, ids
+from engagement.polls.models import PollError, disclose, ids, new_condition_roles
 from engagement.polls.service import Actor, PollService
 from guild_settings.engagement.advanced_polls import normalize as normalize_settings
 import re
@@ -47,13 +47,16 @@ def create_router(context):
         status={'not_found':404,'forbidden':403,'disabled':403,'conflict':409,'privacy_expansion':409,'ballot_locked':409,'delivery_uncertain':409}.get(exc.code,422)
         return api_error(status,'poll_'+exc.code,'投票の入力、権限、現在の状態を確認してください。')
 
-    async def validate_resources(guild,channel,config=None):
+    async def validate_resources(guild,channel,config=None,*,previous=None,existing_channel=False):
         resources=await GuildResources.fetch(context.discord,guild,live=True,assignable_roles=False)
         try: channel=int(ids([channel])[0])
         except (PollError,TypeError):raise PollError('invalid') from None
-        if channel not in resources.channel_ids(0,5):raise PollError('invalid')
+        if channel not in resources.channel_ids(0,5):
+            # Existing Discord posts may live in threads absent from the channel picker.
+            existing=await context.discord.guild_channel(guild,channel) if existing_channel else None
+            if not existing or int(existing.get('type',-1)) not in (10,11,12):raise PollError('invalid')
         if config:
-            roles=ids(config.get('allowed_roles',[]))+ids(config.get('denied_roles',[]))
+            roles=new_condition_roles(config,previous)
             if any(int(role) not in resources.role_ids for role in roles):raise PollError('invalid')
             custom=[int(match[1]) for value in (config.get('emojis') or []) if (match:=re.fullmatch(r'<a?:[A-Za-z0-9_]{2,32}:(\d{1,20})>',value))]
             if custom:
@@ -101,7 +104,8 @@ def create_router(context):
         try:
             service.require(a,'manage')
             current=repo.get(guild_id,poll_id)
-            await validate_resources(guild_id,current['channel_id'],body['config'])
+            if current['revision']!=body['revision']:raise PollError('conflict')
+            await validate_resources(guild_id,current['channel_id'],body['config'],previous=current['config'],existing_channel=True)
             timing={key:body[key] for key in ('closes_at','scheduled_at','duration_seconds') if key in body}
             service.edit(a,poll_id,body['config'],body['revision'],**timing)
             return wire(service.read(a,poll_id,management=True))
@@ -116,7 +120,8 @@ def create_router(context):
             if current['revision']!=body['revision']:raise PollError('conflict')
             kind=body['action']
             if kind in ('launch','move'):
-                channel=await validate_resources(guild_id,body.get('channel_id') or current['channel_id'],current['config'])
+                target=(body.get('channel_id') or current['channel_id']) if kind=='move' else current['channel_id']
+                channel=await validate_resources(guild_id,target,current['config'],previous=current['config'],existing_channel=kind=='launch')
                 row=repo.launch(guild_id,poll_id,a.user_id,body['revision'],channel=channel if kind=='move' else None,principal=a)
             elif kind=='copy':
                 row=service.create(a,current['channel_id'],current['config'],body.get('request_key'))

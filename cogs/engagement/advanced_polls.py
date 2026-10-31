@@ -12,7 +12,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from engagement.polls.repository import PollRepository
-from engagement.polls.models import PollError, duration, normalize, disclose, selection
+from engagement.polls.models import PollError, duration, normalize, disclose, selection, new_condition_roles
 from engagement.polls.service import Actor, PollService
 from engagement.polls.delivery import PollDelivery
 from engagement.polls.discord_adapter import DiscordPollAdapter, embed_for, public_view
@@ -104,8 +104,8 @@ class AdvancedPollsCog(commands.Cog):
             raise PollError('forbidden') from None
         return result
 
-    def validate_config(self,interaction,config):
-        if any(interaction.guild.get_role(int(role)) is None for role in config['allowed_roles']+config['denied_roles']):
+    def validate_config(self,interaction,config,*,previous=None):
+        if any(interaction.guild.get_role(int(role)) is None for role in new_condition_roles(config,previous)):
             raise PollError('invalid')
         for value in config['emojis']:
             parsed=discord.PartialEmoji.from_str(value)

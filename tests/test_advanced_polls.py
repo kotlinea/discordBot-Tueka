@@ -14,6 +14,16 @@ from database.migrations import MIGRATIONS,apply
 
 
 class PollRulesTests(unittest.TestCase):
+    def test_only_new_references_in_each_condition_need_live_roles(self):
+        from engagement.polls.models import new_condition_roles
+        for field,other in (('allowed_roles','denied_roles'),('denied_roles','allowed_roles')):
+            previous={field:['999']}
+            for config,expected in (({field:[999]},set()),({field:[]},set()),
+                                    ({field:['999','888']},{'888'}),({other:['999']},{'999'})):
+                with self.subTest(field=field,config=config):
+                    self.assertEqual(new_condition_roles(config,previous),expected)
+            self.assertEqual(new_condition_roles(previous),{'999'})
+
     def test_duration_boundaries(self):
         self.assertEqual(duration('1d 3h 15m'), 98100)
         self.assertEqual(duration('30d'), 2592000)
@@ -241,6 +251,33 @@ class PollPayloadTests(unittest.IsolatedAsyncioTestCase):
 
 
 class PollBuilderPreviewTests(unittest.IsolatedAsyncioTestCase):
+    async def test_builder_save_retains_deleted_condition_roles(self):
+        from types import SimpleNamespace as NS
+        from unittest.mock import AsyncMock
+        from cogs.engagement.advanced_polls import AdvancedPollsCog
+        from cogs.engagement.poll_builder import BuilderView
+        from engagement.polls.service import PollService
+        for field in ('allowed_roles','denied_roles'):
+            with self.subTest(field=field),temporary_database() as url:
+                repo=PollRepository(url)
+                repo.legacy_create(100,1,10,20,'Q',['A','B'],None,None)
+                poll=repo.by_message(100)
+                poll=repo.edit(1,poll['id'],20,{**poll['config'],field:['999']},poll['revision'])
+                repo.vote(1,poll['id'],30,[0],revision=poll['revision'],roles=['999'] if field=='allowed_roles' else [])
+                actor=Actor(1,20,manager=True)
+                cog=NS(actor=AsyncMock(return_value=actor),service=PollService(repo),failure=AsyncMock())
+                cog.validate_config=lambda interaction,config,**kw:AdvancedPollsCog.validate_config(cog,interaction,config,**kw)
+                interaction=NS(guild=NS(get_role=lambda role:None),response=NS(edit_message=AsyncMock()))
+                builder=BuilderView(cog,actor,repo.get(1,poll['id']),editing=True)
+                builder.values['color']=123
+                await builder.save(interaction)
+                cog.failure.assert_not_awaited()
+                self.assertEqual(repo.get(1,poll['id'])['config']['color'],123)
+                for changed in (['999','888'],['888']):
+                    config={**builder.values,field:changed}
+                    with self.assertRaises(PollError):cog.validate_config(interaction,config,previous=poll['config'])
+                    with self.assertRaises(PollError):cog.validate_config(interaction,builder.values)
+
     def builder(self, *, mode='anonymous', editing=False, visibility=None):
         from cogs.engagement.poll_builder import BuilderView
         from types import SimpleNamespace

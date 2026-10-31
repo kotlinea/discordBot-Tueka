@@ -97,6 +97,13 @@ def ids(values):
     return sorted(set(result))
 
 
+def new_condition_roles(config, previous=None):
+    """Only newly introduced references in each condition need existence validation."""
+    previous = previous or {}
+    return {role for field in ('allowed_roles', 'denied_roles')
+            for role in set(ids(config.get(field, []))) - set(ids(previous.get(field, [])))}
+
+
 def normalize(values, *, option_limit=25):
     question = text(values.get('question'), 1024, required=True)
     options = values.get('options')

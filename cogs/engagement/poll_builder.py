@@ -118,7 +118,7 @@ class BuilderView(discord.ui.View):
     async def save(self,i):
         try:
             actor=await self.cog.actor(i)
-            self.cog.validate_config(i,normalize(self.values))
+            self.cog.validate_config(i,normalize(self.values),previous=self.poll['config'])
             poll=self.cog.service.edit(actor,self.poll['id'],self.values,self.poll['revision'],closes_at=self.poll['closes_at'])
             if not self.editing:self.cog.engagement_repository.launch(actor.guild_id,poll['id'],actor.user_id,poll['revision'],principal=actor)
             await i.response.edit_message(content='保存しました。' if self.editing else f"投票 #{poll['id']} の公開を受け付けました。",embed=None,view=None)
