@@ -19,7 +19,14 @@ class BuilderView(discord.ui.View):
         return interaction.user.id==self.actor.user_id and interaction.guild_id==self.actor.guild_id
 
     def preview(self):
-        return embed_for(disclose({**self.poll,'config':normalize(self.values)}),page=self.page)
+        saved=disclose(self.poll)
+        config=normalize(self.values)
+        snapshot={**self.poll,'config':config}
+        if config['options']!=self.poll['config']['options']:
+            snapshot.update(counts=[0]*len(config['options']),weighted_counts=[0]*len(config['options']),total=0,ballots=[])
+        # Unsaved settings may hide more, but cannot disclose fields hidden by the saved policy.
+        preview={key:value for key,value in disclose(snapshot).items() if key in saved}
+        return embed_for(preview,page=self.page)
 
     async def update(self, interaction):
         self.rebuild()

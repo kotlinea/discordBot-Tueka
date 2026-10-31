@@ -179,6 +179,70 @@ class PollPayloadTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ballot.children[0].max_values,20)
 
 
+class PollBuilderPreviewTests(unittest.IsolatedAsyncioTestCase):
+    def builder(self, *, mode='anonymous', editing=False, visibility=None):
+        from cogs.engagement.poll_builder import BuilderView
+        from types import SimpleNamespace
+        config=normalize(dict(question='Q',options=['A','B'],mode=mode,visibility=visibility))
+        poll=dict(id=1,message_id=100,config=config,status='open' if editing else 'draft',
+                  counts=[1,1] if editing else [0,0],weighted_counts=[7,3] if editing else [0,0],
+                  total=2 if editing else 0,ballots=[dict(user_id=30,choices=[0],weight=7),dict(user_id=40,choices=[1],weight=3)] if editing else [])
+        return BuilderView(SimpleNamespace(),Actor(1,20,(3,)),poll,editing=editing)
+
+    async def test_unsaved_public_mode_does_not_reveal_hidden_results(self):
+        for mode in ('blind','reveal_at_end','secret_winner'):
+            with self.subTest(mode=mode):
+                builder=self.builder(mode=mode,editing=True)
+                builder.values['mode']='public'
+                fields=builder.preview().fields
+                self.assertEqual([(field.name,field.value) for field in fields],[('選択肢','1. A\n2. B')])
+                self.assertEqual(builder.poll['config']['mode'],mode)
+
+    async def test_custom_preview_cannot_expand_saved_visibility(self):
+        hidden={stage:{field:'admins' for field in ('counts','ranking','total','participants','ballots')} for stage in ('open','closed')}
+        for status in ('open','closed'):
+            with self.subTest(status=status):
+                builder=self.builder(mode='custom',editing=True,visibility=hidden)
+                builder.poll['status']=status
+                builder.values['visibility']={stage:{field:'everyone' for field in hidden[stage]} for stage in hidden}
+                self.assertEqual([(field.name,field.value) for field in builder.preview().fields],[('選択肢','1. A\n2. B')])
+
+    async def test_add_and_remove_options_refresh_sized_draft_counts(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+        builder=self.builder()
+        response=SimpleNamespace(edit_message=AsyncMock())
+        interaction=SimpleNamespace(response=response)
+        await builder.add(interaction)
+        embed=response.edit_message.call_args.kwargs['embed']
+        self.assertIn('3. 選択肢 3 — **0**票',embed.fields[0].value)
+        self.assertEqual(embed.fields[-1].value,'0 / 0')
+        self.assertEqual(builder.poll['counts'],[0,0])
+        builder.selected=0
+        await builder.remove(interaction)
+        embed=response.edit_message.call_args.kwargs['embed']
+        self.assertIn('1. B — **0**票',embed.fields[0].value)
+        self.assertIn('2. 選択肢 3 — **0**票',embed.fields[0].value)
+
+    async def test_changed_options_do_not_reassign_existing_results(self):
+        builder=self.builder(mode='public',editing=True)
+        builder.values['options']=['B','A','C']
+        builder.values['emojis']=['','','']
+        fields=builder.preview().fields
+        self.assertIn('3. C — **0**票',fields[0].value)
+        self.assertNotIn('重み',fields[0].value)
+        self.assertEqual(fields[-1].value,'0 / 0')
+
+    async def test_public_cosmetic_preview_preserves_results_and_can_hide_them(self):
+        builder=self.builder(mode='public',editing=True)
+        builder.values['color']=0x123456
+        fields=builder.preview().fields
+        self.assertIn('重み 7',fields[0].value)
+        self.assertEqual(fields[-1].value,'2 / 2')
+        builder.values['mode']='blind'
+        self.assertEqual([(field.name,field.value) for field in builder.preview().fields],[('選択肢','1. A\n2. B')])
+
+
 class PollMigrationTests(unittest.TestCase):
     def test_old_ballots_survive_failed_upgrade_then_successful_upgrade(self):
         with temporary_database(migrate=False) as url,tempfile.TemporaryDirectory() as directory:
