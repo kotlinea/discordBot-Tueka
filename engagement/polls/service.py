@@ -20,9 +20,9 @@ class PollService:
     def read(self, actor, poll_id, *, management=False):
         return self.repository.read(actor,poll_id,management=management)
 
-    def vote(self, actor, poll_id, choices, message_id):
+    def vote(self, actor, poll_id, choices, message_id, *, revision):
         poll = self.repository.vote(actor.guild_id, poll_id, actor.user_id, choices, roles=actor.roles,
-                                    bot=actor.bot, message_id=message_id)
+                                    bot=actor.bot, message_id=message_id, revision=revision)
         return disclose(poll)
 
     def create(self, actor, channel, config, request_key, **timing):

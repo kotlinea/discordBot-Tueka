@@ -79,8 +79,18 @@ class PublicationRepository:
                 return 'paused', snapshot
             if job['action'] in ('publish', 'move') and (row['revision'] != job['generation'] or row['status'] in ('deleted', 'cancelled')):
                 return 'done', snapshot
-            if job['action'] in ('announce','pin','archive') and (row['revision']!=job['generation'] or row['status'] not in ('closed','deleted')):
-                return 'done', snapshot
+            if job['action'] in ('announce','pin','archive'):
+                config=row['config_json']
+                if job['action']=='announce' and (row['status']!='closed' or not config.get('announce_winner') or config['visibility']['closed']['counts']!='everyone'):
+                    return 'done', snapshot
+                if job['action']=='pin' and (row['status']!='closed' or not config.get('pin_on_close')):
+                    return 'done', snapshot
+                if job['action']=='archive' and (row['status'] not in ('closed','deleted') or not row.get('thread_id')):
+                    return 'done', snapshot
+                # A later closing cycle supersedes this intent; cosmetic edits do not.
+                if c.execute('SELECT 1 FROM poll_outbox WHERE poll_id=%s AND action=%s AND generation>%s LIMIT 1',
+                             (row['id'],job['action'],job['generation'])).fetchone():
+                    return 'done', snapshot
             if job['action']=='thread' and row['status'] in ('deleted','cancelled'):
                 return 'done', snapshot
             if job['action'] == 'publish' and row['closes_at'] is not None and row['closes_at'] <= int(self.clock()):

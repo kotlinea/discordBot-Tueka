@@ -43,7 +43,7 @@ class BallotView(discord.ui.View):
             try:
                 await interaction.response.defer()
                 actor = await cog.actor(interaction)
-                cog.service.vote(actor, poll['id'], self.choices, poll['message_id'])
+                cog.service.vote(actor, poll['id'], self.choices, poll['message_id'],revision=poll['revision'])
                 await interaction.edit_original_response(content='投票を保存しました。空の選択は取消として保存します。', view=None, embed=None)
                 await cog._sync_poll(poll['message_id'])
             except PollError as exc:
@@ -325,7 +325,7 @@ class AdvancedPollsCog(commands.Cog):
                     elif len(selected)<poll['config']['max_choices']:selected.append(index)
                     else:raise PollError('invalid')
                 await self.respond(interaction,'選択して確定してください。空の選択で取り消せます。\n匿名方式でも重複防止のため内部に利用者IDを保存します。',view=BallotView(self,actor,poll,selected),ephemeral=True);return
-            self.service.vote(actor,poll['id'],[int(parts[2])],message_id)
+            self.service.vote(actor,poll['id'],[int(parts[2])],message_id,revision=poll['revision'])
             await interaction.followup.send('投票を保存しました。',ephemeral=True)
             await self._sync_poll(message_id,interaction.message)
         except (ValueError,IndexError) as exc:

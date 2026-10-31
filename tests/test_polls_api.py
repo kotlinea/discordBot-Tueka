@@ -51,7 +51,7 @@ class PollApiTests(unittest.TestCase):
     def test_anonymous_admin_cannot_export_person(self):
         self.repo.legacy_create(100,1,10,20,'Q',['A','B'],None,None)
         poll=self.repo.by_message(100)
-        self.repo.vote(1,poll['id'],999,[0])
+        self.repo.vote(1,poll['id'],999,[0],revision=poll['revision'])
         result=self.client.get(f"{self.base}/{poll['id']}")
         self.assertEqual(result.status_code,200,result.text)
         self.assertNotIn('ballots',result.json());self.assertNotIn('participants',result.json())

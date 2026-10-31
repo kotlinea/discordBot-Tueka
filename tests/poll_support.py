@@ -24,5 +24,5 @@ class PublishedPollRepository(PollRepository):
     def cast_poll_vote(self,message,user,index):
         poll=self.by_message(message)
         if not poll:return None
-        try:return self.vote(poll['guild_id'],poll['id'],user,[index],message_id=message)['counts']
+        try:return self.vote(poll['guild_id'],poll['id'],user,[index],message_id=message,revision=poll['revision'])['counts']
         except PollError:return None

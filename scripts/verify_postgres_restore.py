@@ -78,7 +78,7 @@ def main():
         polls.start_delivery(claim.payload)
         polls.receipt(claim.payload,1234567890123456793)
         polls.jobs.finish(claim,Outcome())
-        polls.vote(1,poll['id'],1234567890123456794,[0,1],roles=[500])
+        polls.vote(1,poll['id'],1234567890123456794,[0,1],roles=[500],revision=poll['revision'])
         polls.transition(1,poll['id'],20,'close',poll['revision'])
         pending=polls.create(1,10,20,dict(question='pending poll',options=['A','B']),'restore-pending')
         polls.launch(1,pending['id'],20,pending['revision'])

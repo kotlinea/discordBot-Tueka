@@ -58,6 +58,7 @@ class PollStorageTests(unittest.TestCase):
         self.item=self.repo.by_message(100)
 
     def cast(self,user=30,choices=None,**kw):
+        if 'revision' not in kw:kw['revision']=self.repo.get(1,self.item['id'])['revision']
         return self.repo.vote(1,self.item['id'],user,[0] if choices is None else choices,**kw)
 
     def test_replace_and_cancel(self):
@@ -150,6 +151,36 @@ class PollStorageTests(unittest.TestCase):
         with self.assertRaises(PollError):
             self.repo.edit(1,self.item['id'],30,self.item['config'],1,principal=principal)
 
+    def test_stale_revision_cannot_withdraw_an_existing_vote(self):
+        self.cast()
+        edited=self.repo.edit(1,self.item['id'],20,{**self.item['config'],'color':0xffffff},self.item['revision'])
+        with self.assertRaises(PollError) as error:self.cast(choices=[],revision=self.item['revision'])
+        self.assertEqual(error.exception.code,'conflict')
+        self.assertEqual(self.repo.get(1,self.item['id'])['counts'],[1,0])
+        self.assertEqual(self.cast(choices=[],revision=edited['revision'])['total'],0)
+
+    def test_vote_rechecks_revision_after_waiting_for_the_poll_lock(self):
+        import json
+        from threading import Event
+        from unittest.mock import patch
+        entered=Event()
+        original=self.repo._row
+        def row(*args,**kwargs):
+            if kwargs.get('locked'):entered.set()
+            return original(*args,**kwargs)
+        with ThreadPoolExecutor(max_workers=1) as workers,patch.object(self.repo,'_row',row):
+            with transaction(self.url) as c:
+                c.execute('SELECT id FROM polls WHERE id=%s FOR UPDATE',(self.item['id'],))
+                config={**self.item['config'],'options':['B','A']}
+                c.execute('UPDATE polls SET revision=revision+1,config_json=%s,options_json=%s WHERE id=%s',
+                          (json.dumps(config),json.dumps(config['options']),self.item['id']))
+                future=workers.submit(self.repo.vote,1,self.item['id'],30,[0],message_id=100,revision=self.item['revision'])
+                self.assertTrue(entered.wait(5))
+                self.assertFalse(future.done())
+            with self.assertRaises(PollError) as error:future.result(timeout=5)
+            self.assertEqual(error.exception.code,'conflict')
+        self.assertEqual(self.repo.get(1,self.item['id'])['counts'],[0,0])
+
 
 class PollPayloadTests(unittest.IsolatedAsyncioTestCase):
     async def test_full_length_options_are_available_within_discord_budgets(self):
@@ -241,6 +272,33 @@ class PollBuilderPreviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fields[-1].value,'2 / 2')
         builder.values['mode']='blind'
         self.assertEqual([(field.name,field.value) for field in builder.preview().fields],[('選択肢','1. A\n2. B')])
+
+
+class PollBallotRevisionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_confirm_rejects_a_screen_from_before_an_edit(self):
+        from cogs.engagement.advanced_polls import BallotView
+        from engagement.polls.service import PollService
+        from types import SimpleNamespace as NS
+        from unittest.mock import AsyncMock
+        for changes in ({'options':['B','A']},{'options':['A','C']},{'color':0xffffff}):
+            with self.subTest(changes=changes),temporary_database() as url:
+                repo=PollRepository(url)
+                repo.legacy_create(100,1,10,20,'Q',['A','B'],None,None)
+                poll=repo.by_message(100)
+                actor=Actor(1,30)
+                cog=NS(actor=AsyncMock(return_value=actor),service=PollService(repo),failure=AsyncMock(),_sync_poll=AsyncMock())
+                view=BallotView(cog,actor,poll,[0])
+                repo.edit(1,poll['id'],20,{**poll['config'],**changes},poll['revision'])
+                interaction=NS(response=NS(defer=AsyncMock()),edit_original_response=AsyncMock())
+                await view.children[-1].callback(interaction)
+                self.assertEqual(repo.get(1,poll['id'])['counts'],[0,0])
+                cog.failure.assert_awaited_once()
+                self.assertEqual(cog.failure.await_args.args[1].code,'conflict')
+                interaction.edit_original_response.assert_not_awaited()
+                refreshed=BallotView(cog,actor,repo.get(1,poll['id']),[0])
+                await refreshed.children[-1].callback(interaction)
+                self.assertEqual(repo.get(1,poll['id'])['counts'],[1,0])
+                interaction.edit_original_response.assert_awaited_once()
 
 
 class PollMigrationTests(unittest.TestCase):

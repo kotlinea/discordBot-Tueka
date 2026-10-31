@@ -65,13 +65,13 @@ class PollDeliveryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_move_preserves_ballots_and_rejects_old_post(self):
         self.launch();job=self.claim();self.repo.jobs.finish(job,await self.service.deliver(job.payload))
-        item=self.repo.get(1,self.item['id']);self.repo.vote(1,item['id'],30,[0],message_id=500)
+        item=self.repo.get(1,self.item['id']);self.repo.vote(1,item['id'],30,[0],message_id=500,revision=item['revision'])
         self.repo.launch(1,item['id'],20,item['revision'],channel=11)
         self.port.deliver.return_value=501
         job=self.claim();self.repo.jobs.finish(job,await self.service.deliver(job.payload))
         item=self.repo.get(1,item['id'])
         self.assertEqual((item['channel_id'],item['counts']),(11,[1,0]))
-        with self.assertRaises(PollError):self.repo.vote(1,item['id'],30,[1],message_id=500)
+        with self.assertRaises(PollError):self.repo.vote(1,item['id'],30,[1],message_id=500,revision=item['revision'])
         cleanup=self.claim()
         self.assertEqual(cleanup.payload['action'],'stop_old')
         self.assertEqual(cleanup.payload['old_message_id'],500)
@@ -109,3 +109,62 @@ class PollDeliveryTests(unittest.IsolatedAsyncioTestCase):
         replay=self.repo.create(1,10,20,dict(question='Q',options=['A','B']),'new',duration_seconds=100)
         self.assertEqual(replay['config']['question'],'Changed')
         with self.assertRaises(PollError):self.repo.create(1,10,21,dict(question='Q',options=['A','B']),'new',duration_seconds=100)
+
+    async def automation_poll(self,key,*,close=True,**config):
+        item=self.repo.create(1,10,20,dict(question='Q',options=['A','B'],announce_winner=True,pin_on_close=True,**config),key)
+        self.port.deliver.return_value=500+item['id']
+        self.repo.launch(1,item['id'],20,item['revision'])
+        job=self.claim();self.repo.jobs.finish(job,await self.service.deliver(job.payload))
+        with transaction(self.url) as c:c.execute('UPDATE polls SET thread_id=700 WHERE id=%s',(item['id'],))
+        item=self.repo.get(1,item['id'])
+        return self.repo.transition(1,item['id'],20,'close',item['revision']) if close else item
+
+    async def drain_actions(self):
+        self.port.deliver.reset_mock()
+        while (job:=self.claim()) is not None:
+            self.repo.jobs.finish(job,await self.service.deliver(job.payload))
+        return [call.args[0]['action'] for call in self.port.deliver.await_args_list]
+
+    async def test_closing_actions_follow_current_requirements_not_cosmetic_revision(self):
+        cases=(('unchanged',{'announce','pin','archive'}),('cosmetic',{'announce','pin','archive'}),
+               ('hide_results',{'pin','archive'}),('disable_announce',{'pin','archive'}),
+               ('disable_pin',{'announce','archive'}),('reopen',set()),('delete',{'archive'}),
+               ('reclose',{'announce','pin','archive'}))
+        for change,expected in cases:
+            with self.subTest(change=change):
+                item=await self.automation_poll('actions-'+change)
+                if change in ('reopen','reclose'):
+                    item=self.repo.transition(1,item['id'],20,'reopen',item['revision'])
+                    if change=='reclose':self.repo.transition(1,item['id'],20,'close',item['revision'])
+                elif change=='delete':self.repo.transition(1,item['id'],20,'delete',item['revision'])
+                elif change!='unchanged':
+                    values={'cosmetic':{'color':0xffffff,'image_url':'https://example.com/poll.png'},
+                            'hide_results':{'mode':'custom','visibility':{'open':{},'closed':{}}},
+                            'disable_announce':{'announce_winner':False},'disable_pin':{'pin_on_close':False}}[change]
+                    self.repo.edit(1,item['id'],20,{**item['config'],**values},item['revision'])
+                actions=await self.drain_actions()
+                self.assertCountEqual(actions,expected)
+                if change=='cosmetic':
+                    for call in self.port.deliver.await_args_list:
+                        self.assertEqual(call.args[1]['config']['color'],0xffffff)
+
+    async def test_started_closing_action_still_reconciles_after_edit(self):
+        item=await self.automation_poll('uncertain-close')
+        job=self.claim()
+        self.assertEqual(self.repo.start_delivery(job.payload)[0],'send')
+        self.repo.edit(1,item['id'],20,{**item['config'],'color':0xffffff},item['revision'])
+        await self.service.deliver(job.payload)
+        self.assertTrue(self.port.deliver.await_args.kwargs['recover'])
+
+    async def test_cosmetic_edits_preserve_actions_for_every_closing_trigger(self):
+        for trigger in ('manual','deadline','participant_limit'):
+            with self.subTest(trigger=trigger):
+                item=await self.automation_poll('trigger-'+trigger,close=False,max_participants=1 if trigger=='participant_limit' else None)
+                if trigger=='manual':self.repo.transition(1,item['id'],20,'close',item['revision'])
+                elif trigger=='deadline':
+                    self.repo.edit(1,item['id'],20,item['config'],item['revision'],closes_at=self.now+1)
+                    self.now+=1;self.repo.close_expired()
+                else:self.repo.vote(1,item['id'],30,[0],revision=item['revision'])
+                closed=self.repo.get(1,item['id'])
+                self.repo.edit(1,item['id'],20,{**closed['config'],'color':0xffffff},closed['revision'])
+                self.assertCountEqual(await self.drain_actions(),('announce','pin','archive'))

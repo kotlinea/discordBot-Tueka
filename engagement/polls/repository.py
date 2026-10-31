@@ -110,12 +110,14 @@ class PollRepository(PublicationRepository):
             c.execute('UPDATE polls SET request_json=%s,updated_at=%s WHERE id=%s',(json.dumps(fingerprint),now,row['id']))
             return self._snapshot(c, row)
 
-    def vote(self, guild, poll, user, choices, *, roles=(), bot=False, message_id=None):
+    def vote(self, guild, poll, user, choices, *, revision, roles=(), bot=False, message_id=None):
         with transaction(self.database_url) as c:
             self._enabled(c, guild)
             weights = self.settings.get_module(guild, 'advanced_polls', _conn=c)['settings']['role_weights']
             row = self._row(c, guild, poll, locked=True)
             now = int(self.clock())
+            if type(revision) is not int or row['revision']!=revision:
+                raise PollError('conflict')
             if row['status'] != 'open' or (row['closes_at'] is not None and row['closes_at'] <= now):
                 raise PollError('closed')
             if message_id is not None and row['message_id'] != message_id:
