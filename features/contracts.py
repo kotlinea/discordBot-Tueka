@@ -32,6 +32,7 @@ class Feature:
     settings_factory: str | None = None  # API-scoped SettingsAccess factory.
     module_write: bool = True  # Dedicated configuration routes may own writes.
     maturity: Literal['stable', 'improving', 'unavailable'] = 'improving'
+    access_factory: str | None = None  # Optional Guild workspace access capability.
 
 
 @dataclass(frozen=True)

@@ -103,6 +103,9 @@ class ApiSchemaTests(unittest.TestCase):
             for method, operation in methods.items():
                 for status, response in operation['responses'].items():
                     if status.startswith('2') and status != '204' and '/attachments/' not in path:
+                        if 'application/octet-stream' in response.get('content',{}):
+                            self.assertEqual(response['content']['application/octet-stream']['schema']['format'],'binary')
+                            continue
                         schema = response['content']['application/json']['schema']
                         self.assertIn('$ref', schema, (path, method))
 

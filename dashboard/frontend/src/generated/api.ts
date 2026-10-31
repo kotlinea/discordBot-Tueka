@@ -22,7 +22,7 @@ export type GiveawayEvent = { "id": number; "campaign_id": number; "actor_id": s
 export type GiveawayHistory = { "events": Array<GiveawayEvent>; "draws": Array<GiveawayDraw>; "entries": Array<GiveawayEntry>; "delivery": Array<GiveawayJob>; "draw_jobs": Array<GiveawayJob> }
 export type GiveawayItem = { "id": number; "guild_id": string; "actor_id": string; "config": GiveawayConfig; "status": "draft" | "open" | "closing" | "closed" | "cancelled"; "revision": number; "message_id": (string | null); "delivery_started": boolean; "round_number": number; "ends_at": number; "created_at": number; "updated_at": number; "expires_at": number }
 export type GiveawayJob = { "id": number; "status": string; "attempts": number; "last_error": (string | null); "round_number"?: (number | null) }
-export type Guild = { "id": string; "name": string; "icon": (string | null); "access"?: ("admin" | "ticket_staff") }
+export type Guild = { "id": string; "name": string; "icon": (string | null); "access"?: "admin" | "ticket_staff" | "delegated"; "feature_ids"?: Array<string> }
 export type GuildOverview = { "guild_id": string; "features": Array<Feature>; "resources": Resources; "moderation": ModerationOverview }
 export type HighlightEntry = { "id": number; "board_id": number; "guild_id": string; "source_channel_id": string; "source_message_id": string; "snapshot": HighlightSource; "score": number; "desired": boolean; "revision": number; "created_at": number; "updated_at": number; "expires_at": number }
 export type HighlightEvent = { "id": number; "board_id": number; "entry_id": (number | null); "actor_id": string; "event_type": string; "detail": Record<string, unknown>; "created_at": number }
@@ -45,6 +45,8 @@ export type Items_GiveawayItem_ = { "items": Array<GiveawayItem>; "next"?: (numb
 export type Items_Guild_ = { "items": Array<Guild>; "next"?: (number | null) }
 export type Items_HighlightEntry_ = { "items": Array<HighlightEntry>; "next"?: (number | null) }
 export type Items_ModerationEvent_ = { "items": Array<ModerationEvent>; "next"?: (number | null) }
+export type Items_PollEvent_ = { "items": Array<PollEvent>; "next"?: (number | null) }
+export type Items_PollItem_ = { "items": Array<PollItem>; "next"?: (number | null) }
 export type Items_ReactionRoleEvent_ = { "items": Array<ReactionRoleEvent>; "next"?: (number | null) }
 export type Items_ReactionRoleLinkGroup_ = { "items": Array<ReactionRoleLinkGroup>; "next"?: (number | null) }
 export type Items_Rule_ = { "items": Array<Rule>; "next"?: (number | null) }
@@ -63,6 +65,15 @@ export type ModerationCase = { "id": number; "guild_id": string; "user_id": stri
 export type ModerationEvent = { "id": number; "guild_id": string; "actor_id"?: (string | null); "target_id"?: (string | null); "family": string; "event_type": string; "source": string; "target_user_id"?: (string | null); "channel_id"?: (string | null); "reason": string; "mode": string; "case_id"?: (number | null); "created_at": number }
 export type ModerationOverview = { "summary": Record<string, unknown>; "events": Array<ModerationEvent>; "lockdown": (Lockdown | null) }
 export type ModuleValue = { "enabled": boolean; "settings": Record<string, unknown>; "revision": number }
+export type PollBallot = { "user_id": string; "choices": Array<number>; "weight": number }
+export type PollCapabilities = { "permissions": Array<string>; "enabled": boolean }
+export type PollConfig = { "question": string; "description"?: string; "options": Array<string>; "emojis"?: (Array<string> | null); "max_choices"?: number; "mode"?: "public" | "anonymous" | "secret_winner" | "reveal_at_end" | "blind" | "custom"; "visibility"?: (Record<string, Record<string, string>> | null); "ui"?: "buttons" | "select"; "button_style"?: "primary" | "secondary" | "success" | "danger"; "image_url"?: (string | null); "color"?: number; "max_participants"?: (number | null); "allowed_roles"?: Array<string>; "denied_roles"?: Array<string>; "denied_users"?: Array<string>; "announce_winner"?: boolean; "pin_on_close"?: boolean; "create_thread"?: boolean; "remove_departed_votes"?: boolean }
+export type PollDeliveryItem = { "id": number; "action": string; "status": string; "attempts": number; "last_error": (string | null); "discord_receipt_id": (string | null) }
+export type PollEvent = { "id": number; "actor_id": (string | null); "event_type": string; "created_at": number }
+export type PollHistory = { "events": Array<PollEvent>; "delivery": Array<PollDeliveryItem> }
+export type PollItem = { "id": number; "guild_id": string; "channel_id": string; "message_id"?: (string | null); "status": string; "revision": number; "closes_at"?: (number | null); "created_at": number; "scheduled_at"?: (number | null); "duration_seconds"?: (number | null); "published_at"?: (number | null); "config": PollConfig; "counts"?: (Array<number> | null); "weighted_counts"?: (Array<number> | null); "ranking"?: (Array<number> | null); "total"?: (number | null); "selections"?: (number | null); "participants"?: (Array<string> | null); "ballots"?: (Array<PollBallot> | null) }
+export type PollSettings = { "retention_days"?: number; "role_weights"?: Record<string, number>; "role_permissions"?: Record<string, Array<string>> }
+export type PollSettingsItem = { "revision": number; "enabled"?: boolean; "settings": PollSettings }
 export type Preferences = { "locale": ("ja" | "en"); "appearance": ("precision" | "community" | "atmosphere"); "color_scheme": ("system" | "light" | "dark"); "navigation_collapsed": boolean; "revision": number }
 export type PreviewResponse = { "diagnostics": Array<Diagnostic> }
 export type QueuedResponse = { "status": string; "id": number }
@@ -395,6 +406,7 @@ export const constraints = {
   },
   "Guild": {
     "access": {},
+    "feature_ids": {},
     "icon": {},
     "id": {},
     "name": {}
@@ -547,6 +559,14 @@ export const constraints = {
     "items": {},
     "next": {}
   },
+  "Items_PollEvent_": {
+    "items": {},
+    "next": {}
+  },
+  "Items_PollItem_": {
+    "items": {},
+    "next": {}
+  },
   "Items_ReactionRoleEvent_": {
     "items": {},
     "next": {}
@@ -648,6 +668,108 @@ export const constraints = {
     "summary": {}
   },
   "ModuleValue": {
+    "enabled": {},
+    "revision": {},
+    "settings": {}
+  },
+  "PollBallot": {
+    "choices": {},
+    "user_id": {},
+    "weight": {}
+  },
+  "PollCapabilities": {
+    "enabled": {},
+    "permissions": {}
+  },
+  "PollConfig": {
+    "allowed_roles": {
+      "maxItems": 100
+    },
+    "announce_winner": {},
+    "button_style": {},
+    "color": {
+      "maximum": 16777215.0,
+      "minimum": 0.0
+    },
+    "create_thread": {},
+    "denied_roles": {
+      "maxItems": 100
+    },
+    "denied_users": {
+      "maxItems": 100
+    },
+    "description": {
+      "maxLength": 2000
+    },
+    "emojis": {},
+    "image_url": {},
+    "max_choices": {
+      "maximum": 20.0,
+      "minimum": 1.0
+    },
+    "max_participants": {},
+    "mode": {},
+    "options": {
+      "maxItems": 25,
+      "minItems": 2
+    },
+    "pin_on_close": {},
+    "question": {
+      "maxLength": 1024,
+      "minLength": 1
+    },
+    "remove_departed_votes": {},
+    "ui": {},
+    "visibility": {}
+  },
+  "PollDeliveryItem": {
+    "action": {},
+    "attempts": {},
+    "discord_receipt_id": {},
+    "id": {},
+    "last_error": {},
+    "status": {}
+  },
+  "PollEvent": {
+    "actor_id": {},
+    "created_at": {},
+    "event_type": {},
+    "id": {}
+  },
+  "PollHistory": {
+    "delivery": {},
+    "events": {}
+  },
+  "PollItem": {
+    "ballots": {},
+    "channel_id": {},
+    "closes_at": {},
+    "config": {},
+    "counts": {},
+    "created_at": {},
+    "duration_seconds": {},
+    "guild_id": {},
+    "id": {},
+    "message_id": {},
+    "participants": {},
+    "published_at": {},
+    "ranking": {},
+    "revision": {},
+    "scheduled_at": {},
+    "selections": {},
+    "status": {},
+    "total": {},
+    "weighted_counts": {}
+  },
+  "PollSettings": {
+    "retention_days": {
+      "maximum": 365.0,
+      "minimum": 1.0
+    },
+    "role_permissions": {},
+    "role_weights": {}
+  },
+  "PollSettingsItem": {
     "enabled": {},
     "revision": {},
     "settings": {}
@@ -1444,6 +1566,20 @@ export interface Operations {
   "GET /api/v1/guilds/{guild_id}/modules/{module_id}": { response: Feature; body: never }
   "PUT /api/v1/guilds/{guild_id}/modules/{module_id}": { response: ModuleValue; body: { "enabled"?: boolean; "settings"?: Record<string, unknown>; "revision"?: number } }
   "GET /api/v1/guilds/{guild_id}/overview": { response: GuildOverview; body: never }
+  "GET /api/v1/guilds/{guild_id}/polls/capabilities": { response: PollCapabilities; body: never }
+  "GET /api/v1/guilds/{guild_id}/polls/items": { response: Items_PollItem_; body: never }
+  "POST /api/v1/guilds/{guild_id}/polls/items": { response: PollItem; body: { "config": { "question": string; "description"?: string; "options": Array<string>; "emojis"?: (Array<string> | null); "max_choices"?: number; "mode"?: "public" | "anonymous" | "secret_winner" | "reveal_at_end" | "blind" | "custom"; "visibility"?: (Record<string, Record<string, string>> | null); "ui"?: "buttons" | "select"; "button_style"?: "primary" | "secondary" | "success" | "danger"; "image_url"?: (string | null); "color"?: number; "max_participants"?: (number | null); "allowed_roles"?: Array<string>; "denied_roles"?: Array<string>; "denied_users"?: Array<string>; "announce_winner"?: boolean; "pin_on_close"?: boolean; "create_thread"?: boolean; "remove_departed_votes"?: boolean }; "channel_id": string; "request_key": string; "scheduled_at"?: (number | null); "duration_seconds"?: (number | null); "closes_at"?: (number | null) } }
+  "GET /api/v1/guilds/{guild_id}/polls/items/{poll_id}": { response: PollItem; body: never }
+  "PUT /api/v1/guilds/{guild_id}/polls/items/{poll_id}": { response: PollItem; body: { "config": { "question": string; "description"?: string; "options": Array<string>; "emojis"?: (Array<string> | null); "max_choices"?: number; "mode"?: "public" | "anonymous" | "secret_winner" | "reveal_at_end" | "blind" | "custom"; "visibility"?: (Record<string, Record<string, string>> | null); "ui"?: "buttons" | "select"; "button_style"?: "primary" | "secondary" | "success" | "danger"; "image_url"?: (string | null); "color"?: number; "max_participants"?: (number | null); "allowed_roles"?: Array<string>; "denied_roles"?: Array<string>; "denied_users"?: Array<string>; "announce_winner"?: boolean; "pin_on_close"?: boolean; "create_thread"?: boolean; "remove_departed_votes"?: boolean }; "revision": number; "closes_at"?: (number | null); "scheduled_at"?: (number | null); "duration_seconds"?: (number | null) } }
+  "POST /api/v1/guilds/{guild_id}/polls/items/{poll_id}/actions": { response: PollItem; body: { "revision": number; "action": "launch" | "close" | "reopen" | "cancel" | "delete" | "copy" | "move"; "channel_id"?: (string | null); "closes_at"?: (number | null); "request_key"?: (string | null) } }
+  "POST /api/v1/guilds/{guild_id}/polls/items/{poll_id}/delivery/{job_id}/retry": { response: StatusResponse; body: { "revision": number } }
+  "GET /api/v1/guilds/{guild_id}/polls/items/{poll_id}/export": { response: Blob; body: never }
+  "GET /api/v1/guilds/{guild_id}/polls/items/{poll_id}/history": { response: PollHistory; body: never }
+  "POST /api/v1/guilds/{guild_id}/polls/items/{poll_id}/votes/remove": { response: StatusResponse; body: { "revision": number; "user_id": string } }
+  "GET /api/v1/guilds/{guild_id}/polls/resources": { response: Resources; body: never }
+  "GET /api/v1/guilds/{guild_id}/polls/settings": { response: PollSettingsItem; body: never }
+  "PUT /api/v1/guilds/{guild_id}/polls/settings": { response: PollSettingsItem; body: { "revision": number; "enabled"?: boolean; "settings": { "retention_days"?: number; "role_weights"?: Record<string, number>; "role_permissions"?: Record<string, Array<string>> } } }
+  "GET /api/v1/guilds/{guild_id}/polls/settings/history": { response: Items_PollEvent_; body: never }
   "GET /api/v1/guilds/{guild_id}/reaction-roles": { response: ReactionRoleOverview; body: never }
   "POST /api/v1/guilds/{guild_id}/reaction-roles": { response: ReactionRoleMessage; body: { "id"?: number; "guild_id"?: string; "name"?: string; "source"?: ("bot" | "external"); "channel_id"?: (string | null); "message_id"?: (string | null); "behavior_type"?: ("normal" | "unique" | "verify" | "binding" | "drop" | "reversed" | "temp"); "locked"?: boolean; "access_policy"?: ("whitelist" | "blacklist"); "selection_limit"?: (number | null); "temp_duration_seconds"?: (number | null); "self_destruct_at"?: (number | null); "embed"?: { "title"?: string; "description"?: string; "color"?: string }; "mappings"?: Array<{ "id"?: number; "emoji"?: string; "emoji_key"?: string; "emoji_id"?: (string | null); "role_id"?: string; "max_members"?: (number | null); "position"?: number }>; "whitelist_role_ids"?: Array<string>; "blacklist_role_ids"?: Array<string>; "link_group_id"?: (number | null); "enabled"?: boolean; "status"?: string; "last_error"?: (string | null); "revision"?: number; "message"?: ({ "id"?: number; "guild_id"?: string; "name"?: string; "source"?: ("bot" | "external"); "channel_id"?: (string | null); "message_id"?: (string | null); "behavior_type"?: ("normal" | "unique" | "verify" | "binding" | "drop" | "reversed" | "temp"); "locked"?: boolean; "access_policy"?: ("whitelist" | "blacklist"); "selection_limit"?: (number | null); "temp_duration_seconds"?: (number | null); "self_destruct_at"?: (number | null); "embed"?: { "title"?: string; "description"?: string; "color"?: string }; "mappings"?: Array<{ "id"?: number; "emoji"?: string; "emoji_key"?: string; "emoji_id"?: (string | null); "role_id"?: string; "max_members"?: (number | null); "position"?: number }>; "whitelist_role_ids"?: Array<string>; "blacklist_role_ids"?: Array<string>; "link_group_id"?: (number | null); "enabled"?: boolean; "status"?: string; "last_error"?: (string | null); "revision"?: number } | null) } }
   "GET /api/v1/guilds/{guild_id}/reaction-roles/events": { response: Items_ReactionRoleEvent_; body: never }

@@ -12,7 +12,8 @@ from cogs.engagement.advanced_polls import AdvancedPollsCog
 from database import transaction
 from database.migrations import MIGRATIONS, apply
 from database.testing import temporary_database
-from engagement import EngagementRepository
+from poll_support import PublishedPollRepository as EngagementRepository
+from engagement.polls.service import PollService
 
 
 class PollDisplayTests(unittest.IsolatedAsyncioTestCase):
@@ -21,6 +22,7 @@ class PollDisplayTests(unittest.IsolatedAsyncioTestCase):
         self.url = context.__enter__()
         self.addCleanup(context.__exit__, None, None, None)
         self.repo = EngagementRepository(self.url)
+        self.repo.settings.set_module(1,'advanced_polls',enabled=True)
         self.repo.create_poll(100, 1, 10, 20, 'Question', ['A', 'B'], None, None)
         self.message = NS(id=100, embed=AdvancedPollsCog._embed('Question', ['A', 'B']),
                           view=AdvancedPollsCog._view(100, ['A', 'B']))
@@ -30,17 +32,23 @@ class PollDisplayTests(unittest.IsolatedAsyncioTestCase):
         self.channel = MagicMock(spec=discord.TextChannel)
         self.channel.fetch_message = AsyncMock(return_value=self.message)
         self.guild = NS(id=1, get_channel=lambda _: self.channel,
-                        get_channel_or_thread=lambda _: self.channel)
+                        get_channel_or_thread=lambda _: self.channel,owner_id=20,
+                        fetch_member=AsyncMock(side_effect=lambda user: NS(id=user,roles=[],bot=False,guild_permissions=NS(administrator=False,manage_guild=False))))
         self.cog = object.__new__(AdvancedPollsCog)
         self.cog.engagement_repository = self.repo
+        self.cog.service = PollService(self.repo)
+        self.cog.owner = 'test-polls'
+        self.cog.delivery = NS(deliver=AsyncMock())
         self.cog.guild_settings = NS(module_enabled=lambda *args: True)
         self.cog.bot = NS(get_guild=lambda _: self.guild)
         self.cog._poll_locks = {}
+        self.cog._departure_cursor = (0,0)
 
     def interaction(self, user, option):
         return NS(type=discord.InteractionType.component, message=self.message,
                   guild=self.guild, user=NS(id=user),
                   data={'custom_id': f'tueka-poll:100:{option}'},
+                  followup=NS(send=AsyncMock()),
                   response=NS(edit_message=self.message.edit, defer=AsyncMock(), send_message=AsyncMock()))
 
     def expire(self):
@@ -66,12 +74,12 @@ class PollDisplayTests(unittest.IsolatedAsyncioTestCase):
     async def test_concurrent_votes_finish_with_latest_counts(self):
         entered, release = self.delay_first_edit()
         second_committed = asyncio.Event()
-        cast = self.repo.cast_poll_vote
-        def track(message, user, option):
-            result = cast(message, user, option)
+        cast = self.repo.vote
+        def track(guild, poll, user, options, **kwargs):
+            result = cast(guild, poll, user, options, **kwargs)
             if user == 31: second_committed.set()
             return result
-        self.repo.cast_poll_vote = track
+        self.repo.vote = track
         first = asyncio.create_task(self.cog.on_interaction(self.interaction(30, 0)))
         await asyncio.wait_for(entered.wait(), 5)
         second = asyncio.create_task(self.cog.on_interaction(self.interaction(31, 1)))
@@ -84,12 +92,12 @@ class PollDisplayTests(unittest.IsolatedAsyncioTestCase):
     async def test_close_cannot_be_overwritten_by_inflight_vote(self):
         entered, release = self.delay_first_edit()
         closed = asyncio.Event()
-        close = self.repo.close_expired_polls
+        close = self.repo.close_expired
         def track():
             rows = close()
             closed.set()
             return rows
-        self.repo.close_expired_polls = track
+        self.repo.close_expired = track
         vote = asyncio.create_task(self.cog.on_interaction(self.interaction(30, 0)))
         await asyncio.wait_for(entered.wait(), 5)
         self.expire()
@@ -97,7 +105,7 @@ class PollDisplayTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(closed.wait(), 5)
         release.set()
         await asyncio.gather(vote, closing)
-        self.assertTrue(all(button.disabled for button in self.message.view.children))
+        self.assertTrue(all(button.disabled for button in self.message.view.children if not button.custom_id.startswith('tueka-poll-details:')))
         self.assertIn('1. A — **1**票', self.message.embed.fields[0].value)
 
     async def test_temporary_close_failure_is_retried_after_restart(self):
@@ -109,7 +117,7 @@ class PollDisplayTests(unittest.IsolatedAsyncioTestCase):
         self.cog._poll_locks = {}
         await self.close()
         self.assertEqual(self.channel.fetch_message.await_count, 2)
-        self.assertTrue(all(button.disabled for button in self.message.view.children))
+        self.assertTrue(all(button.disabled for button in self.message.view.children if not button.custom_id.startswith('tueka-poll-details:')))
 
     async def test_failed_vote_edit_is_corrected_by_final_result(self):
         error = discord.HTTPException(NS(status=503, reason='temporary'), 'synthetic')
@@ -122,7 +130,7 @@ class PollDisplayTests(unittest.IsolatedAsyncioTestCase):
         self.message.edit = self.apply_edit
         self.expire()
         await self.close()
-        self.assertTrue(all(button.disabled for button in self.message.view.children))
+        self.assertTrue(all(button.disabled for button in self.message.view.children if not button.custom_id.startswith('tueka-poll-details:')))
         self.assertIn('1. A — **1**票', self.message.embed.fields[0].value)
 
     async def test_thread_poll_is_closed_on_discord(self):
@@ -132,7 +140,7 @@ class PollDisplayTests(unittest.IsolatedAsyncioTestCase):
         self.expire()
         await self.close()
         self.channel.fetch_message.assert_awaited_once_with(100)
-        self.assertTrue(all(button.disabled for button in self.message.view.children))
+        self.assertTrue(all(button.disabled for button in self.message.view.children if not button.custom_id.startswith('tueka-poll-details:')))
 
     async def test_stale_external_writer_ack_requeues_already_synced_latest_revision(self):
         other = EngagementRepository(self.url)
@@ -153,7 +161,7 @@ class PollDisplayTests(unittest.IsolatedAsyncioTestCase):
         await self.close()
         self.assertEqual(other.pending_poll_displays(), [])
         self.assertIn('2. B — **1**票', self.message.embed.fields[0].value)
-        self.assertTrue(all(button.disabled for button in self.message.view.children))
+        self.assertTrue(all(button.disabled for button in self.message.view.children if not button.custom_id.startswith('tueka-poll-details:')))
 
     async def test_missing_message_is_terminal_without_recreation(self):
         self.expire()

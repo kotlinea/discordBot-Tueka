@@ -3,12 +3,12 @@ import type { Feature } from '../types'
 import type { LucideIcon } from 'lucide-react'
 import type { FieldOptions } from '../components/forms/SettingField'
 
-export const NAMESPACES=['common','moderation','tickets','reactionRoles','social','suggestions','applications','appeals','scheduling','starboard','giveaways','insights'] as const
+export const NAMESPACES=['common','moderation','tickets','reactionRoles','social','suggestions','applications','appeals','scheduling','starboard','giveaways','insights','polls'] as const
 export type Namespace = typeof NAMESPACES[number]
 export interface FeatureScreenProps { features: Feature[]; definition?: FeatureDefinition }
 export type ScreenModule = { default: ComponentType<FeatureScreenProps> }
 export type ScreenLoader = () => Promise<ScreenModule>
-export type DisplayAccess = 'manager' | 'ticket_staff'
+export type DisplayAccess = 'manager' | 'ticket_staff' | 'delegated'
 
 /** A screen entry, never a mutation callback. Saving remains owned by the feature. */
 export interface FeaturePage {

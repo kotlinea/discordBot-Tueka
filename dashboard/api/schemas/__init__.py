@@ -12,3 +12,4 @@ from .scheduling import *
 from .starboard import *
 from .giveaways import *
 from .insights import *
+from .polls import *

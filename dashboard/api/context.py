@@ -14,6 +14,7 @@ from scheduling.repository import ScheduleRepository
 from starboard.repository import StarboardRepository
 from giveaways.repository import GiveawayRepository
 from insights.repository import InsightsRepository
+from engagement.polls.repository import PollRepository
 from dataclasses import dataclass, field
 from features.defaults import SettingsAccess
 
@@ -37,7 +38,9 @@ class ApiContext:
     starboard_repository: StarboardRepository
     giveaway_repository: GiveawayRepository
     insights_repository: InsightsRepository
+    poll_repository: PollRepository | None = None
     feature_settings: dict[str, SettingsAccess] = field(default_factory=dict)
+    feature_access: dict[str, Any] = field(default_factory=dict)
 
 def create_context(database_url: str, discord: Any, settings: Any | None=None) -> ApiContext:
     social_repository = SocialRepository(database_url)
@@ -50,8 +53,9 @@ def create_context(database_url: str, discord: Any, settings: Any | None=None) -
     reaction_role_repository = ReactionRoleRepository(settings.database_url) if settings is not None else None
     reaction_role_service = ReactionRoleService(reaction_role_repository, max_mappings=settings.reaction_role_max_mappings_per_message) if reaction_role_repository and settings else None
     suggestion_repository = SuggestionRepository(database_url)
-    context = ApiContext(discord=discord, settings=settings, social_repository=social_repository, moderation_repository=moderation_repository, dashboard_repository=dashboard_repository, guild_settings_repository=guild_settings_repository, ticket_repository=ticket_repository, ticket_transcripts=ticket_transcripts, ticket_service=ticket_service, reaction_role_repository=reaction_role_repository, reaction_role_service=reaction_role_service, suggestion_repository=suggestion_repository, application_repository=ApplicationRepository(database_url), appeal_repository=AppealRepository(database_url), schedule_repository=ScheduleRepository(database_url), starboard_repository=StarboardRepository(database_url), giveaway_repository=GiveawayRepository(database_url), insights_repository=InsightsRepository(database_url))
+    context = ApiContext(discord=discord, settings=settings, social_repository=social_repository, moderation_repository=moderation_repository, dashboard_repository=dashboard_repository, guild_settings_repository=guild_settings_repository, ticket_repository=ticket_repository, ticket_transcripts=ticket_transcripts, ticket_service=ticket_service, reaction_role_repository=reaction_role_repository, reaction_role_service=reaction_role_service, suggestion_repository=suggestion_repository, application_repository=ApplicationRepository(database_url), appeal_repository=AppealRepository(database_url), schedule_repository=ScheduleRepository(database_url), starboard_repository=StarboardRepository(database_url), giveaway_repository=GiveawayRepository(database_url), insights_repository=InsightsRepository(database_url), poll_repository=PollRepository(database_url))
 
-    from .settings import create_settings_access
+    from .settings import create_settings_access, create_workspace_access
     context.feature_settings.update(create_settings_access(context))
+    context.feature_access.update(create_workspace_access(context))
     return context

@@ -1,6 +1,6 @@
 from social import SocialRepository
 from moderation import ModerationRepository
-from engagement import EngagementRepository
+from poll_support import PublishedPollRepository as EngagementRepository
 from community import CommunityRepository
 from dashboard.repository import DashboardRepository
 from db_support import prepare_database

@@ -37,7 +37,8 @@ class Guild(ApiModel):
     id: str
     name: str
     icon: str | None
-    access: Literal["admin"] | Literal["ticket_staff"] = None
+    access: Literal["admin", "ticket_staff", "delegated"] = None
+    feature_ids: list[str] = None
 
 
 class Resource(ApiModel):

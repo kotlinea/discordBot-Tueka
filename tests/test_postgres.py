@@ -24,7 +24,7 @@ class PostgresTests(unittest.TestCase):
         require_current(self.url)
         self.assertEqual(apply(self.url)['applied'], [])
         with transaction(self.url) as c:
-            self.assertEqual(c.execute('SELECT count(*) count FROM information_schema.tables WHERE table_schema=current_schema()').fetchone()['count'], 98)
+                self.assertEqual(c.execute('SELECT count(*) count FROM information_schema.tables WHERE table_schema=current_schema()').fetchone()['count'], 101)
 
     def test_transaction_and_migration_failures_roll_back(self):
         apply(self.url)
@@ -97,7 +97,7 @@ class PostgresTests(unittest.TestCase):
     def test_community_upserts_and_poll_closure(self):
         import time
         from community import CommunityRepository
-        from engagement import EngagementRepository
+        from poll_support import PublishedPollRepository as EngagementRepository
         apply(self.url)
         community = CommunityRepository(self.url)
         community.add_temporary_voice_channel(10, 1, 20)

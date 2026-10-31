@@ -220,10 +220,10 @@
 
 ## /poll
 
-- **用途**: 最大10択のボタン投票を作成します。選択肢は | で区切ります。
-- **引数（*必須）**: question*:string, options*:string, duration_minutes:integer [1..10080], image_url:string
-- **権限**: manage_guild; Bot permissions and role hierarchy also apply.
-- **応答**: 公開応答。エラーは本人向け。
+- **用途**: 選択肢を | で区切り最大20択を作成します。質問1024文字、説明2000文字、各選択肢256文字。既定は結果公開・個票非公開です。
+- **引数（*必須）**: question*:string, options*:string, duration_minutes:integer [1..43200], image_url:string, description:string = "", max_choices:integer [1..20] = 1, mode:string (anonymous, public, secret_winner, reveal_at_end, blind) = "anonymous", allowed_role:role
+- **権限**: サーバー所有者、Administrator、Manage Server、または投票管理を委譲されたロール。
+- **応答**: 公開受付を本人だけに表示し、配送後に投票を投稿します。
 - **無効時**: 対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。
 - **例**: `/poll question:Lunch? options:A|B`
 
@@ -991,3 +991,111 @@
 - **応答**: 本人だけに応答します。返信と審査結果のDM配送状態はDashboardで確認できます。
 - **無効時**: 受付がOFFの間は新しい受付・返信・取り下げを行いません。
 - **例**: `/appeal-withdraw guild_id:123456789012345678 conversation_id:1`
+
+## /poll-time
+
+- **用途**: 期間を指定して投票を作成します。
+- **引数（*必須）**: question*:string, options*:string, time*:string, max_choices:integer [1..20] = 1, mode:string (anonymous, public, secret_winner, reveal_at_end, blind) = "anonymous"
+- **権限**: サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。
+- **応答**: 操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。
+- **無効時**: 閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。
+- **例**: `/poll-time question:Lunch? options:A|B time:3h`
+
+## /poll-schedule
+
+- **用途**: UTCオフセット付き日時で投票を予約します。
+- **引数（*必須）**: question*:string, options*:string, start*:string, time:string
+- **権限**: サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。
+- **応答**: 操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。
+- **無効時**: 閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。
+- **例**: `/poll-schedule question:Lunch? options:A|B start:2027-01-01T12:00:00+09:00`
+
+## /poll-show
+
+- **用途**: 公開範囲に応じた状態と結果を確認します。
+- **引数（*必須）**: poll_id*:integer, page:integer [1..5] = 1
+- **権限**: サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。
+- **応答**: 操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。
+- **無効時**: 閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。
+- **例**: `/poll-show poll_id:1`
+
+## /poll-list
+
+- **用途**: サーバーの投票一覧を確認します。
+- **引数（*必須）**: before:integer
+- **権限**: サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。
+- **応答**: 操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。
+- **無効時**: 閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。
+- **例**: `/poll-list`
+
+## /poll-close
+
+- **用途**: 投票を終了します。
+- **引数（*必須）**: poll_id*:integer
+- **権限**: サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。
+- **応答**: 操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。
+- **無効時**: 閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。
+- **例**: `/poll-close poll_id:1`
+
+## /poll-reopen
+
+- **用途**: 票を保持して投票を再開します。
+- **引数（*必須）**: poll_id*:integer, time:string
+- **権限**: サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。
+- **応答**: 操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。
+- **無効時**: 閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。
+- **例**: `/poll-reopen poll_id:1 time:3h`
+
+## /poll-delete
+
+- **用途**: confirm:trueで投票を削除し、票を消去します。
+- **引数（*必須）**: poll_id*:integer, confirm:boolean = false
+- **権限**: サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。
+- **応答**: 操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。
+- **無効時**: 閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。
+- **例**: `/poll-delete poll_id:1 confirm:true`
+
+## /poll-move
+
+- **用途**: 投票を別チャンネルへ移動します。
+- **引数（*必須）**: poll_id*:integer, channel*:channel
+- **権限**: サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。
+- **応答**: 操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。
+- **無効時**: 閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。
+- **例**: `/poll-move poll_id:1 channel:#polls`
+
+## /poll-export
+
+- **用途**: 公開範囲に応じたCSVまたはJSONを取得します。
+- **引数（*必須）**: poll_id*:integer, format:string (csv, json) = "csv"
+- **権限**: サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。
+- **応答**: 操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。
+- **無効時**: 閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。
+- **例**: `/poll-export poll_id:1 format:csv`
+
+## /pollbuilder
+
+- **用途**: 最大25択を編集し、プレビュー後にCreateで公開します。
+- **引数（*必須）**: question:string = "新しい投票", time:string
+- **権限**: サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。
+- **応答**: 操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。
+- **無効時**: 閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。
+- **例**: `/pollbuilder question:Lunch?`
+
+## /poll-edit
+
+- **用途**: プレビューし、保存を押して編集を確定します。
+- **引数（*必須）**: poll_id*:integer
+- **権限**: サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。
+- **応答**: 操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。
+- **無効時**: 閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。
+- **例**: `/poll-edit poll_id:1`
+
+## /poll-copy
+
+- **用途**: 票を引き継がず設定を下書きへ複製します。
+- **引数（*必須）**: poll_id*:integer
+- **権限**: サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。
+- **応答**: 操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。
+- **無効時**: 閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。
+- **例**: `/poll-copy poll_id:1`

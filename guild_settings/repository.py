@@ -38,8 +38,8 @@ class GuildSettingsRepository:
         return {module_id: self._module(module_id, stored.get(module_id)) for module_id in ids}
 
     def set_module(self, guild_id: int, module_id: str, *, enabled: bool, settings: dict[str, Any] | None = None,
-                   expected_revision: int | None = None) -> dict[str, Any]:
-        with self._connection() as connection:
+                   expected_revision: int | None = None, _conn=None) -> dict[str, Any]:
+        with (nullcontext(_conn) if _conn is not None else self._connection()) as connection:
             lock_resource(connection, 'guild-module', f'{guild_id}:{module_id}')
             current = self.get_module(guild_id, module_id, _conn=connection)
             if expected_revision is not None and current["revision"] != expected_revision:

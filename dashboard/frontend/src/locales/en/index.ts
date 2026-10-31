@@ -1,3 +1,4 @@
+import polls from './polls'
 import common from './common'
 import moderation from './moderation'
 import reactionRoles from './reactionRoles'
@@ -10,4 +11,4 @@ import scheduling from './scheduling'
 import starboard from './starboard'
 import giveaways from './giveaways'
 import insights from './insights'
-export default { common, moderation, reactionRoles, tickets, social, suggestions, applications, appeals, scheduling,starboard,giveaways,insights }
+export default { common, moderation, reactionRoles, tickets, social, suggestions, applications, appeals, scheduling,starboard,giveaways,insights,polls }

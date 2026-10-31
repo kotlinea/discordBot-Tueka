@@ -50,12 +50,22 @@ def create_router(context: ApiContext) -> APIRouter:
                 continue
             administrator = bool(int(item.get('permissions', '0')) & ADMINISTRATOR)
             ticket_staff = False
+            feature_ids = []
+            member = None
             if not administrator and ticket_repository:
                 teams = ticket_repository.teams(guild_id)
                 if teams:
                     member = await discord.guild_member(guild_id, user_id)
                     ticket_staff = any(team_member(team, user_id, member) for team in teams)
-            if administrator or ticket_staff:
-                visible.append({'id': str(item['id']), 'name': item['name'], 'icon': item.get('icon'), 'access': 'admin' if administrator else 'ticket_staff'})
+            if not administrator and context.feature_access:
+                if member is None:
+                    member = await discord.guild_member(guild_id, user_id, use_cache=False)
+                if member:
+                    feature_ids = [feature_id for feature_id, check in context.feature_access.items() if check(guild_id,user_id,member,item)]
+            if administrator or ticket_staff or feature_ids:
+                value = {'id': str(item['id']), 'name': item['name'], 'icon': item.get('icon'), 'access': 'admin' if administrator else 'ticket_staff' if ticket_staff else 'delegated'}
+                if feature_ids:
+                    value['feature_ids'] = feature_ids
+                visible.append(value)
         return {'items': visible}
     return router

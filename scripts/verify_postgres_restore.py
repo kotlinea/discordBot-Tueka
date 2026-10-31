@@ -24,6 +24,9 @@ from database.testing import test_database_url
 from suggestions import SuggestionRepository
 from guild_settings import GuildSettingsRepository
 from ticketing import TicketRepository
+from engagement.polls.repository import PollRepository
+from engagement.polls.models import Actor
+from jobs import Outcome
 
 
 def main():
@@ -67,6 +70,18 @@ def main():
         panel = tickets.save_panel(1, {'name': 'Support', 'mode': 'channel', 'category_id': 100, 'team_id': team['id']})
         ticket = tickets.reserve_ticket(1, panel['id'], 10, 'restore', {})
         transcript = tickets.save_transcript(ticket['id'], 's3', 'encrypted-transcripts/proof', 'content-hash', 123, 9999999999)
+        GuildSettingsRepository(source).set_module(1,'advanced_polls',enabled=True,settings={'role_weights':{'500':10}})
+        polls=PollRepository(source)
+        poll=polls.create(1,10,20,dict(question='restore poll',options=['A','B'],max_choices=2,mode='blind'),'restore-poll')
+        poll=polls.launch(1,poll['id'],20,poll['revision'])
+        claim=polls.jobs.claim('restore-seed')
+        polls.start_delivery(claim.payload)
+        polls.receipt(claim.payload,1234567890123456793)
+        polls.jobs.finish(claim,Outcome())
+        polls.vote(1,poll['id'],1234567890123456794,[0,1],roles=[500])
+        polls.transition(1,poll['id'],20,'close',poll['revision'])
+        pending=polls.create(1,10,20,dict(question='pending poll',options=['A','B']),'restore-pending')
+        polls.launch(1,pending['id'],20,pending['revision'])
         before = inventory(source)
         with tempfile.TemporaryDirectory(prefix='tueka-restore-') as directory:
             dump = Path(directory) / 'snapshot.dump'
@@ -83,6 +98,10 @@ def main():
                 assert restored.get(1234567890123456789, item['id'])['upvotes'] == 1
                 assert restored.create(1, 2, 3, {'idea': 'new'})['id'] > item['id']
                 assert restored.outbox_jobs.claim('after-restore') is not None
+                poll_store=PollRepository(target)
+                assert poll_store.get(1,poll['id'])['weighted_counts']==[10,10]
+                assert 'ballots' not in poll_store.read(Actor(1,20,manager=True),poll['id'],management=True)
+                assert poll_store.jobs.claim('poll-after-restore') is not None
                 try:
                     restore(dump, target)
                 except ValueError:
@@ -99,7 +118,7 @@ def main():
                     raise AssertionError('Truncated dump was accepted')
                 assert inventory(invalid)['tables'] == []
             print(json.dumps({'restored_tables': len(before['tables']), 'dump_bytes': result['bytes'],
-                'large_ids': 'preserved', 'identity': 'advanced', 'queue': 'claimable', 'failed_restore': 'empty', 'settings': 'preserved', 'transcript_reference': 'preserved'}))
+                'large_ids': 'preserved', 'identity': 'advanced', 'queue': 'claimable', 'failed_restore': 'empty', 'settings': 'preserved', 'transcript_reference': 'preserved', 'poll_ballots_weights_privacy_queue':'preserved'}))
     finally:
         for url in urls:
             close_pools(url)

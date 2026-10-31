@@ -13,6 +13,8 @@ import '../i18n'
 vi.mock('../api', async importOriginal => ({ ...await importOriginal<typeof import('../api')>(), request: vi.fn(async () => ({ channels: [], roles: [] })) }))
 
 vi.mock('../features/DefaultSettings', () => ({ default: routeScreen('settings') }))
+vi.mock('../features/engagement/polls/Polls', () => ({ default: routeScreen('polls') }))
+vi.mock('../features/engagement/polls/Settings', () => ({ default: routeScreen('poll-settings') }))
 vi.mock('../features/community/welcome/Settings', () => ({ default: routeScreen('welcome') }))
 vi.mock('../features/engagement/suggestions/Settings', () => ({ default: routeScreen('suggestions') }))
 vi.mock('../features/community/reaction_roles/Overview', () => ({ ReactionRoleOverview: routeScreen('roles'), ReactionRoleSettingsPage: routeScreen('role-settings') }))
@@ -56,8 +58,9 @@ async function mount(path: string, staffOnly = false) {
 
 describe('registered routes preserve direct links and parameters', () => {
   const paths: [string, Record<string, string>][] = [
+    ['modules/advanced_polls', { screen: 'polls' }], ['modules/advanced_polls/settings', { screen: 'poll-settings' }],
     ['modules/welcome', { screen: 'welcome' }],
-    ...['autorole', 'leveling', 'live_stats', 'temporary_voice', 'advanced_polls', 'minigames', 'moderation', 'automod', 'anti_spam', 'anti_raid', 'audit_log', 'trust_score', 'infractions', 'moderation_actions', 'moderation_logs', 'youtube_updates', 'twitch_updates', 'tiktok_updates', 'x_updates', 'instagram_updates'].map(id => [`modules/${id}`, { screen: 'settings', feature: id }] as [string, Record<string, string>]),
+    ...['autorole', 'leveling', 'live_stats', 'temporary_voice', 'minigames', 'moderation', 'automod', 'anti_spam', 'anti_raid', 'audit_log', 'trust_score', 'infractions', 'moderation_actions', 'moderation_logs', 'youtube_updates', 'twitch_updates', 'tiktok_updates', 'x_updates', 'instagram_updates'].map(id => [`modules/${id}`, { screen: 'settings', feature: id }] as [string, Record<string, string>]),
     ['moderation/audit_log', { screen: 'settings', feature: 'audit_log' }], ['moderation/trust_score', { screen: 'settings', feature: 'trust_score' }],
     ['modules/tickets', { screen: 'ticket-settings' }], ['modules/reaction_roles', { screen: 'roles' }], ['modules/suggestions', { screen: 'suggestions' }],
     ['suggestions', { screen: 'suggestions' }], ['reaction-roles', { screen: 'roles' }], ['reaction-roles/new', { screen: 'role-editor' }], ['reaction-roles/35', { screen: 'role-editor', configId: '35' }],

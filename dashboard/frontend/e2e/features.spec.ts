@@ -10,6 +10,13 @@ async function session(page: Page, locale: 'ja' | 'en', access = 'manager') {
   await page.route('**/api/v1/session', route => route.fulfill({ json: { user: { id: '1', name: 'Viewer', avatar_url: '' }, csrf_token: 'csrf', preferences: { locale, appearance: 'precision', color_scheme: 'light', navigation_collapsed: false, revision: 1 } } }))
   await page.route('**/api/v1/guilds', route => route.fulfill({ json: { items: [{ id: '1', name: 'Example', icon: null, access }] } }))
   await page.route('**/api/v1/guilds/1/resources', route => route.fulfill({ json: resources }))
+  await page.route('**/api/v1/guilds/1/polls/**', route => {
+    const path=new URL(route.request().url()).pathname.split('/polls/')[1]
+    if(path==='capabilities')return route.fulfill({json:{permissions:['view','manage','settings'],enabled:true}})
+    if(path==='resources')return route.fulfill({json:resources})
+    if(path==='settings')return route.fulfill({json:{revision:1,enabled:true,settings:{retention_days:90,role_weights:{},role_permissions:{}}}})
+    return route.fulfill({json:{items:[]}})
+  })
 }
 const failure = (status: number) => ({ status, json: { detail: { code: 'rejected', message: `Rejected ${status}`, errors: [] } } })
 
@@ -69,8 +76,8 @@ for (const locale of ['ja', 'en'] as const) {
     for (const item of other) {
       const path = ['audit_log', 'trust_score'].includes(item.id) ? `moderation/${item.id}` : `modules/${item.id}`
       await page.goto(`/servers/1/${path}`)
-      const title = item.id === 'moderation' ? copy.common.nav.moderationSettings : item.id === 'automod' ? copy.moderation.moderation.automod : item.id === 'anti_spam' ? copy.moderation.moderation.anti_spam : item.id === 'anti_raid' ? copy.moderation.moderation.anti_raid : item.id
-      await expect(page.getByRole('heading', { name: item.id, exact: true })).toBeVisible()
+      const title = item.id === 'advanced_polls' ? copy.polls.polls.title : item.id === 'moderation' ? copy.common.nav.moderationSettings : item.id === 'automod' ? copy.moderation.moderation.automod : item.id === 'anti_spam' ? copy.moderation.moderation.anti_spam : item.id === 'anti_raid' ? copy.moderation.moderation.anti_raid : item.id
+      await expect(page.getByRole('heading', { name: item.id==='advanced_polls'?copy.polls.polls.title:item.id, exact: true })).toBeVisible()
       await expect(page.getByRole('navigation', { name: /パンくず|Breadcrumbs/ })).toContainText(title)
     }
     await page.keyboard.press('ControlOrMeta+k')

@@ -16,19 +16,26 @@ from jobs import LostLease
 class PollRecoveryTests(unittest.IsolatedAsyncioTestCase):
     def cog(self):
         cog = object.__new__(AdvancedPollsCog)
-        cog.engagement_repository = NS(close_expired_polls=Mock(), pending_poll_displays=Mock(return_value=[10, 20]))
+        cog.engagement_repository = NS(close_expired=Mock(), pending_displays=Mock(return_value=[10, 20]))
+        cog.engagement_repository.enqueue_due = Mock()
+        cog.engagement_repository.purge_expired = Mock()
+        cog.engagement_repository.departure_candidates = Mock(return_value=[])
+        cog._departure_cursor = (0,0)
+        cog.engagement_repository.jobs = NS(purge=Mock(),claim=Mock(return_value=None))
+        cog.owner = 'test-polls'
+        cog.delivery = NS(deliver=AsyncMock())
         cog._sync_poll = AsyncMock()
         return cog
 
     async def test_transient_database_failure_reaches_next_real_loop_tick(self):
         cog = self.cog()
         recovered = asyncio.Event()
-        cog.engagement_repository.close_expired_polls.side_effect = [psycopg.OperationalError('synthetic disconnect'), None]
-        cog.engagement_repository.pending_poll_displays.return_value = []
+        cog.engagement_repository.close_expired.side_effect = [psycopg.OperationalError('synthetic disconnect'), None]
+        cog.engagement_repository.pending_displays.return_value = []
         def pending():
             recovered.set()
             return []
-        cog.engagement_repository.pending_poll_displays.side_effect = pending
+        cog.engagement_repository.pending_displays.side_effect = pending
         cog.bot = NS(wait_until_ready=AsyncMock())
         loop = cog.close_expired_polls
         loop.change_interval(seconds=0.01)
@@ -49,7 +56,7 @@ class PollRecoveryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_enumeration_failure_is_retried(self):
         cog = self.cog()
-        cog.engagement_repository.pending_poll_displays.side_effect = [psycopg.OperationalError('enumeration'), [20]]
+        cog.engagement_repository.pending_displays.side_effect = [psycopg.OperationalError('enumeration'), [20]]
         await AdvancedPollsCog.close_expired_polls.coro(cog)
         await AdvancedPollsCog.close_expired_polls.coro(cog)
         cog._sync_poll.assert_awaited_once_with(20)
@@ -60,5 +67,3 @@ class PollRecoveryTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(asyncio.CancelledError):
             await AdvancedPollsCog.close_expired_polls.coro(cog)
         cog._sync_poll.assert_awaited_once_with(10)
-
-

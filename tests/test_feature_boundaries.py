@@ -11,7 +11,7 @@ SHARED = {'database', 'jobs', 'discord_io'}
 CATEGORIES = {p.parent.name for p in (ROOT / 'features').glob('*/registry.py')}
 LAYERS = ('features', 'cogs', 'guild_settings', 'dashboard.api')
 # Explicit external presentation/IO adapters, not Domain logic.
-ADAPTERS = {f'{name}.discord_adapter' for name in DOMAINS} | {'suggestions.presentation'}
+ADAPTERS = {f'{name}.discord_adapter' for name in DOMAINS} | {'suggestions.presentation', 'engagement.polls.discord_adapter'}
 EXTERNAL = ADAPTERS | {'social.providers', 'social.worker'}
 
 

@@ -10,7 +10,7 @@ import discord
 
 from cogs.moderation.audit_log import AuditLogCog
 from db_support import prepare_database
-from engagement import EngagementRepository
+from poll_support import PublishedPollRepository as EngagementRepository
 from guild_settings import GuildSettingsRepository
 from moderation import ModerationRepository
 

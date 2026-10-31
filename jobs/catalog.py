@@ -2,6 +2,7 @@
 from .repository import QueueSpec
 
 QUEUE_SPECS = {spec.table: spec for spec in (
+    QueueSpec('poll_outbox'),
     QueueSpec('giveaway_outbox'),
     QueueSpec('giveaway_draw_jobs'),
     QueueSpec('starboard_outbox'),

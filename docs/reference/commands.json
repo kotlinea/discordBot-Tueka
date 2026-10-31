@@ -1017,7 +1017,7 @@
   },
   "poll": {
     "contract": {
-      "description": "最大10択のボタン投票を作成します。選択肢は | で区切ります。",
+      "description": "最大20択の投票を作成します。選択肢は | で区切ります。",
       "parameters": [
         {
           "name": "question",
@@ -1047,7 +1047,7 @@
           "choices": [],
           "default": null,
           "min": 1,
-          "max": 10080
+          "max": 43200
         },
         {
           "name": "image_url",
@@ -1058,21 +1058,67 @@
           "default": null,
           "min": null,
           "max": null
+        },
+        {
+          "name": "description",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": "",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "max_choices",
+          "description": "…",
+          "required": false,
+          "type": "integer",
+          "choices": [],
+          "default": 1,
+          "min": 1,
+          "max": 20
+        },
+        {
+          "name": "mode",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [
+            "anonymous",
+            "public",
+            "secret_winner",
+            "reveal_at_end",
+            "blind"
+          ],
+          "default": "anonymous",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "allowed_role",
+          "description": "…",
+          "required": false,
+          "type": "role",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
         }
       ],
       "module": "cogs.engagement.advanced_polls"
     },
     "ja": {
-      "usage": "最大10択のボタン投票を作成します。選択肢は | で区切ります。",
-      "permissions": "manage_guild; Bot permissions and role hierarchy also apply.",
-      "response": "公開応答。エラーは本人向け。",
+      "usage": "選択肢を | で区切り最大20択を作成します。質問1024文字、説明2000文字、各選択肢256文字。既定は結果公開・個票非公開です。",
+      "permissions": "サーバー所有者、Administrator、Manage Server、または投票管理を委譲されたロール。",
+      "response": "公開受付を本人だけに表示し、配送後に投票を投稿します。",
       "disabled": "対応機能が無効な場合は新規利用できません。既存データの扱いは機能別ガイドを参照。",
       "example": "poll question:Lunch? options:A|B"
     },
     "en": {
-      "usage": "Create a poll; separate up to ten choices with |.",
-      "permissions": "manage_guild; Bot permissions and role hierarchy also apply.",
-      "response": "Public response; errors are private.",
+      "usage": "Create up to 20 choices separated by |. Questions allow 1024 characters, descriptions 2000 and each option 256. The default shows results and hides individual ballots.",
+      "permissions": "Server owner, Administrator, Manage Server, or a role delegated poll management.",
+      "response": "Privately acknowledges publication and posts the poll after delivery.",
       "disabled": "Disabled features cannot start new actions; see the feature guide for retained data and existing actions.",
       "example": "poll question:Lunch? options:A|B"
     }
@@ -4217,6 +4263,529 @@
       "response": "Private response. Managers can inspect DM delivery state for replies and review decisions.",
       "disabled": "New intake, replies and withdrawal are paused while intake is disabled.",
       "example": "appeal-withdraw guild_id:123456789012345678 conversation_id:1"
+    }
+  },
+  "poll-time": {
+    "en": {
+      "usage": "Create a timed poll.",
+      "permissions": "Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.",
+      "example": "poll-time question:Lunch? options:A|B time:3h",
+      "response": "Privately displays results or acceptance. Check delivery status after publication or move.",
+      "disabled": "Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused."
+    },
+    "contract": {
+      "description": "指定した期間の投票を作成します。例: 1d 3h 15m",
+      "parameters": [
+        {
+          "name": "question",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "options",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "time",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "max_choices",
+          "description": "…",
+          "required": false,
+          "type": "integer",
+          "choices": [],
+          "default": 1,
+          "min": 1,
+          "max": 20
+        },
+        {
+          "name": "mode",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [
+            "anonymous",
+            "public",
+            "secret_winner",
+            "reveal_at_end",
+            "blind"
+          ],
+          "default": "anonymous",
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.engagement.advanced_polls"
+    },
+    "ja": {
+      "usage": "期間を指定して投票を作成します。",
+      "permissions": "サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。",
+      "example": "poll-time question:Lunch? options:A|B time:3h",
+      "response": "操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。",
+      "disabled": "閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。"
+    }
+  },
+  "poll-schedule": {
+    "en": {
+      "usage": "Schedule a poll with an explicit UTC offset.",
+      "permissions": "Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.",
+      "example": "poll-schedule question:Lunch? options:A|B start:2027-01-01T12:00:00+09:00",
+      "response": "Privately displays results or acceptance. Check delivery status after publication or move.",
+      "disabled": "Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused."
+    },
+    "contract": {
+      "description": "日時指定で投票を予約します。日時にはUTCオフセットが必要です。",
+      "parameters": [
+        {
+          "name": "question",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "options",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "start",
+          "description": "…",
+          "required": true,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "time",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.engagement.advanced_polls"
+    },
+    "ja": {
+      "usage": "UTCオフセット付き日時で投票を予約します。",
+      "permissions": "サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。",
+      "example": "poll-schedule question:Lunch? options:A|B start:2027-01-01T12:00:00+09:00",
+      "response": "操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。",
+      "disabled": "閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。"
+    }
+  },
+  "poll-show": {
+    "en": {
+      "usage": "View permitted results and status.",
+      "permissions": "Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.",
+      "example": "poll-show poll_id:1",
+      "response": "Privately displays results or acceptance. Check delivery status after publication or move.",
+      "disabled": "Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused."
+    },
+    "contract": {
+      "description": "投票の状態と公開範囲に応じた結果を確認します。",
+      "parameters": [
+        {
+          "name": "poll_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "page",
+          "description": "…",
+          "required": false,
+          "type": "integer",
+          "choices": [],
+          "default": 1,
+          "min": 1,
+          "max": 5
+        }
+      ],
+      "module": "cogs.engagement.advanced_polls"
+    },
+    "ja": {
+      "usage": "公開範囲に応じた状態と結果を確認します。",
+      "permissions": "サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。",
+      "example": "poll-show poll_id:1",
+      "response": "操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。",
+      "disabled": "閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。"
+    }
+  },
+  "poll-list": {
+    "en": {
+      "usage": "List server polls.",
+      "permissions": "Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.",
+      "example": "poll-list",
+      "response": "Privately displays results or acceptance. Check delivery status after publication or move.",
+      "disabled": "Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused."
+    },
+    "contract": {
+      "description": "サーバーの投票一覧を確認します。",
+      "parameters": [
+        {
+          "name": "before",
+          "description": "…",
+          "required": false,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.engagement.advanced_polls"
+    },
+    "ja": {
+      "usage": "サーバーの投票一覧を確認します。",
+      "permissions": "サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。",
+      "example": "poll-list",
+      "response": "操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。",
+      "disabled": "閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。"
+    }
+  },
+  "poll-close": {
+    "en": {
+      "usage": "Close a poll.",
+      "permissions": "Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.",
+      "example": "poll-close poll_id:1",
+      "response": "Privately displays results or acceptance. Check delivery status after publication or move.",
+      "disabled": "Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused."
+    },
+    "contract": {
+      "description": "投票を終了します。",
+      "parameters": [
+        {
+          "name": "poll_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.engagement.advanced_polls"
+    },
+    "ja": {
+      "usage": "投票を終了します。",
+      "permissions": "サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。",
+      "example": "poll-close poll_id:1",
+      "response": "操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。",
+      "disabled": "閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。"
+    }
+  },
+  "poll-reopen": {
+    "en": {
+      "usage": "Reopen a poll keeping ballots.",
+      "permissions": "Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.",
+      "example": "poll-reopen poll_id:1 time:3h",
+      "response": "Privately displays results or acceptance. Check delivery status after publication or move.",
+      "disabled": "Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused."
+    },
+    "contract": {
+      "description": "票を保持して投票を再開します。",
+      "parameters": [
+        {
+          "name": "poll_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "time",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.engagement.advanced_polls"
+    },
+    "ja": {
+      "usage": "票を保持して投票を再開します。",
+      "permissions": "サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。",
+      "example": "poll-reopen poll_id:1 time:3h",
+      "response": "操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。",
+      "disabled": "閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。"
+    }
+  },
+  "poll-delete": {
+    "en": {
+      "usage": "Delete a poll and ballots with confirm:true.",
+      "permissions": "Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.",
+      "example": "poll-delete poll_id:1 confirm:true",
+      "response": "Privately displays results or acceptance. Check delivery status after publication or move.",
+      "disabled": "Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused."
+    },
+    "contract": {
+      "description": "投票を削除し、票を消去します。confirm:trueで確定します。",
+      "parameters": [
+        {
+          "name": "poll_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "confirm",
+          "description": "…",
+          "required": false,
+          "type": "boolean",
+          "choices": [],
+          "default": false,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.engagement.advanced_polls"
+    },
+    "ja": {
+      "usage": "confirm:trueで投票を削除し、票を消去します。",
+      "permissions": "サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。",
+      "example": "poll-delete poll_id:1 confirm:true",
+      "response": "操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。",
+      "disabled": "閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。"
+    }
+  },
+  "poll-move": {
+    "en": {
+      "usage": "Move a poll to another channel.",
+      "permissions": "Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.",
+      "example": "poll-move poll_id:1 channel:#polls",
+      "response": "Privately displays results or acceptance. Check delivery status after publication or move.",
+      "disabled": "Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused."
+    },
+    "contract": {
+      "description": "投票を別チャンネルへ移動します。",
+      "parameters": [
+        {
+          "name": "poll_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "channel",
+          "description": "…",
+          "required": true,
+          "type": "channel",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.engagement.advanced_polls"
+    },
+    "ja": {
+      "usage": "投票を別チャンネルへ移動します。",
+      "permissions": "サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。",
+      "example": "poll-move poll_id:1 channel:#polls",
+      "response": "操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。",
+      "disabled": "閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。"
+    }
+  },
+  "poll-export": {
+    "en": {
+      "usage": "Export permitted results as CSV or JSON.",
+      "permissions": "Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.",
+      "example": "poll-export poll_id:1 format:csv",
+      "response": "Privately displays results or acceptance. Check delivery status after publication or move.",
+      "disabled": "Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused."
+    },
+    "contract": {
+      "description": "公開範囲に応じた結果をCSVまたはJSONで取得します。",
+      "parameters": [
+        {
+          "name": "poll_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "format",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [
+            "csv",
+            "json"
+          ],
+          "default": "csv",
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.engagement.advanced_polls"
+    },
+    "ja": {
+      "usage": "公開範囲に応じたCSVまたはJSONを取得します。",
+      "permissions": "サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。",
+      "example": "poll-export poll_id:1 format:csv",
+      "response": "操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。",
+      "disabled": "閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。"
+    }
+  },
+  "pollbuilder": {
+    "en": {
+      "usage": "Build up to 25 options and publish after preview.",
+      "permissions": "Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.",
+      "example": "pollbuilder question:Lunch?",
+      "response": "Privately displays results or acceptance. Check delivery status after publication or move.",
+      "disabled": "Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused."
+    },
+    "contract": {
+      "description": "プレビューを見ながら最大25択の投票を作成します。",
+      "parameters": [
+        {
+          "name": "question",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": "新しい投票",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "time",
+          "description": "…",
+          "required": false,
+          "type": "string",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.engagement.advanced_polls"
+    },
+    "ja": {
+      "usage": "最大25択を編集し、プレビュー後にCreateで公開します。",
+      "permissions": "サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。",
+      "example": "pollbuilder question:Lunch?",
+      "response": "操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。",
+      "disabled": "閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。"
+    }
+  },
+  "poll-edit": {
+    "en": {
+      "usage": "Preview and save edits.",
+      "permissions": "Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.",
+      "example": "poll-edit poll_id:1",
+      "response": "Privately displays results or acceptance. Check delivery status after publication or move.",
+      "disabled": "Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused."
+    },
+    "contract": {
+      "description": "投票を編集し、保存前にプレビューを確認します。",
+      "parameters": [
+        {
+          "name": "poll_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.engagement.advanced_polls"
+    },
+    "ja": {
+      "usage": "プレビューし、保存を押して編集を確定します。",
+      "permissions": "サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。",
+      "example": "poll-edit poll_id:1",
+      "response": "操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。",
+      "disabled": "閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。"
+    }
+  },
+  "poll-copy": {
+    "en": {
+      "usage": "Copy settings to a draft without ballots.",
+      "permissions": "Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.",
+      "example": "poll-copy poll_id:1",
+      "response": "Privately displays results or acceptance. Check delivery status after publication or move.",
+      "disabled": "Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused."
+    },
+    "contract": {
+      "description": "設定を複製して票を含まない下書きを作成します。",
+      "parameters": [
+        {
+          "name": "poll_id",
+          "description": "…",
+          "required": true,
+          "type": "integer",
+          "choices": [],
+          "default": null,
+          "min": null,
+          "max": null
+        }
+      ],
+      "module": "cogs.engagement.advanced_polls"
+    },
+    "ja": {
+      "usage": "票を引き継がず設定を下書きへ複製します。",
+      "permissions": "サーバー所有者、Administrator、Manage Server、または対応する投票権限を持つロール。poll-showはサーバーメンバーも利用できます。",
+      "example": "poll-copy poll_id:1",
+      "response": "操作結果または受付状態を本人だけに表示します。公開・移動は配送状態も確認してください。",
+      "disabled": "閲覧・出力・終了・削除は利用できます。作成・変更・再開・公開は受け付けません。"
     }
   }
 }
