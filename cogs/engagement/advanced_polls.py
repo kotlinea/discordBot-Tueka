@@ -89,6 +89,21 @@ class AdvancedPollsCog(commands.Cog):
             return await interaction.followup.send(*args,**kwargs)
         return await interaction.response.send_message(*args,**kwargs)
 
+    async def read_poll(self, interaction, actor, poll_id):
+        """Gate every Discord result page on current destination visibility."""
+        result=self.service.read(actor,poll_id)
+        try:
+            channel=await interaction.guild.fetch_channel(int(result['channel_id']))
+            if channel.guild.id!=actor.guild_id:raise PollError('forbidden')
+            member=await interaction.guild.fetch_member(actor.user_id)
+            permissions=channel.permissions_for(member)
+            if not permissions.view_channel:raise PollError('forbidden')
+            if isinstance(channel,discord.Thread) and channel.is_private() and not permissions.manage_threads:
+                await channel.fetch_member(actor.user_id)
+        except discord.HTTPException:
+            raise PollError('forbidden') from None
+        return result
+
     def validate_config(self,interaction,config):
         if any(interaction.guild.get_role(int(role)) is None for role in config['allowed_roles']+config['denied_roles']):
             raise PollError('invalid')
@@ -167,7 +182,7 @@ class AdvancedPollsCog(commands.Cog):
     async def poll_show(self, interaction:discord.Interaction, poll_id:int, page:app_commands.Range[int,1,5]=1):
         try:
             actor=await self.actor(interaction)
-            result=self.service.read(actor,poll_id)
+            result=await self.read_poll(interaction,actor,poll_id)
             view=ResultView(self,actor,poll_id);view.page=page-1
             await self.respond(interaction,embed=view.render(result),view=view,ephemeral=True)
         except PollError as exc: await self.failure(interaction,exc)
@@ -295,7 +310,7 @@ class AdvancedPollsCog(commands.Cog):
             await interaction.response.defer(ephemeral=True,thinking=True)
             actor=await self.actor(interaction)
             if parts[0]=='tueka-poll-details':
-                page=int(parts[2]);result=self.service.read(actor,poll['id'])
+                page=int(parts[2]);result=await self.read_poll(interaction,actor,poll['id'])
                 view=ResultView(self,actor,poll['id']);view.page=page
                 await self.respond(interaction,embed=view.render(result),view=view,ephemeral=True);return
             if parts[0] in ('tueka-poll-vote','tueka-poll-select') or poll['config']['max_choices']>1:

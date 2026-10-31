@@ -37,7 +37,7 @@ class ResultView(discord.ui.View):
     async def update(self,i):
         try:
             await i.response.defer()
-            result=self.cog.service.read(await self.cog.actor(i),self.poll_id)
+            result=await self.cog.read_poll(i,await self.cog.actor(i),self.poll_id)
             await i.edit_original_response(embed=self.render(result),view=self)
         except PollError as exc:await self.cog.failure(i,exc)
 

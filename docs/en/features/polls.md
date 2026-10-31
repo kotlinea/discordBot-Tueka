@@ -52,11 +52,15 @@ Role weights range from 1 to 100; the highest matching weight is captured when a
 
 Use `/poll-list`, `/poll-show`, `/poll-edit`, `/poll-close`, `/poll-reopen`, `/poll-move`, `/poll-copy` and `/poll-delete`. See the [command reference](../reference/commands.md) for arguments.
 
+Using `/poll-show`, the message's results button or result pagination requires permission to view the poll's destination channel. Private-thread results require thread membership or Manage Threads permission.
+
 Once any vote has been cast, question, description, options, eligibility and maximum choices are locked. Color, image, deadline and participant cap remain editable. Editing cannot expand personal-data disclosure. Reopening keeps ballots and cannot undo disclosures that already occurred. Deleting requires confirmation and erases ballots.
 
 Export permitted results with `/poll-export poll_id:1 format:csv` or the Dashboard. Discord attachments are private to the requester. CSV/JSON downloads have an 8 MiB limit, honor disclosure and neutralize spreadsheet formulas in CSV values.
 
 Delegate poll viewing, management, individual-vote viewing, ballot removal, settings and role-weight editing separately. Only server managers can assign these permissions. Weight editing alone cannot grant management rights.
+
+Eligibility, weights and delegated permissions can reference any role in the server, including administrator roles, roles above the Bot, integration-managed roles and @everyone.
 
 Retention defaults to 90 days after closing, cancellation or deletion and supports 1–365 days. Unpublished drafts expire after 7 days. Uncertain deliveries remain until reconciled. Use Reconcile delivery for failed jobs; messages with unknown receipt state are not blindly posted again. Deleted Discord messages are not recreated automatically.
 

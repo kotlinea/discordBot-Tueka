@@ -693,3 +693,14 @@ class AssignableRoleBoundaryTests(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(api.close)
         _, selected, _ = await api.guild_resources(1, use_cache=False)
         self.assertEqual([role['id'] for role in selected], ['3', '4'])
+        # Referencing a role is different from granting it. The cached modes must stay separate.
+        _, referenced, _ = await api.guild_resources(1, assignable_roles=False)
+        self.assertEqual([role['id'] for role in referenced], [role['id'] for role in roles])
+        _, selected, _ = await api.guild_resources(1)
+        self.assertEqual([role['id'] for role in selected], ['3', '4'])
+        roles[2]['position']=100
+        api.invalidate_guild_resources(1)
+        _, referenced, _ = await api.guild_resources(1, assignable_roles=False)
+        self.assertEqual(referenced[2]['position'],100)
+        _, selected, _ = await api.guild_resources(1)
+        self.assertEqual([role['id'] for role in selected], ['4'])

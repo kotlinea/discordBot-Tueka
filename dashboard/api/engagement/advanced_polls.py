@@ -21,7 +21,7 @@ def create_access(context):
     service=PollService(context.poll_repository)
     def check(guild,user,member,metadata):
         manager=bool(metadata.get('owner') or int(metadata.get('permissions',0)) & (0x8 | 0x20))
-        return bool(service.permissions(Actor(guild,user,tuple(member.get('roles',[])),manager=manager)))
+        return bool(service.permissions(Actor(guild,user,(str(guild),*member.get('roles',[])),manager=manager)))
     return check
 
 
@@ -40,14 +40,14 @@ def create_router(context):
         if not manager:
             metadata=next((row for row in await context.discord.user_guilds(token) if str(row['id'])==str(guild_id)),{})
             manager=bool(metadata.get('owner') or int(metadata.get('permissions',0)) & (0x8 | 0x20))
-        return Actor(guild_id,int(user['id']),tuple(member.get('roles',[])),manager=manager,bot=bool(user.get('bot')))
+        return Actor(guild_id,int(user['id']),(str(guild_id),*member.get('roles',[])),manager=manager,bot=bool(user.get('bot')))
 
     def failure(exc):
         status={'not_found':404,'forbidden':403,'disabled':403,'conflict':409,'privacy_expansion':409,'ballot_locked':409,'delivery_uncertain':409}.get(exc.code,422)
         return api_error(status,'poll_'+exc.code,'投票の入力、権限、現在の状態を確認してください。')
 
     async def validate_resources(guild,channel,config=None):
-        resources=await GuildResources.fetch(context.discord,guild,live=True)
+        resources=await GuildResources.fetch(context.discord,guild,live=True,assignable_roles=False)
         try: channel=int(ids([channel])[0])
         except (PollError,TypeError):raise PollError('invalid') from None
         if channel not in resources.channel_ids(0,5):raise PollError('invalid')
@@ -68,7 +68,7 @@ def create_router(context):
     async def resources(request:Request,guild_id:int,a=Depends(actor)):
         try:
             if not service.permissions(a):raise PollError('forbidden')
-            channels,roles,permissions=await context.discord.guild_resources(guild_id,use_cache=False)
+            channels,roles,permissions=await context.discord.guild_resources(guild_id,use_cache=False,assignable_roles=False)
             return {'channels':channels,'roles':roles,'bot_permissions':str(permissions)}
         except PollError as exc:raise failure(exc) from exc
 
@@ -180,7 +180,7 @@ def create_router(context):
             new={**old['settings'],**body['settings']}
             for key,permission in (('retention_days','settings'),('role_weights','weights'),('role_permissions','permissions')):
                 if new[key]!=old['settings'][key]:service.require(a,permission)
-            resources=await GuildResources.fetch(context.discord,guild_id,live=True)
+            resources=await GuildResources.fetch(context.discord,guild_id,live=True,assignable_roles=False)
             if any(int(role) not in resources.role_ids for role in list(new['role_weights'])+list(new['role_permissions'])):raise PollError('invalid')
             result=repo.save_settings(a,new,body['revision'],enabled=body.get('enabled'))
             return {'revision':result['revision'],'settings':result['settings'],'enabled':result['enabled']}

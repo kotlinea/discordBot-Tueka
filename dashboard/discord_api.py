@@ -134,6 +134,7 @@ class DiscordAPI:
 
     def invalidate_guild_resources(self, guild_id: int) -> None:
         self._cache.pop(("resources", str(guild_id)), None)
+        self._cache.pop(("resources_all_roles", str(guild_id)), None)
 
     async def exchange_code(self, code: str) -> dict[str, Any]:
         return (await self._request("POST", "/oauth2/token", data={"client_id": self.client_id, "client_secret": self.client_secret, "grant_type": "authorization_code", "code": code, "redirect_uri": self.redirect_uri})).json()
@@ -160,9 +161,10 @@ class DiscordAPI:
         value = {int(guild["id"]) for guild in response.json()}
         return self._cache_for("bot_guilds", "self", value, 60) if use_cache else value
 
-    async def guild_resources(self, guild_id: int, *, use_cache: bool = True) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
+    async def guild_resources(self, guild_id: int, *, use_cache: bool = True, assignable_roles: bool = True) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
         key = str(guild_id)
-        if use_cache and (cached := self._get_cached("resources", key)) is not None:
+        kind = 'resources' if assignable_roles else 'resources_all_roles'
+        if use_cache and (cached := self._get_cached(kind, key)) is not None:
             return cached
         headers = {"Authorization": f"Bot {self.bot_token}"}
         channels, roles, bot_member = await asyncio.gather(
@@ -191,8 +193,8 @@ class DiscordAPI:
                 list(channel.get("permission_overwrites") or []),
             ))
             visible_channels.append(channel)
-        value = (visible_channels, selectable_roles, bot_permissions)
-        return self._cache_for("resources", key, value, 30) if use_cache else value
+        value = (visible_channels, selectable_roles if assignable_roles else all_roles, bot_permissions)
+        return self._cache_for(kind, key, value, 30) if use_cache else value
 
     async def guild_emojis(self, guild_id: int, *, use_cache: bool = True) -> list[dict[str, Any]]:
         key = str(guild_id)

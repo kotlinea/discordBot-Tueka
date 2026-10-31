@@ -37,5 +37,7 @@ class GuildResources:
         return [name for name in names if not self.permissions & PERMISSION_BITS[name]]
 
     @classmethod
-    async def fetch(cls, discord, guild_id: int, *, live: bool = True) -> GuildResources:
-        return cls(*await discord.guild_resources(guild_id, use_cache=not live))
+    async def fetch(cls, discord, guild_id: int, *, live: bool = True, assignable_roles: bool = True) -> GuildResources:
+        options={'use_cache':not live}
+        if not assignable_roles:options['assignable_roles']=False
+        return cls(*await discord.guild_resources(guild_id, **options))
