@@ -1153,17 +1153,20 @@
         "additionalProperties": true,
         "properties": {
           "access": {
-            "anyOf": [
-              {
-                "const": "admin",
-                "type": "string"
-              },
-              {
-                "const": "ticket_staff",
-                "type": "string"
-              }
+            "enum": [
+              "admin",
+              "ticket_staff",
+              "delegated"
             ],
-            "title": "Access"
+            "title": "Access",
+            "type": "string"
+          },
+          "feature_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Feature Ids",
+            "type": "array"
           },
           "icon": {
             "anyOf": [
@@ -2093,6 +2096,62 @@
         "title": "Items[ModerationEvent]",
         "type": "object"
       },
+      "Items_PollEvent_": {
+        "additionalProperties": true,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PollEvent"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Items[PollEvent]",
+        "type": "object"
+      },
+      "Items_PollItem_": {
+        "additionalProperties": true,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PollItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Items[PollItem]",
+        "type": "object"
+      },
       "Items_ReactionRoleEvent_": {
         "additionalProperties": true,
         "properties": {
@@ -2840,6 +2899,592 @@
           "revision"
         ],
         "title": "ModuleValue",
+        "type": "object"
+      },
+      "PollBallot": {
+        "additionalProperties": true,
+        "properties": {
+          "choices": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "choices",
+          "weight"
+        ],
+        "title": "PollBallot",
+        "type": "object"
+      },
+      "PollCapabilities": {
+        "additionalProperties": true,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "permissions",
+          "enabled"
+        ],
+        "title": "PollCapabilities",
+        "type": "object"
+      },
+      "PollConfig": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_roles": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Allowed Roles",
+            "type": "array"
+          },
+          "announce_winner": {
+            "default": false,
+            "title": "Announce Winner",
+            "type": "boolean"
+          },
+          "button_style": {
+            "default": "secondary",
+            "enum": [
+              "primary",
+              "secondary",
+              "success",
+              "danger"
+            ],
+            "title": "Button Style",
+            "type": "string"
+          },
+          "color": {
+            "default": 5793266,
+            "maximum": 16777215.0,
+            "minimum": 0.0,
+            "title": "Color",
+            "type": "integer"
+          },
+          "create_thread": {
+            "default": false,
+            "title": "Create Thread",
+            "type": "boolean"
+          },
+          "denied_roles": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Denied Roles",
+            "type": "array"
+          },
+          "denied_users": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Denied Users",
+            "type": "array"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Description",
+            "type": "string"
+          },
+          "emojis": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emojis"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "max_choices": {
+            "default": 1,
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Choices",
+            "type": "integer"
+          },
+          "max_participants": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Participants"
+          },
+          "mode": {
+            "default": "anonymous",
+            "enum": [
+              "public",
+              "anonymous",
+              "secret_winner",
+              "reveal_at_end",
+              "blind",
+              "custom"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 25,
+            "minItems": 2,
+            "title": "Options",
+            "type": "array"
+          },
+          "pin_on_close": {
+            "default": false,
+            "title": "Pin On Close",
+            "type": "boolean"
+          },
+          "question": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          },
+          "remove_departed_votes": {
+            "default": false,
+            "title": "Remove Departed Votes",
+            "type": "boolean"
+          },
+          "ui": {
+            "default": "buttons",
+            "enum": [
+              "buttons",
+              "select"
+            ],
+            "title": "Ui",
+            "type": "string"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility"
+          }
+        },
+        "required": [
+          "question",
+          "options"
+        ],
+        "title": "PollConfig",
+        "type": "object"
+      },
+      "PollDeliveryItem": {
+        "additionalProperties": true,
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "discord_receipt_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discord Receipt Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "status",
+          "attempts",
+          "last_error",
+          "discord_receipt_id"
+        ],
+        "title": "PollDeliveryItem",
+        "type": "object"
+      },
+      "PollEvent": {
+        "additionalProperties": true,
+        "properties": {
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "integer"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "actor_id",
+          "event_type",
+          "created_at"
+        ],
+        "title": "PollEvent",
+        "type": "object"
+      },
+      "PollHistory": {
+        "additionalProperties": true,
+        "properties": {
+          "delivery": {
+            "items": {
+              "$ref": "#/components/schemas/PollDeliveryItem"
+            },
+            "title": "Delivery",
+            "type": "array"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/PollEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "events",
+          "delivery"
+        ],
+        "title": "PollHistory",
+        "type": "object"
+      },
+      "PollItem": {
+        "additionalProperties": true,
+        "properties": {
+          "ballots": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PollBallot"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ballots"
+          },
+          "channel_id": {
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "closes_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closes At"
+          },
+          "config": {
+            "$ref": "#/components/schemas/PollConfig"
+          },
+          "counts": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counts"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "integer"
+          },
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          },
+          "guild_id": {
+            "title": "Guild Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "participants": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Participants"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "ranking": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranking"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "scheduled_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled At"
+          },
+          "selections": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selections"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "weighted_counts": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weighted Counts"
+          }
+        },
+        "required": [
+          "id",
+          "guild_id",
+          "channel_id",
+          "status",
+          "revision",
+          "created_at",
+          "config"
+        ],
+        "title": "PollItem",
+        "type": "object"
+      },
+      "PollSettings": {
+        "additionalProperties": true,
+        "properties": {
+          "retention_days": {
+            "default": 90,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "role_permissions": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Role Permissions",
+            "type": "object"
+          },
+          "role_weights": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Role Weights",
+            "type": "object"
+          }
+        },
+        "title": "PollSettings",
+        "type": "object"
+      },
+      "PollSettingsItem": {
+        "additionalProperties": true,
+        "properties": {
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/PollSettings"
+          }
+        },
+        "required": [
+          "revision",
+          "settings"
+        ],
+        "title": "PollSettingsItem",
         "type": "object"
       },
       "Preferences": {
@@ -12506,6 +13151,2000 @@
           }
         },
         "summary": "Overview"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/polls/capabilities": {
+      "get": {
+        "operationId": "capabilities_api_v1_guilds__guild_id__polls_capabilities_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PollCapabilities"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Capabilities"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/polls/items": {
+      "get": {
+        "operationId": "items_api_v1_guilds__guild_id__polls_items_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Items_PollItem_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Items"
+      },
+      "post": {
+        "operationId": "create_api_v1_guilds__guild_id__polls_items_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "channel_id": {
+                    "title": "Channel Id",
+                    "type": "string"
+                  },
+                  "closes_at": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Closes At"
+                  },
+                  "config": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "allowed_roles": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 100,
+                        "title": "Allowed Roles",
+                        "type": "array"
+                      },
+                      "announce_winner": {
+                        "default": false,
+                        "title": "Announce Winner",
+                        "type": "boolean"
+                      },
+                      "button_style": {
+                        "default": "secondary",
+                        "enum": [
+                          "primary",
+                          "secondary",
+                          "success",
+                          "danger"
+                        ],
+                        "title": "Button Style",
+                        "type": "string"
+                      },
+                      "color": {
+                        "default": 5793266,
+                        "maximum": 16777215,
+                        "minimum": 0,
+                        "title": "Color",
+                        "type": "integer"
+                      },
+                      "create_thread": {
+                        "default": false,
+                        "title": "Create Thread",
+                        "type": "boolean"
+                      },
+                      "denied_roles": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 100,
+                        "title": "Denied Roles",
+                        "type": "array"
+                      },
+                      "denied_users": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 100,
+                        "title": "Denied Users",
+                        "type": "array"
+                      },
+                      "description": {
+                        "default": "",
+                        "maxLength": 2000,
+                        "title": "Description",
+                        "type": "string"
+                      },
+                      "emojis": {
+                        "anyOf": [
+                          {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "title": "Emojis"
+                      },
+                      "image_url": {
+                        "anyOf": [
+                          {
+                            "maxLength": 2048,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "title": "Image Url"
+                      },
+                      "max_choices": {
+                        "default": 1,
+                        "maximum": 20,
+                        "minimum": 1,
+                        "title": "Max Choices",
+                        "type": "integer"
+                      },
+                      "max_participants": {
+                        "anyOf": [
+                          {
+                            "maximum": 1000000,
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "title": "Max Participants"
+                      },
+                      "mode": {
+                        "default": "anonymous",
+                        "enum": [
+                          "public",
+                          "anonymous",
+                          "secret_winner",
+                          "reveal_at_end",
+                          "blind",
+                          "custom"
+                        ],
+                        "title": "Mode",
+                        "type": "string"
+                      },
+                      "options": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 25,
+                        "minItems": 2,
+                        "title": "Options",
+                        "type": "array"
+                      },
+                      "pin_on_close": {
+                        "default": false,
+                        "title": "Pin On Close",
+                        "type": "boolean"
+                      },
+                      "question": {
+                        "maxLength": 1024,
+                        "minLength": 1,
+                        "title": "Question",
+                        "type": "string"
+                      },
+                      "remove_departed_votes": {
+                        "default": false,
+                        "title": "Remove Departed Votes",
+                        "type": "boolean"
+                      },
+                      "ui": {
+                        "default": "buttons",
+                        "enum": [
+                          "buttons",
+                          "select"
+                        ],
+                        "title": "Ui",
+                        "type": "string"
+                      },
+                      "visibility": {
+                        "anyOf": [
+                          {
+                            "additionalProperties": {
+                              "additionalProperties": {
+                                "type": "string"
+                              },
+                              "type": "object"
+                            },
+                            "type": "object"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "title": "Visibility"
+                      }
+                    },
+                    "required": [
+                      "question",
+                      "options"
+                    ],
+                    "title": "PollConfig",
+                    "type": "object"
+                  },
+                  "duration_seconds": {
+                    "anyOf": [
+                      {
+                        "maximum": 2592000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Duration Seconds"
+                  },
+                  "request_key": {
+                    "maxLength": 100,
+                    "minLength": 1,
+                    "title": "Request Key",
+                    "type": "string"
+                  },
+                  "scheduled_at": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Scheduled At"
+                  }
+                },
+                "required": [
+                  "config",
+                  "channel_id",
+                  "request_key"
+                ],
+                "title": "PollCreateInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PollItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Create"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/polls/items/{poll_id}": {
+      "get": {
+        "operationId": "item_api_v1_guilds__guild_id__polls_items__poll_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "poll_id",
+            "required": true,
+            "schema": {
+              "title": "Poll Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PollItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Item"
+      },
+      "put": {
+        "operationId": "edit_api_v1_guilds__guild_id__polls_items__poll_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "poll_id",
+            "required": true,
+            "schema": {
+              "title": "Poll Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "closes_at": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Closes At"
+                  },
+                  "config": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "allowed_roles": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 100,
+                        "title": "Allowed Roles",
+                        "type": "array"
+                      },
+                      "announce_winner": {
+                        "default": false,
+                        "title": "Announce Winner",
+                        "type": "boolean"
+                      },
+                      "button_style": {
+                        "default": "secondary",
+                        "enum": [
+                          "primary",
+                          "secondary",
+                          "success",
+                          "danger"
+                        ],
+                        "title": "Button Style",
+                        "type": "string"
+                      },
+                      "color": {
+                        "default": 5793266,
+                        "maximum": 16777215,
+                        "minimum": 0,
+                        "title": "Color",
+                        "type": "integer"
+                      },
+                      "create_thread": {
+                        "default": false,
+                        "title": "Create Thread",
+                        "type": "boolean"
+                      },
+                      "denied_roles": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 100,
+                        "title": "Denied Roles",
+                        "type": "array"
+                      },
+                      "denied_users": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 100,
+                        "title": "Denied Users",
+                        "type": "array"
+                      },
+                      "description": {
+                        "default": "",
+                        "maxLength": 2000,
+                        "title": "Description",
+                        "type": "string"
+                      },
+                      "emojis": {
+                        "anyOf": [
+                          {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "title": "Emojis"
+                      },
+                      "image_url": {
+                        "anyOf": [
+                          {
+                            "maxLength": 2048,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "title": "Image Url"
+                      },
+                      "max_choices": {
+                        "default": 1,
+                        "maximum": 20,
+                        "minimum": 1,
+                        "title": "Max Choices",
+                        "type": "integer"
+                      },
+                      "max_participants": {
+                        "anyOf": [
+                          {
+                            "maximum": 1000000,
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "title": "Max Participants"
+                      },
+                      "mode": {
+                        "default": "anonymous",
+                        "enum": [
+                          "public",
+                          "anonymous",
+                          "secret_winner",
+                          "reveal_at_end",
+                          "blind",
+                          "custom"
+                        ],
+                        "title": "Mode",
+                        "type": "string"
+                      },
+                      "options": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 25,
+                        "minItems": 2,
+                        "title": "Options",
+                        "type": "array"
+                      },
+                      "pin_on_close": {
+                        "default": false,
+                        "title": "Pin On Close",
+                        "type": "boolean"
+                      },
+                      "question": {
+                        "maxLength": 1024,
+                        "minLength": 1,
+                        "title": "Question",
+                        "type": "string"
+                      },
+                      "remove_departed_votes": {
+                        "default": false,
+                        "title": "Remove Departed Votes",
+                        "type": "boolean"
+                      },
+                      "ui": {
+                        "default": "buttons",
+                        "enum": [
+                          "buttons",
+                          "select"
+                        ],
+                        "title": "Ui",
+                        "type": "string"
+                      },
+                      "visibility": {
+                        "anyOf": [
+                          {
+                            "additionalProperties": {
+                              "additionalProperties": {
+                                "type": "string"
+                              },
+                              "type": "object"
+                            },
+                            "type": "object"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "title": "Visibility"
+                      }
+                    },
+                    "required": [
+                      "question",
+                      "options"
+                    ],
+                    "title": "PollConfig",
+                    "type": "object"
+                  },
+                  "duration_seconds": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Duration Seconds"
+                  },
+                  "revision": {
+                    "minimum": 1,
+                    "title": "Revision",
+                    "type": "integer"
+                  },
+                  "scheduled_at": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Scheduled At"
+                  }
+                },
+                "required": [
+                  "config",
+                  "revision"
+                ],
+                "title": "PollEditInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PollItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Edit"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/polls/items/{poll_id}/actions": {
+      "post": {
+        "operationId": "action_api_v1_guilds__guild_id__polls_items__poll_id__actions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "poll_id",
+            "required": true,
+            "schema": {
+              "title": "Poll Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "action": {
+                    "enum": [
+                      "launch",
+                      "close",
+                      "reopen",
+                      "cancel",
+                      "delete",
+                      "copy",
+                      "move"
+                    ],
+                    "title": "Action",
+                    "type": "string"
+                  },
+                  "channel_id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Channel Id"
+                  },
+                  "closes_at": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Closes At"
+                  },
+                  "request_key": {
+                    "anyOf": [
+                      {
+                        "maxLength": 100,
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Request Key"
+                  },
+                  "revision": {
+                    "minimum": 1,
+                    "title": "Revision",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "revision",
+                  "action"
+                ],
+                "title": "PollActionInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PollItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Action"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/polls/items/{poll_id}/delivery/{job_id}/retry": {
+      "post": {
+        "operationId": "retry_api_v1_guilds__guild_id__polls_items__poll_id__delivery__job_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "poll_id",
+            "required": true,
+            "schema": {
+              "title": "Poll Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "revision": {
+                    "minimum": 1,
+                    "title": "Revision",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "revision"
+                ],
+                "title": "PollRevisionInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Retry"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/polls/items/{poll_id}/export": {
+      "get": {
+        "operationId": "export_api_v1_guilds__guild_id__polls_items__poll_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "poll_id",
+            "required": true,
+            "schema": {
+              "title": "Poll Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "csv",
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Export"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/polls/items/{poll_id}/history": {
+      "get": {
+        "operationId": "history_api_v1_guilds__guild_id__polls_items__poll_id__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "poll_id",
+            "required": true,
+            "schema": {
+              "title": "Poll Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PollHistory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "History"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/polls/items/{poll_id}/votes/remove": {
+      "post": {
+        "operationId": "remove_vote_api_v1_guilds__guild_id__polls_items__poll_id__votes_remove_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "poll_id",
+            "required": true,
+            "schema": {
+              "title": "Poll Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "revision": {
+                    "minimum": 1,
+                    "title": "Revision",
+                    "type": "integer"
+                  },
+                  "user_id": {
+                    "title": "User Id",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "revision",
+                  "user_id"
+                ],
+                "title": "PollRemoveVoteInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Remove Vote"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/polls/resources": {
+      "get": {
+        "operationId": "resources_api_v1_guilds__guild_id__polls_resources_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resources"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Resources"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/polls/settings": {
+      "get": {
+        "operationId": "settings_api_v1_guilds__guild_id__polls_settings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PollSettingsItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Settings"
+      },
+      "put": {
+        "operationId": "update_settings_api_v1_guilds__guild_id__polls_settings_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "enabled": {
+                    "default": false,
+                    "title": "Enabled",
+                    "type": "boolean"
+                  },
+                  "revision": {
+                    "title": "Revision",
+                    "type": "integer"
+                  },
+                  "settings": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "retention_days": {
+                        "default": 90,
+                        "maximum": 365,
+                        "minimum": 1,
+                        "title": "Retention Days",
+                        "type": "integer"
+                      },
+                      "role_permissions": {
+                        "additionalProperties": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "title": "Role Permissions",
+                        "type": "object"
+                      },
+                      "role_weights": {
+                        "additionalProperties": {
+                          "type": "integer"
+                        },
+                        "title": "Role Weights",
+                        "type": "object"
+                      }
+                    },
+                    "title": "PollSettings",
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "revision",
+                  "settings"
+                ],
+                "title": "PollSettingsInput",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PollSettingsItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Update Settings"
+      }
+    },
+    "/api/v1/guilds/{guild_id}/polls/settings/history": {
+      "get": {
+        "operationId": "settings_history_api_v1_guilds__guild_id__polls_settings_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guild_id",
+            "required": true,
+            "schema": {
+              "title": "Guild Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Items_PollEvent_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Settings History"
       }
     },
     "/api/v1/guilds/{guild_id}/reaction-roles": {

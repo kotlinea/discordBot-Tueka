@@ -220,10 +220,10 @@ Find each command’s purpose, arguments, permissions and response visibility. R
 
 ## /poll
 
-- **Purpose**: Create a poll; separate up to ten choices with |.
-- **Arguments (* required)**: question*:string, options*:string, duration_minutes:integer [1..10080], image_url:string
-- **Permissions**: manage_guild; Bot permissions and role hierarchy also apply.
-- **Response**: Public response; errors are private.
+- **Purpose**: Create up to 20 choices separated by |. Questions allow 1024 characters, descriptions 2000 and each option 256. The default shows results and hides individual ballots.
+- **Arguments (* required)**: question*:string, options*:string, duration_minutes:integer [1..43200], image_url:string, description:string = "", max_choices:integer [1..20] = 1, mode:string (anonymous, public, secret_winner, reveal_at_end, blind) = "anonymous", allowed_role:role
+- **Permissions**: Server owner, Administrator, Manage Server, or a role delegated poll management.
+- **Response**: Privately acknowledges publication and posts the poll after delivery.
 - **When disabled**: Disabled features cannot start new actions; see the feature guide for retained data and existing actions.
 - **Example**: `/poll question:Lunch? options:A|B`
 
@@ -991,3 +991,111 @@ Find each command’s purpose, arguments, permissions and response visibility. R
 - **Response**: Private response. Managers can inspect DM delivery state for replies and review decisions.
 - **When disabled**: New intake, replies and withdrawal are paused while intake is disabled.
 - **Example**: `/appeal-withdraw guild_id:123456789012345678 conversation_id:1`
+
+## /poll-time
+
+- **Purpose**: Create a timed poll.
+- **Arguments (* required)**: question*:string, options*:string, time*:string, max_choices:integer [1..20] = 1, mode:string (anonymous, public, secret_winner, reveal_at_end, blind) = "anonymous"
+- **Permissions**: Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.
+- **Response**: Privately displays results or acceptance. Check delivery status after publication or move.
+- **When disabled**: Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused.
+- **Example**: `/poll-time question:Lunch? options:A|B time:3h`
+
+## /poll-schedule
+
+- **Purpose**: Schedule a poll with an explicit UTC offset.
+- **Arguments (* required)**: question*:string, options*:string, start*:string, time:string
+- **Permissions**: Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.
+- **Response**: Privately displays results or acceptance. Check delivery status after publication or move.
+- **When disabled**: Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused.
+- **Example**: `/poll-schedule question:Lunch? options:A|B start:2027-01-01T12:00:00+09:00`
+
+## /poll-show
+
+- **Purpose**: View permitted results and status.
+- **Arguments (* required)**: poll_id*:integer, page:integer [1..5] = 1
+- **Permissions**: Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.
+- **Response**: Privately displays results or acceptance. Check delivery status after publication or move.
+- **When disabled**: Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused.
+- **Example**: `/poll-show poll_id:1`
+
+## /poll-list
+
+- **Purpose**: List server polls.
+- **Arguments (* required)**: before:integer
+- **Permissions**: Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.
+- **Response**: Privately displays results or acceptance. Check delivery status after publication or move.
+- **When disabled**: Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused.
+- **Example**: `/poll-list`
+
+## /poll-close
+
+- **Purpose**: Close a poll.
+- **Arguments (* required)**: poll_id*:integer
+- **Permissions**: Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.
+- **Response**: Privately displays results or acceptance. Check delivery status after publication or move.
+- **When disabled**: Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused.
+- **Example**: `/poll-close poll_id:1`
+
+## /poll-reopen
+
+- **Purpose**: Reopen a poll keeping ballots.
+- **Arguments (* required)**: poll_id*:integer, time:string
+- **Permissions**: Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.
+- **Response**: Privately displays results or acceptance. Check delivery status after publication or move.
+- **When disabled**: Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused.
+- **Example**: `/poll-reopen poll_id:1 time:3h`
+
+## /poll-delete
+
+- **Purpose**: Delete a poll and ballots with confirm:true.
+- **Arguments (* required)**: poll_id*:integer, confirm:boolean = false
+- **Permissions**: Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.
+- **Response**: Privately displays results or acceptance. Check delivery status after publication or move.
+- **When disabled**: Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused.
+- **Example**: `/poll-delete poll_id:1 confirm:true`
+
+## /poll-move
+
+- **Purpose**: Move a poll to another channel.
+- **Arguments (* required)**: poll_id*:integer, channel*:channel
+- **Permissions**: Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.
+- **Response**: Privately displays results or acceptance. Check delivery status after publication or move.
+- **When disabled**: Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused.
+- **Example**: `/poll-move poll_id:1 channel:#polls`
+
+## /poll-export
+
+- **Purpose**: Export permitted results as CSV or JSON.
+- **Arguments (* required)**: poll_id*:integer, format:string (csv, json) = "csv"
+- **Permissions**: Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.
+- **Response**: Privately displays results or acceptance. Check delivery status after publication or move.
+- **When disabled**: Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused.
+- **Example**: `/poll-export poll_id:1 format:csv`
+
+## /pollbuilder
+
+- **Purpose**: Build up to 25 options and publish after preview.
+- **Arguments (* required)**: question:string = "新しい投票", time:string
+- **Permissions**: Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.
+- **Response**: Privately displays results or acceptance. Check delivery status after publication or move.
+- **When disabled**: Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused.
+- **Example**: `/pollbuilder question:Lunch?`
+
+## /poll-edit
+
+- **Purpose**: Preview and save edits.
+- **Arguments (* required)**: poll_id*:integer
+- **Permissions**: Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.
+- **Response**: Privately displays results or acceptance. Check delivery status after publication or move.
+- **When disabled**: Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused.
+- **Example**: `/poll-edit poll_id:1`
+
+## /poll-copy
+
+- **Purpose**: Copy settings to a draft without ballots.
+- **Arguments (* required)**: poll_id*:integer
+- **Permissions**: Server owner, Administrator, Manage Server, or a role with the relevant poll permission. Server members may use poll-show.
+- **Response**: Privately displays results or acceptance. Check delivery status after publication or move.
+- **When disabled**: Reading, exporting, closing and deleting remain available. Creating, editing, reopening and publishing are refused.
+- **Example**: `/poll-copy poll_id:1`

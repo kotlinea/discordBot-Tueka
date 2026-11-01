@@ -19,7 +19,7 @@ import { focusPageHeading } from '../routing/focus'
 
 const GuildOverview = lazy(() => import('./guilds/Overview').then(module => ({ default: module.GuildOverview })))
 const ServerInformation = lazy(() => import('./guilds/Information').then(module => ({ default: module.ServerInformation })))
-const staffFeatures = featureRegistry.features.filter(feature => feature.access === 'ticket_staff')
+
 
 export function Shell({ session }: { session: Session }) {
   const { guildId = '' } = useParams()
@@ -32,7 +32,9 @@ export function Shell({ session }: { session: Session }) {
   useEffect(() => () => stopFocus.current(), [])
   const guilds = useQuery({ queryKey: ['guilds'], queryFn: () => request('GET /api/v1/guilds', '/guilds') })
   const currentGuild = guilds.data?.items.find(item => item.id === guildId)
-  const staffOnly = currentGuild?.access === 'ticket_staff'
+  const staffOnly = currentGuild?.access === 'ticket_staff' || currentGuild?.access === 'delegated'
+  const allowedFeatureIds = [...(currentGuild?.feature_ids ?? []), ...(currentGuild?.access === 'ticket_staff' ? featureRegistry.features.filter(f => f.access === 'ticket_staff').map(f => f.id) : [])]
+  const staffFeatures = featureRegistry.features.filter(f => allowedFeatureIds.includes(f.id) && f.access !== 'manager')
   const base = `/servers/${guildId}`
   const needsOverview = location.pathname.replace(/\/$/, '') === base && !staffOnly
   const overview = useQuery({ queryKey: ['overview', guildId], queryFn: () => request('GET /api/v1/guilds/{guild_id}/overview', `/guilds/${guildId}/overview`), enabled: Boolean(currentGuild) && needsOverview })
@@ -85,7 +87,7 @@ export function Shell({ session }: { session: Session }) {
       <Suspense fallback={<Loading/>}><Routes>
         <Route index element={staffOnly ? (staffFeatures[0] ? <Navigate to={featurePath(guildId, staffFeatures[0])} replace/> : <NotFound/>) : <GuildOverview features={features} moderation={overview.data?.moderation || { summary: {}, events: [], lockdown: null }}/>}/>
         {!staffOnly && <Route path="settings" element={<ServerInformation guild={currentGuild} features={features}/>}/>}
-        <Route path="*" element={<RegisteredFeatures features={features} staffOnly={staffOnly}/>}/>
+        <Route path="*" element={<RegisteredFeatures features={features} staffOnly={staffOnly} allowedFeatureIds={allowedFeatureIds}/>}/>
       </Routes></Suspense>
     </div>
   </div></div></Dialog.WorkspaceDialogBoundary></>

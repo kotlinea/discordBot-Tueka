@@ -4,11 +4,11 @@ import type { FeatureDefinition } from '../features/contracts'
 import { featureRegistry } from '../features/registry'
 import s from '../styles/App.module.css'
 
-export function WorkspaceNavigation({ definition, staffOnly }: { definition: FeatureDefinition; staffOnly: boolean }) {
+export function WorkspaceNavigation({ definition, staffOnly, allowedFeatureIds }: { definition: FeatureDefinition; staffOnly: boolean; allowedFeatureIds?: string[] }) {
   const { guildId = '' } = useParams()
   const { pathname } = useLocation()
   const { t } = useTranslation([...definition.namespaces])
-  const pages = definition.pages.filter(page => !staffOnly || page.access === 'ticket_staff')
+  const pages = definition.pages.filter(page => !staffOnly || (allowedFeatureIds ? page.access !== 'manager' && allowedFeatureIds.includes(definition.id) : page.access === 'ticket_staff'))
   if (!pages.length) return null
   const base = featureRegistry.path(guildId, definition.id)
   const active = pages.find(page => matchPath(`${base}/${page.path}${page.nested ? '/*' : ''}`, pathname))

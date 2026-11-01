@@ -15,3 +15,9 @@ def create_settings_access(context) -> dict[str, SettingsAccess]:
             raise ValueError(f'Invalid settings access: {feature.id}')
         access[feature.id] = value
     return access
+
+
+def create_workspace_access(context):
+    features = tuple(feature for feature in FEATURES if feature.access_factory)
+    factories = resolve_bindings(tuple(Binding(feature.id, 'api', feature.access_factory) for feature in features))
+    return {feature.id: factory(context) for feature, factory in zip(features, factories)}

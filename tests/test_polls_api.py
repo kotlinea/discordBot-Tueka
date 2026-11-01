@@ -1,0 +1,318 @@
+"""AP-WEB/PRIVACY: live authorization, CSRF and filtered wire results."""
+import unittest
+from types import SimpleNamespace as NS
+from unittest.mock import AsyncMock
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from database.testing import temporary_database
+from dashboard.api_v1 import create_api_router
+from dashboard.repository import DashboardRepository
+from poll_support import PublishedPollRepository as PollRepository
+
+
+class PollApiTests(unittest.TestCase):
+    def setUp(self):
+        ctx=temporary_database();self.url=ctx.__enter__();self.addCleanup(ctx.__exit__,None,None,None)
+        DashboardRepository(self.url).create_dashboard_session('session','token',3600)
+        self.session={'session_id':'session','csrf_token':'csrf'}
+        self.discord=NS(current_user=AsyncMock(return_value={'id':'20'}),guild_member=AsyncMock(return_value={'roles':['3']}),
+                        can_manage=AsyncMock(return_value=True),user_guilds=AsyncMock(return_value=[{'id':'1','name':'Poll guild','permissions':'0'}]),
+                        guild_resources=AsyncMock(return_value=([{'id':'10','name':'polls','type':0}],[{'id':'3','name':'staff'}],0)),bot_guild_ids=AsyncMock(return_value={1}))
+        app=FastAPI()
+        @app.middleware('http')
+        async def session(request,next):request.scope['session']=self.session;return await next(request)
+        app.include_router(create_api_router(self.url,self.discord))
+        self.client=TestClient(app);self.addCleanup(self.client.close)
+        self.headers={'x-csrf-token':'csrf'}
+        self.repo=PollRepository(self.url);self.repo.settings.set_module(1,'advanced_polls',enabled=True)
+        self.base='/api/v1/guilds/1/polls/items'
+        self.body={'request_key':'new','channel_id':'10','config':{'question':'Q','options':['A','B']}}
+
+    def create(self):
+        response=self.client.post(self.base,json=self.body,headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        return response.json()
+
+    def test_create_and_revision(self):
+        poll=self.create();self.assertEqual(poll['guild_id'],'1')
+        self.assertEqual(self.create()['id'],poll['id'])
+        response=self.client.put(f"{self.base}/{poll['id']}",json={'revision':1,'config':self.body['config']},headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(self.client.put(f"{self.base}/{poll['id']}",json={'revision':1,'config':self.body['config']},headers=self.headers).status_code,409)
+
+    def test_saved_threads_are_checked_live_but_not_offered_as_new_destinations(self):
+        for index,channel_type in enumerate((10,11,12,None,0,2)):
+            with self.subTest(channel_type=channel_type):
+                message=1000+index
+                self.repo.legacy_create(message,1,99,20,'Q',['A','B'],None,None)
+                poll=self.repo.by_message(message)
+                self.discord.guild_channel=AsyncMock(return_value=None if channel_type is None else {'id':'99','type':channel_type})
+                response=self.client.put(f"{self.base}/{poll['id']}",json={'revision':poll['revision'],'config':{**poll['config'],'color':123}},headers=self.headers)
+                self.assertEqual(response.status_code,200 if channel_type in (10,11,12) else 422,response.text)
+                self.discord.guild_channel.assert_awaited_once_with(1,99)
+                self.assertEqual(self.repo.get(1,poll['id'])['revision'],poll['revision']+(response.status_code==200))
+        self.body.update(channel_id='99',request_key='new-thread')
+        self.assertEqual(self.client.post(self.base,json=self.body,headers=self.headers).status_code,422)
+
+    def test_deleted_condition_roles_allow_only_retained_references(self):
+        for field in ('allowed_roles','denied_roles'):
+            for voted in (False,True):
+                with self.subTest(field=field,voted=voted):
+                    self.repo.legacy_create(900+int(voted)+(10 if field=='denied_roles' else 0),1,10,20,'Q',['A','B'],None,None)
+                    poll=self.repo.by_message(900+int(voted)+(10 if field=='denied_roles' else 0))
+                    poll=self.repo.edit(1,poll['id'],20,{**poll['config'],field:['999']},poll['revision'])
+                    if voted:self.repo.vote(1,poll['id'],30,[0],revision=poll['revision'],roles=['999'] if field=='allowed_roles' else [])
+                    path=f"{self.base}/{poll['id']}"
+                    config={**poll['config'],'color':123}
+                    response=self.client.put(path,json={'revision':poll['revision'],'config':config},headers=self.headers)
+                    self.assertEqual(response.status_code,200,response.text)
+                    saved=response.json();self.assertEqual(saved['config'][field],['999'])
+                    for changed in ([*saved['config'][field],'888'],['888']):
+                        response=self.client.put(path,json={'revision':saved['revision'],'config':{**saved['config'],field:changed}},headers=self.headers)
+                        self.assertEqual(response.status_code,422,response.text)
+                        self.assertEqual(self.repo.get(1,poll['id'])['revision'],saved['revision'])
+                    response=self.client.put(path,json={'revision':saved['revision'],'config':{**saved['config'],field:[]}},headers=self.headers)
+                    self.assertEqual(response.status_code,409 if voted else 200,response.text)
+                    if voted:self.assertEqual(response.json()['detail']['code'],'poll_ballot_locked')
+
+    def test_publication_actions_retain_saved_role_references_and_thread_origin(self):
+        for field in ('allowed_roles','denied_roles'):
+            for action in ('launch','move'):
+                with self.subTest(field=field,action=action):
+                    config={**self.body['config'],field:['999']}
+                    if action=='launch':
+                        poll=self.repo.create(1,99,20,config,f'launch-{field}')
+                    else:
+                        message=2000+(field=='denied_roles')
+                        self.repo.legacy_create(message,1,99,20,'Q',['A','B'],None,None)
+                        poll=self.repo.by_message(message)
+                        poll=self.repo.edit(1,poll['id'],20,config,poll['revision'])
+                        self.repo.vote(1,poll['id'],30,[0],revision=poll['revision'],roles=['999'] if field=='allowed_roles' else [])
+                    self.discord.guild_channel=AsyncMock(return_value={'id':'99','type':11})
+                    response=self.client.post(f"{self.base}/{poll['id']}/actions",json={'action':action,'revision':poll['revision'],'channel_id':'10'},headers=self.headers)
+                    self.assertEqual(response.status_code,200,response.text)
+                    if action=='launch':self.discord.guild_channel.assert_awaited_once_with(1,99)
+                    else:self.discord.guild_channel.assert_not_awaited()
+
+    def test_rescheduling_rejects_a_start_after_the_saved_deadline(self):
+        import time
+        now=int(time.time());day=86400
+        for explicit_deadline in (False,True):
+            with self.subTest(explicit_deadline=explicit_deadline):
+                self.body.update(request_key=f'reschedule-{explicit_deadline}',scheduled_at=now+day,closes_at=now+2*day)
+                poll=self.create()
+                path=f"{self.base}/{poll['id']}"
+                body={'revision':poll['revision'],'config':poll['config'],'scheduled_at':now+3*day}
+                if explicit_deadline:body['closes_at']=poll['closes_at']
+                response=self.client.put(path,json=body,headers=self.headers)
+                self.assertEqual(response.status_code,422,response.text)
+                saved=self.client.get(path).json()
+                for field in ('scheduled_at','closes_at','revision','status'):
+                    self.assertEqual(saved[field],poll[field])
+                body['scheduled_at']=now+day+3600
+                response=self.client.put(path,json=body,headers=self.headers)
+                self.assertEqual(response.status_code,200,response.text)
+                self.assertEqual(response.json()['closes_at'],poll['closes_at'])
+
+    def test_published_relative_deadline_can_be_extended_and_cleared(self):
+        import time
+        from jobs import Outcome
+        for status in ('open','closed'):
+            with self.subTest(status=status):
+                poll=self.repo.create(1,10,20,self.body['config'],'timed-'+status,duration_seconds=600)
+                self.repo.launch(1,poll['id'],20,poll['revision'])
+                claim=self.repo.jobs.claim('publish-timed')
+                self.repo.start_delivery(claim.payload);self.repo.receipt(claim.payload,500+poll['id'])
+                self.repo.jobs.finish(claim,Outcome())
+                poll=self.repo.get(1,poll['id'])
+                if status=='closed':poll=self.repo.transition(1,poll['id'],20,'close',poll['revision'])
+                for deadline in (int(time.time())+1200,None):
+                    response=self.client.put(f"{self.base}/{poll['id']}",json={'revision':poll['revision'],'config':poll['config'],
+                        'closes_at':deadline,'duration_seconds':600,'scheduled_at':None},headers=self.headers)
+                    self.assertEqual(response.status_code,200,response.text)
+                    poll=response.json()
+                    self.assertEqual(poll.get('closes_at'),deadline)
+                    self.assertEqual(poll['duration_seconds'],600)
+
+    def test_auth_csrf_and_cross_guild(self):
+        self.assertEqual(self.client.post(self.base,json=self.body).status_code,403)
+        poll=self.create()
+        self.assertEqual(self.client.get(f"/api/v1/guilds/2/polls/items/{poll['id']}").status_code,404)
+        self.discord.guild_member.return_value=None
+        self.assertEqual(self.client.get(self.base).status_code,403)
+        self.session.clear();self.assertEqual(self.client.get(self.base).status_code,401)
+
+    def test_anonymous_admin_cannot_export_person(self):
+        self.repo.legacy_create(100,1,10,20,'Q',['A','B'],None,None)
+        poll=self.repo.by_message(100)
+        self.repo.vote(1,poll['id'],999,[0],revision=poll['revision'])
+        result=self.client.get(f"{self.base}/{poll['id']}")
+        self.assertEqual(result.status_code,200,result.text)
+        self.assertNotIn('ballots',result.json());self.assertNotIn('participants',result.json())
+        exported=self.client.get(f"{self.base}/{poll['id']}/export?format=json")
+        self.assertNotIn('999',exported.text)
+        self.assertEqual(exported.headers['cache-control'],'no-store')
+
+    def test_delegated_weights_cannot_assign_permissions(self):
+        self.discord.can_manage.return_value=False
+        self.repo.settings.set_module(1,'advanced_polls',enabled=True,settings={'role_permissions':{'3':['view','weights']}})
+        self.assertEqual(self.client.get(self.base).status_code,200)
+        self.assertEqual(self.client.post(self.base,json=self.body,headers=self.headers).status_code,403)
+        path='/api/v1/guilds/1/polls/settings'
+        row=self.client.get(path).json()
+        row['settings']['role_permissions']['3'].append('manage')
+        self.assertEqual(self.client.put(path,json=row,headers=self.headers).status_code,403)
+        row=self.client.get(path).json();row['settings']['role_weights']={'3':10}
+        self.assertEqual(self.client.put(path,json=row,headers=self.headers).status_code,200)
+
+    def test_view_only_role_cannot_advance_settings_revision_with_noop(self):
+        self.discord.can_manage.return_value=False
+        self.repo.settings.set_module(1,'advanced_polls',enabled=True,settings={'role_permissions':{'3':['view']}})
+        path='/api/v1/guilds/1/polls/settings'
+        row=self.client.get(path).json()
+        self.assertEqual(self.client.put(path,json=row,headers=self.headers).status_code,403)
+        self.assertEqual(self.client.get(path).json()['revision'],row['revision'])
+
+    def deleted_role_settings(self,rights=None):
+        self.discord.can_manage.return_value=rights is None
+        return self.repo.settings.set_module(1,'advanced_polls',enabled=True,settings={
+            'role_weights':{'3':2,'999':9},'role_permissions':{'3':rights or [],'999':['manage','view']}})
+
+    def test_deleted_role_references_do_not_block_unrelated_authorized_updates(self):
+        from copy import deepcopy
+        path='/api/v1/guilds/1/polls/settings'
+        for rights in (None,['settings'],['weights']):
+            for action,permission in (('retention','settings'),('enabled','settings'),('weights','weights'),('grants','permissions')):
+                with self.subTest(rights=rights,action=action):
+                    self.deleted_role_settings(rights)
+                    original=self.client.get(path).json();row=deepcopy(original)
+                    # Reordering an unchanged grant list is not a permission edit.
+                    row['settings']['role_permissions']['999'].reverse()
+                    if action=='retention':row['settings']['retention_days']=91
+                    elif action=='enabled':row['enabled']=False
+                    elif action=='weights':row['settings']['role_weights']['3']=4
+                    else:row['settings']['role_permissions']['3'].append('manage')
+                    allowed=rights is None or permission in rights
+                    response=self.client.put(path,json=row,headers=self.headers)
+                    self.assertEqual(response.status_code,200 if allowed else 403,response.text)
+                    saved=self.client.get(path).json()
+                    self.assertEqual(saved['settings']['role_weights']['999'],9)
+                    self.assertEqual(saved['settings']['role_permissions']['999'],['manage','view'])
+                    if allowed:self.assertEqual(saved['revision'],original['revision']+1)
+                    else:self.assertEqual(saved,original)
+
+    def test_deleted_role_references_cannot_be_changed_added_or_resurrected(self):
+        from copy import deepcopy
+        path='/api/v1/guilds/1/polls/settings'
+        for field,changed in (('role_weights',10),('role_permissions',['manage','view','settings'])):
+            with self.subTest(field=field):
+                self.deleted_role_settings()
+                original=self.client.get(path).json()
+                for role in ('999','888'):
+                    row=deepcopy(original);row['settings'][field][role]=changed
+                    response=self.client.put(path,json=row,headers=self.headers)
+                    self.assertEqual(response.status_code,422,response.text)
+                    self.assertEqual(self.client.get(path).json(),original)
+                row=deepcopy(original);retained=row['settings'][field].pop('999')
+                response=self.client.put(path,json=row,headers=self.headers)
+                self.assertEqual(response.status_code,200,response.text)
+                row=response.json();row['settings'][field]['999']=retained
+                self.assertEqual(self.client.put(path,json=row,headers=self.headers).status_code,422)
+
+    def test_settings_reference_validation_uses_matching_revision(self):
+        path='/api/v1/guilds/1/polls/settings'
+        self.deleted_role_settings()
+        for delta in (-1,1):
+            with self.subTest(delta=delta):
+                row=self.client.get(path).json();row['revision']+=delta
+                self.discord.guild_resources.reset_mock()
+                response=self.client.put(path,json=row,headers=self.headers)
+                self.assertEqual(response.status_code,409,response.text)
+                self.discord.guild_resources.assert_not_awaited()
+
+    def test_resources_and_nulls(self):
+        self.body['channel_id']='999'
+        self.assertEqual(self.client.post(self.base,json=self.body,headers=self.headers).status_code,422)
+        self.body['channel_id']='10';self.body['config']['emojis']=None
+        self.assertEqual(self.client.post(self.base,json=self.body,headers=self.headers).status_code,422)
+
+    def role_resources(self):
+        import asyncio
+        import httpx
+        from dashboard.discord_api import DiscordAPI
+        roles=[{'id':str(id),'name':name,'position':position,'permissions':str(permissions),'managed':managed}
+               for id,name,position,permissions,managed in ((1,'@everyone',0,0,False),(2,'Bot',10,8,True),
+                   (3,'Member',1,0,False),(4,'Administrator',2,8,False),(5,'Higher',20,0,False),(6,'Managed',1,0,True))]
+        def transport(request):
+            if request.url.path.endswith('/roles'):payload=roles
+            elif request.url.path.endswith('/channels'):payload=[{'id':'10','name':'polls','type':0}]
+            elif request.url.path.endswith('/members/2'):payload={'roles':['2']}
+            else:raise AssertionError(str(request.url))
+            return httpx.Response(200,json=payload)
+        api=DiscordAPI('offline','2','offline','http://testserver/callback')
+        api._client=httpx.AsyncClient(transport=httpx.MockTransport(transport))
+        self.addCleanup(lambda:asyncio.run(api.close()))
+        self.discord.guild_resources=api.guild_resources
+        return roles
+
+    def test_reference_role_matrix_across_poll_operations(self):
+        roles=self.role_resources()
+        result=self.client.get('/api/v1/guilds/1/polls/resources')
+        self.assertEqual(result.status_code,200,result.text)
+        self.assertEqual({row['id'] for row in result.json()['roles']},{row['id'] for row in roles})
+        for role in roles:
+            with self.subTest(role=role['name']):
+                self.body['request_key']='role-'+role['id']
+                self.body['config'].update(allowed_roles=[role['id']],denied_roles=[role['id']])
+                poll=self.create()
+                path=f"{self.base}/{poll['id']}"
+                response=self.client.put(path,json={'revision':poll['revision'],'config':poll['config']},headers=self.headers)
+                self.assertEqual(response.status_code,200,response.text)
+                response=self.client.post(path+'/actions',json={'revision':response.json()['revision'],'action':'launch'},headers=self.headers)
+                self.assertEqual(response.status_code,200,response.text)
+        path='/api/v1/guilds/1/polls/settings'
+        row=self.client.get(path).json()
+        row['settings'].update(role_weights={role['id']:10 for role in roles},role_permissions={role['id']:['view'] for role in roles})
+        response=self.client.put(path,json=row,headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        # Promotion must not invalidate an unrelated save of existing references.
+        roles[2].update(position=100,permissions='8',managed=True)
+        row=response.json();row['settings']['retention_days']=91
+        response=self.client.put(path,json=row,headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+
+    def test_everyone_delegation_uses_implicit_guild_membership_role(self):
+        self.discord.can_manage.return_value=False
+        self.repo.settings.set_module(1,'advanced_polls',enabled=True,settings={'role_permissions':{'1':['view']}})
+        self.assertEqual(self.client.get(self.base).status_code,200)
+        result=self.client.get('/api/v1/guilds').json()['items']
+        self.assertEqual(result[0]['feature_ids'],['advanced_polls'])
+
+    def test_foreign_roles_are_rejected_across_reference_fields(self):
+        from copy import deepcopy
+        poll=self.create()
+        for field in ('allowed_roles','denied_roles'):
+            with self.subTest(field=field):
+                config=deepcopy(poll['config']);config[field]=['999']
+                body={**self.body,'request_key':'foreign-'+field,'config':config}
+                self.assertEqual(self.client.post(self.base,json=body,headers=self.headers).status_code,422)
+                response=self.client.put(f"{self.base}/{poll['id']}",json={'revision':poll['revision'],'config':config},headers=self.headers)
+                self.assertEqual(response.status_code,422,response.text)
+        path='/api/v1/guilds/1/polls/settings'
+        for field,value in (('role_weights',10),('role_permissions',['view'])):
+            with self.subTest(field=field):
+                row=self.client.get(path).json();row['settings'][field]={'999':value}
+                response=self.client.put(path,json=row,headers=self.headers)
+                self.assertEqual(response.status_code,422,response.text)
+                self.assertEqual(self.client.get(path).json()['revision'],row['revision'])
+
+    def test_delegated_workspace_is_discovered_and_lost_with_membership(self):
+        self.discord.can_manage.return_value=False
+        self.repo.settings.set_module(1,'advanced_polls',enabled=True,settings={'role_permissions':{'3':['manage']}})
+        result=self.client.get('/api/v1/guilds')
+        self.assertEqual(result.status_code,200,result.text)
+        self.assertEqual(result.json()['items'][0]['access'],'delegated')
+        self.assertEqual(result.json()['items'][0]['feature_ids'],['advanced_polls'])
+        self.discord.guild_member.return_value=None
+        self.assertEqual(self.client.get('/api/v1/guilds').json()['items'],[])
+

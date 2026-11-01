@@ -43,6 +43,17 @@ SCHEDULE_PATHS = {
 }
 ADDED_PATHS = {**{path:{method} for path,method in U4_PATHS.items()},**APPLICATION_PATHS,**APPEAL_PATHS,**SCHEDULE_PATHS}
 ADDED_PATHS.update({
+    '/api/v1/guilds/{guild_id}/polls/capabilities':{'get'},
+    '/api/v1/guilds/{guild_id}/polls/resources':{'get'},
+    '/api/v1/guilds/{guild_id}/polls/items':{'get','post'},
+    '/api/v1/guilds/{guild_id}/polls/items/{poll_id}':{'get','put'},
+    '/api/v1/guilds/{guild_id}/polls/items/{poll_id}/actions':{'post'},
+    '/api/v1/guilds/{guild_id}/polls/items/{poll_id}/history':{'get'},
+    '/api/v1/guilds/{guild_id}/polls/items/{poll_id}/export':{'get'},
+    '/api/v1/guilds/{guild_id}/polls/items/{poll_id}/delivery/{job_id}/retry':{'post'},
+    '/api/v1/guilds/{guild_id}/polls/items/{poll_id}/votes/remove':{'post'},
+    '/api/v1/guilds/{guild_id}/polls/settings':{'get','put'},
+    '/api/v1/guilds/{guild_id}/polls/settings/history':{'get'},
     '/api/v1/guilds/{guild_id}/insights':{'get'},
     '/api/v1/guilds/{guild_id}/insights/settings':{'get','put'},
     '/api/v1/guilds/{guild_id}/giveaways':{'get','post'},
@@ -127,7 +138,7 @@ class ApiContractTests(unittest.TestCase):
         actual = boundary_responses(self.api)
         self.assertEqual([row for row in actual if row['path'] not in ADDED_PATHS], baseline)
         added = [row for row in actual if row['path'] in ADDED_PATHS]
-        self.assertEqual(len(added), 117)
+        self.assertEqual(len(added), 151)
         for row in added:
             # CSRF runs before authentication on writes, as for existing routes.
             expected_code = ('csrf_invalid' if row['method'] in {'PUT', 'POST'} and row['mode'] != 'forbidden'

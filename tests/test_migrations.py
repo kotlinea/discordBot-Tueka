@@ -243,7 +243,7 @@ class MigrationTests(unittest.TestCase):
     def test_current_repositories_do_not_create_or_change_schema(self):
         from community import CommunityRepository
         from dashboard.repository import DashboardRepository
-        from engagement import EngagementRepository
+        from poll_support import PublishedPollRepository as EngagementRepository
         from guild_settings import GuildSettingsRepository
         from moderation import ModerationRepository
         from reaction_roles import ReactionRoleRepository

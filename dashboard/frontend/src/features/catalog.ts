@@ -40,7 +40,7 @@ export function createRegistry(categories: readonly CategoryDefinition[], presen
       if (feature.pages.length && feature.screenKind !== 'workspace') throw new Error(`Internal pages require workspace: ${feature.id}`)
       if (typeof feature.load !== 'function') throw new Error(`Missing screen loader: ${feature.id}`)
       if (!feature.namespaces.length || feature.namespaces.some(value => !namespaces.has(value))) throw new Error(`Unknown namespace: ${feature.id}`)
-      if (!['manager', 'ticket_staff'].includes(feature.access)) throw new Error(`Unknown display access: ${feature.id}`)
+      if (!['manager', 'ticket_staff', 'delegated'].includes(feature.access)) throw new Error(`Unknown display access: ${feature.id}`)
       // React Router defaults to case-insensitive matching; parameter names are not distinct routes.
       registerRoute(feature.path, feature.id)
       const pageIds = new Set<string>()
@@ -54,7 +54,7 @@ export function createRegistry(categories: readonly CategoryDefinition[], presen
           pageGroups.set(id, titleKey)
         }
         if (!['navigation', 'action'].includes(page.kind)) throw new Error(`Unknown page kind: ${page.id}`)
-        if (!['manager', 'ticket_staff'].includes(page.access) || (feature.access === 'manager' && page.access !== 'manager')) throw new Error(`Invalid page access: ${page.id}`)
+        if (!['manager', 'ticket_staff', 'delegated'].includes(page.access) || (feature.access === 'manager' && page.access !== 'manager')) throw new Error(`Invalid page access: ${page.id}`)
         // Entries are static local destinations. Dynamic detail routes remain in the feature.
         if (/[\\:%]/.test(page.path)) throw new Error(`Invalid page path: ${page.id}`)
         registerRoute(`${feature.path}/${page.path}`, page.id)

@@ -1,0 +1,1 @@
+"""Poll publication persistence."""
